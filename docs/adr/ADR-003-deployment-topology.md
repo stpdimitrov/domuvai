@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | **Accepted** · 2026-09-13 |
 | **Date** | 2026-09-13 |
 | **Deciders** | Stoyan Dimitrov |
 | **Supersedes** | Stage 1 §4 deployment topology (13 deployables). Module boundaries, ownership and the event catalogue are unchanged |

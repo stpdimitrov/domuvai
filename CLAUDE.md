@@ -52,7 +52,7 @@ Every feature states which mode it serves. Rules tagged `BOTH` apply in both.
 | 008 | Every majority carries its denominator explicitly (`TOTAL` \| `REPRESENTED`) |
 | 009 | The agent holds no write credential; prohibited capabilities are not implemented |
 
-ADR-001 is Accepted. **The other eight are Proposed — no production code until they are Accepted.**
+**Seven of nine are Accepted.** ADR-004 (shared facilities) and ADR-007 (no custody) name counsel as a co-decider and remain Proposed. Do not build against those two: ADR-004 gates `registry` and `maintenance`, ADR-007 gates `rail`. Everything else is decided — build on it, do not relitigate it in code.
 
 ## Slice protocol
 

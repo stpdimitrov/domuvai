@@ -88,3 +88,19 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open** — A9 OpenAPI · A10 DDL · A11 test plan. Eight ADRs still Proposed. Coverage floor not yet set: pass `--min-coverage` once there is a number worth defending.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/TRACEABILITY.md`.
+
+---
+
+## S-04 · 2026-09-13 · Seven of nine ADRs Accepted
+
+**Did** — ADR-002, 003, 005, 006, 008 and 009 move to Accepted, joining ADR-001. These have a single named decider and they unblock A9, A10, A12, A14, A15 and the Phase 3 modules.
+
+**ADR-004 and ADR-007 stay Proposed on purpose.** Both name counsel as a co-decider: the custodian entrance's exposure where one assembly refuses its share of a shared facility, and the PSD2 licensing route. Neither blocks near-term work — ADR-004 gates `registry` and `maintenance`, ADR-007 gates `rail` in Phase 5. Accepting them without the legal answer would be recording a decision nobody made.
+
+**Fixed a gate that would have been ignored within a week.** The generated-docs check compared all of `docs/`, so editing an ADR by hand failed the build. Hand-written documents changing is normal; a gate that punishes it is noise, and noise gets switched off — the same failure mode as the 67 false positives in the legal-threshold check. Narrowed to the three generated paths: `docs/FUNCTIONAL.md`, `docs/TRACEABILITY.md`, `docs/events`.
+
+**And I got the negative test wrong twice before getting it right.** Appending a line to a generated file proves nothing: the generator simply overwrites it. The real failure mode is changing the *source* — `rules.json` — without regenerating, which is what CI does on a clean checkout. Tested that way: two generated documents reported out of sync, exit 1. Control case also verified: a hand-edited ADR leaves the build green.
+
+**Open** — counsel on ADR-004 §4 and ADR-007 §2, alongside the four money rules. A9 · A10 · A11 now unblocked. The repo still needs pushing, and the spreadsheet is still the only thing that can tell us whether the rules are right.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/adr/`.

@@ -13,13 +13,16 @@ run "4/6  traceability"         python3 tools/traceability.py
 run "5/6  banned words"         python3 tools/check_banned_words.py
 run "6/6  legal thresholds"     python3 tools/check_legal_literals.py
 
+# Only GENERATED paths belong here. A hand-written document changing is normal;
+# flagging it would make this gate noise, and noise gets switched off.
+GENERATED=(docs/FUNCTIONAL.md docs/TRACEABILITY.md docs/events)
 printf '\n\033[1m▸ generated files must be committed\033[0m\n'
-if ! git diff --quiet -- docs/; then
-  echo "  ✗ a generated document changed — run tools/gates.sh and commit the result:"
-  git diff --name-only -- docs/ | sed 's/^/      /'
+if ! git diff --quiet -- "${GENERATED[@]}"; then
+  echo "  ✗ a generated document is out of sync with its generator — commit the regenerated result:"
+  git diff --name-only -- "${GENERATED[@]}" | sed 's/^/      /'
   fail=1
 else
-  echo "  ✓ docs/ is in sync with its generators"
+  echo "  ✓ generated documents match their generators"
 fi
 
 printf '\n'
