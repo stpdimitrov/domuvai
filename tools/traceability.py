@@ -7,8 +7,11 @@ import json, re, sys, pathlib, argparse
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RULES = json.loads((ROOT/'docs/rules.json').read_text())
 OUT = ROOT/'docs/TRACEABILITY.md'
-SRC = [p for d in ('packages','apps') for p in (ROOT/d).rglob('*.ts')
-       if 'node_modules' not in p.parts]
+# sorted(): rglob order is filesystem-dependent, and an unsorted scan makes the
+# generated report differ between machines — which fails the docs-in-sync gate
+# for no real reason.
+SRC = sorted(p for d in ('packages','apps') for p in (ROOT/d).rglob('*.ts')
+             if 'node_modules' not in p.parts)
 
 RULE_RE = re.compile(r'PM-[A-Z]+-\d{3}')
 TEST_RE = re.compile(r"""(?:test|it)\(\s*['"`](PM-[A-Z]+-\d{3}[^'"`]*)""")

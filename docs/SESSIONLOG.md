@@ -104,3 +104,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open** — counsel on ADR-004 §4 and ADR-007 §2, alongside the four money rules. A9 · A10 · A11 now unblocked. The repo still needs pushing, and the spreadsheet is still the only thing that can tell us whether the rules are right.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/adr/`.
+
+---
+
+## S-05 · 2026-09-13 · A11 — the test plan
+
+**Did** — `tools/testplan.py` turns the 233 rules into a ranked, sliceable worklist at `docs/TESTPLAN.md`. Generated from `rules.json` and the current traceability, so it shrinks as tests land and can never claim coverage the source tree does not have. Added to the gate pack, now seven checks.
+
+**220 rules remaining, in 22 slices.** Every rule in the catalogue carries an acceptance criterion, so every one is testable as written — there is nothing to invent, only to do.
+
+**Ordered by the gate each rule serves**, because a gate is the only thing that can tell us the rules are *wrong*; everything else is scheduling. Within a gate: MUST before SHOULD, and rules whose number is unconfirmed come first — the mechanism is testable today with the number read from configuration while counsel answers. Gate 1 is 57 rules across 5 slices; Gate 2 is the largest at 8.
+
+**Two passes to get the slicing right.** The first produced 48 slices including several of one rule, because it broke a slice whenever the *domain* changed — but FEE, FUND and DEBT all live in `money`, so a single FUND rule between FEE rules split the run. Sorting by module before modality fixed the fragmentation, and merging any tail shorter than four rules back into the slice before it took 48 → 29 → **22**. A one-rule slice is not a slice; it is an errand.
+
+**This is the queue for Claude Code.** Each slice names one module, its rule IDs and what each test must prove, in the shape `zues-slice` expects. `S-G1-01` is the next thing anyone should pick up.
+
+**Open** — A9 OpenAPI · A10 DDL, both now unblocked by the seven Accepted ADRs. Counsel on ADR-004 §4, ADR-007 §2 and the four money rules. The spreadsheet.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/TESTPLAN.md`.

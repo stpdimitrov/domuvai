@@ -19,6 +19,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | 07 | [UIPROMPTS.md](UIPROMPTS.md) | Design prompts, mobile and desktop |
 | — | [RULES.md](RULES.md) · [rules.json](rules.json) | The requirements source. 233 rules |
 | — | [TRACEABILITY.md](TRACEABILITY.md) | Rule → test → implementation. Generated |
+| — | [TESTPLAN.md](TESTPLAN.md) | The remaining rules as ranked slices. Generated |
 | — | [SESSIONLOG.md](SESSIONLOG.md) | Boot here every session — top entry only |
 
 ## Decisions
@@ -51,7 +52,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | A8 event JSON schemas | done |
 | **A9 OpenAPI per module** | not started |
 | **A10 SQL DDL** | not started |
-| **A11 test plan across 233 rules** | not started |
+| A11 test plan across 233 rules | done |
 
 A8 is the serialisation point: it must be merged before two people build modules in parallel.
 
