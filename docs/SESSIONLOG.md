@@ -122,3 +122,24 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open** — A9 OpenAPI · A10 DDL, both now unblocked by the seven Accepted ADRs. Counsel on ADR-004 §4, ADR-007 §2 and the four money rules. The spreadsheet.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/TESTPLAN.md`.
+
+---
+
+## S-06 · 2026-09-13 · A10 — the database schema
+
+**Did** — `db/migrations/0001_init.sql`: 23 tables across 8 schemas, covering the entity contract in `docs/RULES.md` §4. Applied against a real PostgreSQL 16, not written and hoped over. `db/test/constraints.sh` puts every invariant the schema claims against a deliberate violation — **13 checks, all firing.**
+
+**An invariant the schema can enforce is never left to application code.** Ideal parts summing to 100% is a deferred constraint trigger, so a multi-row import can reach a valid state before COMMIT judges it. A journal that does not balance to zero is rejected the same way. A mandate longer than two years is a CHECK, not a reminder. Votes, postings and documents have UPDATE and DELETE rules that make them append-only. One IBAN belongs to one entrance and one purpose, so commingling is unrepresentable.
+
+**Found by running it: a money column that silently rounds.** `amount_minor` was `bigint`, and inserting `42.5` stored **43** — Postgres rounds on an assignment cast, so the domain never sees the fraction. That is precisely how a wrong bill acquires a clean audit trail, and it defeats PM-FEE-016 while appearing to honour it. `numeric(18,0)` does the same. Only unconstrained `numeric` with `CHECK (scale(VALUE) = 0)` refuses the value instead of rounding it. Tested all three side by side; the domain is now numeric. This was invisible on paper and obvious after one INSERT.
+
+> **CHANGE PLAN — needs a decision, not a silent edit.**
+> `docs/RULES.md` §4 says `ideal_parts_pct` is `DECIMAL(7,4)` — four decimal places. `packages/kernel` accepts six (`^\d{1,3}\.\d{1,6}$`, millionths of a percent). The schema follows the rule, so the two now disagree by two digits.
+>
+> Per `CLAUDE.md` the rule wins, which means narrowing the kernel to four decimals — a change to shipped code and its tests, and to what `zues-calc` will accept from a firm's file. The alternative is amending the rule to six decimals, which is an edit to the requirements source and wants a reason.
+>
+> **What decides it: what a Bulgarian title deed actually states.** If deeds carry four decimals, four is right and six is false precision. Ask counsel alongside the four money rules. Until then the schema is the stricter of the two, which fails safe.
+
+**Open** — the precision decision above · A9 OpenAPI · A12 scaffold. Two ADRs still with counsel.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `db/migrations/0001_init.sql`.

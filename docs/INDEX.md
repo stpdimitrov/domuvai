@@ -51,7 +51,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | A7 traceability generator | done |
 | A8 event JSON schemas | done |
 | **A9 OpenAPI per module** | not started |
-| **A10 SQL DDL** | not started |
+| A10 SQL DDL | done |
 | A11 test plan across 233 rules | done |
 
 A8 is the serialisation point: it must be merged before two people build modules in parallel.
