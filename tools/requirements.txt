@@ -1,0 +1,6 @@
+# Python dependencies for tools/gates.sh. CI installs exactly this file, so a
+# generator that needs a new package fails here rather than in a green build.
+jsonschema>=4.20
+markdown>=3.5
+openapi-spec-validator>=0.7
+PyYAML>=6.0

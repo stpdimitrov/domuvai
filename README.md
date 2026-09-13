@@ -43,6 +43,9 @@
 ## Tools
 
 ```bash
+pip install -r tools/requirements.txt   # once
+./tools/gates.sh                        # all eight checks, the same ones CI runs
+
 python3 tools/build_functional.py   # regenerate docs/FUNCTIONAL.md from rules.json — fails if a rule has no module
 python3 tools/md2pdf.py <in.md> <out.html> "<title>"
 node    tools/buildall.js '[["<in.html>","<out.pdf>"]]'   # fails the build on a Mermaid syntax error
