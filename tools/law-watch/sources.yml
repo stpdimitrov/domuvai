@@ -1,0 +1,68 @@
+# What to watch. Poll daily; a change here is never applied automatically
+# unless `auto_apply: true` (PM-LAW-003) — and only scheduled numbers get that.
+
+keywords:
+  - "етажната собственост"
+  - "етажна собственост"
+  - "ЗУЕС"
+  - "домоуправител"
+  - "сдружение на собствениците"
+
+sources:
+  - id: dv_issues
+    name: Държавен вестник — new issues
+    url: https://dv.parliament.bg/DVWeb/broeveList.faces
+    kind: index          # list of issues; check each new one for keywords
+    schedule: "0 7 * * *"
+    priority: high
+    note: >
+      The authority. Check whether a feed or export exists before scraping,
+      and read the terms of use. If scraping is fragile, buy an API from a
+      legal database instead — cheaper than missing an amendment.
+
+  - id: mrrb_zues
+    name: МРРБ — ЗУЕС page and attachments
+    url: https://www.mrrb.bg/bg/zakon-za-upravlenie-na-etajnata-sobstvenost/
+    kind: document       # hash the page and each attached file
+    schedule: "0 7 * * *"
+    priority: high
+
+  - id: strategy_bg
+    name: strategy.bg — draft ordinances in consultation
+    url: https://www.strategy.bg/bg/public-consultations
+    kind: index
+    schedule: "0 8 * * 1"
+    priority: medium
+    note: Early warning. A draft ordinance here becomes law months later.
+
+  - id: parliament_bills
+    name: parliament.bg — bills in progress
+    url: https://www.parliament.bg/bg/bills
+    kind: index
+    schedule: "0 8 * * 1"
+    priority: medium     # PM-LAW-010
+
+  - id: minimum_wage
+    name: Минимална работна заплата (ПМС)
+    url: https://www.mlsp.government.bg
+    kind: scalar
+    schedule: "0 9 * * *"
+    priority: high
+    auto_apply: true     # PM-LAW-003 — new dated row only
+    constant: MIN_WAGE_BGN_MONTHLY
+    affects: [PM-FUND-002]
+
+  - id: default_interest
+    name: Законна лихва за просрочие (ПМС)
+    url: https://www.bnb.bg
+    kind: scalar
+    schedule: "0 9 * * *"
+    priority: medium
+    auto_apply: true
+    constant: DEFAULT_INTEREST_RATE
+    affects: [PM-DEBT-006]
+
+alerting:
+  # PM-LAW-008 — silence is not "no change"
+  unreachable_runs_before_alert: 3
+  notify: ops@example.com

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+*.pdf
+*.png
+*.html
+!docs/**/*.html
+.env
+.env.*
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+/tmp/
