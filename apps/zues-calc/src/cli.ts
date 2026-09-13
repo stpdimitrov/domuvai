@@ -60,6 +60,7 @@ console.log(W('ОБЩО', 10) + R('', 5) + R('', 12) + R(formatMoney(run.total),
 const cmp = flag('--compare');
 if (cmp) {
   const expected = new Map(parseCsv(readFileSync(cmp, 'utf8'))
+    // not-legal: 100 converts euros to cents for comparison, not a statutory threshold
     .map((r) => [r['unit_id'] || r['designation'] || '', Math.round(Number((r['total'] ?? '0').replace(',', '.')) * 100)]));
   let diffs = 0, absent = 0;
   console.log('\nСверка с техните числа');

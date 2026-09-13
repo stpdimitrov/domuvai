@@ -56,3 +56,35 @@ Append only. Never edit an earlier entry. Commit the entry with the work it desc
 **Open** — this is the tool, not the answer. It proves nothing until a real firm's spreadsheet goes through it. A7 traceability · A9 OpenAPI · A10 DDL · A11 test plan. Eight ADRs still Proposed, and this code depends on ADR-006 and ADR-008 among them.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `apps/zues-calc/README.md`.
+
+---
+
+## S-03 · 2026-09-13 · A7 + A13 — the gate pack
+
+**Did** — traceability generator and six CI gates. Drift is no longer something anyone has to remember; it is a red build. `./tools/gates.sh` runs the same six checks locally that CI runs on every push and pull request.
+
+| Gate | Fails when |
+|---|---|
+| tests | any test fails |
+| event contracts | a schema drifts from the catalogue, or an example violates it |
+| functional spec | a rule has no module |
+| traceability | a rule ID in source is absent from `rules.json` |
+| banned words | `tenant`, `building`, or `fee`/`balance` as an identifier |
+| legal thresholds | a statutory number is used as a threshold outside `@zues/law` |
+| generated docs | a generated document is out of sync with its generator |
+
+**The honest number: 14 of 233 rules — 6% — are proved by a test named after them.** That is now generated into `docs/TRACEABILITY.md` per domain, so it cannot be forgotten or rounded up. A `// Rule:` comment with no test counts as a claim, not as evidence, and the report says so.
+
+**Two gates failed their own negative test, and both failures were instructive.**
+
+*The legal-threshold check started with 67 hits* — column widths, `/100` for cents, regex quantifiers `{1,3}`. A gate with that noise is a gate switched off within a day, which is worse than no gate. Rewritten to flag only a watchlist number used as a **threshold**: either side of a comparison, or a multiplier on a variable. Strings, regexes and comments stripped; test files excluded, since naming an expected value is what a test is for. Result: 67 → 1, and the survivor was a genuine cent conversion, annotated `// not-legal:`. The watchlist itself is generated from the rule texts, never typed.
+
+*Orphan rule IDs were not detected at all.* The scanner only read lines matching `// Rule:` or `* Rule:`, so `PM-ZZZ-999` written mid-sentence inside a block comment passed straight through. Split the two concerns: attribution stays strict (only a `Rule:` tag claims an implementation), orphan detection is now broad (any `PM-XXX-000` anywhere in source must exist in the catalogue). Both retested against deliberate failures.
+
+The `docs/` sync test also gave a false pass first time — appending to a generated file proved nothing, because the generator simply overwrote it. The real failure mode is editing `rules.json` without regenerating, which now fails correctly.
+
+**Every one of the six gates has been run against a deliberate failure and seen to fire.** That is the standing rule, applied to the tool that enforces the standing rules.
+
+**Open** — A9 OpenAPI · A10 DDL · A11 test plan. Eight ADRs still Proposed. Coverage floor not yet set: pass `--min-coverage` once there is a number worth defending.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/TRACEABILITY.md`.
