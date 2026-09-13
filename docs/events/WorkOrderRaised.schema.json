@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/WorkOrderRaised.schema.json",
+  "title": "WorkOrderRaised",
+  "description": "Produced by `maintenance`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "estimated",
+    "work_class",
+    "work_order_id"
+  ],
+  "properties": {
+    "work_order_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "asset_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "work_class": {
+      "type": "string",
+      "minLength": 1
+    },
+    "estimated": {
+      "$ref": "#/$defs/Money"
+    },
+    "decision_id": {
+      "$ref": "#/$defs/Uuid"
+    }
+  },
+  "$defs": {
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

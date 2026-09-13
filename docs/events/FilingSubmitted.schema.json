@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/FilingSubmitted.schema.json",
+  "title": "FilingSubmitted",
+  "description": "Produced by `compliance`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority",
+    "filing_id",
+    "filing_kind",
+    "submitted_at"
+  ],
+  "properties": {
+    "filing_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "authority": {
+      "type": "string",
+      "minLength": 1
+    },
+    "filing_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "submitted_at": {
+      "$ref": "#/$defs/Instant"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

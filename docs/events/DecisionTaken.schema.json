@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/DecisionTaken.schema.json",
+  "title": "DecisionTaken",
+  "description": "Produced by `assembly`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agenda_item",
+    "assembly_id",
+    "decision_id",
+    "denominator",
+    "execution_due",
+    "law_version",
+    "majority_rule",
+    "session_no",
+    "status",
+    "tally_against",
+    "tally_for",
+    "threshold"
+  ],
+  "properties": {
+    "decision_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "assembly_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "session_no": {
+      "type": "integer"
+    },
+    "agenda_item": {
+      "type": "string",
+      "minLength": 1
+    },
+    "majority_rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "denominator": {
+      "$ref": "#/$defs/Denominator"
+    },
+    "threshold": {
+      "$ref": "#/$defs/IdealParts"
+    },
+    "tally_for": {
+      "$ref": "#/$defs/IdealParts"
+    },
+    "tally_against": {
+      "$ref": "#/$defs/IdealParts"
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_due": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "law_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "Denominator": {
+      "enum": [
+        "TOTAL",
+        "REPRESENTED"
+      ],
+      "description": "ADR-008 — never implicit"
+    },
+    "IdealParts": {
+      "type": "string",
+      "pattern": "^\\d{1,3}\\.\\d{1,6}$",
+      "description": "exact decimal percentage as a string — never a float (ADR-006, PM-ORG-002)"
+    },
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/envelope.schema.json",
+  "title": "Event envelope",
+  "description": "Every message carries this. Ordering is guaranteed per entrance_id only; delivery is at least once and every consumer is idempotent on event_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "type",
+    "version",
+    "entrance_id",
+    "occurred_at",
+    "correlation_id",
+    "law_version",
+    "producer",
+    "payload"
+  ],
+  "properties": {
+    "event_id": {
+      "$ref": "#/$defs/Uuid",
+      "description": "idempotency key for every consumer"
+    },
+    "type": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "entrance_id": {
+      "$ref": "#/$defs/Uuid",
+      "description": "the only tenant key (ADR-005). Never a building, never a firm"
+    },
+    "occurred_at": {
+      "$ref": "#/$defs/Instant"
+    },
+    "causation_id": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "correlation_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "law_version": {
+      "type": "string",
+      "description": "catalogue version in force when produced (ADR-001)"
+    },
+    "producer": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    }
+  }
+}

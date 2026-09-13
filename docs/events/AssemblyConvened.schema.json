@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/AssemblyConvened.schema.json",
+  "title": "AssemblyConvened",
+  "description": "Produced by `assembly`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agenda_item_count",
+    "assembly_id",
+    "convened_by",
+    "scheduled_for",
+    "urgent"
+  ],
+  "properties": {
+    "assembly_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "convened_by": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "scheduled_for": {
+      "$ref": "#/$defs/Instant"
+    },
+    "agenda_item_count": {
+      "type": "integer"
+    },
+    "urgent": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

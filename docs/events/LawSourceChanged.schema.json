@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/LawSourceChanged.schema.json",
+  "title": "LawSourceChanged",
+  "description": "Produced by `law`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "articles",
+    "impacted_rules",
+    "retrieved_at",
+    "source_id"
+  ],
+  "properties": {
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "articles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "impacted_rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RuleId"
+      },
+      "minItems": 0
+    },
+    "retrieved_at": {
+      "$ref": "#/$defs/Instant"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "RuleId": {
+      "type": "string",
+      "pattern": "^PM-[A-Z]+-\\d{3}$"
+    }
+  }
+}

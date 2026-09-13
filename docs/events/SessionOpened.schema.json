@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/SessionOpened.schema.json",
+  "title": "SessionOpened",
+  "description": "Produced by `assembly`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "assembly_id",
+    "quorum_met",
+    "quorum_threshold",
+    "represented_ideal_parts",
+    "session_no"
+  ],
+  "properties": {
+    "assembly_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "session_no": {
+      "type": "integer"
+    },
+    "represented_ideal_parts": {
+      "$ref": "#/$defs/IdealParts"
+    },
+    "quorum_met": {
+      "type": "boolean"
+    },
+    "quorum_threshold": {
+      "$ref": "#/$defs/IdealParts"
+    }
+  },
+  "$defs": {
+    "IdealParts": {
+      "type": "string",
+      "pattern": "^\\d{1,3}\\.\\d{1,6}$",
+      "description": "exact decimal percentage as a string — never a float (ADR-006, PM-ORG-002)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/CaseFileComposed.schema.json",
+  "title": "CaseFileComposed",
+  "description": "Produced by `evidence`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_file_id",
+    "composed_at",
+    "document_ids",
+    "matter"
+  ],
+  "properties": {
+    "case_file_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "matter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "document_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Uuid"
+      },
+      "minItems": 0
+    },
+    "composed_at": {
+      "$ref": "#/$defs/Instant"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

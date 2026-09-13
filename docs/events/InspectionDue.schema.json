@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/InspectionDue.schema.json",
+  "title": "InspectionDue",
+  "description": "Produced by `maintenance`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "due_on",
+    "obligation_code",
+    "statutory_interval_days"
+  ],
+  "properties": {
+    "asset_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "obligation_code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "due_on": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "statutory_interval_days": {
+      "type": "integer"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

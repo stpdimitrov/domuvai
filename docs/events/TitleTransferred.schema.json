@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/TitleTransferred.schema.json",
+  "title": "TitleTransferred",
+  "description": "Produced by `identity-org`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effective_from",
+    "from_party_id",
+    "to_party_id",
+    "unit_id"
+  ],
+  "properties": {
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "from_party_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "to_party_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "effective_from": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

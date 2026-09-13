@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/ProposalCreated.schema.json",
+  "title": "ProposalCreated",
+  "description": "Produced by `agent`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capability",
+    "catalogue_version",
+    "classification",
+    "grounding_source_ids",
+    "model_version",
+    "proposal_id"
+  ],
+  "properties": {
+    "proposal_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1
+    },
+    "classification": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grounding_source_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Uuid"
+      },
+      "minItems": 0
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "catalogue_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

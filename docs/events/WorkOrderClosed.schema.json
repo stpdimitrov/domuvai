@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/WorkOrderClosed.schema.json",
+  "title": "WorkOrderClosed",
+  "description": "Produced by `maintenance`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actual",
+    "closed_on",
+    "work_order_id"
+  ],
+  "properties": {
+    "work_order_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "actual": {
+      "$ref": "#/$defs/Money"
+    },
+    "closed_on": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "warranty_until": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

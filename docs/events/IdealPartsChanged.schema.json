@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/IdealPartsChanged.schema.json",
+  "title": "IdealPartsChanged",
+  "description": "Produced by `registry`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ideal_parts",
+    "unit_id",
+    "valid_from"
+  ],
+  "properties": {
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "ideal_parts": {
+      "$ref": "#/$defs/IdealParts"
+    },
+    "valid_from": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "IdealParts": {
+      "type": "string",
+      "pattern": "^\\d{1,3}\\.\\d{1,6}$",
+      "description": "exact decimal percentage as a string — never a float (ADR-006, PM-ORG-002)"
+    },
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

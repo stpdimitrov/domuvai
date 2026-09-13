@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/ArrearAged.schema.json",
+  "title": "ArrearAged",
+  "description": "Produced by `money`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "bucket",
+    "due_since",
+    "unit_id"
+  ],
+  "properties": {
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "amount": {
+      "$ref": "#/$defs/Money"
+    },
+    "bucket": {
+      "type": "string",
+      "minLength": 1
+    },
+    "due_since": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/ImportCommitted.schema.json",
+  "title": "ImportCommitted",
+  "description": "Produced by `intake`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "committed_by",
+    "import_id",
+    "rows_changed",
+    "rows_created",
+    "source_document_id"
+  ],
+  "properties": {
+    "import_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "source_document_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "rows_created": {
+      "type": "integer"
+    },
+    "rows_changed": {
+      "type": "integer"
+    },
+    "committed_by": {
+      "$ref": "#/$defs/Uuid"
+    }
+  },
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

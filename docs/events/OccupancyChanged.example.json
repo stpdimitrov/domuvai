@@ -1,0 +1,18 @@
+{
+  "event_id": "147f2352-0495-53fb-b10f-917338b4e8f7",
+  "type": "OccupancyChanged",
+  "version": 1,
+  "entrance_id": "9f1a2b3c-0000-4000-8000-000000000001",
+  "occurred_at": "2026-09-13T08:00:00Z",
+  "causation_id": null,
+  "correlation_id": "9f1a2b3c-0000-4000-8000-0000000000ff",
+  "law_version": "1.3",
+  "producer": "registry",
+  "payload": {
+    "unit_id": "de69b1a2-8ba7-53f0-9862-feb7241ae455",
+    "persons": 3,
+    "children_under_6": 3,
+    "animals": 3,
+    "period_from": "2026-09-13"
+  }
+}

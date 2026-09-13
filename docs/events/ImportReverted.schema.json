@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/ImportReverted.schema.json",
+  "title": "ImportReverted",
+  "description": "Produced by `intake`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "import_id",
+    "reason",
+    "reverted_at",
+    "reverted_by"
+  ],
+  "properties": {
+    "import_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "reverted_by": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "reverted_at": {
+      "$ref": "#/$defs/Instant"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

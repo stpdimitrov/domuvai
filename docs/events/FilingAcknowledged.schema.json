@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/FilingAcknowledged.schema.json",
+  "title": "FilingAcknowledged",
+  "description": "Produced by `compliance`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "acknowledged_at",
+    "authority",
+    "filing_id",
+    "reference"
+  ],
+  "properties": {
+    "filing_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "authority": {
+      "type": "string",
+      "minLength": 1
+    },
+    "acknowledged_at": {
+      "$ref": "#/$defs/Instant"
+    },
+    "reference": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/GrantChanged.schema.json",
+  "title": "GrantChanged",
+  "description": "Produced by `identity-org`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "party_id",
+    "role",
+    "scope",
+    "valid_from"
+  ],
+  "properties": {
+    "party_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "valid_from": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "valid_to": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

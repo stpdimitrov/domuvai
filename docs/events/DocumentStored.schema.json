@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/DocumentStored.schema.json",
+  "title": "DocumentStored",
+  "description": "Produced by `evidence`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "content_hash",
+    "document_id",
+    "kind",
+    "stored_at"
+  ],
+  "properties": {
+    "document_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stored_at": {
+      "$ref": "#/$defs/Instant"
+    },
+    "retention_until": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

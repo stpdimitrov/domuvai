@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/ComplianceTaskRaised.schema.json",
+  "title": "ComplianceTaskRaised",
+  "description": "Produced by `compliance`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "due_on",
+    "obligation_code",
+    "rule_id",
+    "task_id"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "obligation_code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "due_on": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "rule_id": {
+      "$ref": "#/$defs/RuleId"
+    },
+    "owner_party_id": {
+      "$ref": "#/$defs/Uuid"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "RuleId": {
+      "type": "string",
+      "pattern": "^PM-[A-Z]+-\\d{3}$"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

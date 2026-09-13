@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/PassportMeasureAdded.schema.json",
+  "title": "PassportMeasureAdded",
+  "description": "Produced by `maintenance`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "due_on",
+    "measure_code",
+    "passport_id"
+  ],
+  "properties": {
+    "passport_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "measure_code": {
+      "type": "string",
+      "minLength": 1
+    },
+    "due_on": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

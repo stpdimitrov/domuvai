@@ -1,0 +1,18 @@
+{
+  "event_id": "288ae003-dcf1-537f-b949-a817344cd5b0",
+  "type": "ProtocolAnnounced",
+  "version": 1,
+  "entrance_id": "9f1a2b3c-0000-4000-8000-000000000001",
+  "occurred_at": "2026-09-13T08:00:00Z",
+  "causation_id": null,
+  "correlation_id": "9f1a2b3c-0000-4000-8000-0000000000ff",
+  "law_version": "1.3",
+  "producer": "assembly",
+  "payload": {
+    "protocol_id": "de69b1a2-8ba7-53f0-9862-feb7241ae455",
+    "assembly_id": "de69b1a2-8ba7-53f0-9862-feb7241ae455",
+    "announced_at": "2026-09-13T08:00:00Z",
+    "appeal_deadline": "2026-09-13",
+    "evidence_document_id": "de69b1a2-8ba7-53f0-9862-feb7241ae455"
+  }
+}

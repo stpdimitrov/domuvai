@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/DeliveryFailed.schema.json",
+  "title": "DeliveryFailed",
+  "description": "Produced by `notify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "channel",
+    "failed_at",
+    "notice_id",
+    "party_id",
+    "reason"
+  ],
+  "properties": {
+    "notice_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "party_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "channel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failed_at": {
+      "$ref": "#/$defs/Instant"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

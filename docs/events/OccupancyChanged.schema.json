@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/OccupancyChanged.schema.json",
+  "title": "OccupancyChanged",
+  "description": "Produced by `registry`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "animals",
+    "children_under_6",
+    "period_from",
+    "persons",
+    "unit_id"
+  ],
+  "properties": {
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "persons": {
+      "type": "integer"
+    },
+    "children_under_6": {
+      "type": "integer"
+    },
+    "animals": {
+      "type": "integer"
+    },
+    "period_from": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "period_to": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

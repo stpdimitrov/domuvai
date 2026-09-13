@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/BankEventMatched.schema.json",
+  "title": "BankEventMatched",
+  "description": "Produced by `rail`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "bank_event_id",
+    "confidence",
+    "unit_id"
+  ],
+  "properties": {
+    "bank_event_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "intent_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "amount": {
+      "$ref": "#/$defs/Money"
+    },
+    "confidence": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

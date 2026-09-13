@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/MandateExpired.schema.json",
+  "title": "MandateExpired",
+  "description": "Produced by `identity-org`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expired_on",
+    "party_id",
+    "role"
+  ],
+  "properties": {
+    "party_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expired_on": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

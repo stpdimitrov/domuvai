@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/ProtocolAnnounced.schema.json",
+  "title": "ProtocolAnnounced",
+  "description": "Produced by `assembly`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "announced_at",
+    "appeal_deadline",
+    "assembly_id",
+    "evidence_document_id",
+    "protocol_id"
+  ],
+  "properties": {
+    "protocol_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "assembly_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "announced_at": {
+      "$ref": "#/$defs/Instant"
+    },
+    "appeal_deadline": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "evidence_document_id": {
+      "$ref": "#/$defs/Uuid"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

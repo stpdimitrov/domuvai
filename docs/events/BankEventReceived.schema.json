@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/BankEventReceived.schema.json",
+  "title": "BankEventReceived",
+  "description": "Produced by `rail`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "bank_event_id",
+    "reference",
+    "value_date"
+  ],
+  "properties": {
+    "bank_event_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "amount": {
+      "$ref": "#/$defs/Money"
+    },
+    "value_date": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "reference": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

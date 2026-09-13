@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/DeliveryRecorded.schema.json",
+  "title": "DeliveryRecorded",
+  "description": "Produced by `notify`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "channel",
+    "delivered_at",
+    "legally_sufficient",
+    "notice_id",
+    "party_id"
+  ],
+  "properties": {
+    "notice_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "party_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "channel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "delivered_at": {
+      "$ref": "#/$defs/Instant"
+    },
+    "legally_sufficient": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

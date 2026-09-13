@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/UnitChanged.schema.json",
+  "title": "UnitChanged",
+  "description": "Produced by `registry`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "built_area_m2",
+    "designation",
+    "unit_id",
+    "valid_from"
+  ],
+  "properties": {
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "designation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "built_area_m2": {
+      "type": "string",
+      "minLength": 1
+    },
+    "valid_from": {
+      "$ref": "#/$defs/LegalDate"
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

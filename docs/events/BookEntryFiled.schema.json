@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/BookEntryFiled.schema.json",
+  "title": "BookEntryFiled",
+  "description": "Produced by `registry`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "declaration_kind",
+    "filed_at",
+    "party_id",
+    "unit_id"
+  ],
+  "properties": {
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "party_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "declaration_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "filed_at": {
+      "$ref": "#/$defs/Instant"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

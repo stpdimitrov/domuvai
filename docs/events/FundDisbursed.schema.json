@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/FundDisbursed.schema.json",
+  "title": "FundDisbursed",
+  "description": "Produced by `money`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "authorised_by",
+    "decision_id",
+    "disbursement_id",
+    "work_order_id"
+  ],
+  "properties": {
+    "disbursement_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "work_order_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "amount": {
+      "$ref": "#/$defs/Money"
+    },
+    "authorised_by": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "decision_id": {
+      "$ref": "#/$defs/Uuid"
+    }
+  },
+  "$defs": {
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

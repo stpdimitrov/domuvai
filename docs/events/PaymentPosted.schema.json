@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/PaymentPosted.schema.json",
+  "title": "PaymentPosted",
+  "description": "Produced by `money`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allocation_rule",
+    "amount",
+    "posting_id",
+    "unit_id",
+    "value_date"
+  ],
+  "properties": {
+    "posting_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "amount": {
+      "$ref": "#/$defs/Money"
+    },
+    "value_date": {
+      "$ref": "#/$defs/LegalDate"
+    },
+    "allocation_rule": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "LegalDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Europe/Sofia calendar date (PM-SYS-004)"
+    },
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

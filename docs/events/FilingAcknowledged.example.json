@@ -1,0 +1,17 @@
+{
+  "event_id": "767a8ef0-2868-5eba-ab1f-4433e4cad024",
+  "type": "FilingAcknowledged",
+  "version": 1,
+  "entrance_id": "9f1a2b3c-0000-4000-8000-000000000001",
+  "occurred_at": "2026-09-13T08:00:00Z",
+  "causation_id": null,
+  "correlation_id": "9f1a2b3c-0000-4000-8000-0000000000ff",
+  "law_version": "1.3",
+  "producer": "compliance",
+  "payload": {
+    "filing_id": "de69b1a2-8ba7-53f0-9862-feb7241ae455",
+    "authority": "example",
+    "acknowledged_at": "2026-09-13T08:00:00Z",
+    "reference": "example"
+  }
+}

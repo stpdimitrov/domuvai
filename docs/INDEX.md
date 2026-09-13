@@ -43,7 +43,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | Rule catalogue, 233 rules | done |
 | Functional specification | done |
 | Module catalogue, 14 modules / 3 deployables | done |
-| Event catalogue, 19 events | done |
+| Event catalogue, 38 events | done |
 | Cross-cutting standards, NFRs, build order | done |
 | Nine ADRs | done — 8 awaiting Accept |
 | **A7 traceability generator** | not started |

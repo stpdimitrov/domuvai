@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/PaymentInitiated.schema.json",
+  "title": "PaymentInitiated",
+  "description": "Produced by `rail`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "destination_iban_last4",
+    "initiated_at",
+    "intent_id",
+    "unit_id"
+  ],
+  "properties": {
+    "intent_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "amount": {
+      "$ref": "#/$defs/Money"
+    },
+    "destination_iban_last4": {
+      "type": "string",
+      "minLength": 1
+    },
+    "initiated_at": {
+      "$ref": "#/$defs/Instant"
+    }
+  },
+  "$defs": {
+    "Instant": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC instant"
+    },
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

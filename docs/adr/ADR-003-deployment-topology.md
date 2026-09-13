@@ -60,7 +60,7 @@ flowchart TB
   PKG --> CLI
 ```
 
-**What does not change.** The modules keep their names, their owned data, their rule domains and the seventeen events. `gateway` becomes the auth and tenant-resolution middleware of `api`; `bff` becomes its read-model layer. The event envelope, the outbox table and the idempotency keys are built exactly as specified — events are simply delivered in-process before being drained to subscribers. Nothing in the event catalogue is discarded, because the split later must be mechanical.
+**What does not change.** The modules keep their names, their owned data, their rule domains and the thirty-eight events. `gateway` becomes the auth and tenant-resolution middleware of `api`; `bff` becomes its read-model layer. The event envelope, the outbox table and the idempotency keys are built exactly as specified — events are simply delivered in-process before being drained to subscribers. Nothing in the event catalogue is discarded, because the split later must be mechanical.
 
 **What changes.** One Postgres instance, one schema per module, RLS by `entrance_id` on every tenant-scoped table. A charge run reads ideal parts and occupancy **transactionally from the owning module's tables**, not from a projection. That single change closes the correctness hole.
 

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://domuvai.bg/events/ChargeIssued.schema.json",
+  "title": "ChargeIssued",
+  "description": "Produced by `money`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "basis_hash",
+    "charge_run_id",
+    "engine_version",
+    "law_version",
+    "period",
+    "unit_id"
+  ],
+  "properties": {
+    "charge_run_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "unit_id": {
+      "$ref": "#/$defs/Uuid"
+    },
+    "period": {
+      "type": "string",
+      "minLength": 1
+    },
+    "amount": {
+      "$ref": "#/$defs/Money"
+    },
+    "basis_hash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "law_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "Money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_minor",
+        "currency"
+      ],
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "integer minor units — never a float (ADR-006, PM-FEE-016)"
+        },
+        "currency": {
+          "const": "EUR"
+        }
+      }
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}
