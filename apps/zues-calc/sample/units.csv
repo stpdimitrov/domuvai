@@ -1,0 +1,9 @@
+unit_id,designation,ideal_parts,occupants,children_under_6,animals,absent_days,business_use
+A1,ап. 1,12.500000,2,0,0,0,false
+A2,ап. 2,12.500000,4,2,0,0,false
+A3,ап. 3,12.500000,1,0,1,0,false
+A4,ап. 4,12.500000,3,0,0,45,false
+A5,ап. 5,12.500000,2,0,0,0,false
+A6,ап. 6,12.500000,2,0,0,0,false
+A7,ап. 7,12.500000,5,1,2,0,false
+A8,офис,12.500000,2,0,0,0,true

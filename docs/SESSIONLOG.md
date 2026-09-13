@@ -36,3 +36,23 @@ Append only. Never edit an earlier entry. Commit the entry with the work it desc
 **Open** — A7 traceability · A9 OpenAPI · A10 DDL · A11 test plan. Eight ADRs still Proposed.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/events/README.md`.
+
+---
+
+## S-02 · 2026-09-13 · zues-calc — Gate 1 in a command line
+
+**Did** — the first production code. `@zues/kernel` (Money, IdealParts), `@zues/law` (dated constants, allocation keys), `@zues/charges` (pure `computeChargeRun`), and the `zues-calc` CLI. No database, no HTTP, no services.
+
+**20 tests, every one named after the rule it proves.** Not only happy paths — each test also proves the guard fires: a float rejected as money, ideal parts summing to 99.999999% rejected, a repair fund allocated per person rejected, a tariff line with no GA decision rejected, a business multiplier of 9 rejected as outside the statutory range.
+
+**Types do the work the code would otherwise have to remember.** `eur(42.5)` throws — money is integer minor units by construction (PM-FEE-016). Ideal parts are integer millionths of a percent, so `0.1 + 0.2 === 0.3` holds exactly where floats would not (PM-ORG-002). Largest-remainder allocation is property-tested across totals and weightings: a split pot never invents or loses a cent.
+
+**Gate 1 works in both directions.** With correct figures: `✓ GATE 1 — reproduces their spreadsheet to the cent`, exit 0. Change one unit by a single cent: the differing line is named, exit 1. A gate never run against a failure is not a gate.
+
+**Found and fixed while reading the output.** The derivation line for a business unit read `5.00 € × 6 person(s) · business ×3` — the multiplier was in the weight *and* stated again, so a resident would see six people in a two-person office. Now `5.00 € × 2 person(s) · business ×3`. The arithmetic was always right; the explanation was wrong, and PM-FEE-018 is about the explanation.
+
+**Every run ends by naming its unconfirmed constants** — currently three: `ABSENCE_EXEMPTION_DAYS`, `BUSINESS_USE_MULTIPLIER_MIN/MAX`. Those are the questions for counsel, printed at the point of use rather than buried in a document.
+
+**Open** — this is the tool, not the answer. It proves nothing until a real firm's spreadsheet goes through it. A7 traceability · A9 OpenAPI · A10 DDL · A11 test plan. Eight ADRs still Proposed, and this code depends on ADR-006 and ADR-008 among them.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `apps/zues-calc/README.md`.

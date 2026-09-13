@@ -1,0 +1,11 @@
+{
+  "entrance_id": "e1",
+  "period": "2026-09",
+  "legal_date": "2026-09-13",
+  "business_multiplier": 3,
+  "lines": [
+    { "stream": "MANAGEMENT",  "key": "PER_PERSON",     "rate_minor": 500,    "decision_id": "GA-2026-03-12/т.4" },
+    { "stream": "MAINTENANCE", "key": "PER_PERSON",     "rate_minor": 300,    "decision_id": "GA-2026-03-12/т.4" },
+    { "stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "total_minor": 24000, "decision_id": "GA-2026-03-12/т.6" }
+  ]
+}

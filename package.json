@@ -1,0 +1,18 @@
+{
+  "name": "domuvai",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "test": "vitest run",
+    "calc": "tsx apps/zues-calc/src/cli.ts",
+    "events": "cd tools && python3 build_events.py && python3 validate_events.py",
+    "spec": "cd tools && python3 build_functional.py"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}
