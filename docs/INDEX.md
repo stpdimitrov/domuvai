@@ -20,6 +20,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | — | [RULES.md](RULES.md) · [rules.json](rules.json) | The requirements source. 233 rules |
 | — | [TRACEABILITY.md](TRACEABILITY.md) | Rule → test → implementation. Generated |
 | — | [TESTPLAN.md](TESTPLAN.md) | The remaining rules as ranked slices. Generated |
+| — | [api/openapi.json](api/openapi.json) | The HTTP contract. Generated, validated as OpenAPI 3.1 |
 | — | [SESSIONLOG.md](SESSIONLOG.md) | Boot here every session — top entry only |
 
 ## Decisions
@@ -50,7 +51,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | Nine ADRs | done — 7 Accepted, 2 awaiting counsel |
 | A7 traceability generator | done |
 | A8 event JSON schemas | done |
-| **A9 OpenAPI per module** | not started |
+| A9 OpenAPI | done |
 | A10 SQL DDL | done |
 | A11 test plan across 233 rules | done |
 

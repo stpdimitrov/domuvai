@@ -143,3 +143,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open** — the precision decision above · A9 OpenAPI · A12 scaffold. Two ADRs still with counsel.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `db/migrations/0001_init.sql`.
+
+---
+
+## S-07 · 2026-09-13 · A9 — the HTTP contract
+
+**Did** — `tools/build_openapi.py` generates `docs/api/openapi.json`: **26 operations across 7 modules, citing 56 rules, validated as OpenAPI 3.1.** One spec, tagged by module, because ADR-003 says one deployable — a spec per module would describe a deployment that no longer exists. Added to the gate pack, now eight checks.
+
+**Conventions are declared once, not repeated per path.** A convention restated sixty times is a convention that drifts. Six hold everywhere: `entrance_id` is the only tenant key so nothing is addressable across entrances; every write carries `Idempotency-Key` so a queued offline action replays without duplicating; money is integer minor units; a statutory precondition cannot be skipped, and 409 is the refusal; statutory documents are Bulgarian whatever the `Accept-Language`.
+
+**And one that is worth more than it looks: a refusal names the rule that refused.** The problem body carries `rule_id`, so a client can tell a домоуправител *which article stopped them* instead of "invalid request". For a product whose whole claim is that the law is the specification, an error that cannot cite the law is a broken promise.
+
+**Two guards, both proved against a real failure.** An operation citing a rule ID absent from `rules.json` fails the build — planted `PM-ZZZ-999`, exit 1. A spec that is not valid 3.1 fails the build — broke the `info` object, exit 1. Then clean, exit 0.
+
+**I got the negative tests wrong first, again.** `python3 … | head; echo $?` reports the exit status of `head`, so both guards appeared to pass while proving nothing. Third time this session a test harness has lied by reading the wrong exit code. Worth remembering as its own rule: **when a check reports success, confirm it was the check that reported it.**
+
+**Open** — A12 scaffold, which is the line where the work moves to Claude Code. The ideal-parts precision conflict from S-06 is still open. Two ADRs still with counsel. Eight commits, five pushed.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/api/openapi.json`.

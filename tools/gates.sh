@@ -6,17 +6,18 @@ cd "$(dirname "$0")/.."
 fail=0
 run() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; shift; "$@" || { fail=1; printf '\033[31m  ✗ failed\033[0m\n'; }; }
 
-run "1/7  tests"                npx vitest run --reporter=dot
-run "2/7  event contracts"      bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
-run "3/7  functional spec"      bash -c 'cd tools && python3 build_functional.py'
-run "4/7  traceability"         python3 tools/traceability.py
-run "5/7  test plan"            python3 tools/testplan.py
-run "6/7  banned words"         python3 tools/check_banned_words.py
-run "7/7  legal thresholds"     python3 tools/check_legal_literals.py
+run "1/8  tests"                npx vitest run --reporter=dot
+run "2/8  event contracts"      bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
+run "3/8  functional spec"      bash -c 'cd tools && python3 build_functional.py'
+run "4/8  traceability"         python3 tools/traceability.py
+run "5/8  test plan"            python3 tools/testplan.py
+run "6/8  openapi"              python3 tools/build_openapi.py
+run "7/8  banned words"         python3 tools/check_banned_words.py
+run "8/8  legal thresholds"     python3 tools/check_legal_literals.py
 
 # Only GENERATED paths belong here. A hand-written document changing is normal;
 # flagging it would make this gate noise, and noise gets switched off.
-GENERATED=(docs/FUNCTIONAL.md docs/TRACEABILITY.md docs/TESTPLAN.md docs/events)
+GENERATED=(docs/FUNCTIONAL.md docs/TRACEABILITY.md docs/TESTPLAN.md docs/events docs/api)
 printf '\n\033[1m▸ generated files must be committed\033[0m\n'
 if ! git diff --quiet -- "${GENERATED[@]}"; then
   echo "  ✗ a generated document is out of sync with its generator — commit the regenerated result:"

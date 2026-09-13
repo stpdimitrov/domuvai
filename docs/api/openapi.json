@@ -1,0 +1,1861 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "domuvai api",
+    "version": "0.1.0",
+    "summary": "Управление на етажна собственост по ЗУЕС",
+    "description": "One deployable, fourteen modules (ADR-003). Conventions that hold everywhere:\n\n- **`entrance_id` is the only tenant key** (ADR-005). Every resource resolves to exactly one entrance; nothing is addressable across entrances.\n- **Every write carries `Idempotency-Key`** (PM-SYS-014). A queued offline action replays without duplicating.\n- **Money is integer minor units in EUR** (PM-FEE-016). No floats anywhere.\n- **A refusal names the rule that refused** — `rule_id` in the problem body, so a client can explain the law rather than say \"invalid\".\n- **A statutory precondition cannot be skipped** (PM-SYS-006); 409 is the refusal, and the only alternative is a recorded, audited deviation.\n- **Statutory documents are Bulgarian** (PM-SYS-003) whatever the Accept-Language."
+  },
+  "servers": [
+    {
+      "url": "https://api.domuvai.bg/v1"
+    }
+  ],
+  "tags": [
+    {
+      "name": "registry",
+      "description": "Units, the owners' book, occupancy. Owns ORG and BOOK."
+    },
+    {
+      "name": "identity-org",
+      "description": "Parties, titles, mandates, the firm. Owns GOV and PMC."
+    },
+    {
+      "name": "assembly",
+      "description": "Convening, quorum, voting, protocols. Owns GA and VOTE."
+    },
+    {
+      "name": "money",
+      "description": "Charges, the fund, arrears. Owns FEE, FUND and DEBT."
+    },
+    {
+      "name": "intake",
+      "description": "Importing a firm's existing records. Owns no rules — it enforces ORG and BOOK on the way in."
+    },
+    {
+      "name": "compliance",
+      "description": "Statutory obligations and filings. Owns REG."
+    },
+    {
+      "name": "evidence",
+      "description": "Immutable documents and case files. Owns DOC."
+    }
+  ],
+  "paths": {
+    "/entrances/{entrance_id}/units": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "List the units of an entrance",
+        "description": "Rules: `PM-ORG-001`, `PM-ORG-002`",
+        "operationId": "get_entrances_entrance_id_units",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Add a unit",
+        "description": "Rules: `PM-ORG-002`, `PM-ORG-009`",
+        "operationId": "post_entrances_entrance_id_units",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unit"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Unit"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/book": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Read the owners' book — filtered to what the caller may see",
+        "description": "Rules: `PM-BOOK-006`, `PM-BOOK-011`, `PM-SEC-002`",
+        "operationId": "get_entrances_entrance_id_book",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/book/declarations": {
+      "post": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "File an owner declaration on the ministry template",
+        "description": "Rules: `PM-BOOK-003`, `PM-BOOK-004`, `PM-BOOK-009`",
+        "operationId": "post_entrances_entrance_id_book_declarations",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/mandates": {
+      "get": {
+        "tags": [
+          "identity-org"
+        ],
+        "summary": "List office holders as at a date",
+        "description": "Rules: `PM-GOV-004`, `PM-SEC-011`",
+        "operationId": "get_entrances_entrance_id_mandates",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "identity-org"
+        ],
+        "summary": "Record an election",
+        "description": "Rules: `PM-GOV-003`, `PM-GOV-004`, `PM-GOV-005`",
+        "operationId": "post_entrances_entrance_id_mandates",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/assemblies": {
+      "post": {
+        "tags": [
+          "assembly"
+        ],
+        "summary": "Convene an assembly",
+        "description": "Rules: `PM-GA-001`, `PM-GA-002`, `PM-GA-003`, `PM-GA-006`",
+        "operationId": "post_entrances_entrance_id_assemblies",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assemblies/{assembly_id}/notice": {
+      "post": {
+        "tags": [
+          "assembly"
+        ],
+        "summary": "Generate the notice and record the posting act with its evidence",
+        "description": "Rules: `PM-GA-004`, `PM-GA-007`, `PM-GA-008`, `PM-SYS-013`",
+        "operationId": "post_assemblies_assembly_id_notice",
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assemblies/{assembly_id}/sessions": {
+      "post": {
+        "tags": [
+          "assembly"
+        ],
+        "summary": "Open a session and record the quorum reached",
+        "description": "Rules: `PM-GA-012`, `PM-GA-013`, `PM-GA-014`, `PM-GA-015`",
+        "operationId": "post_assemblies_assembly_id_sessions",
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agenda-items/{agenda_item_id}/votes": {
+      "post": {
+        "tags": [
+          "assembly"
+        ],
+        "summary": "Cast or record a vote",
+        "description": "Rules: `PM-GA-009`, `PM-GA-018`, `PM-VOTE-014`, `PM-ORG-005`",
+        "operationId": "post_agenda_items_agenda_item_id_votes",
+        "parameters": [
+          {
+            "name": "agenda_item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agenda-items/{agenda_item_id}/close": {
+      "post": {
+        "tags": [
+          "assembly"
+        ],
+        "summary": "Close the item and compute the tally on its stated denominator",
+        "description": "Rules: `PM-VOTE-011`, `PM-VOTE-012`, `PM-VOTE-013`, `PM-VOTE-016`",
+        "operationId": "post_agenda_items_agenda_item_id_close",
+        "parameters": [
+          {
+            "name": "agenda_item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assemblies/{assembly_id}/protocol": {
+      "post": {
+        "tags": [
+          "assembly"
+        ],
+        "summary": "Draw up the protocol and announce it, starting the appeal clock",
+        "description": "Rules: `PM-GA-019`, `PM-GA-020`, `PM-GA-021`, `PM-GA-023`",
+        "operationId": "post_assemblies_assembly_id_protocol",
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/charge-runs": {
+      "post": {
+        "tags": [
+          "money"
+        ],
+        "summary": "Start a charge run for a period. Resumable; publishes nothing until COMPLETE",
+        "description": "Rules: `PM-FEE-012`, `PM-FEE-014`, `PM-FEE-016`",
+        "operationId": "post_entrances_entrance_id_charge_runs",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/charge-runs/{charge_run_id}": {
+      "get": {
+        "tags": [
+          "money"
+        ],
+        "summary": "Read a charge run and its basis",
+        "description": "Rules: `PM-FEE-014`, `PM-FEE-018`",
+        "operationId": "get_charge_runs_charge_run_id",
+        "parameters": [
+          {
+            "name": "charge_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/units/{unit_id}/statement": {
+      "get": {
+        "tags": [
+          "money"
+        ],
+        "summary": "The resident's itemised statement, showing how each number was derived",
+        "description": "Rules: `PM-FEE-018`, `PM-SEC-002`",
+        "operationId": "get_units_unit_id_statement",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/fund": {
+      "get": {
+        "tags": [
+          "money"
+        ],
+        "summary": "Repair and renewal fund, net of committed but unpaid work",
+        "description": "Rules: `PM-FUND-004`, `PM-FUND-009`",
+        "operationId": "get_entrances_entrance_id_fund",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Money"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/units/{unit_id}/obligations-certificate": {
+      "post": {
+        "tags": [
+          "money"
+        ],
+        "summary": "Issue a dated certificate of outstanding obligations, for a sale",
+        "description": "Rules: `PM-DEBT-007`",
+        "operationId": "post_units_unit_id_obligations_certificate",
+        "parameters": [
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/arrears/{unit_id}/enforcement-packet": {
+      "post": {
+        "tags": [
+          "money"
+        ],
+        "summary": "Compose the чл. 410 packet: decision, proof of announcement, itemised claim",
+        "description": "Rules: `PM-DEBT-003`, `PM-DEBT-004`, `PM-DEBT-009`",
+        "operationId": "post_entrances_entrance_id_arrears_unit_id_enforcement_packet",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "unit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/imports": {
+      "post": {
+        "tags": [
+          "intake"
+        ],
+        "summary": "Upload a source file and profile its columns",
+        "description": "Rules: `PM-DOC-001`",
+        "operationId": "post_entrances_entrance_id_imports",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDryRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports/{import_id}/dry-run": {
+      "post": {
+        "tags": [
+          "intake"
+        ],
+        "summary": "Validate, diff, and recompute a sample bill against their own figures",
+        "description": "Rules: `PM-ORG-002`, `PM-FEE-014`",
+        "operationId": "post_imports_import_id_dry_run",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDryRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports/{import_id}/commit": {
+      "post": {
+        "tags": [
+          "intake"
+        ],
+        "summary": "Commit the import in one transaction",
+        "description": "Rules: `PM-BOOK-007`",
+        "operationId": "post_imports_import_id_commit",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports/{import_id}/revert": {
+      "post": {
+        "tags": [
+          "intake"
+        ],
+        "summary": "Revert an import wholesale by its id",
+        "description": "Rules: `PM-BOOK-007`",
+        "operationId": "post_imports_import_id_revert",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/compliance-tasks": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Statutory obligations due and overdue",
+        "description": "Rules: `PM-MNT-006`, `PM-SYS-011`",
+        "operationId": "get_entrances_entrance_id_compliance_tasks",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entrances/{entrance_id}/filings": {
+      "post": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "File with the municipality or ЕИСЕС; open until acknowledged",
+        "description": "Rules: `PM-REG-001`, `PM-REG-004`, `PM-REG-008`",
+        "operationId": "post_entrances_entrance_id_filings",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Read a stored document and its hash",
+        "description": "Rules: `PM-DOC-001`, `PM-DOC-005`",
+        "operationId": "get_documents_document_id",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/matters/{matter_id}/case-file": {
+      "post": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Compose a court-ready bundle in order, with an index",
+        "description": "Rules: `PM-DOC-006`",
+        "operationId": "post_matters_matter_id_case_file",
+        "parameters": [
+          {
+            "name": "matter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Money": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "amount_minor",
+          "currency"
+        ],
+        "properties": {
+          "amount_minor": {
+            "type": "integer",
+            "description": "integer minor units — never a float (PM-FEE-016, ADR-006)"
+          },
+          "currency": {
+            "const": "EUR"
+          }
+        }
+      },
+      "IdealParts": {
+        "type": "string",
+        "pattern": "^\\d{1,3}\\.\\d{1,4}$",
+        "description": "exact decimal percentage, four places per docs/RULES.md §4"
+      },
+      "LegalDate": {
+        "type": "string",
+        "format": "date",
+        "description": "Europe/Sofia calendar day (PM-SYS-004)"
+      },
+      "Uuid": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "Problem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "description": "RFC 9457. A refusal names the rule that refused.",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "string",
+            "pattern": "^PM-[A-Z]+-\\d{3}$",
+            "description": "the rule that refused, when a rule refused"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {}
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Unit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "designation",
+          "ideal_parts_pct"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "ideal_parts_pct": {
+            "$ref": "#/components/schemas/IdealParts"
+          },
+          "unit_type": {
+            "type": "string"
+          },
+          "area_m2": {
+            "type": "string"
+          },
+          "separate_entrance": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ChargeLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_id",
+          "component",
+          "allocation_key",
+          "amount",
+          "derivation"
+        ],
+        "properties": {
+          "unit_id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "component": {
+            "enum": [
+              "MANAGEMENT",
+              "MAINTENANCE",
+              "REPAIR_FUND"
+            ]
+          },
+          "allocation_key": {
+            "enum": [
+              "PER_PERSON",
+              "BY_IDEAL_PARTS",
+              "PER_UNIT"
+            ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "derivation": {
+            "type": "string",
+            "description": "how the number was derived (PM-FEE-018)"
+          }
+        }
+      },
+      "ChargeRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "period",
+          "status",
+          "law_version",
+          "engine_version"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "period": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETE",
+              "FAILED"
+            ]
+          },
+          "basis_hash": {
+            "type": "string"
+          },
+          "law_version": {
+            "type": "string"
+          },
+          "engine_version": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargeLine"
+            }
+          }
+        }
+      },
+      "Decision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "majority_rule_id",
+          "denominator",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "majority_rule_id": {
+            "type": "string"
+          },
+          "denominator": {
+            "enum": [
+              "TOTAL",
+              "REPRESENTED"
+            ],
+            "description": "never implicit (PM-VOTE-012, ADR-008)"
+          },
+          "threshold_pct": {
+            "$ref": "#/components/schemas/IdealParts"
+          },
+          "tally_for": {
+            "$ref": "#/components/schemas/IdealParts"
+          },
+          "tally_against": {
+            "$ref": "#/components/schemas/IdealParts"
+          },
+          "status": {
+            "enum": [
+              "PROVISIONAL",
+              "FINAL",
+              "ANNULLED"
+            ],
+            "description": "PROVISIONAL until the absentee window closes (PM-VOTE-013)"
+          },
+          "execution_due": {
+            "$ref": "#/components/schemas/LegalDate"
+          }
+        }
+      },
+      "ImportDryRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "import_id",
+          "rows_created",
+          "rows_changed",
+          "violations",
+          "bill_comparison"
+        ],
+        "properties": {
+          "import_id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "rows_created": {
+            "type": "integer"
+          },
+          "rows_changed": {
+            "type": "integer"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          },
+          "bill_comparison": {
+            "type": "object",
+            "description": "their figures against ours, per unit — Gate 1, on every import",
+            "properties": {
+              "matched": {
+                "type": "integer"
+              },
+              "differing": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearer": []
+    }
+  ]
+}
