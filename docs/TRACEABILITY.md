@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 16 | 7% |
-| **Proved by a test named after the rule** | **14** | **6%** |
-| No implementation and no test | 216 | 93% |
+| Referenced in code (`// Rule:`) | 19 | 8% |
+| **Proved by a test named after the rule** | **17** | **7%** |
+| No implementation and no test | 213 | 91% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -125,8 +125,8 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-FEE-001` | — | — |  |
-| `PM-FEE-002` | `packages/charges/test/charges.test.ts:68` | `packages/law/src/index.ts:45` |  |
-| `PM-FEE-003` | — | `packages/law/src/index.ts:45` |  |
+| `PM-FEE-002` | `packages/charges/test/charges.test.ts:68` | `packages/law/src/index.ts:46` |  |
+| `PM-FEE-003` | — | `packages/law/src/index.ts:46` |  |
 | `PM-FEE-004` | `packages/charges/test/charges.test.ts:80` | `packages/kernel/src/index.ts:53` |  |
 | `PM-FEE-005` | `packages/charges/test/charges.test.ts:46` | `packages/charges/src/index.ts:22` |  |
 | `PM-FEE-006` | `packages/charges/test/charges.test.ts:55` | `packages/charges/src/index.ts:26` | ⚠ |
@@ -270,15 +270,15 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SEC-011` | — | — |  |
 | `PM-SEC-012` | — | — |  |
 
-## SYS — Cross-cutting system rules  ·  2/15 covered
+## SYS — Cross-cutting system rules  ·  5/15 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-SYS-001` | `packages/charges/test/charges.test.ts:146` | — |  |
-| `PM-SYS-002` | `packages/charges/test/charges.test.ts:141` | `packages/law/src/index.ts:26` |  |
-| `PM-SYS-003` | — | — |  |
-| `PM-SYS-004` | — | — |  |
-| `PM-SYS-005` | — | — | ⚠ |
+| `PM-SYS-002` | `packages/charges/test/charges.test.ts:141` | `packages/law/src/index.ts:27` |  |
+| `PM-SYS-003` | `packages/kernel/test/sys-time.test.ts:8` | `packages/kernel/src/language.ts:2` |  |
+| `PM-SYS-004` | `packages/kernel/test/sys-time.test.ts:16` | `packages/kernel/src/time.ts:4` |  |
+| `PM-SYS-005` | `packages/kernel/test/sys-time.test.ts:35` | `packages/kernel/src/time.ts:39` | ⚠ |
 | `PM-SYS-006` | — | — |  |
 | `PM-SYS-007` | — | — |  |
 | `PM-SYS-008` | — | — |  |

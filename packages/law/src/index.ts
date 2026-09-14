@@ -7,6 +7,7 @@
  * No clock. No I/O. Every lookup takes the legal date as an argument.
  */
 import raw from './constants.json' with { type: 'json' };
+import { type CivilDate, isWeekend, deadline } from '@zues/kernel';
 
 export const CATALOGUE_VERSION: string = raw.catalogue_version;
 /** Bumped whenever the pure functions change, so a receipt pins the code too. ADR-001 amendment. */
@@ -57,3 +58,42 @@ export const defaultKey = (stream: CostStream): AllocationKey =>
 
 export const keyIsChangeableByAssembly = (stream: CostStream): boolean =>
   stream !== 'REPAIR_FUND';
+
+// ---- non-working days & legal deadlines -----------------------------------
+
+type NonWorkingConfig = {
+  verified: boolean;
+  source: string;
+  todo_legal?: string;
+  fixed: readonly { date: string; name: string }[];
+};
+const NWD = raw.non_working_days as NonWorkingConfig;
+
+/** The verification state of the statutory non-working-day set. Rule: PM-SYS-005 */
+export const nonWorkingDaysMeta = (): { verified: boolean; source: string; todo_legal?: string } =>
+  ({ verified: NWD.verified, source: NWD.source, todo_legal: NWD.todo_legal });
+
+/**
+ * The statutory fixed holidays in force on a legal date, as `MM-DD → name`.
+ * Rule: PM-SYS-005
+ */
+export const statutoryHolidaysOn = (_on: LegalDate): ReadonlyMap<string, string> =>
+  // TODO(legal): PM-SYS-005 — holidays are treated as always-in-force; movable
+  // Easter and the weekend-substitution rule are not yet encoded. The legal date
+  // is taken now so callers need not change when holidays gain temporal bounds.
+  new Map(NWD.fixed.map((h) => [h.date, h.name]));
+
+/**
+ * A legal deadline may not fall on a weekend or a statutory holiday.
+ * Rule: PM-SYS-005
+ */
+export const isStatutoryNonWorkingDay = (d: CivilDate, on: LegalDate): boolean =>
+  isWeekend(d) || statutoryHolidaysOn(on).has(d.slice(5));
+
+/**
+ * The single statutory deadline: `days` calendar days from `from`, rolled off
+ * any weekend or holiday to the next working day, under the law in force on
+ * `on`. The one entry point every module uses. Rule: PM-SYS-004, PM-SYS-005
+ */
+export const statutoryDeadline = (from: CivilDate, days: number, on: LegalDate): CivilDate =>
+  deadline(from, days, (d) => isStatutoryNonWorkingDay(d, on));
