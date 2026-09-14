@@ -65,7 +65,7 @@ That reframing neutralises the three arguments that had favoured TypeScript:
 - A ~1-day port of the existing TypeScript (§5).
 - **The single shared kernel is given up** — the honest cost, below.
 
-**The kernel note (the one real cost).** With a Kotlin backend and a *thin* client, the legal kernel lives once (Kotlin, server) and the client renders server-computed values — correct for bills, final tallies and stored deadlines. The **only** logic pulled toward the client is the **live, in-person assembly tally/quorum**, and only when it must work **offline**. Resolve by one of: (a) online-only live tally (no duplication); (b) a small duplicated `tally()`/`quorum()` with shared golden test vectors; (c) Kotlin Multiplatform for that one function. This is **open and tracked**, gated on the product decision "must an assembly compute offline?" — not a blocker for anything before the `assembly` module.
+**The kernel note (the one real cost).** With a Kotlin backend and a *thin* client, the legal kernel lives once (Kotlin, server) and the client renders server-computed values — correct for bills, final tallies and stored deadlines. The **only** logic pulled toward the client is the **live, in-person assembly tally/quorum**, and only when it must work **offline**. Resolve by one of: (a) online-only live tally (no duplication); (b) a small duplicated `tally()`/`quorum()` with shared golden test vectors; (c) Kotlin Multiplatform for that one function. **Resolved (§7): Option 1** — online-only live meter with offline vote *capture*; the kernel stays single-sourced in Kotlin. `tally()` and `quorum()` are kept pure and isolated so a later switch to (b) or (c) is a cheap, bounded change.
 
 **Integrity — what survives the switch (verified against all nine non-negotiables and the seven Accepted ADRs):**
 
@@ -100,7 +100,9 @@ A decisive shift to a non-JVM team, or a hard product requirement that the *same
 
 ---
 
-## 7 Deferred
+## 7 Resolved · 2026-09-14
 
-- **The offline-assembly product decision** — drives which of the three kernel options in §4 is taken.
-- **Kotlin vs Java** — recommendation is Kotlin; awaiting the team's confirmation. Everything above holds for either.
+Both items deferred above are now decided:
+
+- **Language: Kotlin** (not Java), confirmed by the team. The value/sealed-class modelling and null-safety are worth the few days Java developers spend adopting it.
+- **Offline assembly: Option 1** — the live quorum/tally meter is **online-only**; the device still **captures** votes offline (`PM-SYS-014`, queued and idempotent) and the meter resumes on reconnect. The legal kernel therefore lives **once**, in Kotlin. `tally()` and `quorum()` are written as **pure, isolated functions with a golden-vector contract**, so if a pilot firm's assemblies prove connectivity is unreliable in the field, promoting to a client-side copy (Option 2) or Kotlin Multiplatform (Option 3) is cheap. The binding tally is always computed server-side and stored with its `basis`; the client never decides the legal outcome.
