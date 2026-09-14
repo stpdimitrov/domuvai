@@ -212,3 +212,15 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — port `:law` (dated constants + resolver + the non-working-day calendar) and re-do **S-G1-01a** (PM-SYS-003/004/005) in Kotlin; then `:charges`; then retarget the Python gate globs `*.ts`→`*.kt` and swap `vitest`→`gradle test`. The TypeScript `packages/*` still sit alongside for reference and are removed at the end of the port.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `kernel/build.gradle.kts`.
+
+---
+
+## S-10 · 2026-09-14 · `:law` ported + S-G1-01a redone in Kotlin
+
+**Did** — `:kernel` gained the civil-date/deadline utility (`addCalendarDays`, `weekday`/`isWeekend`, `rollToWorkingDay`, `deadline`, `toSofiaDate`) built on `java.time.LocalDate`, plus the Bulgarian-first `Language` primitive. `:law` ported — dated `Constant`s with `constantOn`/`numberOn`/`unverified` (PM-SYS-001/002), the allocation keys, and the non-working-day calendar with `statutoryDeadline` (S-G1-01a's PM-SYS-005, holidays as config + `TODO(legal)`). **18 JUnit 5 tests, all green** (kernel 10, law 8), each named by its rule ID.
+
+**java.time did the S-G1-01a work better than the hand-rolled TypeScript.** `LocalDate.parse` rejects `2026-02-30` and `01-01-2026` for free; `plusDays` is civil-date arithmetic with no DST exposure; `atZone("Europe/Sofia")` gives the UTC→Sofia crossing. And `days: Int` makes a fractional day a compile error rather than a runtime guard.
+
+**Open / next** — port `:charges` (`computeChargeRun`); then **retarget the gate pack** (`tools/*.py` globs `*.ts`→`*.kt`, `vitest`→`gradle test`) so traceability counts the Kotlin tests; then scaffold the Spring Boot `:app` (the Spring Modulith modular monolith). The TypeScript `packages/*` still sit alongside for reference until the port completes.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `kernel/src/main/kotlin/zues/kernel/Time.kt`, `law/src/main/kotlin/zues/law/Deadlines.kt`.
