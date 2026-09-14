@@ -195,3 +195,20 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / migration (tracked in ADR-010 §5)** — scaffold Gradle/Spring Boot in Kotlin (A12); port `@zues/kernel|law|charges` + `zues-calc` (~a day); **re-do S-G1-01a in Kotlin** (the TS slice stays as the record on its branch); retarget the gate globs `*.ts`→`*.kt`; port the TS examples in `CLAUDE.md`/slice protocol. One product question drives the kernel design: **must an in-person assembly compute its tally offline?** And confirm **Kotlin vs Java** (recommend Kotlin).
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/adr/ADR-010-backend-language.md`, `docs/MODULE-TEMPLATE.md`, the ADR-003 amendment.
+
+---
+
+## S-09 · 2026-09-14 · Kotlin toolchain up — `:kernel` ported, first green build
+
+**Did** — began the ADR-010 migration. Gradle multi-project scaffold (`settings.gradle.kts`, `gradle/libs.versions.toml`, JDK 21 toolchain, committed wrapper), and the first module `:kernel` in Kotlin — `Money` and `IdealParts` as `@JvmInline value class`, `allocateByWeight` (integer largest-remainder), `assertPartsSumTo100`. **4 JUnit 5 tests named by rule ID** (PM-FEE-016, PM-ORG-002 ×2, PM-FEE-004), green.
+
+**Kotlin sharpens two guards into the type system.** `eur(42.5)` is now a *compile* error, not a runtime throw — money is `Long` by construction (PM-FEE-016). `allocateByWeight` uses integer remainders `(total*w) % sum`, so the split is float-free where the TypeScript version still computed fractions as doubles.
+
+**Toolchain notes for the next session (this Intel Mac):**
+- Homebrew has **dropped Intel x86_64 support** — `brew install gradle` fails (Tier 3, no bottles). Gradle is bootstrapped from the distribution zip and pinned via the **committed wrapper** (8.14.3); nothing Gradle is installed system-wide.
+- System `java` is **JDK 25**, too new for Gradle 8.14 to run on. `openjdk@21` is installed (keg-only). **Run every Gradle command with `JAVA_HOME=/usr/local/opt/openjdk@21`.** The build's toolchain is pinned to JDK 21.
+- The loop is `JAVA_HOME=/usr/local/opt/openjdk@21 ./gradlew :kernel:test`.
+
+**Open / next** — port `:law` (dated constants + resolver + the non-working-day calendar) and re-do **S-G1-01a** (PM-SYS-003/004/005) in Kotlin; then `:charges`; then retarget the Python gate globs `*.ts`→`*.kt` and swap `vitest`→`gradle test`. The TypeScript `packages/*` still sit alongside for reference and are removed at the end of the port.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `kernel/build.gradle.kts`.
