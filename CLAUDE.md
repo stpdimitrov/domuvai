@@ -44,15 +44,18 @@ Every feature states which mode it serves. Rules tagged `BOTH` apply in both.
 |---|---|
 | 001 | Dated data + pure functions. **No rules engine.** |
 | 002 | One policy module (`packages/policy`), RLS by `entrance_id` as an independent backstop |
-| 003 | **Three deployables** (`api`, `worker`, `web`), **fourteen modules**, boundaries enforced by `dependency-cruiser` in CI, one Postgres, schema per module |
+| 003 | **Three deployables** (`api`, `worker`, `web`), **fourteen modules**, boundaries enforced in CI (Spring Modulith + ArchUnit; ADR-003 amendment), one Postgres, schema per module |
 | 004 | A shared facility is a cost-sharing agreement with a custodian entrance — **never a second tenant axis** |
 | 005 | The entrance is the isolation unit; the account belongs to it, not to the firm |
 | 006 | Integer minor units, exact decimals, double-entry, one fund per entrance |
 | 007 | **The platform never holds money.** Payment initiation only |
 | 008 | Every majority carries its denominator explicitly (`TOTAL` \| `REPRESENTED`) |
 | 009 | The agent holds no write credential; prohibited capabilities are not implemented |
+| 010 | Backend is **Kotlin · Spring Boot · Spring Modulith**; frontend stays Next.js/TS. Driven by the team's Java background |
 
-**Seven of nine are Accepted.** ADR-004 (shared facilities) and ADR-007 (no custody) name counsel as a co-decider and remain Proposed. Do not build against those two: ADR-004 gates `registry` and `maintenance`, ADR-007 gates `rail`. Everything else is decided — build on it, do not relitigate it in code.
+**Eight of ten are Accepted.** ADR-004 (shared facilities) and ADR-007 (no custody) name counsel as a co-decider and remain Proposed. Do not build against those two: ADR-004 gates `registry` and `maintenance`, ADR-007 gates `rail`. Everything else is decided — build on it, do not relitigate it in code.
+
+**Stack (ADR-010):** Kotlin · Spring Boot · Spring Modulith backend, Next.js/TypeScript frontend. The TypeScript examples below predate ADR-010 and are being ported; the principles they show — integer minor units, exact ideal parts, one deadline utility — are language-neutral.
 
 ## Slice protocol
 

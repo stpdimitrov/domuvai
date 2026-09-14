@@ -250,7 +250,7 @@ CI fails when a rule has no test · a rule ID in code is not in the catalogue ·
 
 Every write endpoint takes an `Idempotency-Key`. Every consumer is idempotent on `event_id`. Producers write state and the outbox row in one transaction. All legal deadlines go through one utility — Europe/Sofia, calendar days.
 
-**Stack:** TypeScript · Postgres 16 (EU) · NestJS · Drizzle with hand-written SQL migrations · Graphile Worker · Next.js, one app, three route groups · object storage with object lock. No Kafka, no second datastore, no GraphQL.
+**Stack (ADR-010):** Backend **Kotlin · Spring Boot · Spring Modulith** · **Postgres 16 (EU)** with jOOQ / Spring Data JDBC and Flyway migrations · **JobRunr / db-scheduler** for jobs · frontend **Next.js (TypeScript)**, one app, three route groups · object storage with object lock. No Kafka, no second datastore, no GraphQL.
 
 ---
 
