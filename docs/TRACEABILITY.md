@@ -16,14 +16,14 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-ORG-001` | — | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
-| `PM-ORG-002` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:20` | `kernel/src/main/kotlin/zues/kernel/IdealParts.kt:5` |  |
+| `PM-ORG-002` | `app/src/test/kotlin/zues/app/registry/UnitValidationTest.kt:14` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:46` |  |
 | `PM-ORG-003` | — | — |  |
 | `PM-ORG-004` | — | — |  |
 | `PM-ORG-005` | — | — |  |
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
-| `PM-ORG-009` | — | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
+| `PM-ORG-009` | — | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:27` |  |
 | `PM-ORG-010` | — | — |  |
 | `PM-ORG-011` | — | — |  |
 | `PM-ORG-012` | — | — |  |

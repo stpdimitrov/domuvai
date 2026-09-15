@@ -4,6 +4,8 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import zues.kernel.IdealParts
+import java.math.BigDecimal
 import java.time.Clock
 import java.util.UUID
 
@@ -20,6 +22,15 @@ data class EntranceCreated(
     val condominiumId: UUID,
 )
 
+/** One unit to register under an entrance. Ideal parts is an exact decimal percent string. */
+data class RegisterUnit(
+    val designation: String,
+    val unitType: String,
+    val areaM2: BigDecimal? = null,
+    val idealParts: String,
+    val separateEntrance: Boolean = false,
+)
+
 /**
  * The registry module's one public operation for the walking skeleton: create a
  * condominium and its first entrance, then raise [EntranceRegistered]. The insert and the
@@ -29,6 +40,7 @@ data class EntranceCreated(
 class RegistryService(
     private val aggregates: JdbcAggregateTemplate,
     private val entrances: EntranceRepository,
+    private val units: PropertyUnitRepository,
     private val events: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
@@ -44,4 +56,34 @@ class RegistryService(
 
     @Transactional(readOnly = true)
     fun listEntrances(): List<Entrance> = entrances.findAll()
+
+    /**
+     * Register the complete set of units for an entrance. Rule: PM-ORG-002 — their ideal
+     * parts must sum to 100%, checked here before the writes and again by the deferred DB
+     * trigger at commit. The whole set is inserted in one transaction so a mid-set state
+     * that does not yet sum to 100% never has to be valid.
+     */
+    @Transactional
+    fun registerUnits(entranceId: UUID, commands: List<RegisterUnit>): List<UUID> {
+        if (!entrances.existsById(entranceId)) {
+            throw NoSuchElementException("no entrance $entranceId")
+        }
+        UnitValidation.requirePartsSumTo100(commands.map { it.idealParts })
+        return commands.map { command ->
+            aggregates.insert(
+                PropertyUnit(
+                    id = UUID.randomUUID(),
+                    entranceId = entranceId,
+                    designation = command.designation,
+                    unitType = command.unitType,
+                    areaM2 = command.areaM2,
+                    idealPartsPct = UnitValidation.toColumn(IdealParts.of(command.idealParts)),
+                    separateEntrance = command.separateEntrance,
+                ),
+            ).id
+        }
+    }
+
+    @Transactional(readOnly = true)
+    fun listUnits(entranceId: UUID): List<PropertyUnit> = units.findByEntranceId(entranceId)
 }

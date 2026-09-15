@@ -312,3 +312,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — (1) persistence for money needs a **registry units** slice first (create units with ideal parts summing to 100%, PM-ORG-002/BOOK-002), then `money` can store an immutable `charge_run` + `charge_line` (PM-FEE-015) referencing real units. (2) Double-entry postings + the fund (ADR-006, PM-FEE-020). (3) The registry `RegistryPersistenceIT` still awaits its first CI run (Docker).
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/`, `charges/src/main/kotlin/zues/charges/Charges.kt`.
+
+---
+
+## S-16 · 2026-09-15 · registry units
+
+**Did** — the `registry` module can now register a unit set under an entrance: `POST /api/registry/entrances/{id}/units`. The whole set is validated to sum to exactly 100% (**PM-ORG-002**) and inserted in one transaction, so a mid-set state that does not yet sum to 100% never has to be valid — the DB's deferred trigger checks the same invariant again at commit. Units carry the `separate_entrance` business flag (**PM-ORG-009**). `GET .../units` reads them back. Unblocks money persistence: charge lines can now reference real `registry.unit` rows.
+
+**A precision decision, made to match the schema** — the kernel's `IdealParts` holds six decimals; `V1`'s `ideal_parts` column is `numeric(7,4)` — four. If the app kept six and the DB rounded to four, their two sum-to-100 checks could disagree. So the registry **rejects ideal parts finer than four decimals** (`ppmPct % 100 == 0`) and maps to the column at scale 4. The schema's precision is the contract; the app conforms to it rather than inventing one.
+
+**What is proved where** — `UnitValidationTest` proves PM-ORG-002 (99.98% rejected with the delta shown; a 100% set accepted; >4-decimal rejected) as a **pure** test, and `RegistryUnitsWebTest` proves the HTTP failure modes (invalid → 400, unknown entrance → 404) — both run in the gate pack **locally**. `RegistryUnitsPersistenceIT` (Testcontainers, `disabledWithoutDocker`) round-trips a set through real Postgres + the FK + the `numeric(7,4)` column — **CI-only** here.
+
+**`./tools/gates.sh` green** — traceability 18/233 (PM-ORG-002 now also proved at the app layer; PM-ORG-009 referenced), banned-words clean on 33 files, legal-thresholds clean, TRACEABILITY regenerated.
+
+**Workflow** — built on `slice/S-16-registry-units`, integrated to `main` by fast-forward, branch deleted (Claude now owns the repo workflow: branch-per-slice → gates green → integrate to `main` → delete branch).
+
+**Open / next** — (1) **money persistence**: an immutable `charge_run` + `charge_line` referencing real units (PM-FEE-015), now that units exist. (2) owner/party + full book-completeness (PM-BOOK-002). (3) the two Docker-gated ITs (`RegistryPersistenceIT`, `RegistryUnitsPersistenceIT`) await their first CI run.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt`, `app/src/main/kotlin/zues/app/registry/RegistryService.kt`.
