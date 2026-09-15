@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 // Pure-Kotlin shared libraries (no Spring) — the ADR-001 layer.
 include(":kernel")
 include(":law")
+include(":charges")

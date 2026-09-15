@@ -10,11 +10,11 @@ OUT = ROOT/'docs/TRACEABILITY.md'
 # sorted(): rglob order is filesystem-dependent, and an unsorted scan makes the
 # generated report differ between machines — which fails the docs-in-sync gate
 # for no real reason.
-SRC = sorted(p for d in ('packages','apps') for p in (ROOT/d).rglob('*.ts')
-             if 'node_modules' not in p.parts)
+SRC = sorted(p for p in ROOT.rglob('*.kt')
+             if 'build' not in p.parts and 'node_modules' not in p.parts)
 
 RULE_RE = re.compile(r'PM-[A-Z]+-\d{3}')
-TEST_RE = re.compile(r"""(?:test|it)\(\s*['"`](PM-[A-Z]+-\d{3}[^'"`]*)""")
+TEST_RE = re.compile(r"fun\s+`(PM-[A-Z]+-\d{3}[^`]*)`")
 
 def scan():
     impl, test, cited = {}, {}, {}

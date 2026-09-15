@@ -224,3 +224,17 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — port `:charges` (`computeChargeRun`); then **retarget the gate pack** (`tools/*.py` globs `*.ts`→`*.kt`, `vitest`→`gradle test`) so traceability counts the Kotlin tests; then scaffold the Spring Boot `:app` (the Spring Modulith modular monolith). The TypeScript `packages/*` still sit alongside for reference until the port completes.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `kernel/src/main/kotlin/zues/kernel/Time.kt`, `law/src/main/kotlin/zues/law/Deadlines.kt`.
+
+---
+
+## S-11 · 2026-09-15 · `:charges` ported + the gate pack retargeted to Kotlin
+
+**Did** — ported `:charges` (`computeChargeRun`, the pure charge engine — allocation, exemptions, the business multiplier, the `basis`/`law_version`/`engine_version` receipt) with **12 JUnit 5 tests** named by rule ID. Then **retargeted the gate pack** from TypeScript to Kotlin: the four Python scanners now read `*.kt` (test detection is `` fun `PM-XXX …` ``, the identifier scan uses Kotlin keywords, the legal-literal scan excludes `law/` and `*/test/*`), and `gates.sh` runs `./gradlew test` instead of `vitest` (with a JDK 21 fallback for `JAVA_HOME`).
+
+**`./tools/gates.sh` is green on the Kotlin tree** — 30 tests; traceability **17/233 covered, 0 orphan IDs**, 14 source files; banned-words and legal-thresholds clean; `TRACEABILITY.md` regenerated to point at the `.kt` files. Same 17 rules as the TypeScript tree — the port kept coverage identical, module for module.
+
+**One naming call to review.** The domain term `Unit` (самостоятелен обект) collides with `kotlin.Unit`. Kept the domain name (per the DEVBRIEF's no-synonyms rule) in `zues.charges` with a comment; it is safe because `kotlin.Unit` is never referenced by name there. Flag if you'd rather rename (e.g. `PropertyUnit`).
+
+**Open / next** — remove the now-redundant TypeScript `packages/*` and `apps/zues-calc` (kernel/law/charges are fully in Kotlin); then scaffold the Spring Boot `:app` (the Spring Modulith modular monolith) with the first HTTP/DB module. The `zues-calc` CLI is not yet re-ported.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`, `tools/gates.sh`.

@@ -22,10 +22,10 @@ for r in rules:
     watch |= {int(x) for x in re.findall(r'(\d{1,2})\s*to\s*\d{1,2}\s*times', t)}
 watch -= {0, 1, 2}
 
-LAW = ROOT/'packages/law'
-SRC = [p for d in ('packages','apps') for p in (ROOT/d).rglob('*.ts')
-       if 'node_modules' not in p.parts and LAW not in p.parents
-       and '.test.' not in p.name]          # a test may name the value it asserts
+LAW = ROOT/'law'
+SRC = [p for p in ROOT.rglob('*.kt')
+       if 'build' not in p.parts and 'node_modules' not in p.parts
+       and LAW not in p.parents and 'test' not in p.parts]   # a test may name the value it asserts
 
 N = r'(\d{1,4})'
 PATTERNS = [
