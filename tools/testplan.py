@@ -42,14 +42,13 @@ MODALITY_RANK = {'MUST': 0, 'MUST NOT': 0, 'SHOULD': 1, 'MAY': 2}
 SLICE_SIZE = 10        # rules per slice — one module, ~400 lines of diff
 
 RULE_RE = re.compile(r'PM-[A-Z]+-\d{3}')
-TEST_RE = re.compile(r"""(?:test|it)\(\s*['"`](PM-[A-Z]+-\d{3})""")
+TEST_RE = re.compile(r"fun\s+`(PM-[A-Z]+-\d{3})")
 
 def covered() -> set[str]:
     out = set()
-    for d in ('packages', 'apps'):
-        for p in (ROOT/d).rglob('*.ts'):
-            if 'node_modules' in p.parts: continue
-            out |= set(TEST_RE.findall(p.read_text()))
+    for p in ROOT.rglob('*.kt'):
+        if 'build' in p.parts or 'node_modules' in p.parts: continue
+        out |= set(TEST_RE.findall(p.read_text()))
     return out
 
 def main() -> int:

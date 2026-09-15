@@ -1,2 +1,0 @@
-{"name":"zues-calc","version":"0.0.0","type":"module","bin":{"zues-calc":"src/cli.ts"},
- "dependencies":{"@zues/kernel":"*","@zues/law":"*","@zues/charges":"*"}}

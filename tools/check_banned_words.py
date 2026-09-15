@@ -10,8 +10,8 @@ BANNED = {
 }
 # `fee` and `balance` are banned only as stored column names
 COLUMNISH = {'fee': 'use charge', 'balance': 'derive it from postings (ADR-006)'}
-IDENT = re.compile(r'\b(?:const|let|var|type|interface|class|enum|function)\s+(\w+)|(\w+)\s*:')
-SRC = [p for d in ('packages','apps') for p in (ROOT/d).rglob('*.ts') if 'node_modules' not in p.parts]
+IDENT = re.compile(r'\b(?:val|var|fun|class|object|interface|enum|typealias)\s+(\w+)|(\w+)\s*:')
+SRC = [p for p in ROOT.rglob('*.kt') if 'build' not in p.parts and 'node_modules' not in p.parts]
 
 bad = []
 for p in SRC:

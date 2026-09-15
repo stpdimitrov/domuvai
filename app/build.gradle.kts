@@ -1,0 +1,46 @@
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.spring)            // all-open for @Component/@Transactional classes
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+// Align the Spring-managed Kotlin stdlib with the Kotlin plugin we compile with.
+extra["kotlin.version"] = libs.versions.kotlin.get()
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.modulith:spring-modulith-bom:${libs.versions.springModulith.get()}")
+    }
+}
+
+dependencies {
+    // web + persistence
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+
+    // module boundaries + the durable outbox (event publication registry)
+    implementation("org.springframework.modulith:spring-modulith-starter-core")
+    implementation("org.springframework.modulith:spring-modulith-starter-jdbc")
+
+    // schema is owned by Flyway; PostgreSQL is the only supported database (ADR-006)
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
+    runtimeOnly("org.postgresql:postgresql")
+
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.modulith:spring-modulith-starter-test")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+}

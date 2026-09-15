@@ -3,10 +3,12 @@
 # Drift is not something anyone has to remember. It is a red build.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+# JDK 21 for the Gradle build; the system default may be newer than Gradle runs on.
+[ -z "${JAVA_HOME:-}" ] && [ -d /usr/local/opt/openjdk@21 ] && export JAVA_HOME=/usr/local/opt/openjdk@21
 fail=0
 run() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; shift; "$@" || { fail=1; printf '\033[31m  ✗ failed\033[0m\n'; }; }
 
-run "1/8  tests"                npx vitest run --reporter=dot
+run "1/8  tests"                ./gradlew test --console=plain
 run "2/8  event contracts"      bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
 run "3/8  functional spec"      bash -c 'cd tools && python3 build_functional.py'
 run "4/8  traceability"         python3 tools/traceability.py

@@ -195,3 +195,102 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / migration (tracked in ADR-010 §5)** — scaffold Gradle/Spring Boot in Kotlin (A12); port `@zues/kernel|law|charges` + `zues-calc` (~a day); **re-do S-G1-01a in Kotlin** (the TS slice stays as the record on its branch); retarget the gate globs `*.ts`→`*.kt`; port the TS examples in `CLAUDE.md`/slice protocol. One product question drives the kernel design: **must an in-person assembly compute its tally offline?** And confirm **Kotlin vs Java** (recommend Kotlin).
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/adr/ADR-010-backend-language.md`, `docs/MODULE-TEMPLATE.md`, the ADR-003 amendment.
+
+---
+
+## S-09 · 2026-09-14 · Kotlin toolchain up — `:kernel` ported, first green build
+
+**Did** — began the ADR-010 migration. Gradle multi-project scaffold (`settings.gradle.kts`, `gradle/libs.versions.toml`, JDK 21 toolchain, committed wrapper), and the first module `:kernel` in Kotlin — `Money` and `IdealParts` as `@JvmInline value class`, `allocateByWeight` (integer largest-remainder), `assertPartsSumTo100`. **4 JUnit 5 tests named by rule ID** (PM-FEE-016, PM-ORG-002 ×2, PM-FEE-004), green.
+
+**Kotlin sharpens two guards into the type system.** `eur(42.5)` is now a *compile* error, not a runtime throw — money is `Long` by construction (PM-FEE-016). `allocateByWeight` uses integer remainders `(total*w) % sum`, so the split is float-free where the TypeScript version still computed fractions as doubles.
+
+**Toolchain notes for the next session (this Intel Mac):**
+- Homebrew has **dropped Intel x86_64 support** — `brew install gradle` fails (Tier 3, no bottles). Gradle is bootstrapped from the distribution zip and pinned via the **committed wrapper** (8.14.3); nothing Gradle is installed system-wide.
+- System `java` is **JDK 25**, too new for Gradle 8.14 to run on. `openjdk@21` is installed (keg-only). **Run every Gradle command with `JAVA_HOME=/usr/local/opt/openjdk@21`.** The build's toolchain is pinned to JDK 21.
+- The loop is `JAVA_HOME=/usr/local/opt/openjdk@21 ./gradlew :kernel:test`.
+
+**Open / next** — port `:law` (dated constants + resolver + the non-working-day calendar) and re-do **S-G1-01a** (PM-SYS-003/004/005) in Kotlin; then `:charges`; then retarget the Python gate globs `*.ts`→`*.kt` and swap `vitest`→`gradle test`. The TypeScript `packages/*` still sit alongside for reference and are removed at the end of the port.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `kernel/build.gradle.kts`.
+
+---
+
+## S-10 · 2026-09-14 · `:law` ported + S-G1-01a redone in Kotlin
+
+**Did** — `:kernel` gained the civil-date/deadline utility (`addCalendarDays`, `weekday`/`isWeekend`, `rollToWorkingDay`, `deadline`, `toSofiaDate`) built on `java.time.LocalDate`, plus the Bulgarian-first `Language` primitive. `:law` ported — dated `Constant`s with `constantOn`/`numberOn`/`unverified` (PM-SYS-001/002), the allocation keys, and the non-working-day calendar with `statutoryDeadline` (S-G1-01a's PM-SYS-005, holidays as config + `TODO(legal)`). **18 JUnit 5 tests, all green** (kernel 10, law 8), each named by its rule ID.
+
+**java.time did the S-G1-01a work better than the hand-rolled TypeScript.** `LocalDate.parse` rejects `2026-02-30` and `01-01-2026` for free; `plusDays` is civil-date arithmetic with no DST exposure; `atZone("Europe/Sofia")` gives the UTC→Sofia crossing. And `days: Int` makes a fractional day a compile error rather than a runtime guard.
+
+**Open / next** — port `:charges` (`computeChargeRun`); then **retarget the gate pack** (`tools/*.py` globs `*.ts`→`*.kt`, `vitest`→`gradle test`) so traceability counts the Kotlin tests; then scaffold the Spring Boot `:app` (the Spring Modulith modular monolith). The TypeScript `packages/*` still sit alongside for reference until the port completes.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `kernel/src/main/kotlin/zues/kernel/Time.kt`, `law/src/main/kotlin/zues/law/Deadlines.kt`.
+
+---
+
+## S-11 · 2026-09-15 · `:charges` ported + the gate pack retargeted to Kotlin
+
+**Did** — ported `:charges` (`computeChargeRun`, the pure charge engine — allocation, exemptions, the business multiplier, the `basis`/`law_version`/`engine_version` receipt) with **12 JUnit 5 tests** named by rule ID. Then **retargeted the gate pack** from TypeScript to Kotlin: the four Python scanners now read `*.kt` (test detection is `` fun `PM-XXX …` ``, the identifier scan uses Kotlin keywords, the legal-literal scan excludes `law/` and `*/test/*`), and `gates.sh` runs `./gradlew test` instead of `vitest` (with a JDK 21 fallback for `JAVA_HOME`).
+
+**`./tools/gates.sh` is green on the Kotlin tree** — 30 tests; traceability **17/233 covered, 0 orphan IDs**, 14 source files; banned-words and legal-thresholds clean; `TRACEABILITY.md` regenerated to point at the `.kt` files. Same 17 rules as the TypeScript tree — the port kept coverage identical, module for module.
+
+**One naming call to review.** The domain term `Unit` (самостоятелен обект) collides with `kotlin.Unit`. Kept the domain name (per the DEVBRIEF's no-synonyms rule) in `zues.charges` with a comment; it is safe because `kotlin.Unit` is never referenced by name there. Flag if you'd rather rename (e.g. `PropertyUnit`).
+
+**Open / next** — remove the now-redundant TypeScript `packages/*` and `apps/zues-calc` (kernel/law/charges are fully in Kotlin); then scaffold the Spring Boot `:app` (the Spring Modulith modular monolith) with the first HTTP/DB module. The `zues-calc` CLI is not yet re-ported.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`, `tools/gates.sh`.
+
+---
+
+## S-12 · 2026-09-15 · retired the redundant TypeScript
+
+**Did** — deleted the TypeScript that Kotlin already replaced: `packages/{kernel,law,charges}`, `apps/zues-calc`, and the root `package.json` / `package-lock.json` / `tsconfig.json` / `vitest.config.ts` (22 tracked files + the untracked `node_modules/`). The domain now has exactly one home — the `:kernel`, `:law`, `:charges` Gradle modules — instead of two that could drift.
+
+**Moved three referencing things with it, so nothing dangles:**
+- **`.github/workflows/ci.yml`** — swapped `setup-node` + `npm ci` (dead once `package.json` is gone) for `setup-java` (temurin 21) + `gradle/actions/setup-gradle`. CI's JDK is now the one Gradle actually runs on; `gates.sh`'s macOS `JAVA_HOME` fallback stays inert on Ubuntu.
+- **`tools/law-watch/impact.py`** — its file scan still read `*.ts/.tsx/.js`; retargeted to `*.kt` (missed in the S-11 retarget because it is not one of the eight gate checks).
+- **`CLAUDE.md`** — corrected the statements the removal made false: the "TypeScript examples are being ported" note (the domain is already Kotlin), the JUnit backtick test-name example, the `index.ts` module-boundary rule (now the Spring Modulith package boundary), and stale `packages/…` / `src/modules/…` paths.
+
+**`./tools/gates.sh` green after the removal** — 30 Kotlin tests pass, traceability unchanged at **17/233 (0 orphan IDs)**, banned-words and legal-thresholds clean on 14 `.kt` files, generated docs match. The scanners glob `*.kt`, so deleting the `*.ts` tree could not touch coverage — and didn't.
+
+**Not re-ported** — the `zues-calc` CLI and its golden fixture (`sample/units.csv` + `tariff.json` → `expected.csv`, the Gate-1 "reproduces the spreadsheet to the cent" harness) live in git history at `c638c32`; re-port as a thin Kotlin CLI over `:charges` when Gate 1 needs the end-to-end fixture.
+
+**Open / next** — scaffold the Spring Boot `:app` (Spring Modulith modular monolith) per `docs/MODULE-TEMPLATE.md`: HTTP + Postgres + the fourteen domain-module packages + the outbox. Two calls still yours: rename `Unit` → `PropertyUnit` (S-11)?; merge the `kotlin/scaffold` + `arch/adr-010-kotlin` branches to `main`?
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `tools/gates.sh`.
+
+---
+
+## S-13 · 2026-09-15 · `Unit` → `PropertyUnit`
+
+**Did** — resolved the S-11 naming call: renamed the `zues.charges` domain type `Unit` (самостоятелен обект) to **`PropertyUnit`**, removing the `kotlin.Unit` collision before `:app` is built on top of `:charges`. Ten code references across `Charges.kt` + `ChargesTest.kt`; the doc comment keeps a one-line note of the old name so the rename is self-explaining. `TRACEABILITY.md` regenerated (rule-tag line numbers shifted +1 as the comment grew) — no coverage change.
+
+**Why** — a domain type that shadows a stdlib type is a footgun that only gets more expensive as callers accumulate. `PropertyUnit` is still the single canonical name for the concept (no synonym proliferation), just disambiguated. Cheap now (one module, no dependents), a refactor later.
+
+**`./tools/gates.sh` green** — 30 tests, traceability 17/233, banned-words clean (`PropertyUnit` trips nothing), generated docs committed.
+
+**Open / next** — scaffold the Spring Boot `:app` walking skeleton (Spring Modulith + Flyway + one module wired HTTP→domain→Postgres→outbox, per `docs/MODULE-TEMPLATE.md`). Consolidating `arch/adr-010-kotlin` + `kotlin/scaffold` to `main` via PRs.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `charges/src/main/kotlin/zues/charges/Charges.kt`.
+
+---
+
+## S-14 · 2026-09-15 · `:app` walking skeleton — `registry` end to end
+
+**Did** — stood up the Spring Boot deployable `:app` (Spring Boot 3.4.1 · Spring Modulith 1.3.1) and wired the first Spring module, **`registry`**, through every seam: `POST /api/registry/entrances` → `RegistryService` → **Spring Data JDBC** → PostgreSQL (schema applied by **Flyway V1**) → an **outbox** event (`EntranceRegistered`, persisted in Modulith's event publication registry, consumed by `@ApplicationModuleListener`). `GET` lists them back. The point of the slice is the wiring, not domain rules — it proves the template on real infrastructure before it is replicated.
+
+**Decisions realized** (from this session's questions):
+- **Persistence = Spring Data JDBC.** Ids are app-assigned UUIDs, so writes go through `JdbcAggregateTemplate.insert` (states insert directly) and reads through a `ListCrudRepository`.
+- **DB tests = Testcontainers, `@Testcontainers(disabledWithoutDocker = true)`.** `RegistryPersistenceIT` runs real Postgres 16 + real Flyway in CI (Docker present) and **skips on a machine without Docker** — so `./tools/gates.sh` stays green locally. `@DynamicPropertySource` builds the JDBC URL (Testcontainers has no fixed port) and adds the `currentSchema` search_path.
+- **Schema has one home again.** `git mv db/migrations/0001_init.sql → app/src/main/resources/db/migration/V1__init.sql`; the app owns and applies it. `db/test/constraints.sh` still runs against the migrated DB unchanged.
+
+**Schema mapping** — one database, schema-per-module (ADR-003). The connection `search_path` spans all module schemas, so an unqualified `@Table("entrance")` resolves to `registry.entrance` while names stay unique across schemas. Flyway keeps its history in `public`, where V1's unqualified DOMAINs (`money_minor`, …) live.
+
+**What is proved where** — `ModularityTests` (`ApplicationModules.verify()`, ADR-003 boundaries) and `RegistryWebTest` (`@WebMvcTest`, HTTP contract with the service mocked) need no database and run in the gate pack **everywhere**. The full HTTP→Postgres→outbox path is exercised only by the Docker-gated IT: **written to standard patterns but not executed in this environment — it is CI-verified.** Treat the persistence path as green in CI, unproven locally, until someone runs it with Docker.
+
+**Also** — added a root `build.gradle.kts` (`plugins { … apply false }`) so the Kotlin plugin classpath loads once instead of per-subproject (Gradle warned the duplicate "may break the build"). `PM-ORG-001` is now *referenced* in `registry` (not yet *covered* by a test) — traceability regenerated.
+
+**`./tools/gates.sh` green** — tests across `:kernel :law :charges :app`; banned-words clean on **24** source files; legal-thresholds clean; generated docs committed.
+
+**Open / next** — (1) **RLS** is not wired yet: V1 defines `app.current_entrance()` but no `ENABLE ROW LEVEL SECURITY` / policies (ADR-002 backstop) — a registry follow-up that sets `app.entrance_id` per transaction. (2) Map `EntranceRegistered` to the formal event catalogue in `docs/events`. (3) Next module: **`money`** (depends on `:charges`) toward Gate 1 — "reproduces the firm's spreadsheet to the cent". (4) A CI run is the first real execution of `RegistryPersistenceIT`.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `app/src/main/kotlin/zues/app/registry/`, `app/src/main/resources/application.yml`.

@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 19 | 8% |
+| Referenced in code (`// Rule:`) | 20 | 9% |
 | **Proved by a test named after the rule** | **17** | **7%** |
-| No implementation and no test | 213 | 91% |
+| No implementation and no test | 212 | 91% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -15,15 +15,15 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-ORG-001` | — | — |  |
-| `PM-ORG-002` | `packages/charges/test/charges.test.ts:26` | `packages/kernel/src/index.ts:24` |  |
+| `PM-ORG-001` | — | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
+| `PM-ORG-002` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:20` | `kernel/src/main/kotlin/zues/kernel/IdealParts.kt:5` |  |
 | `PM-ORG-003` | — | — |  |
 | `PM-ORG-004` | — | — |  |
 | `PM-ORG-005` | — | — |  |
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
-| `PM-ORG-009` | — | `packages/charges/src/index.ts:28` |  |
+| `PM-ORG-009` | — | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-ORG-010` | — | — |  |
 | `PM-ORG-011` | — | — |  |
 | `PM-ORG-012` | — | — |  |
@@ -125,23 +125,23 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-FEE-001` | — | — |  |
-| `PM-FEE-002` | `packages/charges/test/charges.test.ts:68` | `packages/law/src/index.ts:46` |  |
-| `PM-FEE-003` | — | `packages/law/src/index.ts:46` |  |
-| `PM-FEE-004` | `packages/charges/test/charges.test.ts:80` | `packages/kernel/src/index.ts:53` |  |
-| `PM-FEE-005` | `packages/charges/test/charges.test.ts:46` | `packages/charges/src/index.ts:22` |  |
-| `PM-FEE-006` | `packages/charges/test/charges.test.ts:55` | `packages/charges/src/index.ts:26` | ⚠ |
+| `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:37` | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
+| `PM-FEE-003` | — | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
+| `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
+| `PM-FEE-005` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:109` | `charges/src/main/kotlin/zues/charges/Charges.kt:35` |  |
+| `PM-FEE-006` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:119` | `charges/src/main/kotlin/zues/charges/Charges.kt:39` | ⚠ |
 | `PM-FEE-007` | — | — |  |
-| `PM-FEE-008` | — | `packages/charges/src/index.ts:20` |  |
-| `PM-FEE-009` | `packages/charges/test/charges.test.ts:51` | `packages/charges/src/index.ts:24` |  |
-| `PM-FEE-010` | `packages/charges/test/charges.test.ts:87` | `packages/charges/src/index.ts:28` |  |
+| `PM-FEE-008` | — | `charges/src/main/kotlin/zues/charges/Charges.kt:33` |  |
+| `PM-FEE-009` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:114` | `charges/src/main/kotlin/zues/charges/Charges.kt:37` |  |
+| `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-FEE-011` | — | — |  |
-| `PM-FEE-012` | `packages/charges/test/charges.test.ts:103` | `packages/charges/src/index.ts:32` |  |
+| `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |
 | `PM-FEE-013` | — | — |  |
-| `PM-FEE-014` | `packages/charges/test/charges.test.ts:109` | `packages/charges/src/index.ts:80` |  |
+| `PM-FEE-014` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:77` | `charges/src/main/kotlin/zues/charges/Charges.kt:82` |  |
 | `PM-FEE-015` | — | — |  |
-| `PM-FEE-016` | `packages/charges/test/charges.test.ts:41` | `packages/kernel/src/index.ts:6` |  |
+| `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | — | — |  |
-| `PM-FEE-018` | `packages/charges/test/charges.test.ts:134` | `packages/charges/src/index.ts:57` |  |
+| `PM-FEE-018` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:102` | `charges/src/main/kotlin/zues/charges/Charges.kt:70` |  |
 | `PM-FEE-019` | — | — |  |
 | `PM-FEE-020` | — | — |  |
 
@@ -151,7 +151,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 |---|---|---|---|
 | `PM-FUND-001` | — | — |  |
 | `PM-FUND-002` | — | — | ⚠ |
-| `PM-FUND-003` | `packages/charges/test/charges.test.ts:80` | `packages/kernel/src/index.ts:53` |  |
+| `PM-FUND-003` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
 | `PM-FUND-004` | — | — |  |
 | `PM-FUND-005` | — | — |  |
 | `PM-FUND-006` | — | — |  |
@@ -274,11 +274,11 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-SYS-001` | `packages/charges/test/charges.test.ts:146` | — |  |
-| `PM-SYS-002` | `packages/charges/test/charges.test.ts:141` | `packages/law/src/index.ts:27` |  |
-| `PM-SYS-003` | `packages/kernel/test/sys-time.test.ts:8` | `packages/kernel/src/language.ts:2` |  |
-| `PM-SYS-004` | `packages/kernel/test/sys-time.test.ts:16` | `packages/kernel/src/time.ts:4` |  |
-| `PM-SYS-005` | `packages/kernel/test/sys-time.test.ts:35` | `packages/kernel/src/time.ts:39` | ⚠ |
+| `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
+| `PM-SYS-002` | `law/src/test/kotlin/zues/law/LawTest.kt:15` | `law/src/main/kotlin/zues/law/Constants.kt:48` |  |
+| `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
+| `PM-SYS-004` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:26` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
+| `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |
 | `PM-SYS-006` | — | — |  |
 | `PM-SYS-007` | — | — |  |
 | `PM-SYS-008` | — | — |  |
