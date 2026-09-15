@@ -1,6 +1,5 @@
 package zues.app.money
 
-import zues.charges.ChargeRun
 import zues.charges.PropertyUnit
 import zues.charges.Tariff
 import zues.charges.TariffLine
@@ -48,25 +47,5 @@ object ChargeCalculator {
         decisionId = decisionId,
         rateMinor = rateMinor,
         totalMinor = totalMinor,
-    )
-
-    private fun ChargeRun.toResponse() = ChargeRunResponse(
-        entranceId = entranceId,
-        period = period,
-        legalDate = legalDate,
-        lawVersion = lawVersion,
-        engineVersion = engineVersion,
-        totalMinor = total.amountMinor,
-        charges = charges.map { charge ->
-            UnitChargeResponse(
-                unitId = charge.unitId,
-                designation = charge.designation,
-                totalMinor = charge.total.amountMinor,
-                chargeablePersons = charge.chargeablePersons,
-                lines = charge.lines.map { line ->
-                    ChargeLineResponse(line.stream.name, line.key.name, line.amount.amountMinor, line.derivation)
-                },
-            )
-        },
     )
 }

@@ -330,3 +330,19 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — (1) **money persistence**: an immutable `charge_run` + `charge_line` referencing real units (PM-FEE-015), now that units exist. (2) owner/party + full book-completeness (PM-BOOK-002). (3) the two Docker-gated ITs (`RegistryPersistenceIT`, `RegistryUnitsPersistenceIT`) await their first CI run.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt`, `app/src/main/kotlin/zues/app/registry/RegistryService.kt`.
+
+---
+
+## S-17 · 2026-09-15 · money reads units from registry (cross-module port)
+
+**Did** — `money` can now compute a charge run from an entrance's **stored** units, not units in the payload: `POST /api/money/entrances/{id}/charge-runs/preview` posts the tariff and reads the units through `registry`'s published **`Units`** port (`UnitForCharging`), never its tables (ADR-003). This is the read path money persistence needs. Spring Modulith `verify()` is green with the new `money → registry` API dependency — the boundary holds, no cycle. Shared the `ChargeRun → response` mapping (`ChargeMapping.kt`) between the payload calculator (S-15) and this service.
+
+**The occupancy gap, made explicit** — registry units carry ideal parts but not occupancy (household members/animals/absence are unmodelled). So a `PER_PERSON` line is **refused with a clear 400** rather than silently billed as zero persons; `BY_IDEAL_PARTS` and `PER_UNIT` run. Full per-person Gate-1 runs wait on an occupancy slice.
+
+**What is proved where** — `ChargeRunServiceTest` mocks the `registry` port and proves the read path + the occupancy guard + the empty-entrance rejection; `StoredChargeRunWebTest` proves the HTTP contract (200 / 404). Both **local**, no database. (This is an integration slice — no new rule coverage; the FEE-001/FEE-014 line references shifted by one when an unused import was removed.)
+
+**`./tools/gates.sh` green** — 39 source files, banned-words + legal-thresholds clean, `ModularityTests.verify()` passing, TRACEABILITY regenerated.
+
+**Open / next** — (1) **money persistence**: with the read path in place, persist an immutable `charge_run` (basis `jsonb` + hash) + `charge_line` referencing the stored `registry.unit` rows (PM-FEE-015) — the first `money`-owned DB writes, Testcontainers-tested in CI. (2) occupancy modelling to unlock `PER_PERSON`.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Units.kt`, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.
