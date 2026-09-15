@@ -19,6 +19,11 @@ dependencyManagement {
 }
 
 dependencies {
+    // the pure ADR-001 domain: the charge engine and the types it exposes
+    implementation(project(":charges"))
+    implementation(project(":kernel"))
+    implementation(project(":law"))
+
     // web + persistence
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")

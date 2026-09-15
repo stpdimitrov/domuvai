@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 20 | 9% |
-| **Proved by a test named after the rule** | **17** | **7%** |
-| No implementation and no test | 212 | 91% |
+| Referenced in code (`// Rule:`) | 21 | 9% |
+| **Proved by a test named after the rule** | **18** | **8%** |
+| No implementation and no test | 211 | 91% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -120,11 +120,11 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-015` | — | — |  |
 | `PM-VOTE-016` | — | — |  |
 
-## FEE — Charges & allocation  ·  10/20 covered
+## FEE — Charges & allocation  ·  11/20 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-FEE-001` | — | — |  |
+| `PM-FEE-001` | `app/src/test/kotlin/zues/app/money/ChargeCalculatorTest.kt:29` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:21` |  |
 | `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:37` | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-003` | — | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
@@ -137,7 +137,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-011` | — | — |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |
 | `PM-FEE-013` | — | — |  |
-| `PM-FEE-014` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:77` | `charges/src/main/kotlin/zues/charges/Charges.kt:82` |  |
+| `PM-FEE-014` | `app/src/test/kotlin/zues/app/money/ChargeCalculatorTest.kt:37` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:14` |  |
 | `PM-FEE-015` | — | — |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | — | — |  |

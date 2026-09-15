@@ -294,3 +294,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — (1) **RLS** is not wired yet: V1 defines `app.current_entrance()` but no `ENABLE ROW LEVEL SECURITY` / policies (ADR-002 backstop) — a registry follow-up that sets `app.entrance_id` per transaction. (2) Map `EntranceRegistered` to the formal event catalogue in `docs/events`. (3) Next module: **`money`** (depends on `:charges`) toward Gate 1 — "reproduces the firm's spreadsheet to the cent". (4) A CI run is the first real execution of `RegistryPersistenceIT`.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `app/src/main/kotlin/zues/app/registry/`, `app/src/main/resources/application.yml`.
+
+---
+
+## S-15 · 2026-09-15 · money charge-run calculator (stateless)
+
+**Did** — added the second Spring module, **`money`**, wired to the pure engine `:charges`: `POST /api/money/charge-runs/preview` takes a self-contained snapshot (tariff + units), runs `computeChargeRun`, and returns the computed charges as JSON. Minor units throughout (ADR-006); no floats cross the wire. Two Gate-1 rules proved by tests named after them — **PM-FEE-001** (every line typed to one of the three cost streams) and **PM-FEE-014** (re-running the same period reproduces identical figures). An unlawful run (no GA decision, ideal parts ≠ a full share, multiplier out of range) is a **400**, not a 500.
+
+**Why a *calculator*, not persistence** — reading `V1__init.sql`: `money.charge_run.entrance_id` is a FK to `registry.entrance` and `money.charge_line.unit_id` is a NOT-NULL FK to `registry.unit`. A stored run therefore requires registry-owned entrances and units, and ADR-003 forbids `money` writing `registry`'s tables. So a genuinely *self-contained* run (units in the payload) cannot be persisted without registry units existing first. The honest self-contained slice is a stateless calculator; persistence + double-entry wait on a registry-units slice.
+
+**Fully verifiable locally** — unlike the registry DB seam, this slice needs no database: the calculator is a pure Kotlin object (`ChargeCalculator`) and the controller calls it directly, so `ChargeCalculatorTest` (pure) and `ChargeRunWebTest` (`@WebMvcTest`, no mock, no DataSource) both run in the gate pack here. No Docker involved.
+
+**One gate caught a real thing** — the legal-threshold scanner flagged `* 100%` on a wrapped KDoc line as "× 100". It's a false positive (prose about ideal parts), but the fix is the right one anyway: reword the comment to name the rule (PM-ORG-002) instead of the bare number. The scanner stays strict; the comment stays legal-literal-free.
+
+**`./tools/gates.sh` green** — traceability **18/233 covered** (FEE-001, FEE-014 added), banned-words clean on 29 files, legal-thresholds clean, TESTPLAN + TRACEABILITY regenerated.
+
+**Open / next** — (1) persistence for money needs a **registry units** slice first (create units with ideal parts summing to 100%, PM-ORG-002/BOOK-002), then `money` can store an immutable `charge_run` + `charge_line` (PM-FEE-015) referencing real units. (2) Double-entry postings + the fund (ADR-006, PM-FEE-020). (3) The registry `RegistryPersistenceIT` still awaits its first CI run (Docker).
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/`, `charges/src/main/kotlin/zues/charges/Charges.kt`.

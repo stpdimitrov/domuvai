@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **16** (7%) |
-| Remaining | **217** |
+| Proved by a test named after the rule | **17** (7%) |
+| Remaining | **216** |
 | Proposed slices at ~10 rules each | **22** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-54 rule(s) remaining across 5 slice(s).
+53 rule(s) remaining across 5 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -36,7 +36,6 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-FUND-002` | MUST ⚠ | Minimum wage is a dated configuration value; a below-minimum tariff is rejected with the computed floor shown. |
-| `PM-FEE-001` | MUST | Chart of accounts has three roots; a charge line cannot be untyped. |
 | `PM-FEE-003` | MUST | Changing the key without a linked protocol is rejected. |
 | `PM-FEE-007` | MUST | Late declarations are accepted only within the configured grace period. |
 | `PM-FEE-008` | MUST | Tenant registration triggers headcount recalculation. |
@@ -45,12 +44,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-FEE-015` | MUST | Immutable issued charges. |
 | `PM-FEE-020` | MUST | Income is posted to the condominium's ledger, never the manager's. |
 | `PM-FUND-001` | MUST | An entrance without a fund raises a compliance flag. |
+| `PM-FUND-003` | MUST | A unit holding 4.20% of ideal parts is charged 4.20% of the period's fund contribution. |
 
-### S-G1-03 · `money` · FEE · FUND · 11 rule(s)
+### S-G1-03 · `money` · FEE · FUND · 10 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-FUND-003` | MUST | A unit holding 4.20% of ideal parts is charged 4.20% of the period's fund contribution. |
 | `PM-FUND-004` | MUST | The account record stores IBAN, holder and mandate; it cannot equal the operating account. |
 | `PM-FUND-005` | MUST NOT | Ledger enforces one fund per entrance; cross-entrance postings are impossible. |
 | `PM-FUND-006` | MUST | Every fund disbursement requires a purpose code and a linked decision or passport measure. |
