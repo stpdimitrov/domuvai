@@ -12,7 +12,7 @@ All behaviour is governed by `docs/RULES.md` (machine-readable mirror `docs/rule
 - Rules marked `⚠` (`verified: false` in JSON) carry **unconfirmed numerics**. Implement the mechanism, read the number from configuration, emit `TODO(legal): PM-XXX-000`. Do not pick a plausible number.
 - Every function or handler implementing a rule carries `// Rule: PM-XXX-000`.
 - Every rule with an Acceptance column gets a test named after its ID:
-  `test('PM-GA-013 reconvened assembly is valid at 26% of ideal parts', ...)`.
+  `` fun `PM-GA-013 reconvened assembly is valid at 26% of ideal parts`() `` (JUnit 5, backtick name).
 - **A legal number exists in exactly one place** — `@zues/law`, as dated configuration. The engine resolves the value in force on the relevant **legal date** (PM-SYS-002), never `Date.now()`. (ADR-001)
 - Every stored charge, decision or compliance task carries `basis`, `basis_hash`, `law_version` **and `engine_version`**. (ADR-001 amendment)
 - Money is integer minor units in EUR (PM-FEE-016). No floats. Pre-2026 BGN records keep the original amount, the 1.95583 rate and the converted value. (ADR-006)
@@ -43,7 +43,7 @@ Every feature states which mode it serves. Rules tagged `BOTH` apply in both.
 | ADR | Decision |
 |---|---|
 | 001 | Dated data + pure functions. **No rules engine.** |
-| 002 | One policy module (`packages/policy`), RLS by `entrance_id` as an independent backstop |
+| 002 | One policy module (`:policy`), RLS by `entrance_id` as an independent backstop |
 | 003 | **Three deployables** (`api`, `worker`, `web`), **fourteen modules**, boundaries enforced in CI (Spring Modulith + ArchUnit; ADR-003 amendment), one Postgres, schema per module |
 | 004 | A shared facility is a cost-sharing agreement with a custodian entrance — **never a second tenant axis** |
 | 005 | The entrance is the isolation unit; the account belongs to it, not to the firm |
@@ -55,7 +55,7 @@ Every feature states which mode it serves. Rules tagged `BOTH` apply in both.
 
 **Eight of ten are Accepted.** ADR-004 (shared facilities) and ADR-007 (no custody) name counsel as a co-decider and remain Proposed. Do not build against those two: ADR-004 gates `registry` and `maintenance`, ADR-007 gates `rail`. Everything else is decided — build on it, do not relitigate it in code.
 
-**Stack (ADR-010):** Kotlin · Spring Boot · Spring Modulith backend, Next.js/TypeScript frontend. The TypeScript examples below predate ADR-010 and are being ported; the principles they show — integer minor units, exact ideal parts, one deadline utility — are language-neutral.
+**Stack (ADR-010):** Kotlin · Spring Boot · Spring Modulith backend, Next.js/TypeScript frontend. The pure domain layer already lives in Kotlin — the `:kernel`, `:law` and `:charges` Gradle modules. The principles the examples below show — integer minor units, exact ideal parts, one deadline utility — are language-neutral.
 
 ## Slice protocol
 
@@ -93,7 +93,7 @@ One module per slice. Max ~400 lines of reviewable diff. If it will not fit, spl
 - No banned word in an identifier
 - No unverified rule's number as a literal — config lookup + `TODO(legal): PM-XXX-000`
 - **No legal number anywhere outside `@zues/law`**
-- No cross-module database access; no import between modules except through a published `index.ts`
+- No cross-module database access; no import between modules except through a module's published API (Spring Modulith package boundary; ADR-003)
 - Counts and lists in docs are generated, never typed
 
 ### Fresh-context review
@@ -121,7 +121,7 @@ The rule wins. Do not edit quietly — raise a change plan naming the rule ID, t
 
 ## Useful prompts
 
-- `Implement PM-GA-012 … PM-GA-018 in src/modules/assembly/. Table-driven tests named by rule ID.`
-- `Audit src/modules/money against domain FEE in docs/RULES.md. Report IMPLEMENTED/PARTIAL/MISSING with file:line. No edits.`
+- `Implement PM-GA-012 … PM-GA-018 in the assembly module. Table-driven tests named by rule ID.`
+- `Audit the money module against domain FEE in docs/RULES.md. Report IMPLEMENTED/PARTIAL/MISSING with file:line. No edits.`
 - `Generate the schema for §4 of docs/RULES.md; enforce every INVARIANT as a DB constraint where possible.`
 - `List every rule in docs/rules.json with verified=false and show where each unconfirmed number is used in code.`

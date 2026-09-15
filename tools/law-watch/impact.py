@@ -41,7 +41,7 @@ def grep_code(rule_ids: list[str], root: Path) -> dict[str, list[str]]:
     if not root or not root.exists():
         return hits
     for p in root.rglob("*"):
-        if not p.is_file() or p.suffix not in {".ts", ".tsx", ".js", ".py", ".sql"}:
+        if not p.is_file() or p.suffix not in {".kt", ".py", ".sql"}:
             continue
         try:
             text = p.read_text(encoding="utf-8", errors="ignore")

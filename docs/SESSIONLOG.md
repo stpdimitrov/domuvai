@@ -238,3 +238,22 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — remove the now-redundant TypeScript `packages/*` and `apps/zues-calc` (kernel/law/charges are fully in Kotlin); then scaffold the Spring Boot `:app` (the Spring Modulith modular monolith) with the first HTTP/DB module. The `zues-calc` CLI is not yet re-ported.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`, `tools/gates.sh`.
+
+---
+
+## S-12 · 2026-09-15 · retired the redundant TypeScript
+
+**Did** — deleted the TypeScript that Kotlin already replaced: `packages/{kernel,law,charges}`, `apps/zues-calc`, and the root `package.json` / `package-lock.json` / `tsconfig.json` / `vitest.config.ts` (22 tracked files + the untracked `node_modules/`). The domain now has exactly one home — the `:kernel`, `:law`, `:charges` Gradle modules — instead of two that could drift.
+
+**Moved three referencing things with it, so nothing dangles:**
+- **`.github/workflows/ci.yml`** — swapped `setup-node` + `npm ci` (dead once `package.json` is gone) for `setup-java` (temurin 21) + `gradle/actions/setup-gradle`. CI's JDK is now the one Gradle actually runs on; `gates.sh`'s macOS `JAVA_HOME` fallback stays inert on Ubuntu.
+- **`tools/law-watch/impact.py`** — its file scan still read `*.ts/.tsx/.js`; retargeted to `*.kt` (missed in the S-11 retarget because it is not one of the eight gate checks).
+- **`CLAUDE.md`** — corrected the statements the removal made false: the "TypeScript examples are being ported" note (the domain is already Kotlin), the JUnit backtick test-name example, the `index.ts` module-boundary rule (now the Spring Modulith package boundary), and stale `packages/…` / `src/modules/…` paths.
+
+**`./tools/gates.sh` green after the removal** — 30 Kotlin tests pass, traceability unchanged at **17/233 (0 orphan IDs)**, banned-words and legal-thresholds clean on 14 `.kt` files, generated docs match. The scanners glob `*.kt`, so deleting the `*.ts` tree could not touch coverage — and didn't.
+
+**Not re-ported** — the `zues-calc` CLI and its golden fixture (`sample/units.csv` + `tariff.json` → `expected.csv`, the Gate-1 "reproduces the spreadsheet to the cent" harness) live in git history at `c638c32`; re-port as a thin Kotlin CLI over `:charges` when Gate 1 needs the end-to-end fixture.
+
+**Open / next** — scaffold the Spring Boot `:app` (Spring Modulith modular monolith) per `docs/MODULE-TEMPLATE.md`: HTTP + Postgres + the fourteen domain-module packages + the outbox. Two calls still yours: rename `Unit` → `PropertyUnit` (S-11)?; merge the `kotlin/scaffold` + `arch/adr-010-kotlin` branches to `main`?
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `tools/gates.sh`.
