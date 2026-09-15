@@ -23,7 +23,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
-| `PM-ORG-009` | — | `charges/src/main/kotlin/zues/charges/Charges.kt:40` |  |
+| `PM-ORG-009` | — | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-ORG-010` | — | — |  |
 | `PM-ORG-011` | — | — |  |
 | `PM-ORG-012` | — | — |  |
@@ -128,20 +128,20 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:37` | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-003` | — | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
-| `PM-FEE-005` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:109` | `charges/src/main/kotlin/zues/charges/Charges.kt:34` |  |
-| `PM-FEE-006` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:119` | `charges/src/main/kotlin/zues/charges/Charges.kt:38` | ⚠ |
+| `PM-FEE-005` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:109` | `charges/src/main/kotlin/zues/charges/Charges.kt:35` |  |
+| `PM-FEE-006` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:119` | `charges/src/main/kotlin/zues/charges/Charges.kt:39` | ⚠ |
 | `PM-FEE-007` | — | — |  |
-| `PM-FEE-008` | — | `charges/src/main/kotlin/zues/charges/Charges.kt:32` |  |
-| `PM-FEE-009` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:114` | `charges/src/main/kotlin/zues/charges/Charges.kt:36` |  |
-| `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:40` |  |
+| `PM-FEE-008` | — | `charges/src/main/kotlin/zues/charges/Charges.kt:33` |  |
+| `PM-FEE-009` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:114` | `charges/src/main/kotlin/zues/charges/Charges.kt:37` |  |
+| `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-FEE-011` | — | — |  |
-| `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:44` |  |
+| `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |
 | `PM-FEE-013` | — | — |  |
-| `PM-FEE-014` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:77` | `charges/src/main/kotlin/zues/charges/Charges.kt:81` |  |
+| `PM-FEE-014` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:77` | `charges/src/main/kotlin/zues/charges/Charges.kt:82` |  |
 | `PM-FEE-015` | — | — |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | — | — |  |
-| `PM-FEE-018` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:102` | `charges/src/main/kotlin/zues/charges/Charges.kt:69` |  |
+| `PM-FEE-018` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:102` | `charges/src/main/kotlin/zues/charges/Charges.kt:70` |  |
 | `PM-FEE-019` | — | — |  |
 | `PM-FEE-020` | — | — |  |
 

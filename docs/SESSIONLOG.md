@@ -257,3 +257,17 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — scaffold the Spring Boot `:app` (Spring Modulith modular monolith) per `docs/MODULE-TEMPLATE.md`: HTTP + Postgres + the fourteen domain-module packages + the outbox. Two calls still yours: rename `Unit` → `PropertyUnit` (S-11)?; merge the `kotlin/scaffold` + `arch/adr-010-kotlin` branches to `main`?
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `tools/gates.sh`.
+
+---
+
+## S-13 · 2026-09-15 · `Unit` → `PropertyUnit`
+
+**Did** — resolved the S-11 naming call: renamed the `zues.charges` domain type `Unit` (самостоятелен обект) to **`PropertyUnit`**, removing the `kotlin.Unit` collision before `:app` is built on top of `:charges`. Ten code references across `Charges.kt` + `ChargesTest.kt`; the doc comment keeps a one-line note of the old name so the rename is self-explaining. `TRACEABILITY.md` regenerated (rule-tag line numbers shifted +1 as the comment grew) — no coverage change.
+
+**Why** — a domain type that shadows a stdlib type is a footgun that only gets more expensive as callers accumulate. `PropertyUnit` is still the single canonical name for the concept (no synonym proliferation), just disambiguated. Cheap now (one module, no dependents), a refactor later.
+
+**`./tools/gates.sh` green** — 30 tests, traceability 17/233, banned-words clean (`PropertyUnit` trips nothing), generated docs committed.
+
+**Open / next** — scaffold the Spring Boot `:app` walking skeleton (Spring Modulith + Flyway + one module wired HTTP→domain→Postgres→outbox, per `docs/MODULE-TEMPLATE.md`). Consolidating `arch/adr-010-kotlin` + `kotlin/scaffold` to `main` via PRs.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `charges/src/main/kotlin/zues/charges/Charges.kt`.

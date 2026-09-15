@@ -22,10 +22,11 @@ import zues.law.numberOn
  */
 
 /**
- * A самостоятелен обект. Shadows `kotlin.Unit` within this package — deliberate,
- * to keep the domain term; `kotlin.Unit` is never referenced here by name.
+ * A самостоятелен обект — the independent property unit that carries ideal parts
+ * and occupancy, and to which a charge is raised. Named `PropertyUnit` (not `Unit`)
+ * to keep it clear of `kotlin.Unit`.
  */
-data class Unit(
+data class PropertyUnit(
     val unitId: String,
     val designation: String,
     val idealParts: IdealParts,
@@ -81,7 +82,7 @@ data class UnitCharge(
 /** The frozen snapshot the run computed from. Rule: PM-FEE-014 */
 data class Basis(
     val legalDate: LegalDate,
-    val units: List<Unit>,
+    val units: List<PropertyUnit>,
     val tariff: Tariff,
     val constants: Map<String, Double>,
 )
@@ -98,7 +99,7 @@ data class ChargeRun(
 )
 
 /** Rule: PM-FEE-005, PM-FEE-006, PM-FEE-008, PM-FEE-009 */
-fun chargeablePersons(u: Unit, on: LegalDate): Int {
+fun chargeablePersons(u: PropertyUnit, on: LegalDate): Int {
     val exemptionDays = numberOn("ABSENCE_EXEMPTION_DAYS", on).toInt()
     val animalEquiv = numberOn("ANIMAL_OCCUPANT_EQUIVALENT", on).toInt()
     // TODO(legal): PM-FEE-006 — full exemption vs reduced share is unconfirmed.
@@ -108,14 +109,14 @@ fun chargeablePersons(u: Unit, on: LegalDate): Int {
     return adults + u.animals * animalEquiv
 }
 
-private fun weightFor(u: Unit, key: AllocationKey, on: LegalDate): Long = when (key) {
+private fun weightFor(u: PropertyUnit, key: AllocationKey, on: LegalDate): Long = when (key) {
     AllocationKey.PER_PERSON -> chargeablePersons(u, on).toLong()
     AllocationKey.BY_IDEAL_PARTS -> u.idealParts.ppmPct.toLong()
     AllocationKey.PER_UNIT -> 1L
 }
 
 /** Rule: PM-FEE-010 — business use pays a multiple, on management and maintenance only */
-private fun multiplierFor(u: Unit, t: Tariff, stream: CostStream): Int {
+private fun multiplierFor(u: PropertyUnit, t: Tariff, stream: CostStream): Int {
     if (!u.businessUse || stream == CostStream.REPAIR_FUND) return 1
     val min = numberOn("BUSINESS_USE_MULTIPLIER_MIN", t.legalDate).toInt()
     val max = numberOn("BUSINESS_USE_MULTIPLIER_MAX", t.legalDate).toInt()
@@ -128,7 +129,7 @@ private fun multiplierFor(u: Unit, t: Tariff, stream: CostStream): Int {
     return chosen
 }
 
-private fun fmtWeight(key: AllocationKey, u: Unit, on: LegalDate): String = when (key) {
+private fun fmtWeight(key: AllocationKey, u: PropertyUnit, on: LegalDate): String = when (key) {
     AllocationKey.BY_IDEAL_PARTS -> "${u.idealParts.format()}%"
     AllocationKey.PER_PERSON -> "${chargeablePersons(u, on)} person(s)"
     AllocationKey.PER_UNIT -> "1 unit"
@@ -136,7 +137,7 @@ private fun fmtWeight(key: AllocationKey, u: Unit, on: LegalDate): String = when
 
 private fun roundDiv(a: Long, b: Long): Long = (a + b / 2) / b
 
-fun computeChargeRun(entranceId: String, units: List<Unit>, tariff: Tariff): ChargeRun {
+fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tariff): ChargeRun {
     assertPartsSumTo100(units.map { it.idealParts })                 // PM-ORG-002
     for (line in tariff.lines) {
         if (line.decisionId.isBlank()) {
@@ -155,7 +156,7 @@ fun computeChargeRun(entranceId: String, units: List<Unit>, tariff: Tariff): Cha
         val total = line.totalMinor
         val rate = line.rateMinor
         val amounts: List<Money>
-        val how: (Unit) -> String
+        val how: (PropertyUnit) -> String
         if (total != null) {
             amounts = allocateByWeight(eur(total), weights)
             how = { u -> "${eur(total).format()} split by ${line.key.name.lowercase()} · ${fmtWeight(line.key, u, on)}" }

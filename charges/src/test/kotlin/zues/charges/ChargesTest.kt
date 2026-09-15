@@ -22,7 +22,7 @@ class ChargesTest {
         animals: Int = 0,
         absentDays: Int = 0,
         businessUse: Boolean = false,
-    ) = Unit(designation, designation, IdealParts.of(idealParts), occupants, childrenUnder6, animals, absentDays, businessUse)
+    ) = PropertyUnit(designation, designation, IdealParts.of(idealParts), occupants, childrenUnder6, animals, absentDays, businessUse)
 
     private fun defaultLines() = listOf(
         TariffLine(CostStream.MANAGEMENT, AllocationKey.PER_PERSON, "d1", rateMinor = 500L),
