@@ -271,3 +271,26 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — scaffold the Spring Boot `:app` walking skeleton (Spring Modulith + Flyway + one module wired HTTP→domain→Postgres→outbox, per `docs/MODULE-TEMPLATE.md`). Consolidating `arch/adr-010-kotlin` + `kotlin/scaffold` to `main` via PRs.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `charges/src/main/kotlin/zues/charges/Charges.kt`.
+
+---
+
+## S-14 · 2026-09-15 · `:app` walking skeleton — `registry` end to end
+
+**Did** — stood up the Spring Boot deployable `:app` (Spring Boot 3.4.1 · Spring Modulith 1.3.1) and wired the first Spring module, **`registry`**, through every seam: `POST /api/registry/entrances` → `RegistryService` → **Spring Data JDBC** → PostgreSQL (schema applied by **Flyway V1**) → an **outbox** event (`EntranceRegistered`, persisted in Modulith's event publication registry, consumed by `@ApplicationModuleListener`). `GET` lists them back. The point of the slice is the wiring, not domain rules — it proves the template on real infrastructure before it is replicated.
+
+**Decisions realized** (from this session's questions):
+- **Persistence = Spring Data JDBC.** Ids are app-assigned UUIDs, so writes go through `JdbcAggregateTemplate.insert` (states insert directly) and reads through a `ListCrudRepository`.
+- **DB tests = Testcontainers, `@Testcontainers(disabledWithoutDocker = true)`.** `RegistryPersistenceIT` runs real Postgres 16 + real Flyway in CI (Docker present) and **skips on a machine without Docker** — so `./tools/gates.sh` stays green locally. `@DynamicPropertySource` builds the JDBC URL (Testcontainers has no fixed port) and adds the `currentSchema` search_path.
+- **Schema has one home again.** `git mv db/migrations/0001_init.sql → app/src/main/resources/db/migration/V1__init.sql`; the app owns and applies it. `db/test/constraints.sh` still runs against the migrated DB unchanged.
+
+**Schema mapping** — one database, schema-per-module (ADR-003). The connection `search_path` spans all module schemas, so an unqualified `@Table("entrance")` resolves to `registry.entrance` while names stay unique across schemas. Flyway keeps its history in `public`, where V1's unqualified DOMAINs (`money_minor`, …) live.
+
+**What is proved where** — `ModularityTests` (`ApplicationModules.verify()`, ADR-003 boundaries) and `RegistryWebTest` (`@WebMvcTest`, HTTP contract with the service mocked) need no database and run in the gate pack **everywhere**. The full HTTP→Postgres→outbox path is exercised only by the Docker-gated IT: **written to standard patterns but not executed in this environment — it is CI-verified.** Treat the persistence path as green in CI, unproven locally, until someone runs it with Docker.
+
+**Also** — added a root `build.gradle.kts` (`plugins { … apply false }`) so the Kotlin plugin classpath loads once instead of per-subproject (Gradle warned the duplicate "may break the build"). `PM-ORG-001` is now *referenced* in `registry` (not yet *covered* by a test) — traceability regenerated.
+
+**`./tools/gates.sh` green** — tests across `:kernel :law :charges :app`; banned-words clean on **24** source files; legal-thresholds clean; generated docs committed.
+
+**Open / next** — (1) **RLS** is not wired yet: V1 defines `app.current_entrance()` but no `ENABLE ROW LEVEL SECURITY` / policies (ADR-002 backstop) — a registry follow-up that sets `app.entrance_id` per transaction. (2) Map `EntranceRegistered` to the formal event catalogue in `docs/events`. (3) Next module: **`money`** (depends on `:charges`) toward Gate 1 — "reproduces the firm's spreadsheet to the cent". (4) A CI run is the first real execution of `RegistryPersistenceIT`.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/MODULE-TEMPLATE.md`, `app/src/main/kotlin/zues/app/registry/`, `app/src/main/resources/application.yml`.

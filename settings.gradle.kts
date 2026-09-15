@@ -22,3 +22,6 @@ dependencyResolutionManagement {
 include(":kernel")
 include(":law")
 include(":charges")
+
+// The Spring Boot deployable — a Spring Modulith modular monolith (ADR-003, ADR-010).
+include(":app")

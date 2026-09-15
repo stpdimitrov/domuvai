@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 19 | 8% |
+| Referenced in code (`// Rule:`) | 20 | 9% |
 | **Proved by a test named after the rule** | **17** | **7%** |
-| No implementation and no test | 213 | 91% |
+| No implementation and no test | 212 | 91% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -15,7 +15,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-ORG-001` | — | — |  |
+| `PM-ORG-001` | — | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
 | `PM-ORG-002` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:20` | `kernel/src/main/kotlin/zues/kernel/IdealParts.kt:5` |  |
 | `PM-ORG-003` | — | — |  |
 | `PM-ORG-004` | — | — |  |
