@@ -128,3 +128,20 @@ Name the module, cite the measurement, split that module. The build-time boundar
 - **ADR-002 — authorization.** The чл. 7 ал. 4 matrix is relationship-based; whether it is a policy engine or hand-written is unresolved and independent of topology.
 - **Which module splits first.** Probably `rail`, decided by the PSD2 licensing answer (A4).
 - **ADR-001 amendment for `engine_version`.** Separate correctness finding, recorded against ADR-001 itself.
+
+---
+
+## Amendment · 2026-09-14 · Enforcement on the JVM, and the module template
+
+The topology in §2 is **unchanged**. ADR-010 moves the backend to Kotlin on the JVM, which retires the two enforcement mechanisms in §4 that named a TypeScript tool. They are replaced, not weakened.
+
+**§4 enforcement, ported to the JVM:**
+
+1. ~~`dependency-cruiser`~~ → **Spring Modulith `ApplicationModules.verify()` + ArchUnit** in CI: a module may be reached only through its published `api` package; touching another module's `internal` package fails the build. The published `api` package is the Kotlin replacement for the TypeScript `index.ts`.
+3. Cross-module reactions remain outbox-only — now **Spring Modulith externalized application events**, delivered in-process today and one config flip from a broker on extraction.
+
+Points **2** (one schema per module), **4** (RLS on `entrance_id`) and **5** (a charge run reads the owning module's tables, never a projection) are language-neutral and stand exactly as written.
+
+**The module template.** §2 requires that "the split later must be mechanical." That intent is now codified as [`docs/MODULE-TEMPLATE.md`](../MODULE-TEMPLATE.md) — a module skeleton and six boundary rules every slice from S-G1-01b follows, so extraction-readiness is enforced by construction rather than remembered. Its three laws become build checks: one transaction writes one module's schema plus the outbox (never two modules' tables); cross-module reads go through the module's query API (never a cross-schema join); cross-module reactions go through outbox events.
+
+**Right-sizing for 10 000 users.** The `bff` read-model layer named in §2 is built **lazily** — screens read their owning module's tables directly until a measured read hotspot justifies a projection. At Bulgarian-condominium read volumes, standing CQRS read models are machinery deferred, not removed; this is a schedule note, not a change to the topology.

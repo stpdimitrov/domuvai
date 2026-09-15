@@ -17,6 +17,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | 05 | [WORKING.md](WORKING.md) | How two people work without sharing AI context |
 | 06 | [SAASPLAN.md](SAASPLAN.md) | Who pays, how much, the 90-day pilot |
 | 07 | [UIPROMPTS.md](UIPROMPTS.md) | Design prompts, mobile and desktop |
+| 08 | [MODULE-TEMPLATE.md](MODULE-TEMPLATE.md) | The extraction-ready module shape every slice follows (Kotlin · Spring Modulith) |
 | — | [RULES.md](RULES.md) · [rules.json](rules.json) | The requirements source. 233 rules |
 | — | [TRACEABILITY.md](TRACEABILITY.md) | Rule → test → implementation. Generated |
 | — | [TESTPLAN.md](TESTPLAN.md) | The remaining rules as ranked slices. Generated |
@@ -29,15 +30,16 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 |---|---|---|
 | [001](adr/ADR-001-rules-mechanism.md) | Dated data + pure functions, no rules engine | **Accepted** |
 | [002](adr/ADR-002-authorization.md) | One policy module, RLS as independent backstop | **Accepted** |
-| [003](adr/ADR-003-deployment-topology.md) | Three deployables, fourteen modules, CI-enforced boundaries | **Accepted** |
+| [003](adr/ADR-003-deployment-topology.md) | Three deployables, fourteen modules, CI-enforced boundaries · amended 2026-09-14 (JVM enforcement) | **Accepted** |
 | [004](adr/ADR-004-shared-facilities.md) | A shared facility is a cost-sharing agreement, not a tenant | Proposed — counsel |
 | [005](adr/ADR-005-entrance-as-isolation-unit.md) | The entrance is the isolation unit; the account belongs to it | **Accepted** |
 | [006](adr/ADR-006-money-and-numbers.md) | Integer minor units, exact decimals, double-entry per entrance | **Accepted** |
 | [007](adr/ADR-007-no-custody.md) | The platform never holds money | Proposed — counsel |
 | [008](adr/ADR-008-explicit-denominator.md) | Every majority carries its denominator explicitly | **Accepted** |
 | [009](adr/ADR-009-agent-holds-no-credential.md) | The agent holds no write credential | **Accepted** |
+| [010](adr/ADR-010-backend-language.md) | Backend is Kotlin · Spring Boot · Spring Modulith; frontend stays Next.js/TS | **Accepted** |
 
-**Seven of nine Accepted.** ADR-004 and ADR-007 name counsel as a co-decider and stay Proposed until counsel answers — neither blocks near-term work: ADR-004 gates A19/A32, ADR-007 gates `rail` in Phase 5.
+**Eight of ten Accepted.** ADR-004 and ADR-007 name counsel as a co-decider and stay Proposed until counsel answers — neither blocks near-term work: ADR-004 gates A19/A32, ADR-007 gates `rail` in Phase 5.
 
 ## Stage 1 — done and not done
 
@@ -48,7 +50,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | Module catalogue, 14 modules / 3 deployables | done |
 | Event catalogue, 38 events | done |
 | Cross-cutting standards, NFRs, build order | done |
-| Nine ADRs | done — 7 Accepted, 2 awaiting counsel |
+| Ten ADRs | done — 8 Accepted, 2 awaiting counsel |
 | A7 traceability generator | done |
 | A8 event JSON schemas | done |
 | A9 OpenAPI | done |

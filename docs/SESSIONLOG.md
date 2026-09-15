@@ -161,3 +161,37 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open** — A12 scaffold, which is the line where the work moves to Claude Code. The ideal-parts precision conflict from S-06 is still open. Two ADRs still with counsel. Eight commits, five pushed.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `docs/api/openapi.json`.
+
+---
+
+## S-G1-01a · 2026-09-14 · kernel — time, deadlines & a Bulgarian-first default
+
+**Did** — first of the three sub-slices S-G1-01 was split into. Kernel primitives only. `@zues/kernel` gains a pure civil-date layer — `addCalendarDays`, `weekday`/`isWeekend`, `rollToWorkingDay`, the one `deadline`, and `toSofiaDate` — plus a language primitive (`STATUTORY_LANGUAGE`, `assertStatutoryLanguage`). The statutory non-working-day calendar is dated config in `@zues/law` (`non_working_days`); `statutoryDeadline`/`isStatutoryNonWorkingDay` wire the kernel utility to it and are the single deadline entry point every module uses.
+
+**Deadlines are civil days, never instants.** `deadline` reasons on Europe/Sofia `YYYY-MM-DD` and never touches wall-clock time, so seven days across the 2026-03-29 spring-forward is still seven days — the failure PM-SYS-004 exists to prevent. Storage stays UTC; `toSofiaDate` is the one crossing back to a civil day.
+
+**The predicate is a parameter, so kernel stays law-free.** `deadline(from, days, isNonWorking)` takes the non-working-day test as an argument; the statutory holiday set is injected by `@zues/law`. Kernel gains no dependency on law, and the "single utility used everywhere" (PM-SYS-005) lives once, composed with the calendar in `statutoryDeadline`.
+
+**Rules covered** — PM-SYS-003, PM-SYS-004, PM-SYS-005 (traceability 14→17 / 233).
+
+**Tests added** — `packages/kernel/test/sys-time.test.ts` (PM-SYS-003 ×1, PM-SYS-004 ×3, PM-SYS-005 ×2), `packages/law/test/sys-deadlines.test.ts` (PM-SYS-005 ×4). Each proves its guard fires, not just the happy path: an English statutory document is rejected; an impossible date (`2026-02-30`) and a non-ISO date are rejected; a fractional day throws; a predicate that never yields a working day throws rather than looping; a weekend and a weekday holiday both roll; the non-working-day set reports `verified:false` with its `PM-SYS-005` TODO.
+
+**Decisions** — none new. Applies ADR-001 (dated data, pure functions, no clock) and PM-SYS-001/002 (constants temporal, resolved at the legal date, not `Date.now()`).
+
+**Open** — PM-SYS-005 is ⚠. `non_working_days` carries `TODO(legal): PM-SYS-005`: the movable Orthodox Easter days, the КТ чл. 154 ал. 2 weekend-substitution rule, and the ГПК чл. 60 roll as it applies to ЗУЕС deadlines are unconfirmed and wait on counsel — the mechanism is built, the calendar is config. Next slice: **S-G1-01b** (evidence & delivery — PM-SYS-006/007/013/014). Gates 2 (event contracts) and 6 (openapi) stay red locally until `pip install -r tools/requirements.txt` (jsonschema, openapi_spec_validator) — pre-existing, nothing to do with this slice. A vault reconciliation this session found the repo self-sufficient; the one item worth porting later is the PM-SYS-009 sanctions design (`SanctionRule` shape + чл. 55–57 bands), for S-G1-01c.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `packages/kernel/src/time.ts`, `docs/RULES.md` SYS.
+
+---
+
+## S-08 · 2026-09-14 · Backend language decided — Kotlin on the JVM (ADR-010)
+
+**Did** — recorded **ADR-010**: the backend moves to **Kotlin · Spring Boot · Spring Modulith**; the frontend stays **Next.js/TypeScript**. Amended **ADR-003** to port its boundary enforcement from `dependency-cruiser` to Spring Modulith `ApplicationModules.verify()` + ArchUnit, and codified the extraction-ready module shape as **`docs/MODULE-TEMPLATE.md`**. Reconciled the docs that named the old stack — `INDEX.md` (ADR table, counts), `DEVBRIEF.md` (the Stack line), `CLAUDE.md` (ADR table + a note that the TypeScript examples predate ADR-010).
+
+**Why** — the team is three developers with a Java background; the agent writes the bulk, but the humans review, own and hire around legally-critical code, so the language is optimised for them, not the (language-agnostic) writer. The three arguments that had favoured TypeScript are neutral here: the browser forces TS on the frontend regardless, the agent is fast in Kotlin, and the team already runs the JVM. Decided **now** because only ~600 lines exist and A12 is unscaffolded — the port is ~a day today, a rewrite after A12.
+
+**Integrity checked** — `./tools/gates.sh` green before and after (docs-only changes; no generated document touched, no `*.ts` changed). All nine non-negotiables and all seven previously-Accepted ADRs are language-neutral and survive — verified item by item in ADR-010 §4. Topology is unchanged (ADR-003 already chose the CI-enforced modular monolith, not the by-convention one).
+
+**Open / migration (tracked in ADR-010 §5)** — scaffold Gradle/Spring Boot in Kotlin (A12); port `@zues/kernel|law|charges` + `zues-calc` (~a day); **re-do S-G1-01a in Kotlin** (the TS slice stays as the record on its branch); retarget the gate globs `*.ts`→`*.kt`; port the TS examples in `CLAUDE.md`/slice protocol. One product question drives the kernel design: **must an in-person assembly compute its tally offline?** And confirm **Kotlin vs Java** (recommend Kotlin).
+
+**Read first next time** — `docs/INDEX.md`, this entry, `docs/adr/ADR-010-backend-language.md`, `docs/MODULE-TEMPLATE.md`, the ADR-003 amendment.
