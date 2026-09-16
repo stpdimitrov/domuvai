@@ -7,6 +7,7 @@ import zues.charges.ChargeRun
 import zues.charges.PropertyUnit
 import zues.charges.Tariff
 import zues.charges.TariffLine
+import zues.charges.chargeablePersons
 import zues.charges.computeChargeRun
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
@@ -26,8 +27,9 @@ data class ComputedRun(val run: ChargeRun, val units: List<UnitForCharging>)
 
 /**
  * Computes a charge run for an entrance from the units `registry` holds, reached through its
- * published [Units] port — never its tables (ADR-003). Occupancy is not modelled yet, so a
- * `PER_PERSON` line is refused rather than silently billed as zero persons.
+ * published [Units] port — never its tables (ADR-003). A `PER_PERSON` line now bills on the
+ * registered household headcount; the engine excludes children under six (PM-FEE-005). A
+ * per-person run with no chargeable occupant is refused, not billed as a division by zero.
  */
 @Service
 class ChargeRunService(private val units: Units) {
@@ -37,16 +39,20 @@ class ChargeRunService(private val units: Units) {
         if (stored.isEmpty()) {
             throw NoSuchElementException("entrance $entranceId has no registered units")
         }
-        require(request.lines.none { AllocationKey.valueOf(it.key) == AllocationKey.PER_PERSON }) {
-            "PER_PERSON allocation needs occupancy, which is not modelled yet — use BY_IDEAL_PARTS or PER_UNIT"
-        }
         val propertyUnits = stored.map {
             PropertyUnit(
                 unitId = it.unitId.toString(),
                 designation = it.designation,
                 idealParts = IdealParts.of(it.idealParts),
-                occupants = 0,
+                occupants = it.occupants,
+                childrenUnder6 = it.childrenUnder6,
                 businessUse = it.separateEntrance,
+            )
+        }
+        val perPerson = request.lines.any { AllocationKey.valueOf(it.key) == AllocationKey.PER_PERSON }
+        if (perPerson && propertyUnits.sumOf { chargeablePersons(it, request.legalDate) } == 0) {
+            throw IllegalArgumentException(
+                "a PER_PERSON charge needs at least one chargeable occupant; this entrance has none registered",
             )
         }
         val tariff = Tariff(

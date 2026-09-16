@@ -48,7 +48,29 @@ class ChargeRunServiceTest {
     }
 
     @Test
-    fun `a PER_PERSON line is refused until occupancy is modelled`() {
+    fun `PM-FEE-008 a per-person run bills each unit by its chargeable occupants`() {
+        whenever(units.forEntrance(entranceId)).thenReturn(
+            listOf(
+                UnitForCharging(u1, "ап. 1", "60.0000", false, occupants = 3),
+                UnitForCharging(u2, "ап. 2", "40.0000", false, occupants = 1),
+            ),
+        )
+        val response = service.preview(
+            entranceId,
+            StoredChargeRunRequest(
+                period = "2026-05", legalDate = "2026-05-01",
+                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+            ),
+        )
+        assertThat(response.totalMinor).isEqualTo(2_000)   // 500 × (3 + 1) persons
+        val byUnit = response.charges.associate { it.unitId to it.totalMinor }
+        assertThat(byUnit[u1.toString()]).isEqualTo(1_500)
+        assertThat(byUnit[u2.toString()]).isEqualTo(500)
+    }
+
+    @Test
+    fun `a per-person run with no chargeable occupants is refused`() {
+        // the default stub registers no occupants
         assertThatThrownBy {
             service.preview(
                 entranceId,
@@ -57,7 +79,7 @@ class ChargeRunServiceTest {
                     lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
                 ),
             )
-        }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PER_PERSON")
+        }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("occupant")
     }
 
     @Test

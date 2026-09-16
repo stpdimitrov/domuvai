@@ -382,3 +382,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — **S-20 money `PER_PERSON`**: consume `occupants`/`childrenUnder6` from the port, drop the rejection, and guard a per-person line whose entrance has zero registered occupants. Then animals, then absence.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt`, `app/src/main/kotlin/zues/app/registry/Units.kt`.
+
+---
+
+## S-20 · 2026-09-16 · money bills PER_PERSON
+
+**Did** — `money` now bills a `PER_PERSON` line on the **registered household headcount** the port exposes (S-19), completing the occupancy goal. Dropped the S-17 refusal; the engine already excludes children under six (PM-FEE-005). A per-person run whose entrance has **no chargeable occupant** is refused with a 400 — the engine would otherwise divide a pot by a zero weight-sum. The guard computes the real chargeable count with `:charges`' own `chargeablePersons`, so it agrees with the engine to the person.
+
+**End to end** — register a household of three in `registry`, post a `PER_PERSON` management line at 500 minor/person, and the run totals 1500 — read back through the port money shares with `registry`.
+
+**Rules** — **PM-FEE-008** (persons residing are billed as occupants) is proved at the money layer by `ChargeRunServiceTest`: three occupants in one unit, one in another, a per-person rate splits 1500 / 500. **PM-FEE-005** (children excluded) rides on the engine's own coverage.
+
+**What is proved where** — `ChargeRunServiceTest` (per-person allocation + the zero-occupancy guard) runs **locally**; `PerPersonChargeIT` (Testcontainers) drives registry household → money per-person charge against real Postgres — **CI-only**.
+
+**`./tools/gates.sh` green** — traceability 20/233, banned-words clean on 52 files, legal-thresholds clean, `verify()` passing, TRACEABILITY regenerated.
+
+**Open / next** — **animals** (PM-FEE-009 / PM-BOOK-005, one occupant-equivalent each), **absence** exemptions (PM-FEE-006/007), the **30-day** residence threshold and **6th-birthday** transition (both config-driven, from `:law`), and **period-aware** occupancy (a dated port). Separately: double-entry **postings** + the fund (PM-FEE-020), and a `GET` for a stored run.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.

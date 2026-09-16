@@ -131,7 +131,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:48` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:12` |  |
 | `PM-FEE-006` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:119` | `charges/src/main/kotlin/zues/charges/Charges.kt:39` | ⚠ |
 | `PM-FEE-007` | — | — |  |
-| `PM-FEE-008` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:39` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:99` |  |
+| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:51` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:99` |  |
 | `PM-FEE-009` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:114` | `charges/src/main/kotlin/zues/charges/Charges.kt:37` |  |
 | `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-FEE-011` | — | — |  |
