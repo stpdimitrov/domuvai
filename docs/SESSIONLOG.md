@@ -510,3 +510,23 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Frontend** — not started; **backend only**. Decided to be a **separate Next.js app** (ADR-010/003, consolidated in **ADR-011**). Build **gate by gate**, not big-bang; the assistant announces the green light per ADR-011 §3. **Open owner decision:** repo layout — monorepo `web/` (recommended) vs separate repo.
 
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/adr/ADR-011-frontend-topology.md`, then `git log --oneline -12` and `./tools/gates.sh`.
+
+---
+
+## S-26 · 2026-09-16 · absence — a filed non-use declaration exempts the unit (PM-FEE-006/007)
+
+**Did** — closed the registry gap under the already-built engine. `:charges` and `:law` already prorated absence (`chargeablePersons` → 0 when `absentDays > ABSENCE_EXEMPTION_DAYS`), and the *payload* path carried `absentDays` — but a run computed **from the registry** always sent 0, so no registered unit could ever be exempt, and nothing recorded a **filed declaration** (PM-FEE-007). Now `registry` holds `absence_declaration` (a closed span `[absentFrom, absentTo)` + a system-stamped `filedOn`), the `Units` port surfaces `absentDays`, and `ChargeRunService` passes it through into the engine.
+
+**The rule split, deliberately** — the *charge* consequence stays in `:charges` (absent-days vs the window → exempt); the *record* judgment stays in `registry`: the adapter sums a unit's filed declarations, **clipped to the run's calendar year** (PM-FEE-006 counts absence "in a calendar year") and **dropping late filings** (PM-FEE-007 — filed more than the grace window after the absence ends → not applied). `filedOn` is stamped from the clock, never the caller, so timeliness can't be back-dated.
+
+**⚠ two unverified numbers, both config, never invented** — `ABSENCE_EXEMPTION_DAYS` (pre-existing) and the new `ABSENCE_DECLARATION_GRACE_DAYS` live in `:law` marked `verified=false` with a `TODO(legal)`; every test reads them via `numberOn`, never as a literal. The exemption *mode* (full vs reduced share) is still the engine's documented placeholder.
+
+**Tests — each guard proves it fires** — `UnitsAdapterTest`: days surfaced, year-clip, **unfiled → 0**, **late-filed → 0** (boundary filing still counted). `ChargeRunServiceTest`: a unit absent beyond the window drops off a PER_PERSON line while its neighbour bills normally. `LawTest`: the grace window is unconfirmed & config-sourced. `AbsenceWebTest`: 201 / 404 / 400. `AbsencePersistenceIT` (Docker, CI): file → read back through the port, clock pinned so the filing is deterministically timely.
+
+**`./tools/gates.sh` green** — 9/9. Traceability **23/233 (10%)** — **PM-FEE-007 newly covered** (PM-FEE-006 was already green in the engine); TESTPLAN 211 remaining; schema-columns 9 entities / 24 tables (new `absence_declaration`); legal-thresholds clean. OpenAPI unchanged — the absence sub-endpoint stays out of the published contract, as household/animals do.
+
+**Open / next** — **fund** accounts (PM-FUND-004+; ADR-007 *Proposed* — the account record is safe, holding/moving money is not), then **owners / parties** (a receivable needs a liable party) and **intake / spreadsheet import**, toward Gate-1 contract-complete → the frontend green light. Both absence day-counts and the exemption mode remain for counsel.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Units.kt` (the absence computation), `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt`, `law/src/main/kotlin/zues/law/Constants.kt`.
+
+---

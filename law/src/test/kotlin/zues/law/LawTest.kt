@@ -33,6 +33,14 @@ class LawTest {
     }
 
     @Test
+    fun `PM-FEE-007 the absence-declaration grace window is unconfirmed and comes from configuration`() {
+        val c = constantOn("ABSENCE_DECLARATION_GRACE_DAYS", on)
+        assertFalse(c.verified)
+        assertNotNull(c.todoLegal)
+        assertTrue(unverified().map { it.code }.contains("ABSENCE_DECLARATION_GRACE_DAYS"))
+    }
+
+    @Test
     fun `PM-FEE-004 the repair fund is fixed to ideal parts and management defaults per person`() {
         assertEquals(AllocationKey.BY_IDEAL_PARTS, defaultKey(CostStream.REPAIR_FUND))
         assertEquals(AllocationKey.PER_PERSON, defaultKey(CostStream.MANAGEMENT))

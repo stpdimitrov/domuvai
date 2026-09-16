@@ -71,6 +71,15 @@ data class NewAnimalRequest(
 
 data class AnimalsRegisteredResponse(val animalIds: List<UUID>)
 
+data class RegisterAbsencesRequest(val absences: List<NewAbsenceRequest>)
+
+data class NewAbsenceRequest(
+    val absentFrom: String,      // ISO date, inclusive
+    val absentTo: String,        // ISO date, exclusive — the first day back
+)
+
+data class AbsencesRegisteredResponse(val absenceIds: List<UUID>)
+
 /** The registry module's HTTP edge — entrances and their units. */
 @RestController
 @RequestMapping("/api/registry/entrances")
@@ -129,6 +138,20 @@ class RegistryController(private val registry: RegistryService) {
             request.animals.map { RegisterAnimal(it.species, it.vetPassportNo, it.validFrom) },
         )
         return ResponseEntity.status(HttpStatus.CREATED).body(AnimalsRegisteredResponse(ids))
+    }
+
+    @PostMapping("/{entranceId}/units/{unitId}/absences")
+    fun registerAbsences(
+        @PathVariable entranceId: UUID,
+        @PathVariable unitId: UUID,
+        @RequestBody request: RegisterAbsencesRequest,
+    ): ResponseEntity<AbsencesRegisteredResponse> {
+        val ids = registry.registerAbsence(
+            entranceId,
+            unitId,
+            request.absences.map { RegisterAbsence(it.absentFrom, it.absentTo) },
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(AbsencesRegisteredResponse(ids))
     }
 
     @GetMapping("/{entranceId}/units")

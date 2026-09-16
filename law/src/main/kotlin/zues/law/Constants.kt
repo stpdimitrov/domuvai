@@ -33,6 +33,14 @@ private val CONSTANTS: List<Constant> = listOf(
         "ABSENCE_EXEMPTION_DAYS", "30", "2009-01-01", "чл. 51 ал. 2 ЗУЕС", false, rule = "PM-FEE-006",
         todoLegal = "Confirm whether absence gives full exemption or a reduced share, and the exact day count.",
     ),
+    Constant(
+        // PM-FEE-007 — "MUST NOT apply it retroactively beyond the configured window." The
+        // window is a policy number, not one the statute states, so it is unverified: the
+        // value below is a placeholder counsel must confirm, never an asserted legal figure.
+        "ABSENCE_DECLARATION_GRACE_DAYS", "30", "2009-01-01", "чл. 51 ЗУЕС", false, rule = "PM-FEE-007",
+        todoLegal = "Confirm the grace window for filing an absence declaration after the absence " +
+            "ends, and whether it is set by statute or by GA decision.",
+    ),
     Constant("OCCUPANT_THRESHOLD_DAYS", "30", "2009-01-01", "чл. 7 ал. 2 т. 6, чл. 51 ЗУЕС", true, rule = "PM-FEE-008"),
     Constant("ANIMAL_OCCUPANT_EQUIVALENT", "1", "2009-01-01", "чл. 51 ЗУЕС", true, rule = "PM-FEE-009"),
     Constant(

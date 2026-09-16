@@ -146,6 +146,21 @@ CREATE TABLE registry.animal (
   valid_to         date
 );
 
+-- Rule: PM-FEE-006 / PM-FEE-007 — a filed non-use declaration. A unit whose occupants
+-- are absent beyond the statutory window is exempt for the period; the exemption requires
+-- a filed declaration, and a filing too late (PM-FEE-007) is not applied. Unlike residency,
+-- an absence is a closed span: both bounds are known when it is declared. `filed_on` is set
+-- by the system, not the caller — the filing date, not a claimed one, decides timeliness.
+CREATE TABLE registry.absence_declaration (
+  id            uuid PRIMARY KEY,
+  entrance_id   uuid NOT NULL REFERENCES registry.entrance(id),
+  unit_id       uuid NOT NULL REFERENCES registry.unit(id),
+  absent_from   date NOT NULL,
+  absent_to     date NOT NULL,               -- exclusive: the first day back
+  filed_on      date NOT NULL,
+  CHECK (absent_to > absent_from)
+);
+
 -- ============================================================ identity_org
 -- Rule: PM-GOV-004 — a mandate MUST NOT exceed 2 years, and the incumbent
 -- continues until a successor is elected.

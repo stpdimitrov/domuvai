@@ -46,6 +46,15 @@ data class RegisterAnimal(
 )
 
 /**
+ * One filed absence to record for a unit — a closed span `[absentFrom, absentTo)` of non-use
+ * (Rule: PM-FEE-006/007). Both bounds are required; the filing date is stamped by the system.
+ */
+data class RegisterAbsence(
+    val absentFrom: String,
+    val absentTo: String,
+)
+
+/**
  * The registry module's one public operation for the walking skeleton: create a
  * condominium and its first entrance, then raise [EntranceRegistered]. The insert and the
  * event share one transaction, so the outbox row cannot outlive a rolled-back write.
@@ -150,6 +159,36 @@ class RegistryService(
                     vetPassportNo = animal.vetPassportNo,
                     validFrom = animal.validFrom?.let { LocalDate.parse(it) } ?: today,
                     validTo = null,
+                ),
+            ).id
+        }
+    }
+
+    /**
+     * File absence declarations for a unit — the record a per-person exemption requires (Rule:
+     * PM-FEE-007; the exemption itself is PM-FEE-006). Each is a closed span; `filedOn` is
+     * stamped from the clock, so timeliness turns on when the system received the filing, not on
+     * a date the caller claims. The unit must exist and belong to the entrance.
+     */
+    @Transactional
+    fun registerAbsence(entranceId: UUID, unitId: UUID, declarations: List<RegisterAbsence>): List<UUID> {
+        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
+        if (unit.entranceId != entranceId) {
+            throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
+        }
+        val filedOn = LocalDate.now(clock)
+        return declarations.map { declaration ->
+            val from = LocalDate.parse(declaration.absentFrom)
+            val to = LocalDate.parse(declaration.absentTo)
+            require(to.isAfter(from)) { "absentTo ($to) must be after absentFrom ($from)" }
+            aggregates.insert(
+                AbsenceDeclaration(
+                    id = UUID.randomUUID(),
+                    entranceId = entranceId,
+                    unitId = unitId,
+                    absentFrom = from,
+                    absentTo = to,
+                    filedOn = filedOn,
                 ),
             ).id
         }

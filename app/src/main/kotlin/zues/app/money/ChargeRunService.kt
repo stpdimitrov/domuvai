@@ -54,6 +54,7 @@ class ChargeRunService(private val units: Units) {
                 occupants = it.occupants,
                 childrenUnder6 = it.childrenUnder6,
                 animals = it.animals,
+                absentDays = it.absentDays,   // PM-FEE-006 — a filed absence exempts the unit (via the engine)
                 businessUse = it.separateEntrance,
             )
         }

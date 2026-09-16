@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 24 | 10% |
-| **Proved by a test named after the rule** | **22** | **9%** |
-| No implementation and no test | 208 | 89% |
+| Referenced in code (`// Rule:`) | 25 | 11% |
+| **Proved by a test named after the rule** | **23** | **10%** |
+| No implementation and no test | 207 | 89% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -36,7 +36,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-002` | — | — |  |
 | `PM-BOOK-003` | — | — |  |
 | `PM-BOOK-004` | — | — |  |
-| `PM-BOOK-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:66` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
+| `PM-BOOK-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:76` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
 | `PM-BOOK-006` | — | — |  |
 | `PM-BOOK-007` | — | — |  |
 | `PM-BOOK-008` | — | — |  |
@@ -120,7 +120,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-015` | — | — |  |
 | `PM-VOTE-016` | — | — |  |
 
-## FEE — Charges & allocation  ·  14/20 covered
+## FEE — Charges & allocation  ·  15/20 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -128,11 +128,11 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:37` | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-003` | — | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
-| `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:56` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:13` |  |
-| `PM-FEE-006` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:119` | `charges/src/main/kotlin/zues/charges/Charges.kt:39` | ⚠ |
-| `PM-FEE-007` | — | — |  |
-| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:53` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:106` |  |
-| `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:98` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
+| `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:66` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:13` |  |
+| `PM-FEE-006` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:99` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` | ⚠ |
+| `PM-FEE-007` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:106` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` |  |
+| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:54` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:115` |  |
+| `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:121` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
 | `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-FEE-011` | — | — |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |
@@ -275,7 +275,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
-| `PM-SYS-002` | `law/src/test/kotlin/zues/law/LawTest.kt:15` | `law/src/main/kotlin/zues/law/Constants.kt:48` |  |
+| `PM-SYS-002` | `law/src/test/kotlin/zues/law/LawTest.kt:15` | `law/src/main/kotlin/zues/law/Constants.kt:56` |  |
 | `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
 | `PM-SYS-004` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:26` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
 | `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |

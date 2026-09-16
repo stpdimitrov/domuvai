@@ -10,6 +10,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import zues.app.registry.UnitForCharging
 import zues.app.registry.Units
+import zues.law.numberOn
 import java.util.UUID
 
 /**
@@ -92,6 +93,28 @@ class ChargeRunServiceTest {
                 StoredChargeRunRequest("2026-05", "2026-05-01", lines = emptyList()),
             )
         }.isInstanceOf(NoSuchElementException::class.java)
+    }
+
+    @Test
+    fun `PM-FEE-006 a unit absent beyond the window is exempt from a per-person line`() {
+        val exemptionDays = numberOn("ABSENCE_EXEMPTION_DAYS", "2026-05-01").toInt()
+        whenever(units.forEntrance(eq(entranceId), any())).thenReturn(
+            listOf(
+                UnitForCharging(u1, "ап. 1", "60.0000", false, occupants = 2, absentDays = exemptionDays + 1),
+                UnitForCharging(u2, "ап. 2", "40.0000", false, occupants = 1),
+            ),
+        )
+        val response = service.preview(
+            entranceId,
+            StoredChargeRunRequest(
+                period = "2026-05", legalDate = "2026-05-01",
+                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+            ),
+        )
+        val byUnit = response.charges.associate { it.unitId to it.totalMinor }
+        assertThat(byUnit[u1.toString()]).isEqualTo(0)      // absent beyond the window — not billed per person
+        assertThat(byUnit[u2.toString()]).isEqualTo(500)    // billed normally
+        assertThat(response.totalMinor).isEqualTo(500)
     }
 
     @Test
