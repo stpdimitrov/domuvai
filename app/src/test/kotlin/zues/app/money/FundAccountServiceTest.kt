@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
@@ -28,7 +29,8 @@ class FundAccountServiceTest {
         purpose: String = "REPAIR_RENEWAL",
         holderName: String = "Иван Петров",
         holderKind: String = "MANAGER",
-    ) = RegisterFundAccount(iban, purpose, holderName, holderKind)
+        holderPartyId: String? = null,
+    ) = RegisterFundAccount(iban, purpose, holderName, holderKind, holderPartyId)
 
     @Test
     fun `PM-FUND-001 a repair-and-renewal account is registered with a normalised IBAN`() {
@@ -62,6 +64,21 @@ class FundAccountServiceTest {
     @Test
     fun `an unknown holder kind is rejected`() {
         assertThatThrownBy { service.register(entranceId, command(holderKind = "LANDLORD")) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `PM-FUND-004 the holder is linked to a book party when one is given`() {
+        val captor = argumentCaptor<FundAccountRow>()
+        whenever(aggregates.insert(captor.capture())).thenAnswer { it.getArgument<FundAccountRow>(0) }
+        val party = UUID.randomUUID()
+        service.register(entranceId, command(holderPartyId = party.toString()))
+        assertThat(captor.firstValue.holderParty).isEqualTo(party)
+    }
+
+    @Test
+    fun `a malformed holder party id is rejected`() {
+        assertThatThrownBy { service.register(entranceId, command(holderPartyId = "not-a-uuid")) }
             .isInstanceOf(IllegalArgumentException::class.java)
     }
 }

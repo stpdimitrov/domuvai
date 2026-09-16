@@ -23,6 +23,8 @@ data class FundAccountRow(
     val purpose: String,        // FundPurpose
     val holderName: String,
     val holderKind: String,     // HolderKind
+    // The book party that holds the account, when it is a modelled party (Rule: PM-FUND-004).
+    val holderParty: UUID? = null,
 )
 
 /** The account's purpose. The fund is REPAIR_RENEWAL; it must not equal the OPERATING account. */

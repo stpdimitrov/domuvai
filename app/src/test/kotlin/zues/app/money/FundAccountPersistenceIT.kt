@@ -89,6 +89,28 @@ class FundAccountPersistenceIT {
     }
 
     @Test
+    fun `PM-FUND-004 the holder is linked to a book party and read back`() {
+        val entranceId = createEntrance()
+        val partyResponse = mvc.perform(
+            post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"fullName":"Иван Петров","idType":"EGN","idValue":"7501010010"}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val partyId = json.readTree(partyResponse).get("partyId").asText()
+
+        val iban = freshIban()
+        mvc.perform(
+            post("/api/money/entrances/$entranceId/fund-accounts").contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"iban":"$iban","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"MANAGER","holderPartyId":"$partyId"}""",
+                ),
+        ).andExpect(status().isCreated)
+
+        mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].holderParty").value(partyId))
+    }
+
+    @Test
     fun `PM-FUND-004 the fund cannot reuse the operating account's IBAN, but coexists on its own`() {
         val entranceId = createEntrance()
         val operating = freshIban()

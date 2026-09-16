@@ -18,6 +18,7 @@ data class RegisterFundAccountRequest(
     val purpose: String,        // REPAIR_RENEWAL | OPERATING
     val holderName: String,
     val holderKind: String,     // MANAGER | ASSOCIATION
+    val holderPartyId: String? = null,
 )
 
 data class FundAccountView(
@@ -26,6 +27,7 @@ data class FundAccountView(
     val purpose: String,
     val holderName: String,
     val holderKind: String,
+    val holderParty: UUID?,
 )
 
 /**
@@ -45,13 +47,17 @@ class FundAccountController(private val fund: FundAccountService) {
         ResponseEntity.status(HttpStatus.CREATED).body(
             fund.register(
                 entranceId,
-                RegisterFundAccount(request.iban, request.purpose, request.holderName, request.holderKind),
+                RegisterFundAccount(
+                    request.iban, request.purpose, request.holderName, request.holderKind, request.holderPartyId,
+                ),
             ),
         )
 
     @GetMapping
     fun list(@PathVariable entranceId: UUID): List<FundAccountView> =
-        fund.list(entranceId).map { FundAccountView(it.id, it.iban, it.purpose, it.holderName, it.holderKind) }
+        fund.list(entranceId).map {
+            FundAccountView(it.id, it.iban, it.purpose, it.holderName, it.holderKind, it.holderParty)
+        }
 
     /** A malformed IBAN, an unknown purpose or holder kind, or a blank holder → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
@@ -69,5 +75,5 @@ class FundAccountController(private val fund: FundAccountService) {
     @ExceptionHandler(DataIntegrityViolationException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onIntegrity(e: DataIntegrityViolationException): Map<String, String> =
-        mapOf("error" to "the account conflicts with an existing record, or the entrance does not exist")
+        mapOf("error" to "the account conflicts with an existing record, or the entrance or holder party does not exist")
 }

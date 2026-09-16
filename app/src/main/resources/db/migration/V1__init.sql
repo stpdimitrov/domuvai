@@ -306,10 +306,12 @@ CREATE TABLE money.fund_account (
   iban         text NOT NULL,
   purpose      text NOT NULL CHECK (purpose IN ('REPAIR_RENEWAL','OPERATING')),
   -- Rule: PM-FUND-004 — the holder is the chair of the management board (manager) or the
-  -- association, never the platform (ADR-007). Held descriptively until parties are modelled,
-  -- when a nullable holder_party -> registry.party is added and back-filled.
+  -- association, never the platform (ADR-007). `holder_name`/`holder_kind` state the holder;
+  -- `holder_party` is the precise link to the book's party record when there is one (nullable,
+  -- because the association or an as-yet-unregistered chair may not be a modelled party).
   holder_name  text NOT NULL,
   holder_kind  text NOT NULL CHECK (holder_kind IN ('MANAGER','ASSOCIATION')),
+  holder_party uuid REFERENCES registry.party(id),
   -- one account per entrance per purpose, and one IBAN across all entrances: the fund cannot
   -- equal the operating account (PM-FUND-004) and monies cannot be commingled (PM-FUND-005).
   UNIQUE (entrance_id, purpose),

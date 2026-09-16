@@ -588,3 +588,19 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/OwnershipService.kt`, `app/src/main/kotlin/zues/app/registry/Title.kt`.
 
 ---
+
+## S-30 · 2026-09-16 · fund holder → party (closes the S-27 deferral)
+
+**Did** — now that parties exist (S-29), a fund account's holder can be **linked to a book party**. `money.fund_account` gains a nullable `holder_party → registry.party`; registration takes an optional `holderPartyId` and the read returns it. `holder_name`/`holder_kind` stay as the stated holder and the fallback when the holder is not a modelled party (the association, or a chair not yet in the book).
+
+**A DB FK, not a code dependency** — `holder_party` references `registry.party` at the schema level, exactly as `entrance_id` already references `registry.entrance`; `money` imports no registry type, so ADR-003's no-cross-module-code rule holds. A party that does not exist is caught by the FK, not by a cross-module read (which money may not do).
+
+**Tests** — `FundAccountServiceTest`: the holder party is stored when given, a malformed id is a 400. `FundAccountPersistenceIT` (Docker, CI): register a party, link it, read it back; the IBAN comes from `freshIban()` (the S-28 lesson).
+
+**No new rule coverage** — this refines PM-FUND-004's holder from free text to a precise reference; traceability stays **30/233 (13%)**. `./tools/gates.sh` green 9/9 (schema-columns 12 entities, `fund_account` with the new column). Only traceability line numbers regenerated.
+
+**Open / next** — **intake / spreadsheet import** (Gate 1's "reproduce the firm's spreadsheet") or the **receivable read** (a resident's balance), toward Gate-1 contract-complete → the frontend green light.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/FundAccount.kt`, `app/src/main/kotlin/zues/app/money/FundAccountService.kt`.
+
+---

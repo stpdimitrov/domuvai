@@ -5,12 +5,14 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
-/** File a condominium's external bank account (Rule: PM-FUND-004). Holder name and kind required. */
+/** File a condominium's external bank account (Rule: PM-FUND-004). Holder name and kind required;
+ *  `holderPartyId` links the holder to a book party when there is one. */
 data class RegisterFundAccount(
     val iban: String,
     val purpose: String,       // FundPurpose
     val holderName: String,
     val holderKind: String,    // HolderKind
+    val holderPartyId: String? = null,
 )
 
 /** What registering an account returns. */
@@ -45,6 +47,7 @@ class FundAccountService(
         val purpose = enumValueOf<FundPurpose>(command.purpose)   // unknown value -> 400
         val holderKind = enumValueOf<HolderKind>(command.holderKind)
         require(command.holderName.isNotBlank()) { "holderName must not be blank" }
+        val holderParty = command.holderPartyId?.let { UUID.fromString(it) }   // malformed uuid -> 400
         val iban = Iban.normalize(command.iban)
 
         // Rule: PM-FUND-005 — one IBAN across all entrances, so fund monies are never commingled.
@@ -63,6 +66,7 @@ class FundAccountService(
                 purpose = purpose.name,
                 holderName = command.holderName,
                 holderKind = holderKind.name,
+                holderParty = holderParty,   // the FK backstops a party that does not exist
             ),
         )
         return FundAccountRegistered(row.id, entranceId, row.iban, row.purpose)
