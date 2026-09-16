@@ -1,6 +1,7 @@
 package zues.app.registry
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.relational.core.mapping.Column
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
 import java.time.LocalDate
@@ -19,7 +20,10 @@ data class HouseholdMember(
     val entranceId: UUID,
     val unitId: UUID,
     val partyId: UUID?,
-    val isChildUnder6: Boolean,
+    // The schema column is `is_child_under_6`; the default naming would map this property to
+    // `is_child_under6` (as `areaM2` -> `area_m2` shows, no underscore before a digit), so the
+    // column is named explicitly.
+    @Column("is_child_under_6") val isChildUnder6: Boolean,
     val validFrom: LocalDate,
     val validTo: LocalDate?,
 )

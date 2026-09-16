@@ -400,3 +400,17 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — **animals** (PM-FEE-009 / PM-BOOK-005, one occupant-equivalent each), **absence** exemptions (PM-FEE-006/007), the **30-day** residence threshold and **6th-birthday** transition (both config-driven, from `:law`), and **period-aware** occupancy (a dated port). Separately: double-entry **postings** + the fund (PM-FEE-020), and a `GET` for a stored run.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.
+
+---
+
+## S-21 · 2026-09-16 · fix — household column name (CI red → green)
+
+**Found in CI, not locally** — the S-19/S-20 runs went red: `BadSqlGrammarException` in `HouseholdPersistenceIT` (insert) and `ChargeRunPersistenceIT` (S-19 made `UnitsAdapter` read `household_member` on every charge, so issuing a run hit it too — which is why S-18's IT was green on `6ad8918` but failed after S-19). Root cause: Spring Data JDBC's default naming maps `isChildUnder6` to column `is_child_under6`, but the schema column is **`is_child_under_6`** — no underscore before a digit (the same rule that makes `areaM2 → area_m2` *match* and pass). Column not found.
+
+**Fix** — one line: `@Column("is_child_under_6")` on `HouseholdMember.isChildUnder6`. Audited every persisted entity property against the schema; this was the only digit-column mismatch (`area_m2` already matched, which is why S-16's unit IT passed).
+
+**The lesson, logged** — column-name mapping cannot be verified on this Docker-less machine; the gate pack is green locally while the mapping is wrong. CI (Testcontainers) is the backstop and caught it, exactly as the "CI validates the DB layer" note intended. A cheap future gate would compare entity property names to the schema's columns without a database — worth adding before the persistence surface grows.
+
+**`./tools/gates.sh` green locally** (compile + non-DB tests); the real proof is the next CI run.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt`.
