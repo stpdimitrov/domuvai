@@ -85,6 +85,11 @@ class ChargeRunStore(
             }
         }
 
+        // The double-entry side: one journal per run (its id is the run's), debits and credits
+        // balancing to zero — checked here in code and again by the deferred DB trigger.
+        Ledger.forRun(run, entranceId, runId, LocalDate.parse(run.legalDate))
+            .forEach { aggregates.insert(it) }
+
         events.publishEvent(ChargeRunPersisted(runId, entranceId, run.period))
         return ChargeRunIssued(runId, entranceId, run.period, run.total.amountMinor, lineCount)
     }

@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 23 | 10% |
-| **Proved by a test named after the rule** | **21** | **9%** |
-| No implementation and no test | 209 | 90% |
+| Referenced in code (`// Rule:`) | 24 | 10% |
+| **Proved by a test named after the rule** | **22** | **9%** |
+| No implementation and no test | 208 | 89% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -120,7 +120,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-015` | — | — |  |
 | `PM-VOTE-016` | — | — |  |
 
-## FEE — Charges & allocation  ·  13/20 covered
+## FEE — Charges & allocation  ·  14/20 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -143,7 +143,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-017` | — | — |  |
 | `PM-FEE-018` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:102` | `charges/src/main/kotlin/zues/charges/Charges.kt:70` |  |
 | `PM-FEE-019` | — | — |  |
-| `PM-FEE-020` | — | — |  |
+| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:50` | `app/src/main/kotlin/zues/app/money/Postings.kt:35` |  |
 
 ## FUND — Repair & renewal fund  ·  1/11 covered
 

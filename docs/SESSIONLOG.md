@@ -448,3 +448,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — **absence** exemptions (PM-FEE-006/007, ⚠ the number is unverified — config + `TODO(legal)`), the **30-day** residence and **6th-birthday** thresholds (config-driven), **period-aware** occupancy; then double-entry **postings** + the fund (PM-FEE-020), and a `GET` for stored runs.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Animal.kt`, `app/src/main/kotlin/zues/app/registry/Units.kt`.
+
+---
+
+## S-24 · 2026-09-16 · money postings — the double-entry ledger
+
+**Did** — issuing a charge run now also writes its **double-entry** postings, in the same transaction as the run and its lines. Each unit's charge is a **debit** to its receivable; the income is a **credit** to the condominium's ledger, split by cost stream (`INCOME:MANAGEMENT`, …) and carrying no unit — the condominium's, never a manager's (Rule: PM-FEE-020). One journal per run (its id is the run's), debits equal credits, so it **balances to zero** (ADR-006). Postings are immutable, like charge lines.
+
+**Pure where it counts** — the derivation is a pure function, `Ledger.forRun`, so both properties are proved without a database: `PostingsTest` shows the journal sums to zero and the income lands on the entrance ledger split by stream. The database enforces the balance again — a deferred `assert_journal_balances` trigger rejects a journal that does not sum to zero at commit — which `ChargeRunPostingIT` exercises by issuing a run and reading a zero-sum journal back.
+
+**Rules** — **PM-FEE-020** (income to the condominium, by stream) proved purely by `PostingsTest`; **ADR-006** double-entry balance proved purely and, in CI, by the DB trigger.
+
+**What is proved where** — `PostingsTest` (balance + income routing) runs **locally**; `ChargeRunPostingIT` (Testcontainers) issues a run and asserts the persisted journal balances — CI-only. The S-22 gate validated `PostingRow`'s columns locally first (8 entities now).
+
+**`./tools/gates.sh` green** — 9/9; traceability **22/233** (PM-FEE-020 added), banned-words clean on 58 files, legal-thresholds clean, TESTPLAN + TRACEABILITY regenerated.
+
+**Open / next** — **absence** exemptions (PM-FEE-006/007) with **period-aware** occupancy (the dated port), the **30-day / 6-yr** config thresholds, a `GET` for a stored run, and the **fund** accounts (PM-FUND-*). A charge is now computed, stored immutably, and posted to a balanced ledger.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/Postings.kt`, `app/src/main/kotlin/zues/app/money/ChargeRunStore.kt`.
