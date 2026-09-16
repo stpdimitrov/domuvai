@@ -5,13 +5,13 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 28 | 12% |
-| **Proved by a test named after the rule** | **26** | **11%** |
-| No implementation and no test | 204 | 88% |
+| Referenced in code (`// Rule:`) | 32 | 14% |
+| **Proved by a test named after the rule** | **30** | **13%** |
+| No implementation and no test | 200 | 86% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
-## ORG — Structure & ideal parts  ·  1/12 covered
+## ORG — Structure & ideal parts  ·  3/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -19,21 +19,21 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-002` | `app/src/test/kotlin/zues/app/registry/UnitValidationTest.kt:14` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:46` |  |
 | `PM-ORG-003` | — | — |  |
 | `PM-ORG-004` | — | — |  |
-| `PM-ORG-005` | — | — |  |
+| `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:59` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:18` |  |
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
 | `PM-ORG-009` | — | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:27` |  |
 | `PM-ORG-010` | — | — |  |
-| `PM-ORG-011` | — | — |  |
+| `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/OwnershipPersistenceIT.kt:87` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:18` |  |
 | `PM-ORG-012` | — | — |  |
 
-## BOOK — Owners' book & residents  ·  1/12 covered
+## BOOK — Owners' book & residents  ·  3/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-BOOK-001` | — | — |  |
-| `PM-BOOK-002` | — | — |  |
+| `PM-BOOK-002` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:45` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:11` |  |
 | `PM-BOOK-003` | — | — |  |
 | `PM-BOOK-004` | — | — |  |
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:76` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
@@ -42,7 +42,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-008` | — | — |  |
 | `PM-BOOK-009` | — | — |  |
 | `PM-BOOK-010` | — | — |  |
-| `PM-BOOK-011` | — | — |  |
+| `PM-BOOK-011` | `app/src/test/kotlin/zues/app/registry/OwnershipPersistenceIT.kt:107` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:95` |  |
 | `PM-BOOK-012` | — | — |  |
 
 ## GOV — Governance & mandates  ·  0/18 covered

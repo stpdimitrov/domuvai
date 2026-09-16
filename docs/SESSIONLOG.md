@@ -566,3 +566,25 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt`.
 
 ---
+
+## S-29 · 2026-09-16 · owners & parties — the liable party a receivable needs (PM-ORG-011, PM-BOOK-002/011)
+
+**Did** — `registry` now models **who owns a unit**. A **party** (person or legal entity) is registered with an optional identity (ЕГН / БУЛСТАТ / passport), and a **title** links a party to a unit as **OWN** or **USR** for a share, effective-dated. Endpoints: `POST /api/registry/parties`, `POST /entrances/{e}/units/{u}/titles`, and `GET /entrances/{e}/owners?on=YYYY-MM-DD`.
+
+**Ownership resolves *as of a date*, never today (PM-ORG-011)** — a title carries `[validFrom, validTo)`, so a sale ends the seller's title on the day the buyer's begins, and the owners read returns whoever held the unit on the asked date. Same period-aware discipline as S-25's occupancy; this is what a past charge or an arrears claim will resolve the liable party against.
+
+**ЕГН never reaches a resident-visible list (PM-BOOK-011)** — the owners view carries the party's **name only**; the identity number has no field in the response, proved against real data. The restricted single-party read that *may* show it (PM-BOOK-006) waits for the authorization module (ADR-002).
+
+**Co-ownership is a share (PM-ORG-005)** — a title's `share ∈ (0, 1]`, several titles per unit. Summing shares to one, and the voting double-count guard, are the assembly module's, later.
+
+**Tests** — `OwnershipServiceTest` (name recorded; bad id-type / share / party rejected; the as-of-date resolution across a sale, mocked); `OwnershipWebTest` (201 / 400 / 404; the owners response has a name but no id field); `OwnershipPersistenceIT` (Docker, CI: the sale transition; the ЕГН absent from the list). Each IT uses its own entrance/unit/party — no shared-fixture trap (the S-28 lesson).
+
+**`./tools/gates.sh` green** — 9/9. Traceability **30/233 (13%)** — PM-ORG-005, PM-ORG-011, PM-BOOK-002, PM-BOOK-011 newly covered; TESTPLAN 204 remaining; schema-columns 12 entities (party, title). OpenAPI unchanged. `party.contact` is left to its column default (no jsonb mapping this slice).
+
+**Deferred** — the book-complete check (PM-BOOK-002 full), the 15-day declaration deadline + overdue task (PM-BOOK-003, ⚠ + `:law`), book read-authorization (PM-BOOK-006, ADR-002), ЕГН retention/anonymisation (PM-BOOK-010), and shares-sum-to-one.
+
+**Open / next** — **intake / spreadsheet import** (Gate 1's literal "reproduce the firm's spreadsheet") and/or the **receivable read** (a resident's balance) — either moves toward Gate-1 contract-complete → the frontend green light. A small follow-up can now wire `fund_account.holder_party`, since parties exist.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/OwnershipService.kt`, `app/src/main/kotlin/zues/app/registry/Title.kt`.
+
+---

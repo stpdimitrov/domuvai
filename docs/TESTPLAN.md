@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **25** (11%) |
-| Remaining | **208** |
+| Proved by a test named after the rule | **29** (12%) |
+| Remaining | **204** |
 | Proposed slices at ~10 rules each | **21** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-45 rule(s) remaining across 4 slice(s).
+41 rule(s) remaining across 4 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -54,26 +54,22 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-BOOK-001` | MUST | Electronic book is the system of record; export produces the ministry-approved layout. |
-| `PM-BOOK-002` | MUST | A unit missing ideal parts or owner name cannot be marked "book complete". |
 | `PM-BOOK-003` | MUST | Day 16 without declaration raises an overdue task assigned to the manager. |
 | `PM-BOOK-004` | MUST | Template version is configurable and versioned. |
 | `PM-BOOK-006` | MUST | Owner A querying owner B's household returns 403 and an audit entry. |
 | `PM-BOOK-007` | MUST | Audit log is immutable and exportable for a supervisory authority. |
 | `PM-BOOK-008` | MUST | Fee engine reads occupancy as of the billing period. |
 | `PM-BOOK-010` | MUST | A former occupant's household record is anonymised after the retention window. |
-| `PM-BOOK-011` | MUST NOT | Resident directory shows unit and display name only. |
 | `PM-ORG-001` | MUST | Creating a building with 3 entrances allows 3 independent GAs and 3 fund accounts. |
+| `PM-ORG-004` | MUST | A 2-unit owner with 12% outvotes 5 owners holding 10%. |
+| `PM-ORG-006` | MUST | Marking an entrance `CLOSED_COMPLEX` swaps GA-driven fee rules for contract-driven ones and requires an uploaded registered contract. |
 
-### S-G1-04 · `registry` · BOOK · ORG · 12 rule(s)
+### S-G1-04 · `registry` · BOOK · ORG · 8 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-ORG-004` | MUST | A 2-unit owner with 12% outvotes 5 owners holding 10%. |
-| `PM-ORG-005` | MUST | Two 50% co-owners voting oppositely cancel out; total cast = unit's ideal parts. |
-| `PM-ORG-006` | MUST | Marking an entrance `CLOSED_COMPLEX` swaps GA-driven fee rules for contract-driven ones and requires an uploaded registered contract. |
 | `PM-ORG-007` | MUST | Missing entry reference raises a compliance flag on ownership change. |
 | `PM-ORG-009` | MUST | Flag drives PM-FEE-034. |
-| `PM-ORG-011` | MUST | A sale on the 14th splits the month's charge at the configured convention. |
 | `PM-ORG-012` | MUST | New owner onboarding shows all in-force decisions and outstanding plans. |
 | `PM-BOOK-009` | SHOULD | Declaration submitted online lands as a pending entry for manager approval. |
 | `PM-BOOK-012` | SHOULD | Monthly exception report lists units where declared persons ≠ billed persons. |
