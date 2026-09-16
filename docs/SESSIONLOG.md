@@ -466,3 +466,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — **absence** exemptions (PM-FEE-006/007) with **period-aware** occupancy (the dated port), the **30-day / 6-yr** config thresholds, a `GET` for a stored run, and the **fund** accounts (PM-FUND-*). A charge is now computed, stored immutably, and posted to a balanced ledger.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/Postings.kt`, `app/src/main/kotlin/zues/app/money/ChargeRunStore.kt`.
+
+---
+
+## S-25 · 2026-09-16 · period-aware occupancy (a correctness fix)
+
+**Fixed a latent correctness bug** found by design review, before it reached the pilot: occupancy was read from a **dateless** port — today's residents and animals — but a charge is for a **period**. Issuing May's bill in June counted June's household. That silently broke **PM-FEE-014** (a past bill must be exactly reproducible — re-run it later, the headcount has moved) and plainly overcharged anyone who arrived after the period. Masked only because the pilot would bill the current month.
+
+**Did** — the `Units` port now takes the period's date: `forEntrance(entranceId, on)`. The adapter counts a member or animal only if the half-open interval `[validFrom, validTo)` contains `on`. `money` parses `request.legalDate` and passes it (a malformed date is now a clean **400**, not a latent 500). The stored basis is now honestly period-scoped.
+
+**The signature change rippled**, as a correctness fix does: `UnitsAdapterTest` now proves the period scoping (a member who left before, or arrived after, the period is not counted), `ChargeRunServiceTest`'s stubs match the two-arg call, and three ITs register with an explicit `validFrom` and query as of the period.
+
+**No new rule coverage** — this is a correctness refactor; the PM-FEE-008 / PM-FEE-005 / PM-BOOK-005 tests now assert occupancy *as of the period* rather than *as of now*.
+
+**`./tools/gates.sh` green** — 9/9; traceability 22/233, banned-words clean on 58 files, legal-thresholds clean, TRACEABILITY regenerated.
+
+**Open / next** — **absence** (S-26) builds directly on this: a non-use declaration during the period feeds `:charges`' `absentDays`; the exemption threshold stays in `:law` config (⚠ PM-FEE-006/007). Also the **30-day** residence and **6th-birthday** thresholds, then the **fund**.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Units.kt`, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.

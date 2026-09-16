@@ -69,7 +69,11 @@ class PerPersonChargeIT {
         val unitId = registerSingleUnit(entranceId)
         post(
             "/api/registry/entrances/$entranceId/units/$unitId/household",
-            """{"members":[{"isChildUnder6":false},{"isChildUnder6":false},{"isChildUnder6":false}]}""",
+            """{"members":[
+                {"isChildUnder6":false,"validFrom":"2026-01-01"},
+                {"isChildUnder6":false,"validFrom":"2026-01-01"},
+                {"isChildUnder6":false,"validFrom":"2026-01-01"}
+            ]}""",
         ).andExpect(status().isCreated)
 
         val request = json.writeValueAsString(

@@ -4,6 +4,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import zues.app.registry.UnitForCharging
@@ -24,7 +26,7 @@ class ChargeRunServiceTest {
 
     @BeforeEach
     fun stubUnits() {
-        whenever(units.forEntrance(entranceId)).thenReturn(
+        whenever(units.forEntrance(eq(entranceId), any())).thenReturn(
             listOf(
                 UnitForCharging(u1, "ап. 1", "60.0000", false),
                 UnitForCharging(u2, "ап. 2", "40.0000", false),
@@ -49,7 +51,7 @@ class ChargeRunServiceTest {
 
     @Test
     fun `PM-FEE-008 a per-person run bills each unit by its chargeable occupants`() {
-        whenever(units.forEntrance(entranceId)).thenReturn(
+        whenever(units.forEntrance(eq(entranceId), any())).thenReturn(
             listOf(
                 UnitForCharging(u1, "ап. 1", "60.0000", false, occupants = 3),
                 UnitForCharging(u2, "ап. 2", "40.0000", false, occupants = 1),
@@ -94,7 +96,7 @@ class ChargeRunServiceTest {
 
     @Test
     fun `PM-FEE-009 an animal adds an occupant-equivalent to a per-person charge`() {
-        whenever(units.forEntrance(entranceId)).thenReturn(
+        whenever(units.forEntrance(eq(entranceId), any())).thenReturn(
             listOf(UnitForCharging(u1, "ап. 1", "100.0000", false, occupants = 1, animals = 1)),
         )
         val response = service.preview(

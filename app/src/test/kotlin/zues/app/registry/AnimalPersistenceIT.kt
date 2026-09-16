@@ -16,6 +16,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -70,10 +71,10 @@ class AnimalPersistenceIT {
         mvc.perform(
             post("/api/registry/entrances/$entranceId/units/$unitId/animals")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"animals":[{"species":"cat","vetPassportNo":"VP-1"}]}"""),
+                .content("""{"animals":[{"species":"cat","vetPassportNo":"VP-1","validFrom":"2026-01-01"}]}"""),
         ).andExpect(status().isCreated)
 
-        val unit = units.forEntrance(entranceId).single { it.unitId == unitId }
+        val unit = units.forEntrance(entranceId, LocalDate.of(2026, 5, 1)).single { it.unitId == unitId }
         assertThat(unit.animals).isEqualTo(1)
     }
 }

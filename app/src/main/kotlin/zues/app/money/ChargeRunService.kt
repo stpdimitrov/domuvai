@@ -12,6 +12,8 @@ import zues.charges.computeChargeRun
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
 import zues.law.CostStream
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
 import java.util.UUID
 
 /** A charge run over an entrance's stored units: the tariff is supplied, the units come from registry. */
@@ -35,7 +37,12 @@ data class ComputedRun(val run: ChargeRun, val units: List<UnitForCharging>)
 class ChargeRunService(private val units: Units) {
 
     fun compute(entranceId: UUID, request: StoredChargeRunRequest): ComputedRun {
-        val stored = units.forEntrance(entranceId)
+        val on = try {
+            LocalDate.parse(request.legalDate)
+        } catch (e: DateTimeParseException) {
+            throw IllegalArgumentException("legalDate must be an ISO date (YYYY-MM-DD): ${request.legalDate}")
+        }
+        val stored = units.forEntrance(entranceId, on)   // occupancy as of the period, not today
         if (stored.isEmpty()) {
             throw NoSuchElementException("entrance $entranceId has no registered units")
         }

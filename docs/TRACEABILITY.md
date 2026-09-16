@@ -36,7 +36,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-002` | — | — |  |
 | `PM-BOOK-003` | — | — |  |
 | `PM-BOOK-004` | — | — |  |
-| `PM-BOOK-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:64` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
+| `PM-BOOK-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:66` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
 | `PM-BOOK-006` | — | — |  |
 | `PM-BOOK-007` | — | — |  |
 | `PM-BOOK-008` | — | — |  |
@@ -128,11 +128,11 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:37` | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-003` | — | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
 | `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
-| `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:54` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:13` |  |
+| `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:56` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:13` |  |
 | `PM-FEE-006` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:119` | `charges/src/main/kotlin/zues/charges/Charges.kt:39` | ⚠ |
 | `PM-FEE-007` | — | — |  |
-| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:51` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:106` |  |
-| `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:96` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
+| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:53` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:106` |  |
+| `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:98` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
 | `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-FEE-011` | — | — |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |

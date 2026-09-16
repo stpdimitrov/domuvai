@@ -1,6 +1,7 @@
 package zues.app.registry
 
 import org.springframework.stereotype.Component
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -23,7 +24,12 @@ data class UnitForCharging(
 
 /** The registry module's API for reading units. Implemented in-module by [UnitsAdapter]. */
 interface Units {
-    fun forEntrance(entranceId: UUID): List<UnitForCharging>
+    /**
+     * The entrance's units with occupancy **as of [on]** — the billing period's legal date,
+     * not today. A charge for a past period must use that period's headcount, or the bill is
+     * both wrong and irreproducible (PM-FEE-014).
+     */
+    fun forEntrance(entranceId: UUID, on: LocalDate): List<UnitForCharging>
 }
 
 @Component
@@ -32,10 +38,10 @@ class UnitsAdapter(
     private val household: HouseholdMemberRepository,
     private val animals: AnimalRepository,
 ) : Units {
-    override fun forEntrance(entranceId: UUID): List<UnitForCharging> =
+    override fun forEntrance(entranceId: UUID, on: LocalDate): List<UnitForCharging> =
         units.findByEntranceId(entranceId).map { unit ->
-            val residents = household.findByUnitId(unit.id).filter { it.validTo == null }
-            val pets = animals.findByUnitId(unit.id).filter { it.validTo == null }
+            val residents = household.findByUnitId(unit.id).filter { current(it.validFrom, it.validTo, on) }
+            val pets = animals.findByUnitId(unit.id).filter { current(it.validFrom, it.validTo, on) }
             UnitForCharging(
                 unitId = unit.id,
                 designation = unit.designation,
@@ -46,4 +52,7 @@ class UnitsAdapter(
                 animals = pets.size,
             )
         }
+
+    /** In residence on [on]: the half-open interval [validFrom, validTo) contains it. */
+    private fun current(from: LocalDate, to: LocalDate?, on: LocalDate) = from <= on && (to == null || on < to)
 }

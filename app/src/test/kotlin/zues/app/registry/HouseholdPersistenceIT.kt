@@ -16,6 +16,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -68,13 +69,17 @@ class HouseholdPersistenceIT {
         val entranceId = createEntrance()
         val unitId = registerSingleUnit(entranceId)
 
-        val members = """{"members":[{"isChildUnder6":false},{"isChildUnder6":false},{"isChildUnder6":true}]}"""
+        val members = """{"members":[
+            {"isChildUnder6":false,"validFrom":"2026-01-01"},
+            {"isChildUnder6":false,"validFrom":"2026-01-01"},
+            {"isChildUnder6":true,"validFrom":"2026-01-01"}
+        ]}"""
         mvc.perform(
             post("/api/registry/entrances/$entranceId/units/$unitId/household")
                 .contentType(MediaType.APPLICATION_JSON).content(members),
         ).andExpect(status().isCreated)
 
-        val unit = units.forEntrance(entranceId).single { it.unitId == unitId }
+        val unit = units.forEntrance(entranceId, LocalDate.of(2026, 5, 1)).single { it.unitId == unitId }
         assertThat(unit.occupants).isEqualTo(3)
         assertThat(unit.childrenUnder6).isEqualTo(1)
     }
