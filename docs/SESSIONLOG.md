@@ -346,3 +346,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — (1) **money persistence**: with the read path in place, persist an immutable `charge_run` (basis `jsonb` + hash) + `charge_line` referencing the stored `registry.unit` rows (PM-FEE-015) — the first `money`-owned DB writes, Testcontainers-tested in CI. (2) occupancy modelling to unlock `PER_PERSON`.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Units.kt`, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.
+
+---
+
+## S-18 · 2026-09-16 · money persistence — the immutable charge run
+
+**Did** — `money` now **issues** a charge run: `POST /api/money/entrances/{id}/charge-runs` computes from registry units and stores, in one transaction, an immutable `charge_run` (the **basis as `jsonb`** + its SHA-256 hash + `law_version`/`engine_version`/`status`) and one `charge_line` per unit and cost stream referencing the real `registry.unit` rows. The first `money`-owned database writes. A period is billed once — a second attempt is a **409**, never a silent second bill.
+
+**Rules** — **PM-FEE-014** (a past bill is exactly reproducible): the basis serialises to canonical, sorted-key JSON, so the same run yields byte-identical JSON and the same hash — proved **purely** in `BasisJsonTest`, locally. **PM-FEE-015** (issued charges are immutable): the `charge_line` table carries an `ON UPDATE DO INSTEAD NOTHING` rule; `ChargeRunPersistenceIT` issues a run, fires a raw `UPDATE` at a line, and asserts the amount is unchanged.
+
+**The jsonb converter — the one piece I could not run locally** — Spring Data JDBC does not map `jsonb`, so `JsonbValue` + a writing/reading `Converter` pair are registered through `AbstractJdbcConfiguration.userConverters()` (Spring Boot backs off its own when a subclass is present). `postgresql` moved from `runtimeOnly` to `implementation` so `PGobject` is on the compile classpath. It **compiles here but is exercised only in CI** — the Testcontainers IT is the first real test of the round-trip.
+
+**What is proved where** — `BasisJsonTest` (FEE-014 determinism) and `ChargeRunStoreWebTest` (201 / 409 / 404) run **locally**. `ChargeRunPersistenceIT` (Testcontainers, `disabledWithoutDocker`) proves the jsonb round-trip, one typed line per unit summing to the pot, and FEE-015 immutability — **CI-only** on this Docker-less machine.
+
+**`./tools/gates.sh` green** — traceability **19/233** (PM-FEE-015 added), banned-words clean on 47 files, legal-thresholds clean, `ModularityTests.verify()` passing (still `money → registry` only), TESTPLAN + TRACEABILITY regenerated.
+
+**Open / next** — (1) **occupancy** modelling (household members / animals / absence) to unlock `PER_PERSON` and full Gate-1 realism. (2) A `GET` for a stored run. (3) double-entry **postings** + the fund (PM-FEE-020, ADR-006). (4) confirm the S-18 CI run is green — it's the first execution of the jsonb/immutability layer.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/ChargeRunStore.kt`, `app/src/main/kotlin/zues/app/money/JsonbConfig.kt`, `app/src/main/kotlin/zues/app/money/BasisJson.kt`.

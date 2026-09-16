@@ -1,7 +1,9 @@
 package zues.app.money
 
 import org.springframework.stereotype.Service
+import zues.app.registry.UnitForCharging
 import zues.app.registry.Units
+import zues.charges.ChargeRun
 import zues.charges.PropertyUnit
 import zues.charges.Tariff
 import zues.charges.TariffLine
@@ -19,6 +21,9 @@ data class StoredChargeRunRequest(
     val lines: List<TariffLineRequest>,
 )
 
+/** A computed run together with the registry units it was computed from (the store needs both). */
+data class ComputedRun(val run: ChargeRun, val units: List<UnitForCharging>)
+
 /**
  * Computes a charge run for an entrance from the units `registry` holds, reached through its
  * published [Units] port — never its tables (ADR-003). Occupancy is not modelled yet, so a
@@ -27,7 +32,7 @@ data class StoredChargeRunRequest(
 @Service
 class ChargeRunService(private val units: Units) {
 
-    fun preview(entranceId: UUID, request: StoredChargeRunRequest): ChargeRunResponse {
+    fun compute(entranceId: UUID, request: StoredChargeRunRequest): ComputedRun {
         val stored = units.forEntrance(entranceId)
         if (stored.isEmpty()) {
             throw NoSuchElementException("entrance $entranceId has no registered units")
@@ -53,6 +58,9 @@ class ChargeRunService(private val units: Units) {
             },
             businessMultiplier = request.businessMultiplier,
         )
-        return computeChargeRun(entranceId.toString(), propertyUnits, tariff).toResponse()
+        return ComputedRun(computeChargeRun(entranceId.toString(), propertyUnits, tariff), stored)
     }
+
+    fun preview(entranceId: UUID, request: StoredChargeRunRequest): ChargeRunResponse =
+        compute(entranceId, request).run.toResponse()
 }

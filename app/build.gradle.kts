@@ -37,7 +37,8 @@ dependencies {
     // schema is owned by Flyway; PostgreSQL is the only supported database (ADR-006)
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
-    runtimeOnly("org.postgresql:postgresql")
+    // implementation (not runtimeOnly): the jsonb converter references org.postgresql.util.PGobject
+    implementation("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")

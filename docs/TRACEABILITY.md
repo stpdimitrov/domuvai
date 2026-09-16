@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 21 | 9% |
-| **Proved by a test named after the rule** | **18** | **8%** |
-| No implementation and no test | 211 | 91% |
+| Referenced in code (`// Rule:`) | 22 | 9% |
+| **Proved by a test named after the rule** | **19** | **8%** |
+| No implementation and no test | 210 | 90% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -120,7 +120,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-015` | — | — |  |
 | `PM-VOTE-016` | — | — |  |
 
-## FEE — Charges & allocation  ·  11/20 covered
+## FEE — Charges & allocation  ·  12/20 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -137,8 +137,8 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-011` | — | — |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |
 | `PM-FEE-013` | — | — |  |
-| `PM-FEE-014` | `app/src/test/kotlin/zues/app/money/ChargeCalculatorTest.kt:37` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:13` |  |
-| `PM-FEE-015` | — | — |  |
+| `PM-FEE-014` | `app/src/test/kotlin/zues/app/money/BasisJsonTest.kt:33` | `app/src/main/kotlin/zues/app/money/BasisJson.kt:10` |  |
+| `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | — | — |  |
 | `PM-FEE-018` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:102` | `charges/src/main/kotlin/zues/charges/Charges.kt:70` |  |
