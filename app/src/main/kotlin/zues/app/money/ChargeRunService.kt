@@ -46,6 +46,7 @@ class ChargeRunService(private val units: Units) {
                 idealParts = IdealParts.of(it.idealParts),
                 occupants = it.occupants,
                 childrenUnder6 = it.childrenUnder6,
+                animals = it.animals,
                 businessUse = it.separateEntrance,
             )
         }

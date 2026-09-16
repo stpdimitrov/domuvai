@@ -61,6 +61,16 @@ data class NewMemberRequest(
 
 data class HouseholdRegisteredResponse(val memberIds: List<UUID>)
 
+data class RegisterAnimalsRequest(val animals: List<NewAnimalRequest>)
+
+data class NewAnimalRequest(
+    val species: String,
+    val vetPassportNo: String? = null,
+    val validFrom: String? = null,
+)
+
+data class AnimalsRegisteredResponse(val animalIds: List<UUID>)
+
 /** The registry module's HTTP edge — entrances and their units. */
 @RestController
 @RequestMapping("/api/registry/entrances")
@@ -105,6 +115,20 @@ class RegistryController(private val registry: RegistryService) {
             request.members.map { RegisterMember(it.isChildUnder6, it.validFrom) },
         )
         return ResponseEntity.status(HttpStatus.CREATED).body(HouseholdRegisteredResponse(ids))
+    }
+
+    @PostMapping("/{entranceId}/units/{unitId}/animals")
+    fun registerAnimals(
+        @PathVariable entranceId: UUID,
+        @PathVariable unitId: UUID,
+        @RequestBody request: RegisterAnimalsRequest,
+    ): ResponseEntity<AnimalsRegisteredResponse> {
+        val ids = registry.registerAnimals(
+            entranceId,
+            unitId,
+            request.animals.map { RegisterAnimal(it.species, it.vetPassportNo, it.validFrom) },
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(AnimalsRegisteredResponse(ids))
     }
 
     @GetMapping("/{entranceId}/units")

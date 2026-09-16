@@ -430,3 +430,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **`./tools/gates.sh` green** — 9/9, including the new check; generated documents match.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `tools/check_schema_columns.py`, `tools/gates.sh`.
+
+---
+
+## S-23 · 2026-09-16 · registry animals — the occupant-equivalent
+
+**Did** — `registry` now records animals: `POST /api/registry/entrances/{id}/units/{unitId}/animals` stores effective-dated `animal` rows (species + veterinary passport, a separate section of the book — PM-BOOK-005). The `Units` port gained `animals`; `UnitsAdapter` counts the current ones. `money` passes the count to the engine, which already treats each as one occupant-equivalent (PM-FEE-009). The per-person headcount is now complete: residents (children excluded) plus animals.
+
+**Rules** — **PM-BOOK-005** (animals recorded, headcount recalculated) proved by `UnitsAdapterTest`; **PM-FEE-009** (occupant-equivalent) proved at the money layer by `ChargeRunServiceTest` — a unit with one resident and one animal charges for more than one person — on top of the engine's own coverage.
+
+**The S-22 gate earned its keep** — `Animal` is the first entity added since the schema-column check landed, and it validated the mapping **locally** (`vetPassportNo → vet_passport_no`, and the rest) before a single container started. No CI round-trip to find a column typo; the check now reads "7 entities."
+
+**What is proved where** — `UnitsAdapterTest`, `AnimalWebTest` (201 / 404) and the money `ChargeRunServiceTest` run **locally**; `AnimalPersistenceIT` (Testcontainers) persists an animal and reads the count back through the port — CI-only.
+
+**`./tools/gates.sh` green** — 9/9; traceability **21/233** (PM-BOOK-005 added), banned-words clean on 55 files, legal-thresholds clean, TESTPLAN + TRACEABILITY regenerated.
+
+**Open / next** — **absence** exemptions (PM-FEE-006/007, ⚠ the number is unverified — config + `TODO(legal)`), the **30-day** residence and **6th-birthday** thresholds (config-driven), **period-aware** occupancy; then double-entry **postings** + the fund (PM-FEE-020), and a `GET` for stored runs.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Animal.kt`, `app/src/main/kotlin/zues/app/registry/Units.kt`.

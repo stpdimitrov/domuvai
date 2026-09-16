@@ -18,7 +18,8 @@ class UnitsAdapterTest {
 
     private val units: PropertyUnitRepository = mock()
     private val household: HouseholdMemberRepository = mock()
-    private val adapter = UnitsAdapter(units, household)
+    private val animals: AnimalRepository = mock()
+    private val adapter = UnitsAdapter(units, household, animals)
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
@@ -33,6 +34,11 @@ class UnitsAdapterTest {
     private fun member(child: Boolean, movedOut: Boolean = false) = HouseholdMember(
         UUID.randomUUID(), entranceId, unitId, null, child,
         LocalDate.of(2026, 1, 1), if (movedOut) LocalDate.of(2026, 6, 1) else null,
+    )
+
+    private fun animal(gone: Boolean = false) = Animal(
+        UUID.randomUUID(), entranceId, unitId, "cat", "VP-1",
+        LocalDate.of(2026, 1, 1), if (gone) LocalDate.of(2026, 6, 1) else null,
     )
 
     @Test
@@ -52,5 +58,14 @@ class UnitsAdapterTest {
         val unit = adapter.forEntrance(entranceId).single()
         assertThat(unit.occupants).isEqualTo(3)
         assertThat(unit.childrenUnder6).isEqualTo(2)
+    }
+
+    @Test
+    fun `PM-BOOK-005 current animals are counted toward the occupant-equivalent headcount`() {
+        whenever(animals.findByUnitId(unitId)).thenReturn(
+            listOf(animal(), animal(), animal(gone = true)),
+        )
+        val unit = adapter.forEntrance(entranceId).single()
+        assertThat(unit.animals).isEqualTo(2)   // the departed animal is not counted
     }
 }

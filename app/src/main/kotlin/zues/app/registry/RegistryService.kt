@@ -38,6 +38,13 @@ data class RegisterMember(
     val validFrom: String? = null,
 )
 
+/** One animal to register in a unit. `validFrom` defaults to today. */
+data class RegisterAnimal(
+    val species: String,
+    val vetPassportNo: String? = null,
+    val validFrom: String? = null,
+)
+
 /**
  * The registry module's one public operation for the walking skeleton: create a
  * condominium and its first entrance, then raise [EntranceRegistered]. The insert and the
@@ -115,6 +122,33 @@ class RegistryService(
                     partyId = null,
                     isChildUnder6 = member.isChildUnder6,
                     validFrom = member.validFrom?.let { LocalDate.parse(it) } ?: today,
+                    validTo = null,
+                ),
+            ).id
+        }
+    }
+
+    /**
+     * Record animals kept in a unit — a separate section of the book with veterinary passport
+     * data (Rule: PM-BOOK-005). Each becomes an occupant-equivalent in a per-person charge
+     * (Rule: PM-FEE-009). The unit must exist and belong to the entrance.
+     */
+    @Transactional
+    fun registerAnimals(entranceId: UUID, unitId: UUID, animals: List<RegisterAnimal>): List<UUID> {
+        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
+        if (unit.entranceId != entranceId) {
+            throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
+        }
+        val today = LocalDate.now(clock)
+        return animals.map { animal ->
+            aggregates.insert(
+                Animal(
+                    id = UUID.randomUUID(),
+                    entranceId = entranceId,
+                    unitId = unitId,
+                    species = animal.species,
+                    vetPassportNo = animal.vetPassportNo,
+                    validFrom = animal.validFrom?.let { LocalDate.parse(it) } ?: today,
                     validTo = null,
                 ),
             ).id

@@ -91,4 +91,20 @@ class ChargeRunServiceTest {
             )
         }.isInstanceOf(NoSuchElementException::class.java)
     }
+
+    @Test
+    fun `PM-FEE-009 an animal adds an occupant-equivalent to a per-person charge`() {
+        whenever(units.forEntrance(entranceId)).thenReturn(
+            listOf(UnitForCharging(u1, "ап. 1", "100.0000", false, occupants = 1, animals = 1)),
+        )
+        val response = service.preview(
+            entranceId,
+            StoredChargeRunRequest(
+                period = "2026-05", legalDate = "2026-05-01",
+                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+            ),
+        )
+        // one resident plus one animal-equivalent — the animal lifts the chargeable count
+        assertThat(response.charges.single().chargeablePersons).isGreaterThan(1)
+    }
 }
