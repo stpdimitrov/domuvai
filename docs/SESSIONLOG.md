@@ -530,3 +530,25 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Units.kt` (the absence computation), `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt`, `law/src/main/kotlin/zues/law/Constants.kt`.
 
 ---
+
+## S-27 · 2026-09-16 · fund account — the чл. 50 account record (PM-FUND-001/004/005)
+
+**Did** — `money` now records an entrance's external **"Ремонт и обновяване"** fund account (PM-FUND-001): its IBAN, its holder (the chair — **MANAGER** — or the **ASSOCIATION**, the two чл. 50 permits), and its purpose. `POST /api/money/entrances/{id}/fund-accounts` files it; `GET` lists them.
+
+**The account holds no money — that is the whole point (ADR-007).** The row carries **no balance column**; the platform never holds fund monies, so this is only the external account a payment initiation would later target. A balance, when it exists, is derived from postings, never stored.
+
+**No commingling, structurally (PM-FUND-004/005)** — `UNIQUE(iban)` across all entrances and `UNIQUE(entrance_id, purpose)`: one IBAN belongs to one account, and an entrance keeps at most one account per purpose. So the fund **cannot equal the operating account** and monies **cannot be commingled** — enforced by the table, pre-checked in the service for a clean 409, and proved end to end against real Postgres.
+
+**Schema evolved, honestly** — `fund_account.holder_party → registry.party` became `holder_name` + `holder_kind`, because **parties are not modelled yet**. The party link returns (nullable, back-filled) with the owners/parties slice. IBAN is normalised (spaces stripped, upper-cased, ISO-13616 shape); the **mod-97 checksum is deferred to `rail`**, where the IBAN is actually used for initiation.
+
+**Tests** — `IbanTest` (normalise / reject); `FundAccountServiceTest` (validation + both no-commingling guards, mocked, runs locally); `FundAccountWebTest` (201 / 409 / 400); `FundAccountPersistenceIT` (Docker, CI: register + read back; a second same-purpose account refused; the fund refused an operating IBAN yet coexisting on its own).
+
+**`./tools/gates.sh` green** — 9/9. Traceability **26/233 (11%)** — PM-FUND-001/004/005 newly covered; TESTPLAN 208 remaining; schema-columns 10 entities; banned-words clean on 69 files. OpenAPI unchanged — the registration endpoint stays out of the published contract (the `/fund` balance endpoint, PM-FUND-009, is a later slice).
+
+**Deferred here** — the fund **balance net of committed work** (PM-FUND-009), the **minimum contribution floor** against the national minimum wage (PM-FUND-002, ⚠ + a new `:law` constant), **disbursement** (PM-FUND-006/007/008 — the ADR-007-sensitive path), and the **party / mandate** link.
+
+**Open / next** — **owners / parties** in `registry` (a receivable needs a liable party; also unblocks the fund holder link), then **intake / spreadsheet import**, toward Gate-1 contract-complete → the frontend green light.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/FundAccount.kt`, `app/src/main/kotlin/zues/app/money/FundAccountService.kt`, `docs/adr/ADR-007-no-custody.md`.
+
+---

@@ -305,11 +305,19 @@ CREATE TABLE money.fund_account (
   entrance_id  uuid NOT NULL REFERENCES registry.entrance(id),
   iban         text NOT NULL,
   purpose      text NOT NULL CHECK (purpose IN ('REPAIR_RENEWAL','OPERATING')),
-  holder_party uuid NOT NULL REFERENCES registry.party(id),
+  -- Rule: PM-FUND-004 — the holder is the chair of the management board (manager) or the
+  -- association, never the platform (ADR-007). Held descriptively until parties are modelled,
+  -- when a nullable holder_party -> registry.party is added and back-filled.
+  holder_name  text NOT NULL,
+  holder_kind  text NOT NULL CHECK (holder_kind IN ('MANAGER','ASSOCIATION')),
+  -- one account per entrance per purpose, and one IBAN across all entrances: the fund cannot
+  -- equal the operating account (PM-FUND-004) and monies cannot be commingled (PM-FUND-005).
   UNIQUE (entrance_id, purpose),
-  -- one IBAN serves exactly one entrance and one purpose: no commingling
   UNIQUE (iban)
 );
+-- The account holds no balance here: the platform never holds fund monies (ADR-007). This row
+-- is only the external чл. 50 account a payment initiation would target; a balance is derived
+-- from postings, never stored.
 
 -- Double-entry. Rule: ADR-006 — a balance is derived, never stored.
 CREATE TABLE money.posting (

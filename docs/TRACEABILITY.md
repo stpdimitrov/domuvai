@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 25 | 11% |
-| **Proved by a test named after the rule** | **23** | **10%** |
-| No implementation and no test | 207 | 89% |
+| Referenced in code (`// Rule:`) | 28 | 12% |
+| **Proved by a test named after the rule** | **26** | **11%** |
+| No implementation and no test | 204 | 88% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -145,15 +145,15 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-019` | — | — |  |
 | `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:50` | `app/src/main/kotlin/zues/app/money/Postings.kt:35` |  |
 
-## FUND — Repair & renewal fund  ·  1/11 covered
+## FUND — Repair & renewal fund  ·  4/11 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-FUND-001` | — | — |  |
+| `PM-FUND-001` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:68` | `app/src/main/kotlin/zues/app/money/FundAccount.kt:10` |  |
 | `PM-FUND-002` | — | — | ⚠ |
 | `PM-FUND-003` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
-| `PM-FUND-004` | — | — |  |
-| `PM-FUND-005` | — | — |  |
+| `PM-FUND-004` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:87` | `app/src/main/kotlin/zues/app/money/FundAccount.kt:9` |  |
+| `PM-FUND-005` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:80` | `app/src/main/kotlin/zues/app/money/FundAccountService.kt:50` |  |
 | `PM-FUND-006` | — | — |  |
 | `PM-FUND-007` | — | — |  |
 | `PM-FUND-008` | — | — |  |
