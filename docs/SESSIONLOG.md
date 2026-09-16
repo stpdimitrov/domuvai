@@ -364,3 +364,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — (1) **occupancy** modelling (household members / animals / absence) to unlock `PER_PERSON` and full Gate-1 realism. (2) A `GET` for a stored run. (3) double-entry **postings** + the fund (PM-FEE-020, ADR-006). (4) confirm the S-18 CI run is green — it's the first execution of the jsonb/immutability layer.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/ChargeRunStore.kt`, `app/src/main/kotlin/zues/app/money/JsonbConfig.kt`, `app/src/main/kotlin/zues/app/money/BasisJson.kt`.
+
+---
+
+## S-19 · 2026-09-16 · registry household — occupancy behind the port
+
+**Did** — `registry` now records who lives in a unit: `POST /api/registry/entrances/{id}/units/{unitId}/household` stores effective-dated `household_member` rows (a child-under-six flag, `party_id` left null since parties are unmodelled — the count needs no name). The **`Units` port** gained `occupants` and `childrenUnder6`; `UnitsAdapter` derives them from the current members (those with no `validTo`). This is the headcount a per-person charge stands on — exposed, but **not yet consumed**: `money` still refuses `PER_PERSON`. S-20 flips that.
+
+**Rules** — **PM-FEE-008** (persons residing are counted as occupants) is now proved by `UnitsAdapterTest`: registering members raises the count, a moved-out member drops out of it. **PM-FEE-005** (children under six treated separately) — the adapter reports them in their own field, ready for the engine to exclude.
+
+**Deliberately deferred, and why** — the **30-day** residence threshold (PM-FEE-008's number, which belongs in `:law` as `OCCUPANT_THRESHOLD_DAYS`, not this code) and the mid-period **6th-birthday** transition (PM-FEE-005's acceptance) are refinements on top of the count; **animals** (PM-FEE-009 / PM-BOOK-005) and **absence** (PM-FEE-006/007) are their own slices; and occupancy is **current, not period-aware** (the dateless port returns today's members). Each is noted so none is silently assumed.
+
+**What is proved where** — `UnitsAdapterTest` (counts) and `HouseholdWebTest` (201 / 404) run **locally**; `HouseholdPersistenceIT` (Testcontainers) persists members and reads the counts back **through the same port money uses** — CI-only.
+
+**`./tools/gates.sh` green** — traceability **20/233** (PM-FEE-008 added), banned-words clean on 51 files, legal-thresholds clean, `verify()` passing, TESTPLAN + TRACEABILITY regenerated.
+
+**Open / next** — **S-20 money `PER_PERSON`**: consume `occupants`/`childrenUnder6` from the port, drop the rejection, and guard a per-person line whose entrance has zero registered occupants. Then animals, then absence.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt`, `app/src/main/kotlin/zues/app/registry/Units.kt`.

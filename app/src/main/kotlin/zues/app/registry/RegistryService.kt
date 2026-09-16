@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional
 import zues.kernel.IdealParts
 import java.math.BigDecimal
 import java.time.Clock
+import java.time.LocalDate
 import java.util.UUID
 
 /** What the caller asks for. Validation of the enum lives at the edge (DB CHECK is the backstop). */
@@ -29,6 +30,12 @@ data class RegisterUnit(
     val areaM2: BigDecimal? = null,
     val idealParts: String,
     val separateEntrance: Boolean = false,
+)
+
+/** One resident to register in a unit's household. `validFrom` defaults to today. */
+data class RegisterMember(
+    val isChildUnder6: Boolean = false,
+    val validFrom: String? = null,
 )
 
 /**
@@ -86,4 +93,31 @@ class RegistryService(
 
     @Transactional(readOnly = true)
     fun listUnits(entranceId: UUID): List<PropertyUnit> = units.findByEntranceId(entranceId)
+
+    /**
+     * Register residents in a unit's household — the headcount a per-person charge builds on
+     * (Rule: PM-FEE-008). Children under six are flagged for separate treatment (Rule:
+     * PM-FEE-005). The unit must exist and belong to the entrance.
+     */
+    @Transactional
+    fun registerHousehold(entranceId: UUID, unitId: UUID, members: List<RegisterMember>): List<UUID> {
+        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
+        if (unit.entranceId != entranceId) {
+            throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
+        }
+        val today = LocalDate.now(clock)
+        return members.map { member ->
+            aggregates.insert(
+                HouseholdMember(
+                    id = UUID.randomUUID(),
+                    entranceId = entranceId,
+                    unitId = unitId,
+                    partyId = null,
+                    isChildUnder6 = member.isChildUnder6,
+                    validFrom = member.validFrom?.let { LocalDate.parse(it) } ?: today,
+                    validTo = null,
+                ),
+            ).id
+        }
+    }
 }

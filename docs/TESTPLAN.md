@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **18** (8%) |
-| Remaining | **215** |
+| Proved by a test named after the rule | **19** (8%) |
+| Remaining | **214** |
 | Proposed slices at ~10 rules each | **22** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-52 rule(s) remaining across 5 slice(s).
+51 rule(s) remaining across 5 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -38,19 +38,18 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-FUND-002` | MUST ⚠ | Minimum wage is a dated configuration value; a below-minimum tariff is rejected with the computed floor shown. |
 | `PM-FEE-003` | MUST | Changing the key without a linked protocol is rejected. |
 | `PM-FEE-007` | MUST | Late declarations are accepted only within the configured grace period. |
-| `PM-FEE-008` | MUST | Tenant registration triggers headcount recalculation. |
 | `PM-FEE-011` | MUST | A concierge cost line uses the same allocation key as maintenance and inherits its exemptions. |
 | `PM-FEE-013` | MUST | Budget vs actual report is a first-class screen. |
 | `PM-FEE-020` | MUST | Income is posted to the condominium's ledger, never the manager's. |
 | `PM-FUND-001` | MUST | An entrance without a fund raises a compliance flag. |
 | `PM-FUND-003` | MUST | A unit holding 4.20% of ideal parts is charged 4.20% of the period's fund contribution. |
 | `PM-FUND-004` | MUST | The account record stores IBAN, holder and mandate; it cannot equal the operating account. |
+| `PM-FUND-005` | MUST NOT | Ledger enforces one fund per entrance; cross-entrance postings are impossible. |
 
-### S-G1-03 · `money` · FEE · FUND · 9 rule(s)
+### S-G1-03 · `money` · FEE · FUND · 8 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-FUND-005` | MUST NOT | Ledger enforces one fund per entrance; cross-entrance postings are impossible. |
 | `PM-FUND-006` | MUST | Every fund disbursement requires a purpose code and a linked decision or passport measure. |
 | `PM-FUND-007` | MUST | Two-factor approval: decision reference + authorised signatory. |
 | `PM-FUND-008` | MUST | Emergency path checks available balance before releasing the work order. |

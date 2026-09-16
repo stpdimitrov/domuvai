@@ -52,6 +52,15 @@ data class UnitView(
     val separateEntrance: Boolean,
 )
 
+data class RegisterHouseholdRequest(val members: List<NewMemberRequest>)
+
+data class NewMemberRequest(
+    val isChildUnder6: Boolean = false,
+    val validFrom: String? = null,   // ISO date; defaults to today
+)
+
+data class HouseholdRegisteredResponse(val memberIds: List<UUID>)
+
 /** The registry module's HTTP edge — entrances and their units. */
 @RestController
 @RequestMapping("/api/registry/entrances")
@@ -82,6 +91,20 @@ class RegistryController(private val registry: RegistryService) {
             },
         )
         return ResponseEntity.status(HttpStatus.CREATED).body(UnitsCreatedResponse(ids))
+    }
+
+    @PostMapping("/{entranceId}/units/{unitId}/household")
+    fun registerHousehold(
+        @PathVariable entranceId: UUID,
+        @PathVariable unitId: UUID,
+        @RequestBody request: RegisterHouseholdRequest,
+    ): ResponseEntity<HouseholdRegisteredResponse> {
+        val ids = registry.registerHousehold(
+            entranceId,
+            unitId,
+            request.members.map { RegisterMember(it.isChildUnder6, it.validFrom) },
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(HouseholdRegisteredResponse(ids))
     }
 
     @GetMapping("/{entranceId}/units")
