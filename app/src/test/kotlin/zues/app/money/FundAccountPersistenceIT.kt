@@ -18,6 +18,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Fund-account persistence against real PostgreSQL. Proves the table's own guards: one account
@@ -42,13 +43,16 @@ class FundAccountPersistenceIT {
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)
         }
+
+        // The IBAN uniqueness is global and these tests share one container, so every registered
+        // account needs a distinct number. A static counter guarantees it across the per-method
+        // test instances; reusing a literal here would collide across tests, not in production.
+        private val ibanSeq = AtomicLong(0)
+        private fun freshIban(): String = "BG80BNBG" + "%014d".format(ibanSeq.incrementAndGet())
     }
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
-
-    private val ibanA = "BG80BNBG96611020345678"
-    private val ibanB = "BG18RZBB91550123456789"
 
     private fun createEntrance(): UUID {
         val response = mvc.perform(
@@ -67,27 +71,29 @@ class FundAccountPersistenceIT {
     @Test
     fun `PM-FUND-001 a repair-and-renewal fund account is established and read back`() {
         val entranceId = createEntrance()
-        register(entranceId, ibanA, "REPAIR_RENEWAL").andExpect(status().isCreated)
+        val iban = freshIban()
+        register(entranceId, iban, "REPAIR_RENEWAL").andExpect(status().isCreated)
 
         mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].purpose").value("REPAIR_RENEWAL"))
-            .andExpect(jsonPath("$[0].iban").value(ibanA))
+            .andExpect(jsonPath("$[0].iban").value(iban))
     }
 
     @Test
     fun `PM-FUND-005 a second account of the same purpose for the entrance is refused`() {
         val entranceId = createEntrance()
-        register(entranceId, ibanA, "REPAIR_RENEWAL").andExpect(status().isCreated)
-        register(entranceId, ibanB, "REPAIR_RENEWAL").andExpect(status().isConflict)
+        register(entranceId, freshIban(), "REPAIR_RENEWAL").andExpect(status().isCreated)
+        register(entranceId, freshIban(), "REPAIR_RENEWAL").andExpect(status().isConflict)
     }
 
     @Test
     fun `PM-FUND-004 the fund cannot reuse the operating account's IBAN, but coexists on its own`() {
         val entranceId = createEntrance()
-        register(entranceId, ibanA, "OPERATING").andExpect(status().isCreated)
-        register(entranceId, ibanA, "REPAIR_RENEWAL").andExpect(status().isConflict)   // same IBAN — commingling
-        register(entranceId, ibanB, "REPAIR_RENEWAL").andExpect(status().isCreated)    // distinct account, fine
+        val operating = freshIban()
+        register(entranceId, operating, "OPERATING").andExpect(status().isCreated)
+        register(entranceId, operating, "REPAIR_RENEWAL").andExpect(status().isConflict)   // same IBAN — commingling
+        register(entranceId, freshIban(), "REPAIR_RENEWAL").andExpect(status().isCreated)   // distinct account, fine
     }
 }

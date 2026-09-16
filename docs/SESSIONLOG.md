@@ -552,3 +552,17 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/FundAccount.kt`, `app/src/main/kotlin/zues/app/money/FundAccountService.kt`, `docs/adr/ADR-007-no-custody.md`.
 
 ---
+
+## S-28 · 2026-09-16 · fix — fund IT reused a global IBAN (CI red → green)
+
+**CI on S-27 (`6082cc0`) went red while local was green** — the gap is by design: the Docker-gated ITs skip locally and only run in CI. `FundAccountPersistenceIT` shared one Postgres container across its three methods (a static `@Container`, inserts not rolled back) but reused **two IBAN literals**, and `UNIQUE(iban)` is **global**. Whichever test ran after the first collided on the same IBAN and got a 409 where it expected 201. The production code was right; the *fixture* was wrong — the failure was the no-commingling guard doing its job.
+
+**Fix** — a static counter mints a distinct, well-formed IBAN per registration (`freshIban()`), so each test inserts its own. The PM-FUND-004 test still reuses one IBAN on purpose, to prove the iban-conflict.
+
+**No gate for this one** — S-21's column bug was statically detectable (hence the S-22 gate); "a test reuses a globally-unique fixture" is semantic, not cheaply gate-able. The standing rule stands: an IT that shares a container must treat a unique column as global and mint fresh values.
+
+**Local `./tools/gates.sh` green** (the IT still skips locally) — CI is the real proof this time. Only traceability line numbers regenerated.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt`.
+
+---
