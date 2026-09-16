@@ -484,3 +484,29 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Open / next** — **absence** (S-26) builds directly on this: a non-use declaration during the period feeds `:charges`' `absentDays`; the exemption threshold stays in `:law` config (⚠ PM-FEE-006/007). Also the **30-day** residence and **6th-birthday** thresholds, then the **fund**.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/Units.kt`, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.
+
+---
+
+## H-01 · 2026-09-16 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at the S-25 tree; this consolidates a long session (S-15 → S-25 plus the S-21 fix, the S-22 gate, and ADR-011) so the next session can continue without the conversation.
+
+**Where the code is** — the fee engine runs end to end: a charge is **computed** (ideal-parts / per-unit / per-person over registered units + households + animals, children excluded, business multiplier), **stored immutably** with a reproducible period-scoped basis, and **posted** to a balanced double-entry ledger (income to the condominium, by stream). `registry` holds entrances · units · household · animals; `money` holds the charge run + postings. Two of fourteen modules have app code.
+
+**Progress** — ~**15%** of the whole plan (233 rules / 4 gates); rules test-covered **22/233 (9%)**. **Gate 1 ≈ 40–50%** (its architecture is done; remaining below). Gates 2–4 at 0%. Foundation (full schema for all 14 modules, pure engine, 9-gate pack, CI, 11 ADRs, event + OpenAPI contracts) is ~85% done and front-loaded — that's why 15% > 9%.
+
+**How this session operates (owner delegated the workflow — reaffirm or change):**
+- One slice = one branch `slice/S-nn-*` off `main` → build → `./tools/gates.sh` green **locally** → SESSIONLOG entry → commit (attributed) → **integrate to `main` by fast-forward + push** → delete the branch. Direct-to-`main` because **no GitHub auth in-session** (`gh` logged out; PRs need `gh auth login`); the gate pack is the quality bar.
+- **No Docker locally**, so the Testcontainers ITs (`*PersistenceIT`, `*IT`) **skip locally and run in CI** (`ci.yml`, GitHub Actions, full gate pack on Ubuntu). After a DB-touching slice, the owner confirms the CI run is green; S-22's `check_schema_columns.py` gate pre-catches column-mapping bugs (the S-21 class) **locally**.
+- Toolchain: JDK 21 (`gates.sh` sets `JAVA_HOME=/usr/local/opt/openjdk@21`). The session cwd sometimes flips to `…/weatherappnew`; use `git -C …/domuvai` and absolute paths when it does.
+- Attribution (keep): commits end `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; PRs end `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+
+**Next slices (toward Gate-1 contract-complete → frontend green light):**
+1. **S-26 absence** (PM-FEE-006/007) — builds on S-25's period-aware port; a non-use declaration feeds `:charges`' `absentDays`. ⚠ the exemption number is **unverified** → keep it in `:law` config with `TODO(legal)`, never an invented number.
+2. **Fund** accounts (PM-FUND-004+; mind ADR-007 *Proposed* — the account record is safe, holding/moving money is not).
+3. **Owners / parties** in `registry` (a receivable needs a liable party) · **intake / spreadsheet import** (Gate 1's literal "reproduce the firm's spreadsheet").
+4. Then the `registry` + `money` + `intake` OpenAPI freezes → **announce "Gate 1 backend contract-complete — build the Gate-1 frontend."**
+
+**Frontend** — not started; **backend only**. Decided to be a **separate Next.js app** (ADR-010/003, consolidated in **ADR-011**). Build **gate by gate**, not big-bang; the assistant announces the green light per ADR-011 §3. **Open owner decision:** repo layout — monorepo `web/` (recommended) vs separate repo.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/adr/ADR-011-frontend-topology.md`, then `git log --oneline -12` and `./tools/gates.sh`.

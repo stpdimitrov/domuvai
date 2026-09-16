@@ -38,8 +38,11 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | [008](adr/ADR-008-explicit-denominator.md) | Every majority carries its denominator explicitly | **Accepted** |
 | [009](adr/ADR-009-agent-holds-no-credential.md) | The agent holds no write credential | **Accepted** |
 | [010](adr/ADR-010-backend-language.md) | Backend is Kotlin · Spring Boot · Spring Modulith; frontend stays Next.js/TS | **Accepted** |
+| [011](adr/ADR-011-frontend-topology.md) | Frontend is a separate Next.js app; contract-first (OpenAPI-generated client); build gate-by-gate; repo layout (mono vs poly) open | Proposed — owner |
 
-**Eight of ten Accepted.** ADR-004 and ADR-007 name counsel as a co-decider and stay Proposed until counsel answers — neither blocks near-term work: ADR-004 gates A19/A32, ADR-007 gates `rail` in Phase 5.
+**Eight of eleven Accepted.** ADR-004 and ADR-007 name counsel as a co-decider and stay Proposed until counsel answers (ADR-004 gates A19/A32, ADR-007 gates `rail` in Phase 5). **ADR-011** awaits the owner's repo-layout pick before the frontend starts; the backend is unaffected — it stays frontend-agnostic (REST + OpenAPI).
+
+**Frontend status:** not started (backend only, S-09…S-25). Green light = *Gate 1 backend contract-complete* — see ADR-011 §3; the assistant will announce it when `registry` + `money` + `intake` for Gate 1 are built and their OpenAPI is frozen (~6–10 slices out).
 
 ## Stage 1 — done and not done
 
