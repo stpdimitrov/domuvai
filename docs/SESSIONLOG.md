@@ -414,3 +414,19 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **`./tools/gates.sh` green locally** (compile + non-DB tests); the real proof is the next CI run.
 
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt`.
+
+---
+
+## S-22 · 2026-09-16 · gate — entity ⇄ schema columns (closes the S-21 gap)
+
+**Did** — added `tools/check_schema_columns.py` as gate **9/9**. It maps every `@Table` entity's properties to the column name Spring Data JDBC would use — an underscore before each capital, none before a digit (the convention read straight off the working columns `area_m2`, `ideal_parts_pct`, `charge_run_id`) — honours `@Column("…")` overrides, and diffs the result against the columns parsed from `V1__init.sql`. A property mapped to a column the table lacks fails the build **locally**, so the `is_child_under_6` class of bug can no longer reach CI. `gates.sh` renumbered to `/9`.
+
+**Proved against the real failure** — temporarily dropping the `@Column` reintroduces the S-21 bug and the check flags it precisely: `` `isChildUnder6` -> column `is_child_under6`, absent from household_member (has: … is_child_under_6 …) `` — it even names the column that exists. Restored → green. (A check never run against a failure is not a check.)
+
+**Why this was the right fix** — S-21 was caught by CI at the cost of a red `main`; the gap was that column mapping is invisible to `./gradlew test` without Docker. This check needs no database, so it moves that failure from CI back to the developer's terminal. Escape hatches match the house style: name the column with `@Column`, or mark a non-persisted property `// not-a-column`.
+
+**Assumption logged** — table names are treated as unique across schemas (the same `search_path` assumption the app relies on), and the naming rule is the observed default; a future entity with consecutive capitals (an `ID`/`URL` acronym) or a second table of the same name would need the rule revisited. Both are noted in the check's header.
+
+**`./tools/gates.sh` green** — 9/9, including the new check; generated documents match.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `tools/check_schema_columns.py`, `tools/gates.sh`.
