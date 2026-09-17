@@ -41,6 +41,13 @@ class LawTest {
     }
 
     @Test
+    fun `PM-DEBT-002 the default payment term is fourteen days and confirmed`() {
+        val c = constantOn("PAYMENT_TERM_DAYS", on)
+        assertTrue(c.verified)
+        assertEquals(14.0, numberOn("PAYMENT_TERM_DAYS", on))
+    }
+
+    @Test
     fun `PM-FEE-004 the repair fund is fixed to ideal parts and management defaults per person`() {
         assertEquals(AllocationKey.BY_IDEAL_PARTS, defaultKey(CostStream.REPAIR_FUND))
         assertEquals(AllocationKey.PER_PERSON, defaultKey(CostStream.MANAGEMENT))

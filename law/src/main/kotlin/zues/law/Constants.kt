@@ -51,6 +51,9 @@ private val CONSTANTS: List<Constant> = listOf(
         "BUSINESS_USE_MULTIPLIER_MAX", "5", "2009-01-01", "чл. 51 ал. 3 ЗУЕС", false, rule = "PM-FEE-010",
         todoLegal = "Confirm the multiplier range and who chooses within it — GA decision or statute.",
     ),
+    // PM-DEBT-002 — where a decision sets no execution term, obligations fall due 14 days after
+    // it is announced. A clear statutory figure, so it is confirmed.
+    Constant("PAYMENT_TERM_DAYS", "14", "2009-01-01", "чл. 38 ал. 1 ЗУЕС", true, rule = "PM-DEBT-002"),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */

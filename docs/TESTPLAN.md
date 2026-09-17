@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **29** (12%) |
-| Remaining | **204** |
+| Proved by a test named after the rule | **31** (13%) |
+| Remaining | **202** |
 | Proposed slices at ~10 rules each | **21** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -204,15 +204,13 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 3 — collection beats their portfolio average
 
-12 rule(s) remaining across 1 slice(s).
+10 rule(s) remaining across 1 slice(s).
 
-### S-G3-01 · `money` · DEBT · 12 rule(s) · ⚠ 1 unconfirmed
+### S-G3-01 · `money` · DEBT · 10 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-DEBT-012` | MUST ⚠ | Transfer screen shows pre-transfer and post-transfer balances separately. |
-| `PM-DEBT-001` | MUST | Ageing buckets 0–30/31–60/61–90/90+. |
-| `PM-DEBT-002` | MUST | Due-date engine reads the decision's announcement date. |
 | `PM-DEBT-003` | MUST | One-click generation of the чл. 410 application packet with the decision, tally and arrears statement attached. |
 | `PM-DEBT-004` | MUST | Packet validation refuses to export if the announcement act is missing. |
 | `PM-DEBT-005` | MUST | The expulsion workflow enforces: GA decision at 75% → written warning → court filing. |

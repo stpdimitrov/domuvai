@@ -676,3 +676,25 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/intake/ImportService.kt`, `docs/STAGE1-ADDENDUM.md` (§1, the six steps).
 
 ---
+
+## S-35 · 2026-09-17 · arrears ageing — what a unit owes, by how overdue (PM-DEBT-001/002)
+
+**Did** — `GET /api/money/units/{unitId}/arrears?asOf=YYYY-MM-DD`: a unit's outstanding, aged into the standard bands (**CURRENT / 0-30 / 31-60 / 61-90 / 90+**, PM-DEBT-001). Each receivable posting falls due `PAYMENT_TERM_DAYS` after its value date (**PM-DEBT-002**, 14 days, чл. 38 ал. 1 — a confirmed `:law` constant), and is aged by days overdue as of the read date. Every band is present, in order, so the shape is stable for a caller.
+
+**Payments aren't modelled yet, so everything owed is still owed** — the total is the sum of the unit's `RECEIVABLE` postings (ADR-006). When a payment posts its credit, the total and the aged bands fall automatically; nothing here changes.
+
+**Two honest approximations, both noted:**
+- The **ageing bands are an accounting convention, not statute** — the band edges are marked `// not-legal:` so the thresholds gate stays meaningful; only `PAYMENT_TERM_DAYS` is a legal number, and it lives in `:law`.
+- The due date anchors on the charge's **value date** as a stand-in for the decision's announcement (PM-DEBT-002 is "14 days after announcement"); decisions are the assembly module's, not built. The term is right; the anchor is a documented proxy.
+
+**Reads only money's own postings** — self-contained (ADR-003); the unit id is the only cross-boundary value.
+
+**Tests** — `ArrearsServiceTest` (three postings land in 0-30 / 31-60 / 90+; a not-yet-due charge is CURRENT; every band present even at zero — mocked, term read from config); `ArrearsWebTest` (the aged read; a malformed `asOf` → 400); `ArrearsIT` (Docker, CI: issue a run, read arrears 5 days past due → the 18000 sits in 0-30).
+
+**`./tools/gates.sh` green — 9/9, exit 0** (verified). Traceability **32/233 (14%)** — PM-DEBT-001, PM-DEBT-002 newly covered; TESTPLAN 202 remaining; legal-thresholds clean (the bands escaped, the term in `:law`). No schema change — arrears is a read over the existing postings.
+
+**Open / next** — an **entrance-wide arrears roll-up** (all debtors), default **interest** on overdue (PM-DEBT-006, dated config), oldest-first **payment allocation** (PM-DEBT-008); and still, for Gate-1 contract-complete, intake's **commit** (needs a pilot spreadsheet + the seam decision).
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/Arrears.kt`, `law/src/main/kotlin/zues/law/Constants.kt`.
+
+---

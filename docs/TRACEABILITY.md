@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 32 | 14% |
-| **Proved by a test named after the rule** | **30** | **13%** |
-| No implementation and no test | 200 | 86% |
+| Referenced in code (`// Rule:`) | 34 | 15% |
+| **Proved by a test named after the rule** | **32** | **14%** |
+| No implementation and no test | 198 | 85% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -161,12 +161,12 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FUND-010` | — | — |  |
 | `PM-FUND-011` | — | — |  |
 
-## DEBT — Arrears & enforcement  ·  0/12 covered
+## DEBT — Arrears & enforcement  ·  2/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-DEBT-001` | — | — |  |
-| `PM-DEBT-002` | — | — |  |
+| `PM-DEBT-001` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:70` | `app/src/main/kotlin/zues/app/money/Arrears.kt:11` |  |
+| `PM-DEBT-002` | `law/src/test/kotlin/zues/law/LawTest.kt:44` | `app/src/main/kotlin/zues/app/money/Arrears.kt:43` |  |
 | `PM-DEBT-003` | — | — |  |
 | `PM-DEBT-004` | — | — |  |
 | `PM-DEBT-005` | — | — |  |
@@ -275,7 +275,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
-| `PM-SYS-002` | `law/src/test/kotlin/zues/law/LawTest.kt:15` | `law/src/main/kotlin/zues/law/Constants.kt:56` |  |
+| `PM-SYS-002` | `law/src/test/kotlin/zues/law/LawTest.kt:15` | `law/src/main/kotlin/zues/law/Constants.kt:59` |  |
 | `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
 | `PM-SYS-004` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:26` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
 | `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |
