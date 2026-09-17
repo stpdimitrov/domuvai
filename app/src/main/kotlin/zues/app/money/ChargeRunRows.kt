@@ -49,4 +49,5 @@ interface ChargeRunRepository : ListCrudRepository<ChargeRunRow, UUID> {
 
 interface ChargeLineRepository : ListCrudRepository<ChargeLineRow, UUID> {
     fun findByChargeRunId(chargeRunId: UUID): List<ChargeLineRow>
+    fun findByUnitId(unitId: UUID): List<ChargeLineRow>
 }

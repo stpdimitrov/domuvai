@@ -626,3 +626,21 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt`, `app/src/main/kotlin/zues/app/intake/FeeSheet.kt`.
 
 ---
+
+## S-32 · 2026-09-17 · unit statement — what a unit owes, and why (PM-FEE-018)
+
+**Did** — `GET /api/money/units/{unitId}/statement`: a resident's itemised statement. The **balance is derived from the ledger** — the sum of the unit's `RECEIVABLE` postings (ADR-006) — so when payments later post their credits the balance falls without touching the immutable charge lines. The **itemisation** comes from the issued charge lines (each with its cost stream, allocation key, quantity and derivation, PM-FEE-018), dated by their run and sorted by period then component.
+
+**A unit with nothing billed owes nothing** — an empty statement (balance 0, no lines), not a 404. Whether the unit exists is registry's to say; money reports only what it has charged.
+
+**Reads only money's own tables** — postings, charge lines, charge runs — so it stays inside the module (ADR-003); the unit id is the only cross-boundary value, and it is just a UUID.
+
+**Tests** — `StatementServiceTest` (balance = Σ receivable postings; every line itemised with a derivation; an empty unit owes nothing, mocked); `StatementWebTest` (the read's shape); `StatementIT` (Docker, CI: issue a 60/40 run of 10000 management + 20000 maintenance, then read ап. 1's statement — balance 18000, two dated, derived lines).
+
+**`./tools/gates.sh` green** — 9/9. No new rule coverage — PM-FEE-018 was already proved on the engine's derivation, so this is a new read over it — traceability stays **30/233 (13%)**; only its displayed reference regenerated. Two new derived queries (`postings.findByUnitIdAndAccount`, `chargeLines.findByUnitId`); no schema change.
+
+**Open / next** — this closes the charge → post → **owe** loop for Gate 1. Remaining before Gate-1 contract-complete: intake **persistence** (import record → commit → revert, with the cross-module commit decision to settle) and, on top of this balance, the **arrears / ageing** view (PM-DEBT-001, 0–30/31–60/61–90/90+). Then the frontend green light (ADR-011 §3).
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/Statement.kt`, `app/src/main/kotlin/zues/app/money/Postings.kt`.
+
+---

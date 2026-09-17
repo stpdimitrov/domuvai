@@ -141,9 +141,9 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | — | — |  |
-| `PM-FEE-018` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:102` | `charges/src/main/kotlin/zues/charges/Charges.kt:70` |  |
+| `PM-FEE-018` | `app/src/test/kotlin/zues/app/money/StatementIT.kt:71` | `app/src/main/kotlin/zues/app/money/Statement.kt:34` |  |
 | `PM-FEE-019` | — | — |  |
-| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:50` | `app/src/main/kotlin/zues/app/money/Postings.kt:35` |  |
+| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:50` | `app/src/main/kotlin/zues/app/money/Postings.kt:36` |  |
 
 ## FUND — Repair & renewal fund  ·  4/11 covered
 
