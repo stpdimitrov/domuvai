@@ -16,7 +16,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-ORG-001` | — | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
-| `PM-ORG-002` | `app/src/test/kotlin/zues/app/registry/UnitValidationTest.kt:14` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:46` |  |
+| `PM-ORG-002` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:43` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:46` |  |
 | `PM-ORG-003` | — | — |  |
 | `PM-ORG-004` | — | — |  |
 | `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:59` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:18` |  |
@@ -137,7 +137,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-011` | — | — |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |
 | `PM-FEE-013` | — | — |  |
-| `PM-FEE-014` | `app/src/test/kotlin/zues/app/money/BasisJsonTest.kt:33` | `app/src/main/kotlin/zues/app/money/BasisJson.kt:10` |  |
+| `PM-FEE-014` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:23` | `app/src/main/kotlin/zues/app/money/BasisJson.kt:10` |  |
 | `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | — | — |  |

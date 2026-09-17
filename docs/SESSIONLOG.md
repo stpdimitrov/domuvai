@@ -604,3 +604,25 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/FundAccount.kt`, `app/src/main/kotlin/zues/app/money/FundAccountService.kt`.
 
 ---
+
+## S-31 · 2026-09-17 · intake fee-sheet dry-run — Gate 1's "reproduce to the cent"
+
+**Did** — the **intake** module (the sixth with app code) and Gate 1's centerpiece: `POST /api/intake/entrances/{e}/fee-sheet/dry-run` takes a firm's fee sheet (CSV) plus the tariff it was built on, recomputes every fee through the **same `:charges` engine** that will bill it, and compares **to the cent**. The report says `reproduced` (Gate 1 met), names each `differing` unit with its delta, and lists `violations`.
+
+**Stateless, like money's first slice (S-15)** — no persistence: parse → recompute → diff → report. The import record, commit and revert are the next intake slice, so every test runs locally and there is no Docker IT.
+
+**A dry-run reports, it does not raise** — a sheet whose ideal parts do not sum to 100% (PM-ORG-002), or a row that will not parse, becomes a **violation in the report**, not a 500. Only a malformed *tariff* — the caller's own input, e.g. an unknown cost stream — is a 400.
+
+**Module boundary held** — intake computes via `:charges` (the pure library), never through `money`; it imports no other app module, and `ApplicationModules.verify()` (ModularityTests) passes with the new module. Intake "owns no rules" — it enforces ORG and FEE on the way in (ADR-003).
+
+**Input, first cut** — a clean CSV export: header `designation,ideal_parts,occupants,fee_minor`, dot decimals, integer minor units (ADR-006, no floats). Quoting, embedded delimiters, locale-formatted numbers and XLSX are deliberate later hardening.
+
+**Tests** — `FeeSheetTest` (clean / missing column / malformed row / empty); `IntakeDryRunTest` (**PM-FEE-014** reproduces to the cent; a **one-cent** difference named; **PM-ORG-002** sum ≠ 100% a violation); `IntakeWebTest` (the report; a bad cost stream → 400).
+
+**`./tools/gates.sh` green** — 9/9. No new rule coverage — intake re-applies PM-FEE-014 and PM-ORG-002, already covered — so traceability stays **30/233 (13%)**; banned-words clean on 82 files. Only traceability's displayed references regenerated.
+
+**Open / next** — intake **persistence** (import record → dry-run → commit → revert, PM-BOOK-007) and/or **locale/XLSX** parsing; the **receivable read**. When `registry` + `money` + `intake` for Gate 1 are contract-complete and their OpenAPI is frozen, the frontend green light (ADR-011 §3) — not yet: intake persistence and the receivable read are still owed.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt`, `app/src/main/kotlin/zues/app/intake/FeeSheet.kt`.
+
+---
