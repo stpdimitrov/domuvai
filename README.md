@@ -9,16 +9,26 @@
 
 ---
 
-## Status — Stage 1, documentation only
+## Quick start (developers)
 
-**No production code exists yet, and that is deliberate.** Nine architecture decisions had to be recorded first; eight of them are still *Proposed*. Code waits for *Accepted*.
+New here? Three steps:
+
+1. **Clone:** `git clone https://github.com/stpdimitrov/domuvai.git && cd domuvai`
+2. **Auth once:** `gh auth login` → GitHub.com · HTTPS · "Authenticate Git"=Yes · Login with a web browser. Without this your Claude session can't open PRs and falls back to pushing `main` directly.
+3. **Open Claude Code in the repo** — it loads [CLAUDE.md](CLAUDE.md) automatically. Read the **"Working in parallel"** section it shows you.
+
+Then take one slice from [docs/TESTPLAN.md](docs/TESTPLAN.md), claim it with a GitHub Issue, stay in **your one module**, and build it on a `slice/S-nn-*` branch → `./tools/gates.sh` green → open a PR. **Never push to `main`.**
+
+## Status — backend implementation in progress
+
+**Stage 1 — the rule catalogue, the ADRs, the gate pack — is done; the backend is now built slice by slice.** The pure domain (`:kernel`, `:law`, `:charges`) and the `registry`, `money` and `intake` modules have code; [docs/SESSIONLOG.md](docs/SESSIONLOG.md) is where the last slice stopped.
 
 | | |
 |---|---|
 | Rule catalogue | **233 rules**, 16 domains, legal baseline 2026-09-03 |
 | Unconfirmed numerics | **24** — mechanism built, number in configuration, `TODO(legal)` |
-| Architecture decisions | **9**, one Accepted |
-| Modules | **14**, in **3** deployables |
+| Architecture decisions | **11**, eight Accepted (ADR-004, ADR-007 await counsel) |
+| Modules | **14** in **3** deployables — **3** with code so far |
 
 ## Read in this order
 
@@ -44,7 +54,7 @@
 
 ```bash
 pip install -r tools/requirements.txt   # once
-./tools/gates.sh                        # all eight checks, the same ones CI runs
+./tools/gates.sh                        # all nine checks, the same ones CI runs
 
 python3 tools/build_functional.py   # regenerate docs/FUNCTIONAL.md from rules.json — fails if a rule has no module
 python3 tools/md2pdf.py <in.md> <out.html> "<title>"
@@ -54,8 +64,7 @@ node    tools/mmcheck.js <file.md>                        # parse-check diagrams
 
 ## Contributing
 
-One service per slice. One branch per slice. One PR per slice. The slice contract is the PR description.
-See [docs/WORKING.md](docs/WORKING.md) and the `zues-slice` skill in `.claude/skills/`.
+One module per slice, one branch, one PR — the slice contract is the PR description. **Never push to `main`; stay in your own module; rebase on `origin/main` before you push.** See the **"Working in parallel"** section of [CLAUDE.md](CLAUDE.md), [docs/WORKING.md](docs/WORKING.md), and the `zues-slice` skill in `.claude/skills/`.
 
 ---
 
