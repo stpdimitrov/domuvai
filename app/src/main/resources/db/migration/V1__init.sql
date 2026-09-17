@@ -71,12 +71,21 @@ CREATE TABLE registry.unit (
   ideal_parts_pct   ideal_parts NOT NULL,
   -- Rule: PM-ORG-009 — business use through a separate street entrance
   separate_entrance boolean NOT NULL DEFAULT false,
+  -- Provenance of a unit adopted from a fee-sheet import (STAGE1-ADDENDUM §1, step 6): every row
+  -- a commit creates carries its import_id, so the whole import is revertible as a unit. Null for
+  -- units registered directly. No cross-schema FK — it is a provenance stamp, and an import is
+  -- reverted by matching this, not by cascade.
+  import_id         uuid,
   UNIQUE (entrance_id, designation)
 );
 
 -- Rule: PM-ORG-002 — the sum of ideal parts per entrance MUST equal 100%.
 -- Across rows, so a CHECK cannot express it. A deferred constraint trigger
 -- validates at COMMIT, which lets a multi-row import reach a valid state.
+-- An empty entrance (total 0) is allowed: it is the state before any unit is
+-- added and the state a reverted import returns to (STAGE1-ADDENDUM §1). The
+-- invariant a populated entrance must satisfy — exactly 100% — is unchanged; a
+-- partial set (e.g. 90%) is still refused.
 CREATE FUNCTION registry.assert_parts_sum_100() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE e uuid; total numeric;
@@ -84,8 +93,8 @@ BEGIN
   e := COALESCE(NEW.entrance_id, OLD.entrance_id);
   SELECT COALESCE(sum(ideal_parts_pct), 0) INTO total
     FROM registry.unit WHERE entrance_id = e;
-  IF total <> 100.0000 THEN
-    RAISE EXCEPTION 'ideal parts for entrance % sum to %, must be 100.0000 (PM-ORG-002)', e, total;
+  IF total <> 100.0000 AND total <> 0 THEN
+    RAISE EXCEPTION 'ideal parts for entrance % sum to %, must be 100.0000 or empty (PM-ORG-002)', e, total;
   END IF;
   RETURN NULL;
 END $$;
@@ -434,7 +443,9 @@ CREATE RULE document_no_delete AS ON DELETE TO evidence.document DO INSTEAD NOTH
 CREATE TABLE intake.fee_import (
   id           uuid PRIMARY KEY,
   entrance_id  uuid NOT NULL REFERENCES registry.entrance(id),
-  status       text NOT NULL CHECK (status IN ('REPRODUCED','NEEDS_REVIEW')),
+  -- REPRODUCED|NEEDS_REVIEW are the dry-run verdict (S-34); COMMITTED|REVERTED the commit
+  -- lifecycle (STAGE1-ADDENDUM §1, step 6). Only a REPRODUCED import may be committed.
+  status       text NOT NULL CHECK (status IN ('REPRODUCED','NEEDS_REVIEW','COMMITTED','REVERTED')),
   source_sha   text NOT NULL,
   rows_parsed  integer NOT NULL,
   differing    integer NOT NULL,

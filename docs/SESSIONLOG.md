@@ -735,3 +735,37 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/STAGE1-ADDENDUM.md` (§1 intake), `docs/adr/ADR-011-frontend-topology.md`, then `git log --oneline -14` and `./tools/gates.sh`.
 
 ---
+
+## S-36 · 2026-09-17 · intake commit — the Gate-1 finisher (the seam, resolved)
+
+**Did** — built intake **commit** and **revert**: a reviewed import (`REPRODUCED`) is committed, its units are adopted into `registry`, each stamped with `import_id` and revertible by it (STAGE1-ADDENDUM §1, step 6). Owner directed "continue with the finisher" and declined to defer, so this ships **minimal + provisional** rather than waiting for the pilot spreadsheet — the mechanism, with the pilot-sheet-shaped fields defaulted and flagged.
+
+**The seam my H-02 handover left open is resolved — by re-reading, not by an owner decision.** MODULE-TEMPLATE's three laws settle it: law 1 (one transaction writes one module's schema + the outbox, never two) *forbids* the synchronous cross-schema write-port I'd half-considered; law 3 (reactions go through outbox events) *mandates* the event. So commit = intake publishes **`ImportCommitted`**, `registry` reacts and adopts; revert = **`ImportReverted`**, `registry` drops the stamped rows. Both events were **already in the A8 catalogue** (`docs/events/`), so none was invented; the pattern (`ApplicationEventPublisher` + `@ApplicationModuleListener`) was already in the tree (`money/ChargeRunStore`, `registry/RegistryNotifications`). The externalized schema is a **counts summary**; the in-process event additionally carries the rows for the listener (dropped at externalization).
+
+**Dependency direction** — `registry` → `intake` on the event type only (the consumer depends on the producer's event), acyclic because `intake` never imports `registry`. `ApplicationModules.verify()` (ModularityTests, runs locally) is **green**, so the seam is boundary-legal.
+
+**Deliberately provisional (all flagged, none silent), pending the pilot spreadsheet:**
+- Only **designation + ideal parts** are adopted — the exact fields the dry-run already maps. `unit_type` defaults to `UNSPECIFIED` (`TODO(pilot-sheet)`); area, **occupancy, owners/household** are not in a fee sheet and wait for the real file.
+- **money is untouched** — fees follow from a later charge run; no arrears/opening-balance migration here.
+- `committed_by` is a required request field (a commit names its actor) but is **not yet identity-validated** (identity-org unbuilt); `source_document_id` = the import id as a **stand-in** until `evidence` exists.
+- Adoption is **insert-only into a fresh entrance** (`rows_changed` = 0); merge/re-import is a later slice.
+
+**Rules covered** — **PM-ORG-002** "the sum of ideal parts per entrance MUST equal 100%": `adoptImport` reuses `UnitValidation.requirePartsSumTo100`, and the deferred DB trigger backstops it. **PM-ORG-001** "model ownership at the level of … a separate entrance": adopted units are entrance-scoped and read back under it. (Coverage count stays 32/233 — PM-ORG-002 was already covered; this slice re-enforces it on the commit path.)
+
+**Schema** — `registry.unit.import_id uuid` (provenance, nullable, no cross-schema FK); `intake.fee_import.status` CHECK extended with `COMMITTED`/`REVERTED`; the `assert_parts_sum_100` trigger now allows an **empty** entrance (total 0 **or** 100) so a first import is revertible to nothing — the populated-entrance invariant (exactly 100%) is unchanged, a partial set (e.g. 90%) still refused.
+
+**Tests added** — local (run in the gate pack): `ImportServiceTest` — commit adopts + publishes `ImportCommitted`; a non-`REPRODUCED` import and a hash-mismatched sheet are refused; revert publishes `ImportReverted`; only a `COMMITTED` import reverts. `ImportCommitWebTest` — commit 200 + counts, wrong-state **409**, revert 200. CI-only IT: `ImportCommitPersistenceIT` — the HTTP commit→revert status lifecycle, and the registry listener adopting (stamped, `UNSPECIFIED`, summing 100 — PM-ORG-002 — under the entrance — PM-ORG-001), **idempotent** on redelivery, dropped on revert; a 90% set refused.
+
+**Decisions** — no new ADR. The seam follows ADR-003 §4 + MODULE-TEMPLATE laws 1/3 (recorded there, not re-decided here). The trigger refinement (empty entrance is valid) is a PM-ORG-002-preserving clarification, documented in `V1__init.sql`.
+
+**`./tools/gates.sh` — 9/9, exit 0** (verified: read the exit code and the `ALL GATES GREEN` line, per the S-33 rule). Diff ≈517 lines (≈220 logic, ≈300 tests) — larger than the ~400 guide because it stands up the first cross-module event flow.
+
+**Honest coverage gap** — the **async delivery hop** (Modulith dispatch from publish to listener) is not directly asserted: I cannot run Docker ITs locally, so I proved the two halves separately (intake publishes — local unit test; registry adopts — the IT calls the listener directly) rather than risk an un-runnable async test pushing a red CI. A `Scenario`-based end-to-end await is a worthwhile follow-up.
+
+**What Gate-1 needs now** — the commit *mechanism* is built. What remains is genuinely pilot-sheet-shaped: the **rich mapping** (the firm's real columns → owners/household/IBANs/opening balances, XLSX, locale numbers) and money migration. That is additive on this seam, not a redesign of it.
+
+**Open / next** — (1) confirm CI green on this push (DB-touching: the IT runs only in CI). (2) Still unblocked and independent: entrance-wide **arrears roll-up**, default **interest** (PM-DEBT-006), oldest-first **allocation** (PM-DEBT-008). (3) The **pilot spreadsheet** now unblocks the *rich* intake mapping and is still the cheapest, highest-value external item. (4) Frontend green light (ADR-011) — the backend commit contract is now in place; owner still owes the **monorepo vs separate-repo** decision.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/STAGE1-ADDENDUM.md` (§1 intake), `docs/MODULE-TEMPLATE.md` (laws 1/3 — the seam), `app/src/main/kotlin/zues/app/intake/ImportService.kt` + `app/src/main/kotlin/zues/app/registry/ImportAdoption.kt`, then `git log --oneline -14` and `./tools/gates.sh`.
+
+---

@@ -26,10 +26,13 @@ data class PropertyUnit(
     val idealPartsPct: BigDecimal,
     /** Rule: PM-ORG-009 — separate street entrance for business use, drives the fee multiplier */
     val separateEntrance: Boolean,
+    /** Provenance if adopted from a fee-sheet import (STAGE1-ADDENDUM §1); null if registered directly. */
+    val importId: UUID? = null,
 )
 
 interface PropertyUnitRepository : ListCrudRepository<PropertyUnit, UUID> {
     fun findByEntranceId(entranceId: UUID): List<PropertyUnit>
+    fun findByImportId(importId: UUID): List<PropertyUnit>
 }
 
 /**

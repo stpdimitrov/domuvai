@@ -111,6 +111,42 @@ class RegistryService(
     fun listUnits(entranceId: UUID): List<PropertyUnit> = units.findByEntranceId(entranceId)
 
     /**
+     * Adopt the units of a committed fee-sheet import into the book, each stamped with its
+     * [importId] so the whole import is revertible as a unit (STAGE1-ADDENDUM §1, step 6). The
+     * same PM-ORG-002 invariant registerUnits enforces applies: the set must sum to 100%, checked
+     * here and again by the deferred DB trigger at commit. Idempotent on [importId] — delivery of
+     * ImportCommitted is at least once, so a redelivery adopts nothing twice. Called by the
+     * registry's own event listener, never by intake directly (ADR-003; MODULE-TEMPLATE law 3).
+     */
+    @Transactional
+    fun adoptImport(entranceId: UUID, importId: UUID, commands: List<RegisterUnit>): List<UUID> {
+        if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
+        if (units.findByImportId(importId).isNotEmpty()) return emptyList()   // already adopted
+        UnitValidation.requirePartsSumTo100(commands.map { it.idealParts })
+        return commands.map { command ->
+            aggregates.insert(
+                PropertyUnit(
+                    id = UUID.randomUUID(),
+                    entranceId = entranceId,
+                    designation = command.designation,
+                    unitType = command.unitType,
+                    areaM2 = command.areaM2,
+                    idealPartsPct = UnitValidation.toColumn(IdealParts.of(command.idealParts)),
+                    separateEntrance = command.separateEntrance,
+                    importId = importId,
+                ),
+            ).id
+        }
+    }
+
+    /** Undo an import: drop every unit that carried its [importId] (STAGE1-ADDENDUM §1). */
+    @Transactional
+    fun revertImport(importId: UUID) {
+        val adopted = units.findByImportId(importId)
+        if (adopted.isNotEmpty()) units.deleteAll(adopted)
+    }
+
+    /**
      * Register residents in a unit's household — the headcount a per-person charge builds on
      * (Rule: PM-FEE-008). Children under six are flagged for separate treatment (Rule:
      * PM-FEE-005). The unit must exist and belong to the entrance.
