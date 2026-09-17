@@ -42,7 +42,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 
 **Eight of eleven Accepted.** ADR-004 and ADR-007 name counsel as a co-decider and stay Proposed until counsel answers (ADR-004 gates A19/A32, ADR-007 gates `rail` in Phase 5). **ADR-011** awaits the owner's repo-layout pick before the frontend starts; the backend is unaffected — it stays frontend-agnostic (REST + OpenAPI).
 
-**Frontend status:** not started (backend only, S-09…S-25). Green light = *Gate 1 backend contract-complete* — see ADR-011 §3; the assistant will announce it when `registry` + `money` + `intake` for Gate 1 are built and their OpenAPI is frozen (~6–10 slices out).
+**Frontend status:** not started (backend only, S-09…S-35). Green light = *Gate 1 backend contract-complete* — see ADR-011 §3. `registry`, `money` and `intake` for Gate 1 are largely built — units · households · animals · absence · owners/parties · charge compute/persist/post · fund account · unit statement · arrears ageing · intake dry-run + import record. The one piece left is **intake commit** (adopt an imported sheet into `registry`/`money`), blocked on a real pilot spreadsheet — it defines the intake schema — and the cross-module write seam (events vs a published write-port). The assistant announces the green light once that lands and the OpenAPI is frozen.
 
 ## Stage 1 — done and not done
 

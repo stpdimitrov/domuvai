@@ -698,3 +698,40 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/Arrears.kt`, `law/src/main/kotlin/zues/law/Constants.kt`.
 
 ---
+
+## H-02 · 2026-09-17 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at `e8d1fef`, clean and CI-green. This consolidates the session that built S-26 → S-35 (ten slices + two fixes) on top of H-01, so the next session continues without the conversation.
+
+**Where the code is now** — the fee engine runs **charge → post → owe → age**, end to end:
+- **`registry`** — entrances · units · household · animals · **absence declarations** (S-26) · **parties + titles** (owners/users, effective-dated, ЕГН never in a resident list) (S-29).
+- **`money`** — charge run compute/persist/post (double-entry) · **fund account** (the чл. 50 external account, no custody) (S-27) · **fund holder → party** link (S-30) · **unit statement** (itemised, ledger-derived balance) (S-32) · **arrears ageing** (CURRENT/0-30/31-60/61-90/90+) (S-35).
+- **`intake`** (the sixth module with app code) — **fee-sheet dry-run** (Gate 1 "reproduce to the cent", stateless) (S-31) · **import record** (verdict + source hash, durable) (S-34).
+- **`:law`** gained `ABSENCE_DECLARATION_GRACE_DAYS` (unverified) and `PAYMENT_TERM_DAYS` (14, confirmed).
+
+**Three of fourteen modules have app code** (registry, money, intake).
+
+**Progress** — rules test-covered **32/233 (14%)**, up from 22 at H-01. Whole-plan ≈ **~20%** (foundation front-loaded; see H-01). Gates 2–4 still at 0%. **Gate 1 is ~70–80% built** — the one functional piece left is intake **commit**.
+
+**The one thing blocking Gate-1 contract-complete → the frontend green light:**
+- **intake commit** — adopt an imported sheet's rows into `registry`/`money`, one transaction, every row carrying `import_id`, revertible by `import_id` (STAGE1-ADDENDUM §1, step 6). It is **blocked on two owner/design items**: (1) a **real pilot spreadsheet** — the addendum says it *defines the intake schema* and "will probably invalidate an assumption while that is still cheap" (INDEX lists it as the cheapest, highest-value unblock); (2) the **cross-module write seam** — domain events vs a published write-port — best settled against real data. Do not invent the intake mapping schema before the spreadsheet.
+
+**How this session operates (owner delegated the workflow — reaffirm or change):**
+- One slice = one branch `slice/S-nn-*` off `main` → build → `./tools/gates.sh` green **locally** → SESSIONLOG entry → commit (attributed) → **fast-forward to `main` + push** → delete branch. Direct-to-`main` because there is **no GitHub auth in-session** (`gh` logged out); the gate pack is the quality bar.
+- **No Docker locally** → the Testcontainers `*IT`/`*PersistenceIT` **skip locally, run in CI** (`ci.yml`, the full gate pack on Ubuntu). After a DB-touching slice, confirm the CI run is green via the **public GitHub Actions API** (repo is public; poll `actions/runs?per_page=N` and match `head_sha`) — `gh` cannot be used.
+- **Two hard-won rules from this session's mistakes (S-33):** (1) **Read `./tools/gates.sh`'s own exit code and its `ALL GATES GREEN` line — never pipe it through `| tail`/`| grep`**, which hid a failing gate and pushed a red commit (`2a4869d`). (2) **Actually create the `slice/…` branch** before building (S-32 was built on `main` by mistake — harmless, but off-ritual).
+- Gate quirks that bit real slices: the **banned-words** gate forbids the exact identifiers `balance`/`fee` (derive a balance from postings, ADR-006) — `balanceMinor` is fine, `balance` is not; the **legal-thresholds** gate flags watchlist numbers in comparisons — put statutory numbers in `:law`, and mark a genuinely non-legal number (e.g. accounting ageing bands) `// not-legal: <why>`; the **schema-columns** gate maps camelCase→snake_case with no underscore before a digit; IT fixtures that share one container must respect **global** unique constraints (S-28 — mint fresh values).
+- Toolchain: JDK 21 (`gates.sh` sets `JAVA_HOME=/usr/local/opt/openjdk@21`). The session cwd sometimes flips to `…/weatherappnew`; use `git -C …/domuvai` / absolute paths.
+- Attribution (keep): commits end `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; PRs end `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+
+**Next slices — three unblocked, pick per owner:**
+1. **Entrance-wide arrears roll-up** — all debtors of an entrance in one aged view (extends S-35, self-contained).
+2. **Default interest** on overdue (PM-DEBT-006, dated `:law` rate) · oldest-first **payment allocation** (PM-DEBT-008).
+3. **Start the Gate-1 frontend** for the stable contracts already built — only intake commit is missing (ADR-011; owner still owes the **monorepo vs separate-repo** decision).
+Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
+
+**Frontend** — not started; **backend only**. Separate Next.js app, contract-first (ADR-010/003/011). Open owner decision: **repo layout — monorepo `web/` (recommended) vs separate repo** (ADR-011 §3).
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/STAGE1-ADDENDUM.md` (§1 intake), `docs/adr/ADR-011-frontend-topology.md`, then `git log --oneline -14` and `./tools/gates.sh`.
+
+---
