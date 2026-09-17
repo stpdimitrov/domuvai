@@ -779,3 +779,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Lesson** — `@ApplicationModuleListener` is `@Async`; calling such a bean's method directly in a test still goes through the async proxy, so it does not run synchronously. Exercise the reaction by calling the underlying non-async service (or unwrap the proxy). And a corollary of the no-Docker-locally rule: an IT that runs **only** in CI has to be reasoned through for async and lifecycle, because it cannot be run locally to catch this before the push.
 
 ---
+
+## WF-01 · 2026-09-17 · parallel-development setup (three developers)
+
+**Did** — turned the two-person protocol into a three-developer one, enforced by the repo so every Claude session picks it up automatically (not a code slice — no rule/module change):
+- **`CLAUDE.md`** gained a **"Working in parallel"** section — auto-loaded by every session, so the other developers' Claude sessions intercept it without being told: never push to `main` (branch → PR → CI → merge); one module per developer, claim the slice first; rebase before pushing; generated docs are regenerated, never hand-merged; schema changes are new `V<yyyyMMddHHmm>__*.sql` files; `SESSIONLOG.md` union-merges.
+- **`.gitattributes`** (new) — `docs/SESSIONLOG.md merge=union` so two appended entries concatenate instead of conflicting; generated docs marked `linguist-generated`.
+- **`tools/check_schema_columns.py`** — now reads **every** `V*.sql` and understands `ALTER TABLE … ADD COLUMN` (was hardcoded to `V1__init.sql`), so additive migrations are gate-safe. Verified: same 25 tables today, and an ALTER-added column is now seen.
+- **`docs/WORKING.md`** — updated for three: never-push-to-`main` + rebase + claim in the loop, a **Conflict surfaces** table, a module-lane work split (the A-plan split was stale), and a pre-flight (`gh auth login` per dev, branch protection).
+
+**Gates** — 9/9, exit 0. Bootstrap change committed **direct-to-`main`** because there is no `gh` auth in-session to open a PR — the last such push before the PR flow is turned on.
+
+**Owner action to finish the switch** — each developer runs `gh auth login`; enable **branch protection** on `main` (PRs required, the gate-pack CI run a required check). Until both are done, a session with no GitHub auth still falls back to direct-to-`main`.
+
+**Read first next time** — `CLAUDE.md` (Working in parallel), `docs/WORKING.md`, this entry.
+
+---

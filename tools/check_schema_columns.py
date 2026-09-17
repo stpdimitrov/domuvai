@@ -16,13 +16,22 @@ not a column with a trailing `// not-a-column` comment.
 import re, sys, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SCHEMA = ROOT / 'app/src/main/resources/db/migration/V1__init.sql'
+MIGRATIONS = ROOT / 'app/src/main/resources/db/migration'
 SRC = ROOT / 'app/src/main'
 
 CONSTRAINT_KEYWORDS = {'UNIQUE', 'CHECK', 'PRIMARY', 'FOREIGN', 'CONSTRAINT', 'EXCLUDE'}
 TABLE = re.compile(r'@Table\("([^"]+)"\)')
 COLUMN = re.compile(r'@Column\("([^"]+)"\)')
 PROP = re.compile(r'\bval\s+(\w+)\s*:')
+# Additive migrations (V2, V3…) may add a column to an existing table rather than recreate it.
+ALTER_ADD = re.compile(r'ALTER TABLE\s+\w+\.(\w+)\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?(\w+)', re.IGNORECASE)
+
+
+def migrations_sql() -> str:
+    """Every Flyway migration concatenated — the V1 baseline plus any additive V2, V3… files.
+    Schema changes land in a new file per change (never edit an applied migration), so parallel
+    developers do not fight over one file; the gate reads them all."""
+    return "\n".join(p.read_text() for p in sorted(MIGRATIONS.glob('V*.sql')))
 
 
 def to_column(prop: str) -> str:
@@ -65,6 +74,9 @@ def parse_schema(sql: str) -> dict[str, set[str]]:
                 current += ch
         cols |= _column_of(current)
         tables[m.group(1)] = cols
+    # Additive migrations: a column added to an existing table via ALTER TABLE … ADD COLUMN.
+    for a in ALTER_ADD.finditer(sql):
+        tables.setdefault(a.group(1), set()).add(a.group(2).lower())
     return tables
 
 
@@ -106,7 +118,7 @@ def entities(text: str):
 
 
 def main() -> int:
-    tables = parse_schema(SCHEMA.read_text())
+    tables = parse_schema(migrations_sql())
     checked, bad = 0, []
     for path in SRC.rglob('*.kt'):
         for table, props in entities(path.read_text()):

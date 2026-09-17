@@ -1,0 +1,14 @@
+# Parallel-development merge rules. See CLAUDE.md "Working in parallel" and docs/WORKING.md.
+
+# The session log is append-only: each entry is self-contained (its own S-nn header), so when
+# two developers each append an entry, concatenate both sides instead of raising a conflict.
+docs/SESSIONLOG.md merge=union
+
+# Generated docs are NOT union-merged — concatenating them would duplicate rows and corrupt the
+# structure. On a conflict, take origin/main's version and re-run the generator (the gate pack
+# regenerates them), then commit. Marked as generated so diffs stay quiet by default.
+docs/TRACEABILITY.md    linguist-generated=true
+docs/TESTPLAN.md        linguist-generated=true
+docs/FUNCTIONAL.md      linguist-generated=true
+docs/api/openapi.json   linguist-generated=true
+docs/events/**          linguist-generated=true

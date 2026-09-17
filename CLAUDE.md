@@ -104,6 +104,19 @@ Review the diff against the rule texts as if someone else wrote it. Re-reading y
 
 Append to `docs/SESSIONLOG.md` and commit it with the slice. Never edit an earlier entry.
 
+## Working in parallel (multiple developers)
+
+Up to three developers build here at once, each in their own Claude Code session. Sessions share nothing but this repo, so every rule below is enforced by the repo, not by anyone's memory.
+
+- **Never push to `main`. Branch → PR → CI green → merge.** Direct-to-`main` cannot work for more than one person — the second push is rejected — and it skips the gate every merge must pass. Push the `slice/S-nn-*` branch, open a PR (the slice contract is its description), let CI run the gate pack, merge when green. Branch protection requires it.
+- **One module per developer at a time.** The module is the parallelism boundary (ADR-003). Before starting, claim the slice — a GitHub Issue from `docs/TESTPLAN.md` — and check that no open PR touches your module. Never open a module someone else has in flight.
+- **Rebase before you push or update a PR:** `git fetch && git rebase origin/main`, so conflicts surface in your session where you can resolve them, not at merge time.
+- **Generated docs are regenerated, never hand-merged** — `docs/TRACEABILITY.md`, `docs/TESTPLAN.md`, `docs/FUNCTIONAL.md`, `docs/api/openapi.json`, `docs/events/*`. On a conflict, take `origin/main`'s version and re-run the generators (the gate pack does this), then commit. Hand-merging them corrupts the structure.
+- **Schema changes go in a NEW migration file** — `V<yyyyMMddHHmm>__short_desc.sql`, never an edit to an applied migration. `V1__init.sql` is the baseline; one file per change, so two developers' schema work never touches the same file. The schema-columns gate reads every `V*.sql` (both `CREATE TABLE` and `ALTER TABLE … ADD COLUMN`).
+- **`docs/SESSIONLOG.md` is append-only and union-merges** (`.gitattributes`): add your slice's entry at the end, never edit an earlier one — two appends concatenate instead of conflicting.
+
+Full protocol and the work split: `docs/WORKING.md`.
+
 ## Standing rules
 
 - **Never invent a legal threshold.** No rule covering the case means stop and ask.
