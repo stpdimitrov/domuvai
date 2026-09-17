@@ -19,10 +19,10 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
-import zues.app.registry.ImportAdoption
 import zues.app.registry.PropertyUnitRepository
+import zues.app.registry.RegisterUnit
+import zues.app.registry.RegistryService
 import java.math.BigDecimal
-import java.time.Instant
 import java.util.UUID
 
 /**
@@ -30,11 +30,12 @@ import java.util.UUID
  * hop between them:
  *  - the intake HTTP lifecycle: a reviewed import commits (its file's hash must match) and reverts,
  *    and its status transitions REPRODUCED → COMMITTED → REVERTED;
- *  - the registry's reaction: the listener adopts the units (stamped with the import id, typed
- *    UNSPECIFIED until the pilot sheet, summing to 100% — PM-ORG-002 — under their entrance —
- *    PM-ORG-001), is idempotent on redelivery, and drops them on revert.
- * The publish itself is proved by ImportServiceTest; Spring Modulith delivers between the two.
- * Docker-gated — skips locally, runs in CI.
+ *  - the registry's adoption (RegistryService.adoptImport, which the listener calls): units are
+ *    created stamped with the import id, typed UNSPECIFIED until the pilot sheet, summing to 100%
+ *    (PM-ORG-002) under their entrance (PM-ORG-001), idempotent on redelivery, dropped on revert.
+ * The publish is proved by ImportServiceTest; the listener→adopt hop is one line; Spring Modulith
+ * delivers the event between them (a Scenario end-to-end await is a follow-up). Docker-gated —
+ * skips locally, runs in CI.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -59,7 +60,7 @@ class ImportCommitPersistenceIT {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var units: PropertyUnitRepository
-    @Autowired lateinit var adoption: ImportAdoption
+    @Autowired lateinit var registry: RegistryService
 
     private fun createEntrance(): UUID {
         val response = mvc.perform(
@@ -110,12 +111,14 @@ class ImportCommitPersistenceIT {
     fun `the registry adopts a committed import's units, idempotently, and drops them on revert (PM-ORG-001, PM-ORG-002)`() {
         val entranceId = createEntrance()
         val importId = UUID.randomUUID()
-        val event = ImportCommitted(
-            entranceId, importId, importId, UUID.randomUUID(), 2, 0,
-            listOf(AdoptedUnit("об. 1", "70.0000"), AdoptedUnit("об. 2", "30.0000")),
+        val commands = listOf(
+            RegisterUnit(designation = "об. 1", unitType = "UNSPECIFIED", idealParts = "70.0000"),
+            RegisterUnit(designation = "об. 2", unitType = "UNSPECIFIED", idealParts = "30.0000"),
         )
 
-        adoption.on(event)
+        // adoptImport is the reaction the listener runs; called directly it is synchronous (the
+        // @ApplicationModuleListener wrapper is @Async — its delivery is Spring Modulith's, not ours).
+        assertThat(registry.adoptImport(entranceId, importId, commands)).hasSize(2)
 
         val adopted = units.findByEntranceId(entranceId)
         assertThat(adopted).hasSize(2)                                              // PM-ORG-001: under the entrance
@@ -124,10 +127,10 @@ class ImportCommitPersistenceIT {
         assertThat(adopted).allSatisfy { assertThat(it.unitType).isEqualTo("UNSPECIFIED") }
         assertThat(adopted.map { it.idealPartsPct }.reduce(BigDecimal::add)).isEqualByComparingTo(BigDecimal("100.0000"))
 
-        adoption.on(event)                                                         // redelivery is idempotent
+        assertThat(registry.adoptImport(entranceId, importId, commands)).isEmpty()  // redelivery is idempotent
         assertThat(units.findByImportId(importId)).hasSize(2)
 
-        adoption.on(ImportReverted(entranceId, importId, UUID.randomUUID(), Instant.parse("2026-06-01T00:00:00Z"), "undo"))
+        registry.revertImport(importId)
         assertThat(units.findByImportId(importId)).isEmpty()
     }
 
@@ -135,10 +138,11 @@ class ImportCommitPersistenceIT {
     fun `the registry refuses to adopt units that do not sum to 100 percent (PM-ORG-002)`() {
         val entranceId = createEntrance()
         assertThatThrownBy {
-            adoption.on(
-                ImportCommitted(
-                    entranceId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 2, 0,
-                    listOf(AdoptedUnit("об. 1", "60.0000"), AdoptedUnit("об. 2", "30.0000")),   // 90%, not 100
+            registry.adoptImport(
+                entranceId, UUID.randomUUID(),
+                listOf(
+                    RegisterUnit(designation = "об. 1", unitType = "UNSPECIFIED", idealParts = "60.0000"),
+                    RegisterUnit(designation = "об. 2", unitType = "UNSPECIFIED", idealParts = "30.0000"),   // 90%, not 100
                 ),
             )
         }.isInstanceOf(RuntimeException::class.java)

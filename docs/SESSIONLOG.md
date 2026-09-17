@@ -769,3 +769,13 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/STAGE1-ADDENDUM.md` (§1 intake), `docs/MODULE-TEMPLATE.md` (laws 1/3 — the seam), `app/src/main/kotlin/zues/app/intake/ImportService.kt` + `app/src/main/kotlin/zues/app/registry/ImportAdoption.kt`, then `git log --oneline -14` and `./tools/gates.sh`.
 
 ---
+
+## S-36 fix · 2026-09-17 · the commit IT's adoption assertions were async
+
+**Found** — CI red on `3b5259b` (the Gate-pack step, a Docker IT — invisible locally, all 9 gates were green). `ImportCommitPersistenceIT` called the registry's listener directly (`adoption.on(event)`), but **`@ApplicationModuleListener` is meta-annotated `@Async`**, so the injected bean is an async proxy: the call dispatched to a background thread and returned before the units existed — the size assertion saw 0, and the expected exception was thrown on the background thread rather than caught. The HTTP-lifecycle test (asserts only status codes) was unaffected.
+
+**Fixed** — the two adoption tests now call `RegistryService.adoptImport`/`revertImport` directly (plain `@Transactional`, synchronous), proving the same properties — PM-ORG-001/002, `import_id` provenance, idempotency, revert — deterministically. The listener→adopt hop is one line; the async delivery between publish and adopt stays a documented follow-up (a Spring Modulith `Scenario` await).
+
+**Lesson** — `@ApplicationModuleListener` is `@Async`; calling such a bean's method directly in a test still goes through the async proxy, so it does not run synchronously. Exercise the reaction by calling the underlying non-async service (or unwrap the proxy). And a corollary of the no-Docker-locally rule: an IT that runs **only** in CI has to be reasoned through for async and lifecycle, because it cannot be run locally to catch this before the push.
+
+---
