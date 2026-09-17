@@ -20,6 +20,7 @@ CREATE SCHEMA IF NOT EXISTS money;        -- FEE, FUND, DEBT
 CREATE SCHEMA IF NOT EXISTS maintenance;  -- MNT
 CREATE SCHEMA IF NOT EXISTS compliance;   -- REG
 CREATE SCHEMA IF NOT EXISTS evidence;     -- DOC
+CREATE SCHEMA IF NOT EXISTS intake;       -- importing a firm's records
 
 -- ---------------------------------------------------------------- session
 -- The tenant key is set per transaction. Nothing runs before it is known.
@@ -424,5 +425,21 @@ CREATE TABLE evidence.document (
 );
 CREATE RULE document_no_update AS ON UPDATE TO evidence.document DO INSTEAD NOTHING;
 CREATE RULE document_no_delete AS ON DELETE TO evidence.document DO INSTEAD NOTHING;
+
+-- ============================================================ intake
+-- A record of one fee-sheet import: its verdict (did the engine reproduce the firm's figures
+-- to the cent — Gate 1) and provenance (the content hash of what they gave us). The column
+-- mapping and the committed rows are deliberately NOT modelled here: a real pilot spreadsheet
+-- defines the intake schema (STAGE1-ADDENDUM §1), and the cross-module commit is a later slice.
+CREATE TABLE intake.fee_import (
+  id           uuid PRIMARY KEY,
+  entrance_id  uuid NOT NULL REFERENCES registry.entrance(id),
+  status       text NOT NULL CHECK (status IN ('REPRODUCED','NEEDS_REVIEW')),
+  source_sha   text NOT NULL,
+  rows_parsed  integer NOT NULL,
+  differing    integer NOT NULL,
+  violations   integer NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
 
 COMMIT;

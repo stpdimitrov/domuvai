@@ -1,0 +1,50 @@
+package zues.app.intake
+
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
+import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
+
+/** The stored import's verdict and provenance — the full per-unit report lives in the create response. */
+data class ImportView(
+    val id: UUID,
+    val status: String,
+    val sourceSha: String,
+    val rowsParsed: Int,
+    val differing: Int,
+    val violations: Int,
+)
+
+/** Durable imports: record a fee sheet with its Gate-1 verdict, and read it back. */
+@RestController
+@RequestMapping("/api/intake")
+class ImportController(private val imports: ImportService) {
+
+    @PostMapping("/entrances/{entranceId}/imports")
+    fun record(
+        @PathVariable entranceId: UUID,
+        @RequestBody request: FeeSheetDryRunRequest,
+    ): ResponseEntity<ImportResult> =
+        ResponseEntity.status(HttpStatus.CREATED).body(imports.record(entranceId, request))
+
+    @GetMapping("/imports/{id}")
+    fun get(@PathVariable id: UUID): ImportView =
+        imports.find(id).let { ImportView(it.id, it.status, it.sourceSha, it.rowsParsed, it.differing, it.violations) }
+
+    /** A malformed tariff — an unknown cost stream or allocation key — is the caller's error. */
+    @ExceptionHandler(IllegalArgumentException::class, IllegalStateException::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    fun onInvalid(e: RuntimeException): Map<String, String> = mapOf("error" to (e.message ?: "invalid import"))
+
+    /** No import with that id. */
+    @ExceptionHandler(NoSuchElementException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
+}

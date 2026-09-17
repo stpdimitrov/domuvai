@@ -656,3 +656,23 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `tools/check_banned_words.py`.
 
 ---
+
+## S-34 · 2026-09-17 · intake persistence — the import record (verdict + provenance)
+
+**Did** — a fee-sheet import is now **durable**. `POST /api/intake/entrances/{e}/imports` runs the dry-run (S-31) and stores the result: its verdict (`REPRODUCED` when the engine matched the firm to the cent, else `NEEDS_REVIEW`), the counts, and a **SHA-256 of the source** — what the firm actually gave us (STAGE1-ADDENDUM §1, step 1). `GET /api/intake/imports/{id}` reads it back. New `intake` schema + `fee_import` table.
+
+**Deliberately the envelope, not the contents** — the column mapping, the profiled structure, and the rows a commit would create are **not** modelled, because the addendum says a real pilot spreadsheet defines the intake schema (and "will probably invalidate an assumption while that is still cheap"). What is stored — a verdict and a content hash — is orthogonal to that mapping, so it is safe to build now.
+
+**Commit stays deferred, with its seam** — step 6 (one transaction, every created row carrying the `import_id`, revertible by `import_id`) writes across module boundaries into `registry`/`money`. That decision — domain events vs a published write-port — is unsettled and waits for a real spreadsheet and an explicit call. So this slice records imports; it does not yet adopt them. The source file itself belongs in `evidence` eventually; for now only its hash is kept in intake.
+
+**Module boundary held** — intake's new entity carries only scalars (the `entrance_id` FK is a UUID); it imports no other app module, and `ModularityTests` passes. Intake still owns no rules.
+
+**Tests** — `ImportServiceTest` (a reproduced sheet → `REPRODUCED` + a 64-char hash; one cent off → `NEEDS_REVIEW`; a missing import not found, mocked); `ImportWebTest` (201 with id + report; the read; a 404); `ImportPersistenceIT` (Docker, CI: record and read back both a reproduced and a one-cent-off import). `intake` added to the IT search_path.
+
+**`./tools/gates.sh` green — 9/9, exit 0** (read the real exit code, per the S-33 lesson). Schema-columns 13 entities / 25 tables (`fee_import`); banned-words clean on 93 files. No new rule coverage — intake owns none — so traceability holds at 30/233; no generated doc changed.
+
+**Open / next** — the intake **commit** (the cross-module adoption; needs the seam decision and ideally a real spreadsheet) and column **profiling** (step 2); the **arrears / ageing** view on the statement balance (PM-DEBT-001). Gate-1 contract-complete still owes the commit path.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/intake/ImportService.kt`, `docs/STAGE1-ADDENDUM.md` (§1, the six steps).
+
+---
