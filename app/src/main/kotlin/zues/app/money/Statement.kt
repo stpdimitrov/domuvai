@@ -43,7 +43,7 @@ class StatementService(
 ) {
     @Transactional(readOnly = true)
     fun forUnit(unitId: UUID): UnitStatement {
-        val balance = postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE).sumOf { it.amountMinor }
+        val balanceMinor = postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE).sumOf { it.amountMinor }
         val lines = chargeLines.findByUnitId(unitId)
         val periodByRun = chargeRuns.findAllById(lines.map { it.chargeRunId }.distinct())
             .associate { it.id to it.period }
@@ -59,6 +59,6 @@ class StatementService(
                 )
             }
             .sortedWith(compareBy({ it.period }, { it.component }))
-        return UnitStatement(unitId, balance, statementLines)
+        return UnitStatement(unitId, balanceMinor, statementLines)
     }
 }

@@ -644,3 +644,15 @@ The `docs/` sync test also gave a false pass first time — appending to a gener
 **Read first next time** — `docs/INDEX.md`, this entry, `app/src/main/kotlin/zues/app/money/Statement.kt`, `app/src/main/kotlin/zues/app/money/Postings.kt`.
 
 ---
+
+## S-33 · 2026-09-17 · fix — `balance` is a banned identifier (gate red)
+
+**S-32 (`2a4869d`) was pushed with a red gate.** The banned-words gate forbids the exact identifier `balance` — a *stored* balance is the mistake, since a balance is derived from postings (ADR-006). `Statement.kt` had a local `val balance`; renamed to `val balanceMinor` (the field already carried that name and passes — the check flags only the exact word `balance`, not `balanceMinor`). `./tools/gates.sh` now green 9/9, exit 0.
+
+**Two process slips, both mine, recorded so they do not recur:**
+- **Masked gate output — the real cause.** I read the gates through `| grep` and `| tail`, which hid gate 7's failure, and the pipe's exit code was `tail`'s `0`, so the `&&` chain pushed a red commit. **Run `./tools/gates.sh` and read its own exit code and the `ALL GATES GREEN` line — never pipe it in a way that drops the status.**
+- **Forgot the branch.** S-32 was built directly on `main`. Harmless here — the gate pack is the bar, not the branch — but the ritual is `slice/S-nn-*` off `main`.
+
+**Read first next time** — `docs/INDEX.md`, this entry, `tools/check_banned_words.py`.
+
+---
