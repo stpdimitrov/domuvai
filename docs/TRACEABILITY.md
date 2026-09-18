@@ -6,8 +6,8 @@
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
 | Referenced in code (`// Rule:`) | 34 | 15% |
-| **Proved by a test named after the rule** | **32** | **14%** |
-| No implementation and no test | 198 | 85% |
+| **Proved by a test named after the rule** | **33** | **14%** |
+| No implementation and no test | 197 | 85% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -161,7 +161,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FUND-010` | — | — |  |
 | `PM-FUND-011` | — | — |  |
 
-## DEBT — Arrears & enforcement  ·  2/12 covered
+## DEBT — Arrears & enforcement  ·  3/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -172,7 +172,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-DEBT-005` | — | — |  |
 | `PM-DEBT-006` | — | — |  |
 | `PM-DEBT-007` | — | — |  |
-| `PM-DEBT-008` | — | — |  |
+| `PM-DEBT-008` | `app/src/test/kotlin/zues/app/money/PaymentAllocationTest.kt:24` | — |  |
 | `PM-DEBT-009` | — | — |  |
 | `PM-DEBT-010` | — | — |  |
 | `PM-DEBT-011` | — | — |  |

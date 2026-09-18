@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **31** (13%) |
-| Remaining | **202** |
+| Proved by a test named after the rule | **32** (14%) |
+| Remaining | **201** |
 | Proposed slices at ~10 rules each | **21** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -204,9 +204,9 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 3 — collection beats their portfolio average
 
-10 rule(s) remaining across 1 slice(s).
+9 rule(s) remaining across 1 slice(s).
 
-### S-G3-01 · `money` · DEBT · 10 rule(s) · ⚠ 1 unconfirmed
+### S-G3-01 · `money` · DEBT · 9 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
@@ -215,7 +215,6 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-DEBT-004` | MUST | Packet validation refuses to export if the announcement act is missing. |
 | `PM-DEBT-005` | MUST | The expulsion workflow enforces: GA decision at 75% → written warning → court filing. |
 | `PM-DEBT-007` | MUST | Certificate generation is logged; the figure is frozen at issue. |
-| `PM-DEBT-008` | MUST | Allocation is explainable per payment. |
 | `PM-DEBT-009` | MUST | The court packet shows a complete escalation history. |
 | `PM-DEBT-011` | MUST NOT | Notices posted at the entrance show unit identifiers only if the internal rules permit; personal data is never posted. |
 | `PM-DEBT-006` | SHOULD | Interest recalculates on partial payments. |
