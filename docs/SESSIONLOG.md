@@ -795,3 +795,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `CLAUDE.md` (Working in parallel), `docs/WORKING.md`, this entry.
 
 ---
+
+## S-37 · 2026-09-18 · payment allocation — settle the oldest debt first (the rule, pure)
+
+**Did** — implemented PM-DEBT-008 as pure logic in `money`: `PaymentAllocation.allocate` settles a unit's **oldest debt first**, or a payer-**designated** debt first with the remainder oldest-first, and returns the **rule applied** (`OLDEST_FIRST` | `DESIGNATED`) plus the per-debt breakdown — explainable per payment (ЗЗД чл. 76). `netOutstanding` applies prior payments FIFO oldest-first, so a later payment sees the correct remaining debts (ADR-006 — outstanding **derived, never stored**). No persistence, no clock, no I/O.
+
+**Rules covered** — PM-DEBT-008 (MUST). Traceability 32 → 33/233; TESTPLAN 202 → 201.
+
+**Tests added** — `PaymentAllocationTest` — 9 cases, named after PM-DEBT-008 (+ a positive-amount guard): oldest-first, partial reach, designation-first, rule-visible, overpayment remainder, nothing-owed, prior-payments FIFO, a later payment after prior ones. All pure — run in the **local** gate pack, no Docker.
+
+**Decisions** — none. Split from the full payment feature to stay under the reviewable-diff limit (~480 lines whole): this slice is the rule; S-38 wires it.
+
+**Out of scope / next (S-38)** — persist the payment; post the RECEIVABLE credits **dated to each settled debt** so Statement (S-32) and Arrears (S-35) stay consistent with oldest-first; the HTTP endpoint. Then default interest (PM-DEBT-006, SHOULD — dated `:law` rate) builds on it.
+
+**Read first next time** — this entry, `app/src/main/kotlin/zues/app/money/PaymentAllocation.kt`, `app/src/main/kotlin/zues/app/money/Postings.kt` (the ledger S-38 credits).
+
+---
