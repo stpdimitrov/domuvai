@@ -6,8 +6,8 @@
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
 | Referenced in code (`// Rule:`) | 34 | 15% |
-| **Proved by a test named after the rule** | **33** | **14%** |
-| No implementation and no test | 197 | 85% |
+| **Proved by a test named after the rule** | **34** | **15%** |
+| No implementation and no test | 196 | 84% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -28,12 +28,12 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/OwnershipPersistenceIT.kt:87` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:18` |  |
 | `PM-ORG-012` | — | — |  |
 
-## BOOK — Owners' book & residents  ·  3/12 covered
+## BOOK — Owners' book & residents  ·  4/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-BOOK-001` | — | — |  |
-| `PM-BOOK-002` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:45` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:11` |  |
+| `PM-BOOK-001` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:52` | — |  |
+| `PM-BOOK-002` | `app/src/test/kotlin/zues/app/registry/BookCompletenessTest.kt:14` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:11` |  |
 | `PM-BOOK-003` | — | — |  |
 | `PM-BOOK-004` | — | — |  |
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:76` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |

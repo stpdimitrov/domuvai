@@ -811,3 +811,21 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — this entry, `app/src/main/kotlin/zues/app/money/PaymentAllocation.kt`, `app/src/main/kotlin/zues/app/money/Postings.kt` (the ledger S-38 credits).
 
 ---
+
+## S-38 · 2026-09-19 · Book of the Condominium — completeness + read/export (PM-BOOK-001/002)
+
+**Did** — the домова книга (чл. 7 ЗУЕС) as a **read** over registry's own record (units · titles/parties as-of · household · non-use), never a second copy. `BookService.forEntrance(entranceId, on)` assembles per-unit entries (designation, built area, ideal parts, owner/user names, household count, non-use periods) and a **book-complete** flag; `GET /api/registry/entrances/{e}/book?on=` reads it back — the electronic book is the system of record. Names only, never ЕГН (PM-BOOK-011); resolved **as of** a date, never today (PM-ORG-011). **No schema change** — a pure read.
+
+**Rules covered** — PM-BOOK-001 (MUST, чл. 7 ал. 1), PM-BOOK-002 (MUST, чл. 7 ал. 2). Traceability → **34/233 (15%)**; TESTPLAN 200 remaining. This closes the **ADR-011 §3 registry "book completeness + ministry export" gate item**.
+
+**Tests added** — `BookCompletenessTest` (pure, PM-BOOK-002: complete only with ideal parts + an owner named, incl. missing/blank) and `BookWebTest` (PM-BOOK-001 read-back + malformed-date 400) run **locally**; `BookPersistenceIT` (a unit with owner/household/non-use → complete; a unit with no owner → incomplete; book-level complete; HTTP read-back) runs in CI.
+
+**Decisions** — none. `complete` follows the acceptance exactly: ideal parts present AND ≥1 `OWN` title; built area is recorded but does not gate completeness.
+
+**Out of scope** — the exact ministry export **layout/versioning** (PM-BOOK-004); the 15-day-declaration overdue task (PM-BOOK-003 — compliance + clock); the access/export **audit log** (PM-BOOK-007); **temporary occupants** and **agreed owner–user rights** (no registry model yet — the book shows what exists).
+
+**Gate 1 status** — with this, the **only** remaining Gate-1 backend gap is the **intake rich mapping**, which is blocked on the pilot spreadsheet. So the Gate-1 backend contract is as complete as it can be without that file; the frontend green light (ADR-011) now turns on the **pilot spreadsheet** + the owner's **repo-layout & auth** decisions + freezing the OpenAPI — not on more backend. Payments/interest (S-37's "S-38" note) are Gate 2 and resume after.
+
+**Read first next time** — this entry, `docs/adr/ADR-011-frontend-topology.md` (§3 green light), `app/src/main/kotlin/zues/app/registry/BookService.kt`.
+
+---

@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **32** (14%) |
-| Remaining | **201** |
+| Proved by a test named after the rule | **33** (14%) |
+| Remaining | **200** |
 | Proposed slices at ~10 rules each | **21** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-41 rule(s) remaining across 4 slice(s).
+40 rule(s) remaining across 4 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -53,7 +53,6 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-BOOK-001` | MUST | Electronic book is the system of record; export produces the ministry-approved layout. |
 | `PM-BOOK-003` | MUST | Day 16 without declaration raises an overdue task assigned to the manager. |
 | `PM-BOOK-004` | MUST | Template version is configurable and versioned. |
 | `PM-BOOK-006` | MUST | Owner A querying owner B's household returns 403 and an audit entry. |
@@ -63,12 +62,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-ORG-001` | MUST | Creating a building with 3 entrances allows 3 independent GAs and 3 fund accounts. |
 | `PM-ORG-004` | MUST | A 2-unit owner with 12% outvotes 5 owners holding 10%. |
 | `PM-ORG-006` | MUST | Marking an entrance `CLOSED_COMPLEX` swaps GA-driven fee rules for contract-driven ones and requires an uploaded registered contract. |
+| `PM-ORG-007` | MUST | Missing entry reference raises a compliance flag on ownership change. |
 
-### S-G1-04 · `registry` · BOOK · ORG · 8 rule(s)
+### S-G1-04 · `registry` · BOOK · ORG · 7 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-ORG-007` | MUST | Missing entry reference raises a compliance flag on ownership change. |
 | `PM-ORG-009` | MUST | Flag drives PM-FEE-034. |
 | `PM-ORG-012` | MUST | New owner onboarding shows all in-force decisions and outstanding plans. |
 | `PM-BOOK-009` | SHOULD | Declaration submitted online lands as a pending entry for manager approval. |
