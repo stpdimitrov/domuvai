@@ -902,3 +902,21 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `CLAUDE.md` (incl. "Working in parallel" + the go-live gate), `docs/INDEX.md`, this entry, `docs/adr/ADR-012-intake-format-agnostic.md`, then `git log --oneline -16` and `./tools/gates.sh` (with `GRADLE_USER_HOME=$HOME/.gradle`).
 
 ---
+
+## S-41 · 2026-09-21 · intake — the mapping through the API (profile + confirmed mapping, ADR-012)
+
+**Did** — exposed the format-agnostic intake mapping (S-39/S-40) through the HTTP contract, the ADR-011 §3 Gate-1 green-light piece:
+- **`POST /api/intake/entrances/{id}/fee-sheet/profile`** — a pure propose step: reads a sheet's header, returns the `ProposedMapping` (column → field, the columns it could not place, the required fields no column carries). Stores nothing.
+- Threaded a **confirmed `mapping`** through `FeeSheetDryRunRequest`, so dry-run, `record` and `commit` all read a non-standard sheet once a human confirms its mapping; omit it and the profiler proposes one (the standard-layout path, unchanged). At `commit`, the source hash still pins the bytes and the reproduce-to-the-cent check is the guard — the mapping is only how the same bytes are read.
+- **Contract**: added the `profile` operation + `FeeSheetProfile`/`MappingProposal`/`IntakeField` schemas to `tools/build_openapi.py` (contract-first — the catalogue is the source, the controller implements it). Regenerated `docs/api/openapi.json` → **27 operations, valid 3.1**. The upload op summary was corrected (profiling is now its own step).
+- **Adversarial corpus** (ADR-012 §7): profiler tests for duplicate-column first-wins and a wholly unrecognised header; web tests for the profile endpoint and a confirmed-mapping dry-run; a service test proving the mapping threads through `record`.
+
+**Scope call** — S-41 is the *API exposure* only. **Adopting the optional mapped fields** (owner, household, animals, absence, business use) into the registry is **S-41b**: it changes the externalized `ImportCommitted` event contract and the registry adoption seam, so it earns its own PR with event-contract + IT coverage. Splitting it keeps both PRs reviewable and gate-green.
+
+**Gates** — `./gradlew test` green (all modules, ITs skip locally); openapi/traceability/testplan/banned/schema-columns green. Traceability unchanged at 34/233 — S-41 is contract/mechanism, no new rule closed.
+
+**Next** — **S-41b** (adopt optional fields into registry, event-contract change). Then **Track B**: S-42 payment persistence (wire S-37 to the ledger + endpoint) → S-43 default interest (PM-DEBT-006). **Track C** frontend still blocked on the owner's ADR-011 repo-layout + auth calls — but with S-41 the intake contract is now frozen, so once the owner answers, the Gate-1 frontend can start.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, the H-03 handover, this entry, then `git log --oneline -16` and `./tools/gates.sh` (with `GRADLE_USER_HOME=$HOME/.gradle`).
+
+---

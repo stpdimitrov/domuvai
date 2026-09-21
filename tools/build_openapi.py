@@ -80,6 +80,27 @@ SCHEMAS = {
      'bill_comparison':{'type':'object',
        'description':'their figures against ours, per unit — Gate 1, on every import',
        'properties':{'matched':{'type':'integer'},'differing':{'type':'integer'}}}}},
+ 'IntakeField': {'type':'string',
+   'description':'a domain field a fee sheet can carry — the target of any column mapping (ADR-012), '
+     'fixed by our rules (PM-BOOK-002, PM-ORG-002), never by one spreadsheet',
+   'enum':['DESIGNATION','IDEAL_PARTS','OCCUPANTS','FEE_MINOR',
+           'BUILT_AREA','OWNER_NAME','CHILDREN_UNDER_6','ANIMALS','ABSENT_DAYS','BUSINESS_USE']},
+ 'FeeSheetProfile': {'type':'object','additionalProperties':False,
+   'required':['csv'],
+   'properties':{'csv':{'type':'string',
+     'description':'the sheet — only its header row is read, to propose a mapping'}}},
+ 'MappingProposal': {'type':'object','additionalProperties':False,
+   'required':['mapping','unmapped_columns','missing_required'],
+   'description':'a proposed column → field mapping for one sheet, plus what could not be placed '
+     '(ADR-012): a human confirms or corrects it and returns it on the dry-run/commit. Nothing is '
+     'dropped silently, and a required field no column carries is named so the import cannot proceed',
+   'properties':{
+     'mapping':{'type':'object','description':'source column, as written → domain field',
+       'additionalProperties':{'$ref':'#/components/schemas/IntakeField'}},
+     'unmapped_columns':{'type':'array','items':{'type':'string'},
+       'description':'columns the profiler could not place — surfaced for a human, never dropped'},
+     'missing_required':{'type':'array','items':{'$ref':'#/components/schemas/IntakeField'},
+       'description':'required fields no column carries — mapped by hand before the import proceeds'}}},
 }
 
 # path, method, tag, summary, rules, [request schema], response schema
@@ -136,8 +157,11 @@ OPS = [
   'Compose the чл. 410 packet: decision, proof of announcement, itemised claim',
   ['PM-DEBT-003','PM-DEBT-004','PM-DEBT-009'],None,'Problem'),
  # ---- intake
+ ('/entrances/{entrance_id}/fee-sheet/profile','post','intake',
+  'Profile a sheet\'s columns — propose a mapping onto the domain fields, to confirm',
+  ['PM-ORG-002','PM-BOOK-002'],'FeeSheetProfile','MappingProposal'),
  ('/entrances/{entrance_id}/imports','post','intake',
-  'Upload a source file and profile its columns',
+  'Record a source-file import: run the dry-run and store its verdict',
   ['PM-DOC-001'],None,'ImportDryRun'),
  ('/imports/{import_id}/dry-run','post','intake',
   'Validate, diff, and recompute a sample bill against their own figures',

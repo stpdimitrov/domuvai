@@ -29,7 +29,7 @@ class ImportService(
 ) {
     @Transactional
     fun record(entranceId: UUID, request: FeeSheetDryRunRequest): ImportResult {
-        val sheet = FeeSheet.parse(request.csv)
+        val sheet = FeeSheet.parse(request.csv, request.mapping)
         // A malformed tariff throws here (400) before anything is stored; a sheet that will not
         // reproduce does not throw — it is a recorded NEEDS_REVIEW import, which is the point.
         val report = IntakeDryRun.of(
@@ -70,7 +70,9 @@ class ImportService(
         if (sha256(request.csv) != record.sourceSha) {
             throw ImportStateException("the submitted sheet does not match the reviewed import (source hash differs)")
         }
-        val sheet = FeeSheet.parse(request.csv)
+        // The hash pins the bytes; the mapping is how they are read. A different mapping that still
+        // reproduces to the cent is still a valid commit — the reproduce check below is the guard.
+        val sheet = FeeSheet.parse(request.csv, request.mapping)
         val report = IntakeDryRun.of(
             record.entranceId.toString(), request.period, request.legalDate, request.businessMultiplier, request.lines, sheet,
         )
