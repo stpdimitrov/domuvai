@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Proposed** · 2026-09-21 — the owner set the constraint (may never obtain a pilot sheet; every firm's format differs); awaits the owner's accept |
+| **Status** | **Accepted** · 2026-09-21 — the owner accepted; format-agnostic intake, with the go-live gate and preventive/recovery in §7. Building assumes the first client sheet arrives **after** the planned implementation |
 | **Date** | 2026-09-21 |
 | **Deciders** | Stoyan Dimitrov |
 | **Supersedes** | `docs/STAGE1-ADDENDUM.md` §1's *"Ask the pilot firm for one real spreadsheet … it defines the intake schema"* — the schema is the domain's, not any one sheet's |
@@ -69,3 +69,25 @@ A single pilot firm signs, their format is stable, and they are the only custome
 - The **profiling heuristics** (how columns are matched to fields) — start simple (header-name match), improve iteratively.
 - **XLSX** parsing and **locale number formats** — CSV / typed input first; format breadth grows behind the same mapping seam.
 - The **mapping UI** — a frontend concern (ADR-011), gated on the frontend green light; the API exposes profile + confirm.
+
+## 7 Preventive measures & recovery — the risk boundary
+
+Building the fee engine and intake before a real sheet exists leaves one validation open (§4): our figures are proved against constructed fixtures, not a real firm's numbers. The owner's plan is that the first client sheet arrives **after** the planned implementation, so this boundary must hold for the whole build. It is **bounded, not eliminated** — and proceeding carries no *additional* risk over waiting, because of the following.
+
+**The line: build freely; do not go live on real money until a real sheet reproduces to the cent.**
+
+- **Go-live gate (blocks production, not construction).** No entrance is billed for real, and no firm is onboarded onto live charges, until at least one real fee sheet reproduces to the cent through the dry-run. This is Gate 1's original kill-signal, held as a go-live gate; building, testing and demoing proceed freely.
+
+**Preventive measures (folded into the intake slices, not a separate work stream):**
+
+- **Every sheet-contradictable assumption stays dated config, never a literal** (ADR-001) — a correction is then a *data* change, not a code change. The 24 unconfirmed numbers already are.
+- **An adversarial fixture corpus** stands in for the pilot sheet: several synthetic sheets in **different shapes** with edge cases (no-owner unit, business use, absence, children, zero occupants, BGN legacy, rounding boundaries). A regression to a single hard-coded format fails a test (the §4 enforcement, strengthened).
+- **A reproduction harness** — the dry-run is built so a real sheet, when it arrives, is validated in one step → an instant per-cent diff.
+
+**Recovery — most of it already exists by design:**
+
+- **Versioned, reproducible charges** (ADR-001: `basis` · `basis_hash` · `law_version` · `engine_version`) → if the engine is later corrected, the exact charges computed under the old logic are identifiable and recomputable.
+- **Revertible imports** (S-36, by `import_id`) → a wrong import is undone cleanly.
+- **Dated config** (ADR-001) → a wrong number is corrected forward, never by rewriting history.
+
+So the missing sheet delays **validation**, not **construction**; the downside is capped by the go-live gate and made cheap by the recovery mechanisms already in place.
