@@ -845,3 +845,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — this entry, `app/src/main/kotlin/zues/app/intake/IntakeField.kt`, `app/src/main/kotlin/zues/app/intake/FeeSheet.kt` (the fixed parse S-40 folds into the mapping), `docs/adr/ADR-012-intake-format-agnostic.md`.
 
 ---
+
+## S-40 · 2026-09-21 · mapping-driven dry-run — one parse path (ADR-012)
+
+**Did** — refactored `FeeSheet.parse` to be **mapping-driven**, replacing the fixed 4-column parse with one path (ADR-012). `parse(csv, mapping?)` uses a confirmed column→field mapping when given, else `MappingProfiler` auto-profiles the header. **Callers unchanged** (`parse(csv)`), so the dry-run (S-31) and commit (S-36) became **format-agnostic for free** — a Bulgarian- or arbitrarily-headed sheet now reproduces and commits. Standard headers auto-profile to the old fixed mapping, so the existing path is byte-identical.
+
+**Rules covered** — none new (mechanism). The reproduce path (PM-FEE-014, S-31) is preserved, now format-agnostic.
+
+**Tests added** — 2 in `FeeSheetTest`: a reordered **Bulgarian**-headed sheet parses via the profiler; a **confirmed mapping** parses headers the profiler cannot recognise (`col_a…`). The 4 original FeeSheet tests + `IntakeDryRunTest` + `ImportServiceTest` pass unchanged — the safety net for the refactor; the intake ITs run in CI on standard headers.
+
+**Decisions** — ADR-012 (Accepted). One-parse-path was the integrity note from the S-39 evaluation (no two divergent ways to read a sheet).
+
+**Out of scope / next (S-41)** — expose profile + a confirmed mapping through the API (add `mapping` to the request; a `POST …/profile` endpoint) and thread it into commit; adopt the **optional** mapped fields (owner, household, business, children, animals, absence) so reproduce + adopt use the fuller sheet. Grow the adversarial corpus.
+
+**Read first next time** — this entry, `app/src/main/kotlin/zues/app/intake/FeeSheet.kt`, `IntakeField.kt` + `MappingProfiler.kt`, `docs/adr/ADR-012-intake-format-agnostic.md`.
+
+---

@@ -1,12 +1,14 @@
 package zues.app.intake
 
 /**
- * A firm's fee sheet, parsed. Intake owns no rules; it enforces the existing ones on the way in
- * (ADR-003). This first cut reads a clean CSV export — a header naming the four columns, then a
- * row per unit — so the dry-run can recompute each fee and compare it to the firm's own (Gate 1).
+ * A firm's fee sheet, parsed — **mapping-driven** (ADR-012): the sheet's own columns are mapped onto
+ * our domain fields, so any layout is read, not just one canonical header. A confirmed column→field
+ * mapping is used when supplied; otherwise the profiler proposes one from the header, so a sheet
+ * whose columns are recognised parses on its own and any other parses once a human confirms its
+ * mapping. Intake owns no rules; it enforces the existing ones on the way in (ADR-003).
  *
- * Money is minor units and ideal parts use a dot decimal (ADR-006, PM-FEE-016), so the sheet
- * carries no locale-formatted numbers yet; quoting, embedded delimiters and XLSX are later work.
+ * Money is minor units and ideal parts use a dot decimal (ADR-006, PM-FEE-016); quoting, embedded
+ * delimiters, locale numbers and XLSX are later work behind the same mapping seam.
  */
 data class FeeRow(
     val designation: String,
@@ -18,17 +20,25 @@ data class FeeRow(
 data class ParsedSheet(val rows: List<FeeRow>, val violations: List<String>)
 
 object FeeSheet {
-    private val REQUIRED = listOf("designation", "ideal_parts", "occupants", "fee_minor")
 
-    fun parse(csv: String): ParsedSheet {
+    /**
+     * Parse a fee sheet into rows. [mapping] (column header → field) is used when given; otherwise
+     * [MappingProfiler] proposes one from the header. Each required field — designation, ideal parts,
+     * occupants and the firm's fee — must resolve to a column, or the whole sheet is a violation.
+     */
+    fun parse(csv: String, mapping: Map<String, IntakeField>? = null): ParsedSheet {
         val lines = csv.trim().lines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return ParsedSheet(emptyList(), listOf("the sheet is empty"))
 
-        val header = lines.first().split(",").map { it.trim().lowercase() }
-        val at = REQUIRED.associateWith { header.indexOf(it) }
-        val missing = REQUIRED.filter { at.getValue(it) < 0 }
+        val header = lines.first().split(",").map { it.trim() }
+        val effective = mapping ?: MappingProfiler.profile(header).mapping
+        val columns = IntakeField.REQUIRED.associateWith { field ->
+            val column = effective.entries.firstOrNull { it.value == field }?.key
+            column?.let { c -> header.indexOfFirst { it.equals(c, ignoreCase = true) } } ?: -1
+        }
+        val missing = IntakeField.REQUIRED.filter { columns.getValue(it) < 0 }
         if (missing.isNotEmpty()) {
-            return ParsedSheet(emptyList(), listOf("missing column(s): ${missing.joinToString()}"))
+            return ParsedSheet(emptyList(), listOf("missing column(s) for: ${missing.joinToString { it.name.lowercase() }}"))
         }
 
         val rows = mutableListOf<FeeRow>()
@@ -37,13 +47,13 @@ object FeeSheet {
             val cells = line.split(",")
             val rowNo = i + 2   // 1-based, past the header
             runCatching {
-                val designation = cells[at.getValue("designation")].trim()
+                val designation = cells[columns.getValue(IntakeField.DESIGNATION)].trim()
                 require(designation.isNotBlank()) { "blank designation" }
                 FeeRow(
                     designation = designation,
-                    idealParts = cells[at.getValue("ideal_parts")].trim(),
-                    occupants = cells[at.getValue("occupants")].trim().toInt(),
-                    theirFeeMinor = cells[at.getValue("fee_minor")].trim().toLong(),
+                    idealParts = cells[columns.getValue(IntakeField.IDEAL_PARTS)].trim(),
+                    occupants = cells[columns.getValue(IntakeField.OCCUPANTS)].trim().toInt(),
+                    theirFeeMinor = cells[columns.getValue(IntakeField.FEE_MINOR)].trim().toLong(),
                 )
             }.onSuccess { rows.add(it) }
                 .onFailure { violations.add("row $rowNo could not be read: ${line.trim()}") }
