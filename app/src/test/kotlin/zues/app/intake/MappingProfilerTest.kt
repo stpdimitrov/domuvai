@@ -52,4 +52,22 @@ class MappingProfilerTest {
         assertThat(p.mapping["собственик"]).isEqualTo(IntakeField.OWNER_NAME)
         assertThat(p.mapping["животни"]).isEqualTo(IntakeField.ANIMALS)
     }
+
+    @Test
+    fun `two columns for one field — first wins, the second is surfaced not dropped`() {
+        // a sheet that carries the fee twice ("amount" and "сума" both mean FEE_MINOR)
+        val p = MappingProfiler.profile(listOf("designation", "ideal_parts", "occupants", "amount", "сума"))
+        assertThat(p.mapping["amount"]).isEqualTo(IntakeField.FEE_MINOR)   // first-wins
+        assertThat(p.mapping).doesNotContainKey("сума")
+        assertThat(p.unmappedColumns).containsExactly("сума")              // the duplicate is surfaced
+        assertThat(p.missingRequired).isEmpty()
+    }
+
+    @Test
+    fun `a wholly unrecognised header maps nothing and names every required field`() {
+        val p = MappingProfiler.profile(listOf("col_a", "col_b", "col_c", "col_d"))
+        assertThat(p.mapping).isEmpty()
+        assertThat(p.unmappedColumns).containsExactly("col_a", "col_b", "col_c", "col_d")
+        assertThat(p.missingRequired).containsExactlyInAnyOrderElementsOf(IntakeField.REQUIRED)
+    }
 }

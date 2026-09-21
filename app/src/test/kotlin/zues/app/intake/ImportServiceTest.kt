@@ -56,6 +56,26 @@ class ImportServiceTest {
     }
 
     @Test
+    fun `record honours a confirmed mapping for a header the profiler cannot recognise`() {
+        val captor = argumentCaptor<ImportRow>()
+        whenever(aggregates.insert(captor.capture())).thenAnswer { it.getArgument<ImportRow>(0) }
+        val req = FeeSheetDryRunRequest(
+            period = "2026-05", legalDate = "2026-05-01",
+            lines = listOf(TariffInput("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
+            csv = "col_a,col_b,col_c,col_d\nап. 1,60.0000,2,6000\nап. 2,40.0000,1,4000",
+            mapping = mapOf(
+                "col_a" to IntakeField.DESIGNATION, "col_b" to IntakeField.IDEAL_PARTS,
+                "col_c" to IntakeField.OCCUPANTS, "col_d" to IntakeField.FEE_MINOR,
+            ),
+        )
+        // without the mapping these headers are unrecognised (missing every required column); with it,
+        // the sheet parses and reproduces to the cent — so this proves the mapping threads through record.
+        val result = service.record(entranceId, req)
+        assertThat(result.report.reproduced).isTrue()
+        assertThat(captor.firstValue.status).isEqualTo("REPRODUCED")
+    }
+
+    @Test
     fun `an import that does not reconcile is recorded as NEEDS_REVIEW`() {
         val captor = argumentCaptor<ImportRow>()
         whenever(aggregates.insert(captor.capture())).thenAnswer { it.getArgument<ImportRow>(0) }

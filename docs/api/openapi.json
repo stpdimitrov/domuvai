@@ -1100,12 +1100,83 @@
         }
       }
     },
+    "/entrances/{entrance_id}/fee-sheet/profile": {
+      "post": {
+        "tags": [
+          "intake"
+        ],
+        "summary": "Profile a sheet's columns — propose a mapping onto the domain fields, to confirm",
+        "description": "Rules: `PM-ORG-002`, `PM-BOOK-002`",
+        "operationId": "post_entrances_entrance_id_fee_sheet_profile",
+        "parameters": [
+          {
+            "name": "entrance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MappingProposal"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Refused. The body names the rule that refused.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A statutory precondition is not met.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeSheetProfile"
+              }
+            }
+          }
+        }
+      }
+    },
     "/entrances/{entrance_id}/imports": {
       "post": {
         "tags": [
           "intake"
         ],
-        "summary": "Upload a source file and profile its columns",
+        "summary": "Record a source-file import: run the dry-run and store its verdict",
         "description": "Rules: `PM-DOC-001`",
         "operationId": "post_entrances_entrance_id_imports",
         "parameters": [
@@ -1842,6 +1913,68 @@
                 "type": "integer"
               }
             }
+          }
+        }
+      },
+      "IntakeField": {
+        "type": "string",
+        "description": "a domain field a fee sheet can carry — the target of any column mapping (ADR-012), fixed by our rules (PM-BOOK-002, PM-ORG-002), never by one spreadsheet",
+        "enum": [
+          "DESIGNATION",
+          "IDEAL_PARTS",
+          "OCCUPANTS",
+          "FEE_MINOR",
+          "BUILT_AREA",
+          "OWNER_NAME",
+          "CHILDREN_UNDER_6",
+          "ANIMALS",
+          "ABSENT_DAYS",
+          "BUSINESS_USE"
+        ]
+      },
+      "FeeSheetProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "csv"
+        ],
+        "properties": {
+          "csv": {
+            "type": "string",
+            "description": "the sheet — only its header row is read, to propose a mapping"
+          }
+        }
+      },
+      "MappingProposal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mapping",
+          "unmapped_columns",
+          "missing_required"
+        ],
+        "description": "a proposed column → field mapping for one sheet, plus what could not be placed (ADR-012): a human confirms or corrects it and returns it on the dry-run/commit. Nothing is dropped silently, and a required field no column carries is named so the import cannot proceed",
+        "properties": {
+          "mapping": {
+            "type": "object",
+            "description": "source column, as written → domain field",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/IntakeField"
+            }
+          },
+          "unmapped_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "columns the profiler could not place — surfaced for a human, never dropped"
+          },
+          "missing_required": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntakeField"
+            },
+            "description": "required fields no column carries — mapped by hand before the import proceeds"
           }
         }
       }
