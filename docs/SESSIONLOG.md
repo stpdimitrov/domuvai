@@ -861,3 +861,44 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — this entry, `app/src/main/kotlin/zues/app/intake/FeeSheet.kt`, `IntakeField.kt` + `MappingProfiler.kt`, `docs/adr/ADR-012-intake-format-agnostic.md`.
 
 ---
+
+## H-03 · 2026-09-21 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at `df5d8c9` (S-40 merged), clean, in sync, CI-green. This consolidates the session that ran from H-02 through S-40, so the next session continues without the conversation.
+
+**What this session shipped (since H-02)**
+- **S-36 intake commit** (+ a fix): adopt a reviewed sheet into `registry` via the outbox events `ImportCommitted`/`ImportReverted` (the settled seam — MODULE-TEMPLATE laws 1/3); revertible by `import_id`. Fix: the IT called an `@ApplicationModuleListener` (which is `@Async`) directly — corrected to call the synchronous service.
+- **WF-01 parallel-development setup** (see below).
+- **S-37 payment allocation** (PM-DEBT-008): pure oldest-first / designated allocation, `netOutstanding` FIFO — the rule, no persistence yet.
+- **S-38 Book of the Condominium** (PM-BOOK-001/002): a pure read over registry (units · owners-as-of · household · non-use) with a book-complete flag; names only, as-of a date. **Closed the ADR-011 §3 registry gate item.**
+- **ADR-012 (Accepted)**: **intake is format-agnostic** — map any firm's columns onto our known domain fields per import; a pilot sheet is *validation, not schema*. §7 holds the risk boundary: the **go-live gate** (build freely, do NOT bill real money until a real sheet reproduces to the cent), preventive measures (dated config, adversarial fixtures, a reproduction harness) and recovery (versioned charges, revertible imports, dated config — mostly already built).
+- **S-39 intake mapping model + profiler**: `IntakeField` (target fields from the rules) + `MappingProfiler` (EN + BG header aliases; proposes, human confirms; surfaces unmapped, names missing).
+- **S-40 mapping-driven parse**: `FeeSheet.parse` is now mapping-driven (one path); callers unchanged, so the dry-run + commit are format-agnostic; standard headers auto-profile to the old mapping (identical existing path).
+- **Skills**: built `zues-audit` (read-only verify) and `zues-adr` (house ADR format) — the repo's skills table promised them; only `zues-slice` existed. All three now in `.claude/skills/`.
+- **README**: developer quick-start; status de-staled.
+
+**Two decisions of record this session** — **ADR-012** (intake format-agnostic + go-live gate, **Accepted**); **ADR-011** stays Proposed on the owner's repo-layout + auth calls.
+
+**The big operating shift — the PR flow is LIVE**
+- `gh` is now authenticated **as the owner (stpdimitrov, admin)** in-session, so work goes **branch → PR → CI green → merge** (PRs #3–#10 merged). Direct-to-`main` is superseded; it survives only as a fallback for a session with no `gh` auth.
+- **Three-developer parallel workflow** is set up and enforced by the repo (so every Claude session inherits it): `CLAUDE.md` **"Working in parallel"** (never push `main`; one module per dev; rebase; regenerate-don't-hand-merge generated docs; additive migrations; `SESSIONLOG` union-merges), `.gitattributes` (`SESSIONLOG.md merge=union`), `check_schema_columns.py` reads every `V*.sql` incl. `ALTER TABLE … ADD COLUMN`, and `docs/WORKING.md` updated for three.
+
+**Progress** — traceability **34/233 (15%)**; TESTPLAN 200 remaining. Modules with app code: registry, money, intake. Gate 1 backend is contract-complete **except** intake's rich mapping — and ADR-012 makes that **buildable without the pilot sheet** (in progress: S-39/S-40 done, S-41 next).
+
+**Resume point — next work**
+1. **S-41** (intake): expose profile + a **confirmed mapping** through the API (add `mapping` to the request; a `POST …/profile` endpoint), thread it into commit, and **adopt the optional mapped fields** (owner, household, business, children, animals, absence). Grow the adversarial fixture corpus + the reproduction harness (ADR-012 §7).
+2. **Track B money** (unblocked, additive): **S-42 payment persistence** (wire S-37's allocation to the ledger + endpoint) → **S-43 default interest** (PM-DEBT-006).
+3. **Track C frontend**: blocked on the owner's ADR-011 calls (repo layout mono/poly + auth).
+
+**Owner actions still open** — branch protection on `main` (I can set it up, admin); `gh auth login` for the **other two developers** (their sessions fall back to direct-to-`main` without it); the **ADR-011** decisions; the **pilot spreadsheet** (now *validation*, not a blocker — get it when convenient).
+
+**Operating lessons this session**
+- **PR flow**: I open PRs and merge on green (self-merge is fine while sole active dev; branch protection will formalise it). The **CI poller's `rc=1` can be a transient network error**, not a check failure — re-verify with `gh pr checks <n>` before believing a red.
+- **Branch per slice** — I slipped onto `main` for S-40 and caught it **before any commit** (nothing landed on `main`); create `slice/S-nn-*` first.
+- **Gradle gotcha**: a stale daemon can point at a cleaned scratchpad distro → `NoSuchFileException` on a distribution JAR. Fix: `./gradlew --stop` and run with `GRADLE_USER_HOME="$HOME/.gradle"` (JDK 21 at `/usr/local/opt/openjdk@21`).
+- **The go-live gate** (ADR-012 §7) is now in `CLAUDE.md` — never wire real billing without a real sheet reproducing to the cent.
+- No-Docker-locally still holds: `*IT`/`*PersistenceIT` skip locally, run in CI; reason async/lifecycle through before pushing (the S-36 `@Async` bug).
+
+**Read first next time** — `CLAUDE.md` (incl. "Working in parallel" + the go-live gate), `docs/INDEX.md`, this entry, `docs/adr/ADR-012-intake-format-agnostic.md`, then `git log --oneline -16` and `./tools/gates.sh` (with `GRADLE_USER_HOME=$HOME/.gradle`).
+
+---
