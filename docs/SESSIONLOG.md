@@ -829,3 +829,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — this entry, `docs/adr/ADR-011-frontend-topology.md` (§3 green light), `app/src/main/kotlin/zues/app/registry/BookService.kt`.
 
 ---
+
+## S-39 · 2026-09-21 · intake mapping model + profiler (format-agnostic, ADR-012)
+
+**Did** — the first slice of **format-agnostic intake** (ADR-012 Accepted this session). `IntakeField` fixes the **target** fields a fee sheet maps onto — derived from the rules, not from any sheet: `DESIGNATION`, `IDEAL_PARTS`, `OCCUPANTS`, `FEE_MINOR` (required — the minimum to reproduce & compare a fee), plus `BUILT_AREA`, `OWNER_NAME`, `CHILDREN_UNDER_6`, `ANIMALS`, `ABSENT_DAYS`, `BUSINESS_USE` (recorded when present). `MappingProfiler.profile(headers)` proposes a column→field mapping by header aliases (English **and** Bulgarian), surfaces columns it cannot place, and names a required field no column carries. Pure — a **proposal a human confirms**, never a silent adoption (STAGE1-ADDENDUM §1). No persistence.
+
+**Rules covered** — none newly (the mapping is mechanism; intake owns no rules). The field-set derives from PM-BOOK-002, PM-ORG-002, PM-FEE-005/006/008/009/010, PM-ORG-009 — cited, not claimed.
+
+**Tests added** — `MappingProfilerTest` (5, pure, **local**): the fixed 4-column layout; a **different** reordered Bulgarian layout with an extra column (ADR-012 §7 — the two-layout corpus that stands in for a pilot sheet); a missing required field named; unrecognised columns surfaced; optional fields mapped.
+
+**Decisions** — ADR-012 (Accepted this session): intake is format-agnostic; a real sheet is validation, not schema; **go-live gate** (§7) caps the risk (build freely, do not bill real money until a real sheet reproduces to the cent).
+
+**Out of scope / next (S-40)** — wire the confirmed mapping into the dry-run, **replacing** the fixed 4-column parse (S-31) with one mapping-driven path (the 4-column contract becomes a default mapping; the existing dry-run tests pass via it). Then S-41 (mapping-driven commit). Grow the adversarial fixture corpus as the harness.
+
+**Read first next time** — this entry, `app/src/main/kotlin/zues/app/intake/IntakeField.kt`, `app/src/main/kotlin/zues/app/intake/FeeSheet.kt` (the fixed parse S-40 folds into the mapping), `docs/adr/ADR-012-intake-format-agnostic.md`.
+
+---
