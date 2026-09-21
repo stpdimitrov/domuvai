@@ -52,10 +52,10 @@ Every feature states which mode it serves. Rules tagged `BOTH` apply in both.
 | 008 | Every majority carries its denominator explicitly (`TOTAL` \| `REPRESENTED`) |
 | 009 | The agent holds no write credential; prohibited capabilities are not implemented |
 | 010 | Backend is **Kotlin · Spring Boot · Spring Modulith**; frontend stays Next.js/TS. Driven by the team's Java background |
-| 011 | Frontend is a **separate Next.js app**, contract-first (OpenAPI client), built gate-by-gate. *Proposed* — repo layout (mono/poly) + auth are the owner's open calls |
+| 011 | Frontend is a **separate Next.js app**, contract-first (OpenAPI client), built gate-by-gate. **Monorepo** — `web/` beside `app/` in this repo, sibling toolchains, folder-scoped CI. **Auth: OIDC · stateless `api` (validates JWT, issues nothing) · session in the Next.js BFF (httpOnly cookie)**; the token is authN, the policy module + RLS are authZ. IdP **provider deferred** to the first FE auth slice (**Keycloak** marked as the default — EU-resident, e-ID path) |
 | 012 | **Intake is format-agnostic** — map any firm's columns onto our known domain fields per import, never a canonical spreadsheet. **Go-live gate:** build freely, but do **not** bill real money until a real fee sheet reproduces to the cent (ADR-012 §7) |
 
-**Nine of twelve are Accepted.** ADR-004 (shared facilities) and ADR-007 (no custody) name counsel as a co-decider and remain Proposed — do not build against them (ADR-004 gates `registry` and `maintenance`, ADR-007 gates `rail`). ADR-011 (frontend) is Proposed on the owner's repo-layout/auth calls. Everything else is decided — build on it, do not relitigate it in code.
+**Ten of twelve are Accepted.** ADR-004 (shared facilities) and ADR-007 (no custody) name counsel as a co-decider and remain Proposed — do not build against them (ADR-004 gates `registry` and `maintenance`, ADR-007 gates `rail`). ADR-011 (frontend) is **Accepted** (2026-09-21): monorepo + OIDC/BFF, provider deferred. Everything else is decided — build on it, do not relitigate it in code.
 
 **Stack (ADR-010):** Kotlin · Spring Boot · Spring Modulith backend, Next.js/TypeScript frontend. The pure domain layer already lives in Kotlin — the `:kernel`, `:law` and `:charges` Gradle modules. The principles the examples below show — integer minor units, exact ideal parts, one deadline utility — are language-neutral.
 

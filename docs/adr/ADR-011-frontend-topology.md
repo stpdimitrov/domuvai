@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Proposed** · 2026-09-16 — the separate-frontend part restates ADR-010/ADR-003 (Accepted); the **repo-layout** choice is open and awaits the owner |
+| **Status** | **Accepted** · 2026-09-21 — repo layout = **monorepo** and the auth *architecture* (OIDC · stateless `api` · Next.js BFF session) are decided; the auth **provider** is deferred to the first frontend auth slice (**Keycloak** marked as the default to revisit). See **Decision · 2026-09-21** below |
 | **Date** | 2026-09-16 |
 | **Deciders** | Stoyan Dimitrov |
 | **Consolidates** | ADR-010 (frontend stays Next.js/TS), ADR-003 (the `web` deployable) |
@@ -29,7 +29,7 @@ The backend has been built frontend-agnostic (pure REST + generated OpenAPI), so
    - **One auth strategy** across the seam (OIDC / JWT session); the `api` stays stateless; CORS is configured at the `api`.
    - **No domain logic in the browser.** The kernel is single-sourced in Kotlin (ADR-010 "Option 1"); the frontend calls the API, including the online-only live assembly tally. This is the S-12 lesson (no duplicated domain in TS) applied to the UI.
 
-3. **Repo layout — OPEN.** Recommended: **monorepo (`web/` folder in this repo)**, because domuvai's culture is "generate never type, one fact one home," and a monorepo makes contract changes atomic (endpoint + regenerated OpenAPI + regenerated TS client + screen in one PR) and lets the gate pack enforce the client is in sync. The alternative — a separate `domuvai-web` repo — gives cleaner separation and matches the owner's SunnyEscape split-repo pattern, at the cost of two-PR lockstep and contract-drift risk. **The owner picks mono vs poly before the frontend starts.** (Re-introducing npm for a real Next.js UI is *not* the S-12 mistake, which was duplicating the domain in TS.)
+3. **Repo layout — DECIDED (2026-09-21): monorepo.** Recommended and chosen: **monorepo (`web/` folder in this repo)**, because domuvai's culture is "generate never type, one fact one home," and a monorepo makes contract changes atomic (endpoint + regenerated OpenAPI + regenerated TS client + screen in one PR) and lets the gate pack enforce the client is in sync. The alternative — a separate `domuvai-web` repo — gives cleaner separation and matches the owner's SunnyEscape split-repo pattern, at the cost of two-PR lockstep and contract-drift risk. **The owner chose the monorepo on 2026-09-21** — see the Decision section below. (Re-introducing npm for a real Next.js UI is *not* the S-12 mistake, which was duplicating the domain in TS.)
 
 ## 3 When to build the frontend — the green light
 
@@ -57,8 +57,31 @@ When those land (est. ~6–10 more slices) and the `registry` + `money` + `intak
 - **Cost:** two deployables to coordinate; auth spans a seam; the OpenAPI contract must stay stable per gate (hence the gate-by-gate green light).
 - **Revisit when:** a dedicated FE developer joins (polyrepo separation gets more attractive); per-screen aggregation grows heavy (add Next.js API routes as a thin BFF — never push aggregation into the browser or bloat the domain modules).
 
-## 5 Open questions
+## 5 Open questions — resolved 2026-09-21
 
-1. Repo layout — **monorepo (recommended) vs separate repo**. Owner to decide before the FE starts.
-2. Auth mechanism — OIDC provider vs self-issued JWT; where the session lives.
-3. Whether a BFF (Next.js API routes) is warranted, or the SPA calls `api` directly.
+1. Repo layout — **resolved: monorepo** (see Decision below).
+2. Auth mechanism — **resolved: OIDC + stateless `api` + Next.js BFF session**; the concrete provider is deferred to the first FE auth slice (see Decision below).
+3. BFF vs SPA-direct — **resolved: a thin BFF** — the session lives in the Next.js server; per-screen aggregation is server-side, never in the browser (the S-12 lesson).
+
+## Decision · 2026-09-21 · repo layout and auth
+
+The owner (Stoyan Dimitrov) resolved the two open sub-decisions, moving this ADR to **Accepted**.
+
+### Repo layout — **monorepo** (`web/` in this repo)
+
+`web/` (Next.js/TS) lives beside `app/` (Kotlin/Gradle) in this repository, as **siblings with independent toolchains and folder-scoped CI**, deployed independently (`web` on edge, `api` on JVM — ADR-003 unchanged). A monorepo is *not* a unified build.
+
+**Why, for this team:** three full-stack developers on Claude Code (WF-01), contract-first, and a gate pack that already fails on drifted generated docs. A monorepo makes a contract change **atomic** — endpoint (Kotlin) + regenerated `openapi.json` + regenerated TS client + screen in **one PR, one CI run** — and lets the gate pack fail the build when the **TS client is out of sync with the spec**. The owner has already lived the polyrepo tax on SunnyEscape (two repos in lockstep on every contract change); avoiding it here is the point.
+
+**What reverses it:** a dedicated **frontend-only** developer joins, or the FE deploy cadence must diverge hard from the API (§4). Neither holds today.
+
+### Auth — **OIDC · stateless `api` · session in the Next.js BFF** (architecture Accepted; provider deferred)
+
+- The **`api` is a stateless OAuth2 resource server**: it *validates* JWT access tokens (JWKS) and **never issues credentials** (ADR-009). Identity is asserted by the IdP.
+- The **session lives in `web` as an httpOnly, secure cookie** — a thin BFF. The browser never holds a raw JWT; the Next.js server exchanges the cookie for the bearer when it calls `api`.
+- The **token is authentication, not authorization.** It carries the party identity; the `api` resolves party → entrance and enforces via the **policy module + RLS backstop** (ADR-002, ADR-005). The entrance stays the only isolation key.
+- **Do not hand-roll auth.** A ЗУЕС platform is a court-exhibit system with GDPR access-logging duties (PM-BOOK-007); a managed OIDC IdP is the responsible call, and it maps to the three audiences (residents on mobile, managers, firm console) via roles/claims.
+
+**Provider — deferred, Keycloak marked as the default.** The concrete IdP is chosen at the **first frontend auth slice**, when a Gate-1 screen actually needs login. The marked default to revisit is **Keycloak self-hosted** — EU-resident (GDPR/PM-BOOK-007), OIDC/SAML, with a path to broker Bulgarian e-ID / QES (Evrotrust, B-Trust) for ballots later. The provider decision must satisfy: **EU data residency**, email/phone login for non-technical residents, and a future e-ID/QES brokering path. Because the architecture is provider-agnostic (standard OIDC), deferring the provider does **not** block the frontend structure or S-41b.
+
+**What this unblocks:** with the intake contract frozen (S-41), every Gate-1 backend item is contract-complete, so the Gate-1 frontend (a `web/` app in this repo) can start as soon as the owner gives the go-ahead.

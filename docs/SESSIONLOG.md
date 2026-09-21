@@ -920,3 +920,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, the H-03 handover, this entry, then `git log --oneline -16` and `./tools/gates.sh` (with `GRADLE_USER_HOME=$HOME/.gradle`).
 
 ---
+
+## ADR-011 · 2026-09-21 · Accepted — frontend topology settled (monorepo + OIDC/BFF)
+
+**Did** — the owner (Stoyan Dimitrov) resolved the two open ADR-011 sub-decisions, moving it **Proposed → Accepted**:
+- **Repo layout — monorepo.** `web/` (Next.js/TS) beside `app/` (Kotlin/Gradle) in this repo; sibling toolchains, **folder-scoped CI**, independent deploys (a monorepo, not a unified build). Rationale: three full-stack Claude Code devs (WF-01) + contract-first + a gate pack that already fails on drifted generated docs → a contract change is **atomic** (endpoint + regenerated `openapi.json` + regenerated TS client + screen in one PR), and the gate can enforce the client stays in sync. Avoids the SunnyEscape two-repo lockstep the owner has already lived. Reverses if a **FE-only** dev joins or FE deploy cadence must diverge (§4).
+- **Auth — OIDC · stateless `api` · Next.js BFF session** (architecture Accepted). The `api` validates JWT (JWKS), **issues nothing** (ADR-009); the session is an **httpOnly cookie in the `web` BFF** (browser never holds a raw JWT); the **token is authN**, the **policy module + RLS** stay authZ (ADR-002/005, entrance is the only isolation key). **Provider deferred** to the first FE auth slice — **Keycloak self-hosted marked as the default** (EU residency for GDPR/PM-BOOK-007, OIDC/SAML, a path to broker Bulgarian e-ID / QES for ballots). Provider must satisfy EU residency + resident-friendly login + an e-ID/QES path.
+
+**Why now** — S-41 froze the intake mapping contract, so every Gate-1 backend item is contract-complete; deciding topology now means the Gate-1 frontend can start the moment the owner gives the go-ahead. The OIDC architecture is provider-agnostic, so the deferred provider blocks neither the FE structure nor S-41b.
+
+**Changed** — `docs/adr/ADR-011-frontend-topology.md` (Status → Accepted; §2.3 repo layout DECIDED; §5 resolved; **Decision · 2026-09-21** section). `docs/INDEX.md` (ADR-011 row Accepted; "Ten of twelve Accepted"; frontend status → **green light reached**). `CLAUDE.md` (decisions row 011 + count).
+
+**Next** — **S-41b** (adopt optional mapped fields into `registry`, event-contract change) → **Track B** S-42 payment persistence → S-43 default interest. **Track C** (`web/` Gate-1 frontend) is now **unblocked** — scaffold on the owner's go-ahead; the auth **provider** is the one open pick, taken at the first FE auth slice.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, the H-03 handover, S-41 + this entry, `docs/adr/ADR-011-frontend-topology.md`.
+
+---
