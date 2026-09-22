@@ -42,11 +42,16 @@ Imported from the Claude Design project (`70a25109-…`) and re-implemented as i
 — the design tool's `<x-dc>` runtime is always discarded. Screens carry the design's sample
 data, modeled as typed rows, so wiring each to the API later is a data-source swap.
 
+The **7-screen manager console is complete** (01–07): Портфейл, Вход, Начисления, Общо събрание,
+Задължения, Каса и фонд, Съответствие.
+
 - **`/`** — the landing (`Етаж`), static marketing.
 - **`/portfolio`** — the console's firm-wide portfolio dashboard (screen 01). A portfolio row
   links through to the entrance detail.
 - **`/debts`** — firm-wide arrears (screen 05 Задължения): debtors grouped by entrance, each on
   the чл. 38 ЗУЕС → чл. 410 ГПК escalation ladder (Покана → Нотариална → Решение на ОС → Заповед).
+- **`/compliance`** — the firm's regulatory standing (screen 07 Съответствие): register / insurance /
+  management-contract status cards, and a filings-and-declarations table.
 - **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
   the entrance's file, accounts and next assembly. Uses the **entrance** sidebar.
 - **`/entrance/charges`** — the monthly charge run (screen 03 Начисления): the OS-decision basis,
@@ -59,8 +64,9 @@ data, modeled as typed rows, so wiring each to the API later is a data-source sw
   threshold), and live attendance with proxies. Has its own stylesheet (`assembly.css`).
 
 The console has two navigation contexts — the **firm** sidebar (`(firm)/`) and the **entrance**
-sidebar (`entrance/`) — as sibling nested layouts under one flex shell. Nav items beyond the built
-screens are placeholders, activated as each lands (Начисления, Каса и фонд, Общо събрание, …).
+sidebar (`entrance/`) — as sibling nested layouts under one flex shell. A handful of nav items
+(Обекти, Календар на сроковете, Доставчици, Документи, Екип, …) remain placeholders — screens not
+in the imported design.
 
 Still static: no auth, no API. The generated API client + auth arrive when a Gate-1 screen
 needs live data.

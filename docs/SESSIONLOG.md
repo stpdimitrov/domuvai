@@ -1055,3 +1055,18 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, this entry, then the persisted design canvas for screen 07.
 
 ---
+
+## WEB-08 · 2026-09-22 · console screen 07 — Съответствие (firm compliance) · console complete
+
+**Did** — built **07 Съответствие** at `/compliance` (firm context; Съответствие на фирмата active, badge 2). **This completes the 7-screen manager console.**
+- **The firm's regulatory standing**: three **status cards** — public-register entry (Рег. № ПД-0142, valid to 14.12.2026), professional-liability insurance (Полица 22-0034512, ЗАД „Армеец", €50.000/event, expiring in 39 days — red), and management contracts (62 действащи, mandates by чл. 19, ал. 5 ЗУЕС) — each with a countdown badge and an action link; plus a **filings & declarations table** (Документ · Период · Институция · Подаден · Вх. № · Основание · Статус) with statuses Приет / Изпратен / Просрочен (overdue row flagged) / До 23 дни, citing ЗСч, ЗУЕС, ОРЗД, ЗМИП. Wired the Съответствие nav link (`/compliance`).
+
+**Verified** — `npm run build` clean (strict types; `/compliance` prerendered); rendered at 1440×900, faithful, no console errors.
+
+**Console complete** — 01 Портфейл ✅, 02 Вход ✅, 03 Начисления ✅, 04 Общо събрание ✅, 05 Задължения ✅, 06 Каса и фонд ✅, **07 Съответствие ✅**. Routes: `/portfolio`, `/entrance`, `/entrance/charges`, `/entrance/fund`, `/debts`, `/compliance`, `/assembly` — plus the `/` landing. All static; every screen's data is typed for a later API-source swap.
+
+**Remaining design work** (not the console): the two `Домоуправител Про - desktop` polish files (cross-check for refined art) and the **mobile app** (`Етажна собственост` — resident + manager, 390×844, light/dark). And the standing follow-ups: the OpenAPI-generated client + a `web` CI job; re-host the landing hero clip.
+
+**Read first next time** — `web/README.md`, this entry.
+
+---
