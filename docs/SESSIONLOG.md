@@ -1038,3 +1038,20 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
 
 ---
+
+## WEB-07 · 2026-09-22 · console screen 04 — Общо събрание (live general assembly)
+
+**Did** — built **04 Общо събрание** at `/assembly` — the most complex screen, a **full-bleed live-session view with no sidebar** (its own `assembly.css`, standalone route outside the console groups).
+- **Session-quorum banner** — сесия 1 пропаднала (51%) → сесия 2 открита (26% праг), citing чл. 15, ал. 2 ЗУЕС, with three session badges.
+- **Three columns**: the **agenda** (6 points, т.3 being voted, статуси Приета/Гласува се сега/Предстои); the **item under vote** — a Кворум-сега gauge (58,412% with 26%/51% threshold markers), a **tally card** with a represented/all-ideal-parts toggle and За/Против/Въздържал се/Не гласували bars (the За bar carries the **67% majority marker**, чл. 17 ЗУЕС) resolving to "решението се приема"; the **live attendance** list (16 от 24, Лично/Пълномощно split, proxy holders tagged Пълн. · за ап. X, denominators to six decimals).
+- Wired the entrance "Общи събрания" nav link and the "Отвори подготовката" button to `/assembly`. All modeled as typed data — the shape the `assembly` module's quorum/tally query emits (denominators explicit per ADR-008).
+
+**Verified** — `npm run build` clean (strict types; `/assembly` prerendered); rendered at 1440×900, faithful, no console errors.
+
+**Progress** — 01 Портфейл ✅, 02 Вход ✅, 03 Начисления ✅, 04 Общо събрание ✅, 05 Задължения ✅, 06 Каса и фонд ✅. **One left: 07 Съответствие.**
+
+**Next** — **07 Съответствие** (compliance) — the final console screen. Then the console set is complete; remaining design work is the two `Домоуправител Про - desktop` polish files and the mobile app (`Етажна собственост`).
+
+**Read first next time** — `web/README.md`, this entry, then the persisted design canvas for screen 07.
+
+---

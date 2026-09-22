@@ -181,7 +181,7 @@ export default function EntrancePage() {
               <div style={{ font: "400 11.5px/1.5 'IBM Plex Mono', monospace", color: "#6B6F6C", marginTop: 3 }}>
                 6 точки · сесии 51% → 26% → без праг (чл. 15 ЗУЕС)
               </div>
-              <button type="button" className="btn-solid" style={{ marginTop: 10 }}>Отвори подготовката</button>
+              <Link href="/assembly" className="btn-solid" style={{ marginTop: 10 }}>Отвори подготовката</Link>
             </div>
           </div>
         </div>
