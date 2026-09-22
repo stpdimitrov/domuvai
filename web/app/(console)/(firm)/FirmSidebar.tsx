@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 // activated as each screen lands (WEB-02…). `due` badges are overdue-count flags (ЗУЕС).
 const NAV: { label: string; href: string; count?: string; due?: string }[] = [
   { label: "Портфейл", href: "/portfolio", count: "62" },
-  { label: "Задължения", href: "#", due: "31" },
+  { label: "Задължения", href: "/debts", due: "31" },
   { label: "Начисления", href: "#" },
   { label: "Календар на сроковете", href: "#", due: "9" },
   { label: "Доставчици", href: "#" },

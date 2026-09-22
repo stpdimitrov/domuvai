@@ -45,6 +45,8 @@ data, modeled as typed rows, so wiring each to the API later is a data-source sw
 - **`/`** — the landing (`Етаж`), static marketing.
 - **`/portfolio`** — the console's firm-wide portfolio dashboard (screen 01). A portfolio row
   links through to the entrance detail.
+- **`/debts`** — firm-wide arrears (screen 05 Задължения): debtors grouped by entrance, each on
+  the чл. 38 ЗУЕС → чл. 410 ГПК escalation ladder (Покана → Нотариална → Решение на ОС → Заповед).
 - **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
   the entrance's file, accounts and next assembly. Uses the **entrance** sidebar.
 - **`/entrance/charges`** — the monthly charge run (screen 03 Начисления): the OS-decision basis,
