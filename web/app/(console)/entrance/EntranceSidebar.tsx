@@ -15,7 +15,7 @@ const ENTRANCE: { label: string; href: string; due?: string }[] = [
   { label: "Статутен календар", href: "/entrance", due: "3" },
   { label: "Обекти и идеални части", href: "#" },
   { label: "Начисления", href: "/entrance/charges" },
-  { label: "Каса и фонд", href: "#" },
+  { label: "Каса и фонд", href: "/entrance/fund" },
   { label: "Общи събрания", href: "#" },
   { label: "Задължения", href: "#", due: "5" },
   { label: "Доставчици и договори", href: "#" },

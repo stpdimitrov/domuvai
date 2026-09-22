@@ -1022,3 +1022,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
 
 ---
+
+## WEB-06 · 2026-09-22 · console screen 06 — Каса и фонд (cash & repair fund)
+
+**Did** — built **06 Каса и фонд** at `/entrance/fund` (entrance context; Каса и фонд active).
+- **The money-ledger screen**: two **account cards** — 501 operating cash and the ring-fenced 502 **repair fund** (badge "Отделна сметка · чл. 50 ЗУЕС") — each with balance / committed / available (available = balance − committed, shown green); a filter chip row; and a **double-entry journal** (Дата · Документ · Описание · Дебит сметка · Кредит сметка · Дебит · Кредит · Салдо 501) where **Дебит = Кредит per line** (ADR-006), 502 rows tinted green, an **off-balance commitment** row greyed, and a period оборотна ведомост totals row (€4.442,80 = €4.442,80).
+- Accounts + journal modeled as typed data — the shape the backend's fund/postings query emits. Added account-card + journal CSS and a green badge variant; wired the Каса и фонд nav link.
+
+**Verified** — `npm run build` clean (strict types; `/entrance/fund` prerendered); rendered at 1440×900, faithful, no console errors.
+
+**Progress** — 01 Портфейл ✅, 02 Вход ✅, 03 Начисления ✅, 05 Задължения ✅, **06 Каса и фонд ✅**. Remaining: 04 Общо събрание, 07 Съответствие.
+
+**Next** — **04 Общо събрание** (general assembly), then **07 Съответствие** (compliance) — the last two console screens.
+
+**Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
+
+---
