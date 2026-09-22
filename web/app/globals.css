@@ -1,0 +1,96 @@
+:root {
+  --bg: #E7E6E1;
+  --ink: #17191A;
+  --green: #14584A;
+  --green-dark: #0E3E34;
+  --muted: #5C605E;
+  --line: #DEDDD9;
+  --card: #EDECE8;
+  --card-hover: #E2E1DC;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--green);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--green-dark);
+}
+
+/* Nav links — muted, darken on hover (class beats the base `a` rule). */
+.nav-link {
+  font: 400 14px/1 'IBM Plex Sans';
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.nav-link:hover {
+  color: var(--ink);
+}
+
+/* Primary "Заявете демо" call to action. */
+.btn-demo {
+  display: inline-block;
+  background: var(--green);
+  color: #ffffff;
+  transition: background 0.2s;
+}
+.btn-demo:hover {
+  background: var(--green-dark);
+  color: #ffffff;
+}
+
+/* Feature cards — background lifts and the arrow nudges right on hover (pure CSS). */
+.feature-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  padding: 16px 22px;
+  transition: background 0.2s;
+  cursor: pointer;
+  color: var(--ink);
+}
+.feature-card:hover {
+  background: var(--card-hover);
+}
+.feature-card .arrow {
+  color: #9A9E96;
+  transition: transform 0.2s, color 0.2s;
+}
+.feature-card:hover .arrow {
+  color: #3D413E;
+  transform: translateX(2px);
+}
+
+/* The design is desktop-first; keep it usable on small screens without redesigning it. */
+@media (max-width: 860px) {
+  .nav {
+    padding: 16px 20px !important;
+  }
+  .nav-links {
+    display: none !important;
+  }
+  .what-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+  .feature-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .panel {
+    padding: 40px 24px 0 !important;
+  }
+}

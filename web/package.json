@@ -1,0 +1,22 @@
+{
+  "name": "domuvai-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "domuvai frontend (web) — Next.js PWA, contract-first against the api's OpenAPI (ADR-011)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3"
+  }
+}
