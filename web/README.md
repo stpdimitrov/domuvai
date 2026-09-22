@@ -47,6 +47,9 @@ data, modeled as typed rows, so wiring each to the API later is a data-source sw
   links through to the entrance detail.
 - **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
   the entrance's file, accounts and next assembly. Uses the **entrance** sidebar.
+- **`/entrance/charges`** — the monthly charge run (screen 03 Начисления): the OS-decision basis,
+  a per-object charge table (management / common / elevator / fund), validation checks, and a
+  confirm-or-return action bar.
 
 The console has two navigation contexts — the **firm** sidebar (`(firm)/`) and the **entrance**
 sidebar (`entrance/`) — as sibling nested layouts under one flex shell. Nav items beyond the built
