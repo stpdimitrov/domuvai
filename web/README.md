@@ -23,11 +23,17 @@ app/
   HeroVideo.tsx    client component: the boomerang hero background
   globals.css      tokens + base + hover styles
   (console)/       the manager console — a route group (no URL segment)
-    layout.tsx     the console shell (sidebar + main column)
-    Sidebar.tsx    firm navigation (client; active state from the path)
-    console.css    console shell, table and status-badge styles
-    portfolio/
-      page.tsx     /portfolio — the manager's risk-sorted portfolio dashboard
+    layout.tsx     the console flex shell + console.css (sidebar differs by context)
+    console.css    console shell, table, timeline and card styles
+    (firm)/            firm-wide context
+      layout.tsx       firm sidebar + main
+      FirmSidebar.tsx  firm navigation (client; active from the path)
+      portfolio/
+        page.tsx       /portfolio — the risk-sorted portfolio dashboard
+    entrance/          single-entrance context
+      layout.tsx       entrance sidebar + main
+      EntranceSidebar.tsx  entrance navigation (client)
+      page.tsx         /entrance — the entrance detail (statutory calendar)
 ```
 
 ## Status
@@ -37,9 +43,14 @@ Imported from the Claude Design project (`70a25109-…`) and re-implemented as i
 data, modeled as typed rows, so wiring each to the API later is a data-source swap.
 
 - **`/`** — the landing (`Етаж`), static marketing.
-- **`/portfolio`** — the manager console's portfolio dashboard (screen 01 of 7), on the shared
-  console shell. Sidebar nav items beyond Портфейл are placeholders, activated as each screen
-  lands (Вход, Начисления, Общо събрание, Задължения, Каса и фонд, Съответствие).
+- **`/portfolio`** — the console's firm-wide portfolio dashboard (screen 01). A portfolio row
+  links through to the entrance detail.
+- **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
+  the entrance's file, accounts and next assembly. Uses the **entrance** sidebar.
+
+The console has two navigation contexts — the **firm** sidebar (`(firm)/`) and the **entrance**
+sidebar (`entrance/`) — as sibling nested layouts under one flex shell. Nav items beyond the built
+screens are placeholders, activated as each lands (Начисления, Каса и фонд, Общо събрание, …).
 
 Still static: no auth, no API. The generated API client + auth arrive when a Gate-1 screen
 needs live data.

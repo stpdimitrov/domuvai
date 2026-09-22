@@ -973,3 +973,20 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, `docs/adr/ADR-011-frontend-topology.md`, this entry, then the persisted design canvases if re-porting.
 
 ---
+
+## WEB-03 · 2026-09-22 · console screen 02 — Вход (entrance detail) + two nav contexts
+
+**Did** — built the second manager-console screen, **02 Вход** (a single entrance's detail), and refactored the shell to carry two navigation contexts.
+- **Two sidebars.** The entrance view uses an entrance-scoped sidebar (Статутен календар · Обекти · Начисления · Каса и фонд · Общи събрания · Задължения · …), not the firm one. Refactored `(console)/layout.tsx` down to just the flex shell + `console.css`, and split the nav into **sibling nested layouts**: `(console)/(firm)/` (firm sidebar → `/portfolio`) and `(console)/entrance/` (entrance sidebar → `/entrance`). `Sidebar.tsx` → `(firm)/FirmSidebar.tsx`; portfolio moved under `(firm)/` (URL unchanged). A portfolio row now **links to** `/entrance`.
+- **`/entrance`** — the design's Вход screen: breadcrumb + entrance pill, a tab bar, and a two-column body — left, the **statuten-kalendar timeline** (Просрочени / Този месец / Следващите 90 дни, each item citing its ЗУЕС article in IBM Plex Mono, with dot + status badge); right, the **Дело на входа / Сметки на входа / Следващо събрание** cards. Calendar items and card rows modeled as typed data.
+- Same stone/green language; reused the console tokens and added timeline/card CSS.
+
+**Verified** — `npm run build` clean (strict types, `/entrance` + `/portfolio` prerendered); both rendered at 1440×900 in the browser pane, faithful, no console errors; `/portfolio` intact after the restructure.
+
+**Scope** — still static (no API/auth). `/entrance` is a single demo entrance; real routing becomes `/entrance/[id]` when wired. Entrance tab bar and non-active nav items are placeholders.
+
+**Next** — **03 Начисления** (charges), then **05 Задължения**, **06 Каса и фонд**, **04 Общо събрание**, **07 Съответствие**, one PR each. Wire to the API once the OpenAPI client is generated.
+
+**Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
+
+---
