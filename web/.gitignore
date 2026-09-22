@@ -1,0 +1,12 @@
+/node_modules
+/.next
+/out
+/build
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store
+.env*.local
+
+# The repo root .gitignore blanket-ignores package-lock.json (Gradle backend);
+# re-include it here so web's install is reproducible.
+!package-lock.json

@@ -936,3 +936,22 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, the H-03 handover, S-41 + this entry, `docs/adr/ADR-011-frontend-topology.md`.
 
 ---
+
+## WEB-01 · 2026-09-22 · web/ scaffold + landing page (Етаж) — first frontend slice
+
+**Did** — stood up the `web` deployable (ADR-011) as a monorepo sibling of `app/`, and implemented the **landing page** the owner designed in Claude Design.
+- **Scaffold** — Next.js 15 (App Router) + React 19 + TypeScript, minimal by hand (no `create-next-app` boilerplate): `web/{package.json,next.config.mjs,tsconfig.json,.gitignore,README.md}` + `web/app/{layout.tsx,globals.css,page.tsx,HeroVideo.tsx}`. Independent toolchain, own build; `node_modules`/`.next` gitignored.
+- **Import** — pulled `Етаж - лендинг.dc.html` (+ `support.js`) from the Claude Design project `70a25109-…` via the DesignSync MCP. **Discarded the design tool's `<x-dc>` runtime** (`support.js`) and re-implemented the page as idiomatic React: static markup as a server component, hover states as pure CSS, and the boomerang hero video as a `'use client'` component (`HeroVideo.tsx`) — a faithful port of the capture-to-canvas logic, with a graceful fallback to the looping `<video>` on a CORS-tainted canvas.
+- **Faithful to the design**: Literata + IBM Plex Sans, the stone/green palette, the fixed nav, the hero "Нито един пропуснат срок.", the frosted "Какво правим?" panel, and the three ЗУЕС cards (Календар по ЗУЕС · Начисления и каса · Общи събрания). It is **static marketing** — no auth, no API.
+
+**Verified** — `npm run build` clean (compiled, strict type-check, `/` prerendered static); rendered in the browser pane top-to-bottom, no console errors.
+
+**Auth path getting here** — the DesignSync MCP needed a design-system authorization the CLI couldn't give: the machine had **two Claude Code installs** (npm-global 2.1.87 shadowing native), both far behind. Fixed by `claude install` (native → 2.1.278, user-space, no sudo); the owner then ran `/design-login` on the current build, which seeded the machine-level auth this desktop session reuses.
+
+**Notes / TODO** — re-host the hero clip (currently the design tool's CDN URL) on a domuvai origin before launch; add the OpenAPI-generated client + a `web` build/lint CI job (the backend gate pack does not build `web`). The authenticated consoles (resident/manager/firm) and the API client come when a Gate-1 screen needs data.
+
+**Next** — more Gate-1 frontend screens (the design project also has `Домоуправител` working/desktop screens + `Етажна собственост`), or resume backend **S-41b** (adopt optional mapped fields) / **S-42** payments. The auth **provider** pick lands at the first screen that needs login.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, `docs/adr/ADR-011-frontend-topology.md`, this entry, `web/README.md`.
+
+---
