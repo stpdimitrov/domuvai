@@ -1,16 +1,11 @@
 import type { ReactNode } from "react";
-import Sidebar from "./Sidebar";
 import "./console.css";
 
 /**
- * The manager console shell (ADR-011): the firm sidebar plus a main column each screen fills
- * with its own top bar and body. A thin view — every number it shows is decided by `api`.
+ * The console frame (ADR-011). The sidebar differs by context — firm-wide vs a single
+ * entrance — so each nested group ((firm)/, entrance/) supplies its own sidebar; this layout
+ * only owns the flex shell and the shared stylesheet.
  */
 export default function ConsoleLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="console">
-      <Sidebar />
-      <main className="console-main">{children}</main>
-    </div>
-  );
+  return <div className="console">{children}</div>;
 }

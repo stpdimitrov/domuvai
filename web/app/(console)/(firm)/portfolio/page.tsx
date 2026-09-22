@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Портфейл — Етаж" };
 
@@ -108,7 +109,7 @@ export default function PortfolioPage() {
         </div>
 
         {ROWS.map((r) => (
-          <div key={r.addr} className={`pf-grid pf-row${r.overdue > 0 ? " flagged" : ""}`}>
+          <Link href="/entrance" key={r.addr} className={`pf-grid pf-row${r.overdue > 0 ? " flagged" : ""}`}>
             <div className="ellipsis">
               <span style={{ fontWeight: 500 }}>{r.addr}</span> <span className="dim">· {r.units} об.</span>
             </div>
@@ -128,7 +129,7 @@ export default function PortfolioPage() {
             <div className="num">
               <span className={`badge ${r.risk}`}>{r.riskLabel}</span>
             </div>
-          </div>
+          </Link>
         ))}
 
         <div className="pf-grid pf-foot">

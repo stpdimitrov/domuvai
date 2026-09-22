@@ -18,7 +18,7 @@ const NAV: { label: string; href: string; count?: string; due?: string }[] = [
 
 const RECENT = ["ул. Шипка 14, вх. Б", "бул. Витоша 102, вх. А", "ж.к. Младост 3, бл. 318, вх. 2"];
 
-export default function Sidebar() {
+export default function FirmSidebar() {
   const pathname = usePathname();
 
   return (
