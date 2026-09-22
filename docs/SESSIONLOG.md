@@ -1006,3 +1006,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
 
 ---
+
+## WEB-05 · 2026-09-22 · console screen 05 — Задължения (arrears / escalation ladder)
+
+**Did** — built **05 Задължения** at `/debts` (firm context; firm sidebar, Задължения active).
+- **The collections screen**: the **чл. 38 ЗУЕС → чл. 410 ГПК escalation ladder** (Покана → Нотариална покана → Решение на ОС → Заповед за изпълнение) with a colour legend; a debtor table **grouped by entrance** (each group its subtotal + a note, e.g. "няма решение на ОС за съдебно събиране"); per-debtor rows with a **4-segment ladder bar** + step label, oldest-debt age (colour-coded), interest, and the next action — including a red **"Блокира ескалацията:"** flag where a step is gated; a totals row with the step distribution (1·14  2·9  3·5  4·3).
+- Modeled as typed groups/debtors — the shape the backend's arrears-ageing query emits. Added ladder + group-row CSS; wired the Задължения nav link (`/debts`).
+
+**Verified** — `npm run build` clean (strict types; `/debts` prerendered); rendered at 1440×900, faithful, no console errors.
+
+**Progress** — 01 Портфейл ✅, 02 Вход ✅, 03 Начисления ✅, **05 Задължения ✅**. Remaining: 06 Каса и фонд, 04 Общо събрание, 07 Съответствие.
+
+**Next** — **06 Каса и фонд** (cash & repair fund), then 04 Общо събрание, 07 Съответствие.
+
+**Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
+
+---

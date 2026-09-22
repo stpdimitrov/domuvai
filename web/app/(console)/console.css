@@ -652,6 +652,55 @@
   background: #0e3e34;
 }
 
+/* ================= arrears (Задължения) ================= */
+
+.dt-grid {
+  display: grid;
+  grid-template-columns: 64px 148px 96px 84px 96px 224px 1fr;
+  column-gap: 14px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 1000px;
+}
+.dt-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 16px;
+  background: #efeeea;
+  border-bottom: 1px solid #deddd9;
+  font: 500 11.5px/1 "IBM Plex Sans";
+  min-width: 1000px;
+}
+.dt-group.mid {
+  border-top: 1px solid #deddd9;
+}
+.dt-group .gnote {
+  color: #6b6f6c;
+  font-weight: 400;
+}
+.dt-group .gtotal {
+  font-variant-numeric: tabular-nums;
+}
+.ladder {
+  display: flex;
+  gap: 3px;
+}
+.ladder span {
+  width: 34px;
+  height: 5px;
+}
+.step-label {
+  font: 500 11.5px/1 "IBM Plex Sans";
+}
+.action {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
 @media (max-width: 720px) {
   .sidebar {
     display: none;
