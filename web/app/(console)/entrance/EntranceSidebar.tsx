@@ -14,7 +14,7 @@ const FIRM: { label: string; href: string; due?: string }[] = [
 const ENTRANCE: { label: string; href: string; due?: string }[] = [
   { label: "Статутен календар", href: "/entrance", due: "3" },
   { label: "Обекти и идеални части", href: "#" },
-  { label: "Начисления", href: "#" },
+  { label: "Начисления", href: "/entrance/charges" },
   { label: "Каса и фонд", href: "#" },
   { label: "Общи събрания", href: "#" },
   { label: "Задължения", href: "#", due: "5" },

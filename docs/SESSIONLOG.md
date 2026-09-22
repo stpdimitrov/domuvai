@@ -990,3 +990,19 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
 
 ---
+
+## WEB-04 · 2026-09-22 · console screen 03 — Начисления (monthly charge run)
+
+**Did** — built **03 Начисления** at `/entrance/charges` (entrance context; reuses the entrance sidebar, "Начисления" active).
+- **The fee-engine screen**: a **basis card** (the ОС decision the run is built on — per-resident management/common/elevator rates, fund per 0,01% ideal parts, exemptions per чл. 51 ЗУЕС) + preparer/version; a **per-object charge table** (Обект · Собственик · Живущи · Освобождавания · Коеф. · Ид. части · Управл. · Общи ч. · Асанс. · Фонд · Общо) with exemption tags (Дете < 6 г. · Отсъства > 30 д. · Ръчна корекция) and green commercial coefficients; a **totals row**; and a **confirm/return action bar** (validation line + "Общо за начисляване €1.252,50" + Върни за корекция / Потвърди начисленията).
+- Rows modeled as typed data — **exactly what the backend's `computeChargeRun` emits per object**, so wiring is a source swap. Added charge-table + action-bar CSS; wired the Начисления nav link.
+
+**Verified** — `npm run build` clean (strict types; `/entrance/charges` prerendered); rendered at 1440×900, faithful, no console errors.
+
+**Progress** — console screens: 01 Портфейл ✅, 02 Вход ✅, **03 Начисления ✅**. Remaining: 05 Задължения, 06 Каса и фонд, 04 Общо събрание, 07 Съответствие. Still static (no API/auth).
+
+**Next** — **05 Задължения** (arrears — arrears ageing is built in the backend), then 06 Каса и фонд, 04 Общо събрание, 07 Съответствие.
+
+**Read first next time** — `web/README.md`, this entry, then the persisted design canvas for the next screen.
+
+---

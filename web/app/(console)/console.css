@@ -547,6 +547,111 @@
   color: #fff;
 }
 
+/* ================= charges (Начисления) ================= */
+
+.ch-grid {
+  display: grid;
+  grid-template-columns: 70px 146px 58px 148px 62px 96px 80px 84px 74px 82px 1fr;
+  column-gap: 12px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 1120px;
+}
+.ch-head {
+  position: sticky;
+  top: 0;
+  height: 30px;
+  background: #f7f6f3;
+  border-bottom: 1px solid #deddd9;
+  font: 500 10.5px/1 "IBM Plex Sans";
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b6f6c;
+}
+.ch-row {
+  height: 34px;
+  border-bottom: 1px solid #eae9e5;
+  font: 400 12.5px/1 "IBM Plex Sans";
+}
+.ch-row.flagged {
+  background: #fcfaf8;
+}
+.ch-more {
+  height: 30px;
+  font: 400 12px/1 "IBM Plex Sans";
+  color: #6b6f6c;
+}
+.ch-foot {
+  position: sticky;
+  bottom: 0;
+  height: 34px;
+  background: #f7f6f3;
+  border-top: 1px solid #deddd9;
+  font: 500 12.5px/1 "IBM Plex Sans";
+}
+.tag-mini {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font: 500 9.5px/1 "IBM Plex Sans";
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.tag-mini.calm {
+  background: #ecebe7;
+  border: 1px solid #deddd9;
+  color: #5c605e;
+}
+.tag-mini.warn {
+  background: #f8eedc;
+  border: 1px solid #ead6ae;
+  color: #7a5210;
+}
+.action-bar {
+  height: 68px;
+  flex: none;
+  margin-top: 14px;
+  background: #ffffff;
+  border-top: 1px solid #deddd9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  gap: 18px;
+}
+.btn-outline {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid #deddd9;
+  background: #ffffff;
+  font: 400 13px/32px "IBM Plex Sans";
+  color: #3d413e;
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
+}
+.btn-outline:hover {
+  border-color: #c4c2bc;
+}
+.btn-confirm {
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 6px;
+  background: #14584a;
+  color: #ffffff;
+  font: 500 13px/34px "IBM Plex Sans";
+  white-space: nowrap;
+  flex: none;
+  border: 0;
+  cursor: pointer;
+}
+.btn-confirm:hover {
+  background: #0e3e34;
+}
+
 @media (max-width: 720px) {
   .sidebar {
     display: none;
