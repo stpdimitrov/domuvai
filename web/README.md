@@ -52,6 +52,8 @@ data, modeled as typed rows, so wiring each to the API later is a data-source sw
 - **`/entrance/charges`** — the monthly charge run (screen 03 Начисления): the OS-decision basis,
   a per-object charge table (management / common / elevator / fund), validation checks, and a
   confirm-or-return action bar.
+- **`/entrance/fund`** — cash & repair fund (screen 06 Каса и фонд): the 501 operating and 502
+  fund accounts (чл. 50 ЗУЕС) with balance / committed / available, and a double-entry journal.
 
 The console has two navigation contexts — the **firm** sidebar (`(firm)/`) and the **entrance**
 sidebar (`entrance/`) — as sibling nested layouts under one flex shell. Nav items beyond the built
