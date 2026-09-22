@@ -1,0 +1,272 @@
+/* The live general-assembly view — full-bleed, no sidebar. Its own stylesheet so it stays
+   self-contained; the stone/green language and tokens match the console. */
+
+.asm {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f2f1ee;
+  color: #17191a;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.asm-top {
+  height: 52px;
+  flex: none;
+  background: #fff;
+  border-bottom: 1px solid #deddd9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+.asm-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 10px;
+  background: #dce5e1;
+  border: 1px solid #c3d4cd;
+  border-radius: 6px;
+}
+.asm-pill .name {
+  font: 600 13px/1 "IBM Plex Sans";
+  color: #14584a;
+}
+.asm-ghost {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 5px;
+  border: 1px solid #deddd9;
+  font: 400 12px/24px "IBM Plex Sans";
+  color: #3d413e;
+  background: #fff;
+  cursor: pointer;
+}
+
+.asm-banner {
+  min-height: 44px;
+  flex: none;
+  background: #f8eedc;
+  border-bottom: 1px solid #ead6ae;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 20px;
+  flex-wrap: wrap;
+}
+
+.sbadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 3px;
+  font: 500 10px/1 "IBM Plex Sans";
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sbadge.fail { background: #f6e3e0; border: 1px solid #e9c5bf; color: #8e2318; }
+.sbadge.open { background: #14584a; border: 1px solid #14584a; color: #fff; }
+.sbadge.next { background: #fff; border: 1px solid #deddd9; color: #6b6f6c; }
+.sbadge.live { background: #f8eedc; border: 1px solid #ead6ae; color: #7a5210; }
+
+.asm-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 284px minmax(0, 1fr) 336px;
+}
+
+/* agenda (left) */
+.agenda {
+  border-right: 1px solid #deddd9;
+  background: #edece8;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: auto;
+}
+.agenda-h {
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #deddd9;
+  font: 500 10px/1 "IBM Plex Sans";
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b6f6c;
+}
+.agenda-item {
+  padding: 9px 16px;
+  border-bottom: 1px solid #e4e3df;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.agenda-item.active {
+  padding: 11px 16px;
+  background: #fff;
+  box-shadow: inset 3px 0 0 #14584a;
+}
+.agenda-n {
+  font: 500 11.5px/1.4 "IBM Plex Sans";
+  color: #6b6f6c;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.agenda-item.active .agenda-n { font-weight: 600; color: #14584a; }
+.agenda-t { font: 400 12.5px/1.4 "IBM Plex Sans"; color: #3d413e; }
+.agenda-item.active .agenda-t { font-weight: 500; color: #17191a; }
+.agenda-s {
+  font: 500 10px/1 "IBM Plex Sans";
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.agenda-s.pending {
+  font: 400 10.5px/1 "IBM Plex Sans";
+  letter-spacing: 0;
+  text-transform: none;
+  color: #6b6f6c;
+}
+
+/* centre column */
+.asm-center {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  gap: 16px;
+  overflow: auto;
+}
+.kicker {
+  font: 500 10px/1 "IBM Plex Sans";
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b6f6c;
+}
+.card {
+  background: #fff;
+  border: 1px solid #deddd9;
+}
+.qbar {
+  margin-top: 12px;
+  height: 6px;
+  background: #eae9e5;
+  position: relative;
+  overflow: hidden;
+}
+.qfill { position: absolute; left: 0; top: 0; bottom: 0; background: #14584a; }
+.qmark { position: absolute; top: -3px; bottom: -3px; width: 1px; }
+.vrow-head { display: flex; justify-content: space-between; font: 400 12.5px/1 "IBM Plex Sans"; }
+.vbar {
+  margin-top: 5px;
+  height: 8px;
+  background: #eae9e5;
+  position: relative;
+  overflow: hidden;
+}
+.vfill { position: absolute; inset: 0; }
+.vmark { position: absolute; top: -3px; bottom: -3px; width: 1px; background: #17191a; }
+.toggle {
+  display: flex;
+  border: 1px solid #deddd9;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.toggle span {
+  padding: 0 8px;
+  height: 22px;
+  font: 400 10.5px/22px "IBM Plex Sans";
+  color: #5c605e;
+}
+.toggle span.on { background: #17191a; color: #fff; font-weight: 500; }
+.asm-solid {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 6px;
+  background: #14584a;
+  color: #fff;
+  font: 500 12.5px/32px "IBM Plex Sans";
+  flex: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.asm-chip {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 5px;
+  border: 1px solid #deddd9;
+  font: 400 12px/26px "IBM Plex Sans";
+  color: #3d413e;
+  white-space: nowrap;
+  flex: none;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* attendance (right) */
+.attend {
+  border-left: 1px solid #deddd9;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.attend-h {
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-bottom: 1px solid #deddd9;
+  font: 500 10px/1 "IBM Plex Sans";
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b6f6c;
+}
+.attend-scroll { flex: 1; min-height: 0; overflow: auto; }
+.attend-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 84px;
+  column-gap: 8px;
+  align-items: center;
+  height: 29px;
+  padding: 0 14px;
+  border-bottom: 1px solid #f0efeb;
+  font: 400 12px/1 "IBM Plex Sans";
+}
+.attend-row.alt { background: #fbfaf7; }
+.proxy-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 2px;
+  font: 500 9px/1 "IBM Plex Sans";
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: #dce5e1;
+  color: #14584a;
+}
+.chip-count {
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 3px;
+  font: 500 10px/1 "IBM Plex Sans";
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.chip-count.calm { background: #ecebe7; border: 1px solid #deddd9; color: #5c605e; }
+.chip-count.green { background: #dce5e1; border: 1px solid #c3d4cd; color: #14584a; }
