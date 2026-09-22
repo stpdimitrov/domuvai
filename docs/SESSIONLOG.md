@@ -955,3 +955,21 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, `docs/adr/ADR-011-frontend-topology.md`, this entry, `web/README.md`.
 
 ---
+
+## WEB-02 · 2026-09-22 · console shell + Портфейл dashboard — first manager screen
+
+**Did** — began integrating the manager console (`Домоуправител - работни екрани`, a 7-screen 1440×1024 canvas). Built the shared **console shell** and the first screen, **01 Портфейл** (the firm-wide portfolio dashboard).
+- **Route group `(console)/`** — `layout.tsx` renders the firm **sidebar** (`Sidebar.tsx`, a client component; active item from `usePathname`) + a main column each screen fills. `console.css` holds the shell, table and status-badge styles; tokens still live in `globals.css`.
+- **`/portfolio`** — the risk-sorted table of all entrances: overdue ЗУЕС tasks, next deadline (with the legal article in IBM Plex Mono), collection %, arrears, repair fund, mandate expiry, and a Критичен/Внимание/Спокоен risk badge; summary line, filter chips and a totals row. The design's sample data is modeled as **typed rows** (`EntranceRow[]`) so wiring to the api's cross-entrance query later is a data-source swap.
+- **Design language** — same stone/green as the landing (the `_ds/organic` bundle in the design project is unused scaffolding — a warm terracotta system for a different product; ignored). Added IBM Plex Mono to the font link for legal refs.
+- **Real, not an artboard** — the fixed 1440×1024 frame became a responsive route that fills the viewport (sidebar fixed, table scrolls); the design-doc chrome (labels, palette swatches) was dropped.
+
+**Verified** — `npm run build` clean (strict types, `/portfolio` prerendered static); rendered at 1440×900 in the browser pane, faithful to the design, no console errors.
+
+**Scope** — static, no API/auth yet (same posture as the landing). The other 6 console screens (Вход · Начисления · Общо събрание · Задължения · Каса и фонд · Съответствие) follow one PR each, in that logical order; nav items are placeholders until each lands. There are also two `Домоуправител Про - desktop` files to cross-check for polished art per screen, and a mobile app spec (`Етажна собственост`, 390×844, resident+manager, light+dark).
+
+**Next** — **02 Вход** (entrance detail — registry: units + book), then the money screens (03 Начисления, 05 Задължения, 06 Каса и фонд), then 04 Общо събрание and 07 Съответствие. Wire to the API once the OpenAPI client is generated.
+
+**Read first next time** — `web/README.md`, `docs/adr/ADR-011-frontend-topology.md`, this entry, then the persisted design canvases if re-porting.
+
+---
