@@ -1084,3 +1084,35 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, this entry.
 
 ---
+
+## H-04 · 2026-09-23 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at the merge of this docs PR (H-04); before it, `main` was `ba09d92`. Everything below is merged (PRs #12–#22). This consolidates the session that ran from H-03 through the frontend build, so the next session continues without the conversation.
+
+**What this session shipped (since H-03)**
+- **S-41** (intake mapping API, PR #12): `POST …/fee-sheet/profile` + a confirmed `mapping` threaded through dry-run/record/commit. **Froze the intake contract → Gate 1 backend contract-complete** (the ADR-011 §3 green light).
+- **ADR-011 Accepted** (PR #13): frontend = **monorepo** (`web/` here) + **OIDC · stateless api · Next.js BFF**; auth **provider deferred**, **Keycloak** marked as the default.
+- **Frontend built** (PRs #14–#22) from the owner's Claude Design project (`70a25109-…`), all re-implemented as idiomatic React (the `<x-dc>` runtime always discarded), all with **typed mock data**:
+  - **WEB-01** `web/` scaffold + landing; **WEB-02..08** the 7-screen manager console — Портфейл `/portfolio`, Вход `/entrance`, Начисления `/entrance/charges`, Каса и фонд `/entrance/fund`, Задължения `/debts`, Общо събрание `/assembly`, Съответствие `/compliance` (two nav contexts: firm `(firm)/` + entrance `entrance/`); **WEB-09** a full interactive landing refresh (scroll-aware nav + mobile menu, FAQ accordion, validated demo form).
+
+**Evaluation — did the last steps disrupt the initial plan?** Core disciplines **intact**: contract-first ("no hand-written `fetch`" — the screens are static, no live calls), ADR-011 topology, the go-live gate (no billing wired), the branch→PR→CI-green→merge flow. **Two deviations, now recorded** (ADR-011 amendment 2026-09-23):
+1. **Frontend built UI-first, ahead of the generated OpenAPI client** (§2.2's enforced boundary). Acceptable as scaffolding — every screen's data is typed, so wiring is a source-swap — but the mock data can **drift** until the client lands, and the console runs **ahead of the backend** (`assembly`/`compliance`/arrears-escalation screens exist before their modules). They are **design-validated shells**, not feature-complete.
+2. **`web/` is ungated in CI** (`ci.yml` runs only the backend gate pack) — a broken web build merges silently.
+Neither breaks correctness; both are convergence debt, scheduled below.
+
+**Adapted plan / resume queue**
+1. **Frontend convergence (restores ADR-011 §2.2)** — (a) add a **`web` CI job** (install · typecheck · `next build`) — immediate, cheap, closes the ungated gap; (b) **generate the OpenAPI TS client** and **replace the mock data screen by screen**, starting with the Gate-1 screens whose backend exists (`portfolio`/`entrance`/`charges`/`fund`/`debts`); (c) pick the **auth provider** (Keycloak) at the first login screen. Optional: import the **`Етаж - вход`** login design (a separate file in the project; `Вход`/`Започнете безплатно` currently point at `/portfolio`).
+2. **Backend critical path for a *billable* pilot** (unchanged, still primary) — **S-41b** (adopt the optional mapped fields into `registry` — an externalized `ImportCommitted` event-contract change, its own PR + IT) → **Track B**: **S-42** payment persistence (wire S-37 to the ledger + endpoint) → **S-43** default interest (PM-DEBT-006). The **go-live gate** (ADR-012 §7) still governs: do not bill real money until a real sheet reproduces to the cent.
+3. **Design backlog** — the two `Домоуправител Про - desktop` polish files (cross-check for refined art) and the **mobile app** (`Етажна собственост`, resident + manager, 390×844, light/dark).
+
+**Open owner actions** — branch protection on `main`; `gh auth login` for the other two devs; ADR-004 / ADR-007 counsel; the pilot spreadsheet (now *validation*, not a blocker); the **auth provider** pick (Keycloak) when the first login screen is built.
+
+**Operating lessons this session**
+- **DesignSync (Claude Design MCP) auth**: it needs a design-system authorization the old CLI lacked. Root cause was a **dual Claude Code install** — npm-global (`/usr/local/bin`, 2.1.87) shadowing a native install, both far behind. Fix: `claude install` (native → 2.1.278, user-space, no sudo); the owner then ran `/design-login`, which seeds a **machine-level auth this desktop session reuses**. `claude mcp list` does not show `claude_design` — it is a desktop-app built-in, not a configured server.
+- **Extract a screen from a design canvas** with the Python helper (load the `get_file` JSON `content`, balance `<div>` tags from `data-screen-label="…"`); the console file is one 214KB multi-artboard canvas. The `.dc.html` files are static inline-styled HTML (no `{{ }}` bindings) except the landing, which carries an `<x-dc>` runtime + logic.
+- **Browser-pane scroll checks**: nested `element.offsetTop` is relative to the offsetParent (not the document) — use `getBoundingClientRect().top + scrollY` for absolute; and `html{scroll-behavior:smooth}` makes `scrollTo` animate, so force `scrollBehavior='auto'` before reading positions.
+- **Gate/CI**: the backend gate pack still runs locally with `GRADLE_USER_HOME=$HOME/.gradle`; `web/` has **no** CI yet (see queue #1). A dev server may still be **running at `localhost:3000`** (started for the "run on localhost" request) — it survives across turns; stop with `pkill -f "next dev"`.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md` (frontend status), this entry, `docs/adr/ADR-011-frontend-topology.md` (Amendment 2026-09-23), `web/README.md`, then `git log --oneline -20`.
+
+---
