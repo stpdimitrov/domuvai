@@ -22,12 +22,61 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
 a {
   color: var(--green);
   text-decoration: none;
 }
 a:hover {
   color: var(--green-dark);
+}
+
+/* ---- landing (marketing) ---- */
+.ln-link {
+  color: var(--ink);
+  transition: color 0.2s;
+}
+.ln-link:hover {
+  color: var(--green);
+}
+.ln-solid {
+  background: var(--green);
+  color: #ffffff;
+  transition: background 0.2s;
+}
+.ln-solid:hover {
+  background: var(--green-dark);
+  color: #ffffff;
+}
+.ln-outline {
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  box-sizing: border-box;
+  transition: background 0.2s;
+}
+.ln-outline:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+/* section links darken to ink on hover, overriding the inline active/idle colour */
+.ln-navlink {
+  transition: color 0.2s;
+}
+.ln-navlink:hover {
+  color: var(--ink) !important;
+}
+.ln-faq-btn {
+  transition: color 0.2s;
+}
+.ln-faq-btn:hover {
+  color: var(--green);
 }
 
 /* Nav links — muted, darken on hover (class beats the base `a` rule). */

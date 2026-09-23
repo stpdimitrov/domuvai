@@ -1070,3 +1070,17 @@ Blocked until a pilot spreadsheet: **intake commit** (the Gate-1 finisher).
 **Read first next time** — `web/README.md`, this entry.
 
 ---
+
+## WEB-09 · 2026-09-23 · landing refresh — full marketing site (Етаж)
+
+**Did** — the owner published a new `Етаж - лендинг.dc.html` (now a 9-section, interactive design, ~83KB). Re-imported via DesignSync and rebuilt `/` as a real Next.js page, discarding the `<x-dc>` runtime.
+- **Sections**: scroll-aware sticky nav + mobile menu · boomerang hero (reused `HeroVideo`) + "Какво правим" panel · **Платформа** (intro + f01 Календар / f02 Начисления-каса / f03 Общи събрания feature blocks, each with a mock console card, + f04 Задължения / f05 Съответствие) · **За кого** (3 roles) · **Как започвате** (3 steps) · **Доверие** (derivation card + 6 principles) · **Цени** (3 plans) · **Фирмата** (bio + reg details) · **Въпроси** (FAQ accordion) · **Демо** (validated request form) · footer.
+- **Interactivity as client components**: `LandingNav.tsx` (scroll → solid nav, scroll-spy active-section underline, `< 880px` hamburger + full-screen menu), `Faq.tsx` (one-open accordion), `DemoForm.tsx` (name/count/email/consent validation, phone regex, success state). Static content stays server-rendered in `page.tsx`. Added landing hover classes + `scroll-behavior`/`:focus-visible` to `globals.css`. `Вход`/`Започнете безплатно`/`Вход в системата` point at `/portfolio` (no login screen imported yet); the `./Етаж - вход.dc.html` login is a separate design file.
+
+**Verified** — `npm run build` clean (strict types; `/` prerendered, ~6 kB). In-browser at 1280 + 375: nav goes solid on scroll with the correct active underline, the platform mock cards render, the demo form flags all required fields ("4 полета изискват внимание."), and the mobile menu opens. No console errors.
+
+**Notes** — the hero clip is still the design tool's CDN URL (re-host before launch); a login screen (`Етаж - вход`) exists in the design project but isn't imported.
+
+**Read first next time** — `web/README.md`, this entry.
+
+---
