@@ -45,7 +45,11 @@ data, modeled as typed rows, so wiring each to the API later is a data-source sw
 The **7-screen manager console is complete** (01–07): Портфейл, Вход, Начисления, Общо събрание,
 Задължения, Каса и фонд, Съответствие.
 
-- **`/`** — the landing (`Етаж`), static marketing.
+- **`/`** — the landing (`Етаж`): a full marketing site — a scroll-aware sticky nav (transparent
+  over the hero, solid on scroll, with a scroll-spy underline) + mobile menu, the boomerang hero,
+  the platform showcase (mock console cards), roles, steps, trust, pricing, company, an FAQ
+  accordion, and a validated "заявете демо" form. Client parts: `LandingNav`, `Faq`, `DemoForm`,
+  `HeroVideo`.
 - **`/portfolio`** — the console's firm-wide portfolio dashboard (screen 01). A portfolio row
   links through to the entrance detail.
 - **`/debts`** — firm-wide arrears (screen 05 Задължения): debtors grouped by entrance, each on
