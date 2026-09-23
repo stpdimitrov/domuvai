@@ -85,3 +85,17 @@ The owner (Stoyan Dimitrov) resolved the two open sub-decisions, moving this ADR
 **Provider — deferred, Keycloak marked as the default.** The concrete IdP is chosen at the **first frontend auth slice**, when a Gate-1 screen actually needs login. The marked default to revisit is **Keycloak self-hosted** — EU-resident (GDPR/PM-BOOK-007), OIDC/SAML, with a path to broker Bulgarian e-ID / QES (Evrotrust, B-Trust) for ballots later. The provider decision must satisfy: **EU data residency**, email/phone login for non-technical residents, and a future e-ID/QES brokering path. Because the architecture is provider-agnostic (standard OIDC), deferring the provider does **not** block the frontend structure or S-41b.
 
 **What this unblocks:** with the intake contract frozen (S-41), every Gate-1 backend item is contract-complete, so the Gate-1 frontend (a `web/` app in this repo) can start as soon as the owner gives the go-ahead.
+
+## Amendment · 2026-09-23 · Frontend built UI-first, ahead of the generated client
+
+The Gate-1 green light (S-41) was reached and the frontend was built from the owner's Claude Design canvases: a marketing landing and the seven-screen manager console (`/portfolio`, `/entrance`, `/entrance/charges`, `/entrance/fund`, `/debts`, `/compliance`, `/assembly`), merged in PRs #14–#22.
+
+**What deviated from §2.2.** §2.2 makes a **typed client generated from the OpenAPI** the enforced contract boundary ("no hand-written `fetch`"). To move at the pace of the design hand-off, the screens were built **UI-first with hand-modeled typed mock data** shaped like the expected API responses — *not* the generated client, and with **no live `fetch` at all** (the screens are static). This does not violate "no hand-written fetch", but it **defers the enforced boundary**.
+
+**Consequences, accepted.**
+- **Good:** the design is validated as running, responsive React now; every screen's data is typed, so wiring is a source-swap; the console shell, scroll-aware nav and the two nav contexts (firm / entrance) are proven.
+- **Bad, and accepted:** the mock data can **drift** from the real contract until the client lands; and the console runs **ahead of the backend** — screens for `assembly` (GA), `compliance` (REG) and the arrears escalation exist before those modules do. They are **design-validated shells**, not feature-complete.
+
+**Convergence (restores §2.2).** The next frontend milestone is to **generate the OpenAPI TS client and replace the mock data screen by screen**, starting with the Gate-1 screens whose backend exists (`portfolio` / `entrance` / `charges` / `fund` / `debts`). At that point the generated client becomes the enforced boundary as §2.2 intends. The **auth provider** (Keycloak, marked above) is picked at the first screen that needs login.
+
+**A gap this exposed.** CI (`ci.yml`) runs only the backend gate pack — **`web/` is ungated**, so a broken web build merges silently. Adding a `web` CI job (install · typecheck · `next build`) is the immediate next frontend slice.
