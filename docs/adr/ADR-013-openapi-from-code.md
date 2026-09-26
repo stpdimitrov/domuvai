@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Proposed** · 2026-09-26 |
+| **Status** | **Accepted** · 2026-09-26 — the owner accepted option C (the spec is generated from the running code) |
 | **Date** | 2026-09-26 |
 | **Deciders** | Stoyan Dimitrov |
 | **Supersedes** | A9's generation source (S-07: `docs/api/openapi.json` generated from the hand catalogue in `tools/build_openapi.py`). The catalogue stays — as the rule-traceability map and the list of planned operations |
