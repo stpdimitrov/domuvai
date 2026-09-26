@@ -1153,7 +1153,7 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 
 **What the generated contract now shows** — error bodies are `{"error": "…"}`, not RFC 9457 problems; no auth; `/api/<module>/…` paths; `camelCase` JSON; `required` follows Kotlin nullability.
 
-**Open** — **WEB-11**: generate the TS client from this spec (and add `docs/api/openapi.json` to the `web` workflow's `paths`), then wire `/entrance/fund` first. A new controller collaborator must be mocked in `OpenApiContractTest` — its context fails loudly otherwise.
+**Open** — **WEB-11**: generate the TS client from this spec (and add `docs/api/openapi.json` to the `web` workflow's `paths`), then wire **`/entrance/charges`** first — its per-unit lines, persons, stream amounts and totals match `ChargeRunResponse`, and preview + issue back its confirm bar. Not `/entrance/fund` (as the ADR-013 entry said): the API has its account records only — no balances, commitments or journal yet. A new controller collaborator must be mocked in `OpenApiContractTest` — its context fails loudly otherwise.
 
 **Read first next time** — ADR-013, the `tools/build_openapi.py` docstring, this entry.
 
