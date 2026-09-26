@@ -1,0 +1,23 @@
+name: web
+
+# Folder-scoped (ADR-011): runs only when the frontend changes. `next build`
+# includes the TypeScript type-check, so a broken web build fails the PR.
+on:
+  push: { branches: [main], paths: ['web/**', '.github/workflows/web.yml'] }
+  pull_request: { paths: ['web/**', '.github/workflows/web.yml'] }
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: web } }
+    env: { NEXT_TELEMETRY_DISABLED: '1' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Build + type-check
+        run: npm run build

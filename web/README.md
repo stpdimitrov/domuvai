@@ -14,6 +14,13 @@ npm run dev      # http://localhost:3000
 npm run build    # production build + type-check
 ```
 
+## CI
+
+`.github/workflows/web.yml` runs `npm ci` + `npm run build` (the build includes the strict
+type-check) on every PR and `main` push that touches `web/`. It is folder-scoped (ADR-011), so it
+does not run when `web/` is untouched — **do not make it a required status check**: a required
+check that never runs blocks the merge.
+
 ## Layout
 
 ```
@@ -82,4 +89,6 @@ httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the d
 
 - Re-host the hero clip in `HeroVideo.tsx` on a domuvai-owned origin (currently the design
   tool's CDN URL).
-- Add the OpenAPI-generated client + a `web` build/lint CI job.
+- Add the OpenAPI-generated client (ADR-011 §2.2) — and add `docs/api/openapi.json` to the
+  CI workflow's `paths`, so a contract change rebuilds `web`.
+- Add a lint step (ESLint is not configured yet).
