@@ -1,7 +1,6 @@
 package zues.app.registry
 
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -86,12 +85,12 @@ data class AbsencesRegisteredResponse(val absenceIds: List<UUID>)
 class RegistryController(private val registry: RegistryService) {
 
     @PostMapping
-    fun register(@RequestBody request: RegisterEntranceRequest): ResponseEntity<EntranceCreatedResponse> {
+    @ResponseStatus(HttpStatus.CREATED)
+    fun register(@RequestBody request: RegisterEntranceRequest): EntranceCreatedResponse {
         val created = registry.registerEntrance(
             RegisterEntrance(request.address, request.label, request.managementForm),
         )
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(EntranceCreatedResponse(created.entranceId, created.condominiumId))
+        return EntranceCreatedResponse(created.entranceId, created.condominiumId)
     }
 
     @GetMapping
@@ -99,59 +98,63 @@ class RegistryController(private val registry: RegistryService) {
         registry.listEntrances().map { EntranceView(it.id, it.condominiumId, it.label, it.managementForm) }
 
     @PostMapping("/{entranceId}/units")
+    @ResponseStatus(HttpStatus.CREATED)
     fun registerUnits(
         @PathVariable entranceId: UUID,
         @RequestBody request: RegisterUnitsRequest,
-    ): ResponseEntity<UnitsCreatedResponse> {
+    ): UnitsCreatedResponse {
         val ids = registry.registerUnits(
             entranceId,
             request.units.map {
                 RegisterUnit(it.designation, it.unitType, it.areaM2, it.idealParts, it.separateEntrance)
             },
         )
-        return ResponseEntity.status(HttpStatus.CREATED).body(UnitsCreatedResponse(ids))
+        return UnitsCreatedResponse(ids)
     }
 
     @PostMapping("/{entranceId}/units/{unitId}/household")
+    @ResponseStatus(HttpStatus.CREATED)
     fun registerHousehold(
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: RegisterHouseholdRequest,
-    ): ResponseEntity<HouseholdRegisteredResponse> {
+    ): HouseholdRegisteredResponse {
         val ids = registry.registerHousehold(
             entranceId,
             unitId,
             request.members.map { RegisterMember(it.isChildUnder6, it.validFrom) },
         )
-        return ResponseEntity.status(HttpStatus.CREATED).body(HouseholdRegisteredResponse(ids))
+        return HouseholdRegisteredResponse(ids)
     }
 
     @PostMapping("/{entranceId}/units/{unitId}/animals")
+    @ResponseStatus(HttpStatus.CREATED)
     fun registerAnimals(
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: RegisterAnimalsRequest,
-    ): ResponseEntity<AnimalsRegisteredResponse> {
+    ): AnimalsRegisteredResponse {
         val ids = registry.registerAnimals(
             entranceId,
             unitId,
             request.animals.map { RegisterAnimal(it.species, it.vetPassportNo, it.validFrom) },
         )
-        return ResponseEntity.status(HttpStatus.CREATED).body(AnimalsRegisteredResponse(ids))
+        return AnimalsRegisteredResponse(ids)
     }
 
     @PostMapping("/{entranceId}/units/{unitId}/absences")
+    @ResponseStatus(HttpStatus.CREATED)
     fun registerAbsences(
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: RegisterAbsencesRequest,
-    ): ResponseEntity<AbsencesRegisteredResponse> {
+    ): AbsencesRegisteredResponse {
         val ids = registry.registerAbsence(
             entranceId,
             unitId,
             request.absences.map { RegisterAbsence(it.absentFrom, it.absentTo) },
         )
-        return ResponseEntity.status(HttpStatus.CREATED).body(AbsencesRegisteredResponse(ids))
+        return AbsencesRegisteredResponse(ids)
     }
 
     @GetMapping("/{entranceId}/units")

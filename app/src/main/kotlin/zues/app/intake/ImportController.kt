@@ -1,7 +1,6 @@
 package zues.app.intake
 
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -37,11 +36,12 @@ data class RevertRequest(val revertedBy: UUID, val reason: String)
 class ImportController(private val imports: ImportService) {
 
     @PostMapping("/entrances/{entranceId}/imports")
+    @ResponseStatus(HttpStatus.CREATED)
     fun record(
         @PathVariable entranceId: UUID,
         @RequestBody request: FeeSheetDryRunRequest,
-    ): ResponseEntity<ImportResult> =
-        ResponseEntity.status(HttpStatus.CREATED).body(imports.record(entranceId, request))
+    ): ImportResult =
+        imports.record(entranceId, request)
 
     @GetMapping("/imports/{id}")
     fun get(@PathVariable id: UUID): ImportView =
