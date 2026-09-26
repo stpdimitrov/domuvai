@@ -1130,3 +1130,13 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Next** — before the TS client: **ADR-013 — the OpenAPI spec is generated from the code** (owner decision), then the slice that implements it.
 
 ---
+
+## ADR-013 · 2026-09-26 · Proposed — the OpenAPI contract is generated from the running code
+
+**Did** — drafted ADR-013 from the drift WEB-10 measured (9 of 27 catalogued operations match a running endpoint; `camelCase` code vs `snake_case` spec; A9's `Idempotency-Key` / `rule_id` conventions implemented nowhere; no spec ⇔ code check). It proposes: springdoc generates `docs/api/openapi.json` from the controllers; the hand catalogue becomes the rule-traceability map (a running endpoint without rule citations fails the gate; unbuilt operations stay, marked `planned`); the wire format is what runs (`/api/<module>/…`, `camelCase`). §3 weighs A–D; **B (a method + path conformance gate) vs C (generated from the code)** is the decision — B cannot see bodies, which is where a generated client breaks.
+
+**Status** — **Proposed**, awaiting the owner. No code against it until Accepted.
+
+**Next** — on acceptance: the implementing slice (springdoc + a spec test + the catalogue re-keyed to real paths + the `x-rules` merge), then **WEB-11** (generated TS client; first screen `/entrance/fund`, whose backend exists).
+
+---
