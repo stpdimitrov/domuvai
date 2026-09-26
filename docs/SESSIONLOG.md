@@ -1140,3 +1140,21 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Next** — the implementing slice **API-01** (springdoc + a spec test + the catalogue re-keyed to real paths + the `x-rules` merge), then **WEB-11** (generated TS client; first screen `/entrance/fund`, whose backend exists).
 
 ---
+
+## API-01 · 2026-09-26 · the published contract is generated from the running code (ADR-013)
+
+**Did** — `docs/api/openapi.json` is now generated from the controllers. `OpenApiContractTest` (a `@WebMvcTest`: every controller, collaborators mocked — no database, no Docker) asks springdoc for the spec and writes `app/build/openapi/api-docs.json`. springdoc is a **test-only** dependency (2.8.8, the last release on Spring Boot 3.4), so the running app serves no `/v3/api-docs`. `tools/build_openapi.py` (gate 6/9) is rebuilt as the **rule map + publisher**: `RUNNING` maps each of the 24 running operations to the rules it serves (merged as `x-rules`), `PLANNED` keeps the 17 A9 operations not built yet, and deterministic `operationId`s and module tags replace springdoc's. The 10 creation endpoints now declare `@ResponseStatus(CREATED)` instead of returning `ResponseEntity.status(CREATED)` — same behaviour, and the spec documents `201` instead of claiming `200`.
+
+**Rules covered** — none implemented; 27 rules cited by the 24 running operations. Citations were re-derived from the implementation (`TRACEABILITY.md`, rule-named tests, controller KDoc): A9's are kept where the code serves them and replaced where it does not — commit/revert `PM-BOOK-007` (access logging, not built) → `PM-DOC-001` / `PM-ORG-001/002`; the book's and statement's caller filtering (`PM-BOOK-006`, `PM-SEC-002`) arrives with the authorization module (ADR-002).
+
+**Tests added** — `OpenApiContractTest`. Guards proved against real failures, each exit 1: uncatalogued endpoint · stale entry · unknown rule (running and planned) · operation citing no rule · missing raw spec; clean → exit 0. Regenerated from scratch twice → byte-identical. 146 app tests pass (24 Docker ITs skip locally; they run in CI).
+
+**Decisions** — ADR-013, implemented. The A9 hand schemas are retired — the code's types are the schemas now. A9's prose conventions (`Idempotency-Key`, the `rule_id` problem body, bearer security, the `/v1` server) left the published spec: none of them runs yet (ADR-013 §2.5, §6).
+
+**What the generated contract now shows** — error bodies are `{"error": "…"}`, not RFC 9457 problems; no auth; `/api/<module>/…` paths; `camelCase` JSON; `required` follows Kotlin nullability.
+
+**Open** — **WEB-11**: generate the TS client from this spec (and add `docs/api/openapi.json` to the `web` workflow's `paths`), then wire **`/entrance/charges`** first — its per-unit lines, persons, stream amounts and totals match `ChargeRunResponse`, and preview + issue back its confirm bar. Not `/entrance/fund` (as the ADR-013 entry said): the API has its account records only — no balances, commitments or journal yet. A new controller collaborator must be mocked in `OpenApiContractTest` — its context fails loudly otherwise.
+
+**Read first next time** — ADR-013, the `tools/build_openapi.py` docstring, this entry.
+
+---

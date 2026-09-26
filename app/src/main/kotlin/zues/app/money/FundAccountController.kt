@@ -2,7 +2,6 @@ package zues.app.money
 
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -40,16 +39,15 @@ data class FundAccountView(
 class FundAccountController(private val fund: FundAccountService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun register(
         @PathVariable entranceId: UUID,
         @RequestBody request: RegisterFundAccountRequest,
-    ): ResponseEntity<FundAccountRegistered> =
-        ResponseEntity.status(HttpStatus.CREATED).body(
-            fund.register(
-                entranceId,
-                RegisterFundAccount(
-                    request.iban, request.purpose, request.holderName, request.holderKind, request.holderPartyId,
-                ),
+    ): FundAccountRegistered =
+        fund.register(
+            entranceId,
+            RegisterFundAccount(
+                request.iban, request.purpose, request.holderName, request.holderKind, request.holderPartyId,
             ),
         )
 
