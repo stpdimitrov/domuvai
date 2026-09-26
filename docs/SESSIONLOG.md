@@ -1116,3 +1116,17 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md` (frontend status), this entry, `docs/adr/ADR-011-frontend-topology.md` (Amendment 2026-09-23), `web/README.md`, then `git log --oneline -20`.
 
 ---
+
+## WEB-10 · 2026-09-26 · `web` CI gate — a broken web build can no longer merge
+
+**Did** — closed the gap the H-04 evaluation found (ADR-011 amendment 2026-09-23: "`web/` is ungated"). New workflow `.github/workflows/web.yml`: Node 22 · `npm ci` · `npm run build` (the build runs the strict TypeScript check). **Folder-scoped** per ADR-011 — it triggers only on changes to `web/**` or the workflow itself; the backend `gates` workflow is unchanged. `web/README.md` gained a CI section; `docs/INDEX.md` frontend status updated.
+
+**Verified** — simulated CI from a clean copy of the tracked `web/` files (`git archive HEAD web`): `npm ci` + `npm run build` → exit 0, 11 static routes. Then injected a type error (`const probe: number = 'not a number'`) → `Failed to compile. Type error: Type 'string' is not assignable to type 'number'.` → exit 1. The gate fails a broken build.
+
+**Notes** — path-filtered, so **do not make `web / build` a required status check** when branch protection is set: a skipped workflow never reports, and a required check that never reports blocks every non-web PR. No lint step (ESLint is not configured in `web/`). When the generated TS client lands, add `docs/api/openapi.json` to the workflow's `paths`.
+
+**Found while planning this step** — `docs/api/openapi.json` does **not** describe the running API. Only **9 of 27** catalogued operations match a controller; **15** running endpoints are uncatalogued (incl. `GET /entrances`, `GET …/fund-accounts`, `GET /units/{id}/arrears` — the reads the console screens need); **18** catalogued operations do not run (design-ahead modules, plus renames such as `/fund` vs `/fund-accounts`). The running paths carry `/api/<module>`, and the JSON is `camelCase` where the spec says `snake_case`. Nothing checks spec ⇔ code — gate 6/9 validates OpenAPI syntax and rule IDs only. A TS client generated from this spec would compile and then fail at runtime.
+
+**Next** — before the TS client: **ADR-013 — the OpenAPI spec is generated from the code** (owner decision), then the slice that implements it.
+
+---
