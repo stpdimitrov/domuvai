@@ -38,10 +38,12 @@ data class UnitArrears(
 )
 
 /**
- * Arrears ageing for a unit (Rule: PM-DEBT-001). Reads only the unit's receivable postings — every
- * one is owed until a payment posts its credit (ADR-006). A charge falls due `PAYMENT_TERM_DAYS`
- * after its value date (Rule: PM-DEBT-002); the value date stands in for the decision's
- * announcement until the assembly module records one. Overdue days are counted from that due date.
+ * Arrears ageing for a unit (Rule: PM-DEBT-001). Reads only the unit's receivable postings made by
+ * the read date — a charge is owed until a payment posts its credit (ADR-006), and a payment made
+ * after the read date had not reduced it yet. A charge falls due `PAYMENT_TERM_DAYS` after its
+ * value date (Rule: PM-DEBT-002); the value date stands in for the decision's announcement until
+ * the assembly module records one. Overdue days are counted from that due date, and a payment's
+ * credit is banded with the debt it settled.
  */
 @Service
 class ArrearsService(private val postings: PostingRepository) {
@@ -49,9 +51,9 @@ class ArrearsService(private val postings: PostingRepository) {
     @Transactional(readOnly = true)
     fun forUnit(unitId: UUID, asOf: LocalDate): UnitArrears {
         val term = numberOn("PAYMENT_TERM_DAYS", asOf.toString()).toLong()
-        val rows = postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE)
+        val rows = postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE).filter { !it.valueDate.isAfter(asOf) }
         val byBand = rows
-            .groupBy { Ageing.band(ChronoUnit.DAYS.between(it.valueDate.plusDays(term), asOf)) }
+            .groupBy { Ageing.band(ChronoUnit.DAYS.between(Ledger.debtDate(it).plusDays(term), asOf)) }
             .mapValues { (_, ps) -> ps.sumOf { it.amountMinor } }
         return UnitArrears(
             unitId = unitId,

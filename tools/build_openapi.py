@@ -64,6 +64,11 @@ RUNNING = {
    ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("List the entrance's fund accounts", ['PM-FUND-001', 'PM-FUND-004']),
+ ('post', '/api/money/entrances/{entranceId}/payments'):
+   ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
+    ['PM-DEBT-008']),
+ ('get', '/api/money/entrances/{entranceId}/payments/{paymentId}'):
+   ("A payment's allocation — the rule applied and what each debt received", ['PM-DEBT-008']),
  # ---- intake
  ('post', '/api/intake/entrances/{entranceId}/fee-sheet/profile'):
    ("Profile a sheet's columns — propose a mapping onto the domain fields, to confirm",

@@ -5,7 +5,7 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 34 | 15% |
+| Referenced in code (`// Rule:`) | 35 | 15% |
 | **Proved by a test named after the rule** | **34** | **15%** |
 | No implementation and no test | 196 | 84% |
 
@@ -143,7 +143,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-017` | — | — |  |
 | `PM-FEE-018` | `app/src/test/kotlin/zues/app/money/StatementIT.kt:71` | `app/src/main/kotlin/zues/app/money/Statement.kt:34` |  |
 | `PM-FEE-019` | — | — |  |
-| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:50` | `app/src/main/kotlin/zues/app/money/Postings.kt:36` |  |
+| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:50` | `app/src/main/kotlin/zues/app/money/Postings.kt:38` |  |
 
 ## FUND — Repair & renewal fund  ·  4/11 covered
 
@@ -166,13 +166,13 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-DEBT-001` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:70` | `app/src/main/kotlin/zues/app/money/Arrears.kt:11` |  |
-| `PM-DEBT-002` | `law/src/test/kotlin/zues/law/LawTest.kt:44` | `app/src/main/kotlin/zues/app/money/Arrears.kt:43` |  |
+| `PM-DEBT-002` | `law/src/test/kotlin/zues/law/LawTest.kt:44` | `app/src/main/kotlin/zues/app/money/Arrears.kt:44` |  |
 | `PM-DEBT-003` | — | — |  |
 | `PM-DEBT-004` | — | — |  |
 | `PM-DEBT-005` | — | — |  |
 | `PM-DEBT-006` | — | — |  |
 | `PM-DEBT-007` | — | — |  |
-| `PM-DEBT-008` | `app/src/test/kotlin/zues/app/money/PaymentAllocationTest.kt:24` | — |  |
+| `PM-DEBT-008` | `app/src/test/kotlin/zues/app/money/PaymentAllocationTest.kt:24` | `app/src/main/kotlin/zues/app/money/PaymentController.kt:18` |  |
 | `PM-DEBT-009` | — | — |  |
 | `PM-DEBT-010` | — | — |  |
 | `PM-DEBT-011` | — | — |  |

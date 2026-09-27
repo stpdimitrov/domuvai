@@ -18,6 +18,9 @@ object BasisJson {
 
     fun of(run: ChargeRun): String = mapper.writeValueAsString(basisMap(run.basis))
 
+    /** Any basis built from primitives, as canonical JSON — keys sorted, byte-stable. */
+    fun canonical(basis: Map<String, Any?>): String = mapper.writeValueAsString(basis)
+
     fun hash(json: String): String =
         MessageDigest.getInstance("SHA-256")
             .digest(json.toByteArray(Charsets.UTF_8))

@@ -1174,3 +1174,62 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Read first next time** — `web/README.md` (The API client), this entry, ADR-013.
 
 ---
+
+## S-42 · 2026-09-27 · payment persistence — record a payment, oldest debt first (PM-DEBT-008)
+
+**Did**
+- `money` records payments: `POST /api/money/entrances/{e}/payments` (requires `Idempotency-Key`) and `GET …/payments/{id}`.
+- A payment is allocated by S-37's `PaymentAllocation`: oldest debt first, or the payer's designated debt first. It is posted as one balanced journal, with every leg dated on the payment day:
+  - `BANK:<purpose>` or `CASH` is debited.
+  - One `RECEIVABLE` credit per settled debt, each naming its debt in the new `posting.settles_value_date`.
+  - Any overpayment goes to a unit-scoped `ADVANCE`.
+- The payment row stores the rule applied, the designation, and a `basis` (rule · remainder rule · amount · date · the open debts it saw) with `basis_hash`, `law_version` and `engine_version` (ADR-006 l.40, ADR-001 amendment).
+- `ArrearsService` now reads **as of** its date: it counts only postings dated on or before `asOf` and bands a credit with the debt it settled. The statement is unchanged.
+- `PaymentPosted` is published in the write's transaction.
+- New migration `V202609271200__money_payment.sql`.
+- Claim: stpdimitrov/domuvai#29.
+
+**Rules covered** — PM-DEBT-008 (MUST): now implemented, where it was test-only since S-37. PM-DEBT-001: its as-of reading is corrected. Traceability 34/233 covered · 35 referenced; TESTPLAN 200 remaining.
+
+**Tests added**
+- `PaymentLedgerTest`: 5, pure.
+- `PaymentWebTest`: 7. These are HTTP mapping only, so they are deliberately not rule-named.
+- `PaymentPersistenceIT`: 9, on Postgres 16. Covers oldest-first plus as-of arrears; designated plus explainable read-back plus stored basis/hash/versions; a designation not owed → 400; retry recorded once; overpayment → advance; no reach past the payment date; backdated → 409 and future → 400; the settles CHECK and payment immutability proved against real violations; a foreign unit → 404.
+- `ArrearsServiceTest`: +1 (PM-DEBT-001 as-of).
+- Mutations proved each guard fires: credit dating (4 tests failed), the as-of filter (2), the backdating guard (1).
+
+**Decisions (owner, 2026-09-27)**
+- **D1:** `receivedInto` is OPERATING | REPAIR_RENEWAL (a registered account of the entrance) | CASH.
+- **D2:** an overpayment goes to `ADVANCE`.
+- **C1:** a journal has one date; a credit names the debt it settled; a payment reaches only debts raised on or before its date. This **reverses S-37's note** ("credits dated to each settled debt"), which a fresh review showed breaks as-of reads and makes intermediate-date ledgers unbalanced.
+- **C2:** the allocation's basis is stored.
+- **Backdating:** a payment dated before one already recorded for the unit is refused (409). Reversal plus re-record comes later.
+
+**Found**
+- **Two fresh-context reviews** (a subagent given only the diff and the rule texts) found the credit-dating flaw above, a false `DESIGNATED` when the designation had no effect, the missing ADR-006 basis and ADR-001 versions, the out-of-order bug, a missing future-date check, and a 500 on a same-key race. All are fixed.
+- **Counsel question, before S-43.** ЗЗД чл. 76 ал. 1 puts the *most onerous* debt before the oldest and splits simultaneous debts pro rata. Ал. 2 settles costs → interest → principal. The catalogue reduces PM-DEBT-008 to oldest-first, and the code follows the catalogue. Once S-43 adds interest, ал. 2 decides whether a payment covers interest before principal. That is a catalogue/ADR question, not a code one.
+- **PM-PMC-008 has no ledger guard.** No DB check stops one journal mixing entrances, although DEVBRIEF promises one. This slice cannot create a mixed journal. Follow-up **S-42a**.
+- **`DEVBRIEF.md` is stale:** 13 deployables, and §11 points at the retired vault.
+
+**Open**
+- Show or net `ADVANCE` on the statement and arrears. Apply advances to later charges.
+- Reverse a payment.
+- Pre-2026 BGN payments (PM-FEE-016 needs a law constant for the euro-adoption date). Charge runs share this gap.
+- Reject fractional money in JSON. Jackson's `ACCEPT_FLOAT_AS_INT` truncates `150.75` to `150`.
+- A two-thread lock IT.
+- A light registry membership API. `Units.forEntrance` is heavy for a yes/no.
+- A debt is keyed by value date, so two runs on one date merge.
+- `PaymentAllocation` lives in `app`, so `ENGINE_VERSION` (`:law`) does not version it.
+- Remove the stale `netOutstanding`.
+- List a unit's payments.
+- S-42a.
+- **S-43** (default interest, PM-DEBT-006) is next on the money track, after the counsel answer.
+
+**Operating lessons**
+- **Local JDK:** Gradle 8.14 cannot start on JDK 27. Use `brew install openjdk@21` (no sudo; keg-only) and `JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`.
+- **Docker ITs:** they skip silently unless Testcontainers can talk to Docker Desktop 29. Its minimum API is 1.40, and the BOM's Testcontainers asks for 1.32. Run with `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock JAVA_TOOL_OPTIONS=-Dapi.version=1.44`, then **check the XML for `skipped="0"`**, since a skip reports green.
+- **Gate 6** needs `tools/requirements.txt`. Locally: `python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt`, and put `.venv/bin` first on `PATH`.
+
+**Read first next time** — this entry, `app/src/main/kotlin/zues/app/money/Payments.kt`, `Postings.kt` (`Ledger.forPayment`, `openDebts`), `docs/adr/ADR-006-money-and-numbers.md`.
+
+---
