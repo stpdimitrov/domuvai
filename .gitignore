@@ -16,3 +16,7 @@ __pycache__/
 
 node_modules/
 package-lock.json
+
+# IDE and notes-app state — per machine, never shared
+.idea/
+.obsidian/
