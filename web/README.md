@@ -12,13 +12,25 @@ cd web
 npm install
 npm run dev      # http://localhost:3000
 npm run build    # production build + type-check
+npm run gen:api  # regenerate lib/api/schema.d.ts from docs/api/openapi.json
 ```
+
+Live screens call `api` from this Next.js server (never from the browser), at `API_URL`
+(default `http://localhost:8080`). With the backend down, a live screen says so instead of failing.
+
+## The API client
+
+`lib/api/schema.d.ts` is **generated** from the contract (`docs/api/openapi.json`, itself generated
+from the Kotlin controllers — ADR-013) by `openapi-typescript`; never edit it. `lib/api/client.ts` is the
+typed `openapi-fetch` client, marked `server-only`. A path, parameter or body the API does not accept
+is a type error. When the backend changes the contract, run `npm run gen:api` and commit the result.
 
 ## CI
 
-`.github/workflows/web.yml` runs `npm ci` + `npm run build` (the build includes the strict
-type-check) on every PR and `main` push that touches `web/`. It is folder-scoped (ADR-011), so it
-does not run when `web/` is untouched — **do not make it a required status check**: a required
+`.github/workflows/web.yml` runs on every PR and `main` push that touches `web/` or the contract:
+`npm ci`, then **the generated client must match the contract** (`gen:api` + `git diff --exit-code`),
+then `npm run build` (strict type-check of every use). A breaking API change fails here, not in
+production (ADR-011 §2.2). It is folder-scoped (ADR-011), so it does not run when neither changes — **do not make it a required status check**: a required
 check that never runs blocks the merge.
 
 ## Layout
@@ -29,6 +41,9 @@ app/
   page.tsx         the landing (Етаж) at /  — static marketing
   HeroVideo.tsx    client component: the boomerang hero background
   globals.css      tokens + base + hover styles
+lib/api/
+  schema.d.ts      GENERATED from docs/api/openapi.json — never edit
+  client.ts        the typed, server-only client for `api`
   (console)/       the manager console — a route group (no URL segment)
     layout.tsx     the console flex shell + console.css (sidebar differs by context)
     console.css    console shell, table, timeline and card styles
@@ -65,9 +80,12 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   management-contract status cards, and a filings-and-declarations table.
 - **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
   the entrance's file, accounts and next assembly. Uses the **entrance** sidebar.
-- **`/entrance/charges`** — the monthly charge run (screen 03 Начисления): the OS-decision basis,
-  a per-object charge table (management / common / elevator / fund), validation checks, and a
-  confirm-or-return action bar.
+- **`/entrance/charges`** — the monthly charge run (screen 03 Начисления) — **live** (WEB-11): the
+  engine's preview (`POST …/charge-runs/preview`) joined server-side to the entrance's units and
+  owners. `?period=YYYY-MM` (default: this month) and `?entrance=<id>` (default: the first
+  registered). Hover an amount for its derivation. The basis is a visibly labelled **demo** — the
+  assembly module does not serve GA decisions yet — so confirming is disabled. The design's
+  exemptions, coefficient and elevator columns show `—`: the API has no field for them yet.
 - **`/entrance/fund`** — cash & repair fund (screen 06 Каса и фонд): the 501 operating and 502
   fund accounts (чл. 50 ЗУЕС) with balance / committed / available, and a double-entry journal.
 - **`/assembly`** — the live general assembly (screen 04 Общо събрание): a full-bleed, no-sidebar
@@ -79,8 +97,7 @@ sidebar (`entrance/`) — as sibling nested layouts under one flex shell. A hand
 (Обекти, Календар на сроковете, Доставчици, Документи, Екип, …) remain placeholders — screens not
 in the imported design.
 
-Still static: no auth, no API. The generated API client + auth arrive when a Gate-1 screen
-needs live data.
+Every other screen is still static (typed mock data). No auth yet.
 
 **Auth (ADR-011):** OIDC · the `api` validates JWT and issues nothing · the session is an
 httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the default).
@@ -89,6 +106,4 @@ httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the d
 
 - Re-host the hero clip in `HeroVideo.tsx` on a domuvai-owned origin (currently the design
   tool's CDN URL).
-- Add the OpenAPI-generated client (ADR-011 §2.2) — and add `docs/api/openapi.json` to the
-  CI workflow's `paths`, so a contract change rebuilds `web`.
 - Add a lint step (ESLint is not configured yet).

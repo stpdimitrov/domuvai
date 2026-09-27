@@ -1158,3 +1158,19 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Read first next time** — ADR-013, the `tools/build_openapi.py` docstring, this entry.
 
 ---
+
+## WEB-11 · 2026-09-27 · the generated client + `/entrance/charges` live
+
+**Did** — restored ADR-011 §2.2's enforced boundary. `openapi-typescript` generates `web/lib/api/schema.d.ts` from `docs/api/openapi.json` (`npm run gen:api`); `web/lib/api/client.ts` is a typed `openapi-fetch` client, `server-only` (the browser never calls `api`; Next.js is the thin BFF), at `API_URL`. The `web` workflow now also triggers on the contract and fails when the generated client differs from it. **`/entrance/charges` is live**: one server-side aggregation — the engine's `POST …/charge-runs/preview` joined to `GET …/units` (ideal parts) and `GET …/owners` (names, co-owners joined) — with `?period=` (default: this month, Europe/Sofia) and `?entrance=` (default: the first registered). Each amount's hover shows the engine's derivation. Clear states for backend down, no entrance, and an API refusal (its own message).
+
+**Verified** — no database on this machine, so against a stub API **typed to the generated contract** (`satisfies`; `tsc` clean): the page posted exactly `StoredChargeRunRequest`; 6 units rendered with the joined owners and ideal parts, per-stream sums and totals (€789,00); derivations on hover; a 400 rendered the API's reason; with the backend down it says so. Clean-copy `npm ci` + `gen:api` (byte-identical) + `next build` pass; `/entrance/charges` is dynamic (no build-time fetch). **The boundary, proved:** renaming `chargeablePersons` in the spec fails the drift check (exit 1), and after regeneration fails `next build` at the exact use (`page.tsx`). Not yet verified against the real backend — that needs a local Postgres or Docker.
+
+**Decisions** — generator: `openapi-typescript` + `openapi-fetch` (types only, a 6 kB typed fetch; ADR-013 §6 deferred it here). The tariff basis is a **labelled demo** (the design's GA decision): the API takes the tariff with the request, and the assembly module does not serve decisions yet — confirming is disabled; never bill from it (ADR-012 §7).
+
+**Design vs domain gaps (not invented, shown as `—`)** — the design's **elevator** column has no stream (PM-FEE-001 defines three: management, maintenance, repair fund); the **exemptions** tags and the per-unit **coefficient** have no response field. And the design's sample shop coefficients (×2,00 / ×1,50) are below PM-FEE-010's 3–5× range — a design-sample issue, not wired.
+
+**Open** — a local runtime (Postgres or Colima) to verify against the real backend and seed a demo entrance; then the next screens (`/debts` via per-unit arrears, `/portfolio` via the entrance list). A follow-up for the API: `TariffLineRequest.stream`/`key` are plain strings — typing them as the `CostStream`/`AllocationKey` enums would put the allowed values into the generated client.
+
+**Read first next time** — `web/README.md` (The API client), this entry, ADR-013.
+
+---

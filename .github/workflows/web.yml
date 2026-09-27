@@ -1,10 +1,11 @@
 name: web
 
-# Folder-scoped (ADR-011): runs only when the frontend changes. `next build`
-# includes the TypeScript type-check, so a broken web build fails the PR.
+# Folder-scoped (ADR-011): runs when the frontend, or the contract its client is generated from,
+# changes. The generated client must match the contract and `next build` type-checks every use of
+# it — so a breaking API change fails here, not in production (ADR-011 §2.2, ADR-013).
 on:
-  push: { branches: [main], paths: ['web/**', '.github/workflows/web.yml'] }
-  pull_request: { paths: ['web/**', '.github/workflows/web.yml'] }
+  push: { branches: [main], paths: ['web/**', 'docs/api/openapi.json', '.github/workflows/web.yml'] }
+  pull_request: { paths: ['web/**', 'docs/api/openapi.json', '.github/workflows/web.yml'] }
 
 jobs:
   build:
@@ -19,5 +20,7 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      - name: Generated client matches the contract
+        run: npm run gen:api && git diff --exit-code lib/api/schema.d.ts
       - name: Build + type-check
         run: npm run build
