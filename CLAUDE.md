@@ -66,7 +66,7 @@ Context drift across sessions is the main risk. Conversation context is never sh
 
 ### Boot, in order
 
-1. `CLAUDE.md` · 2. `docs/INDEX.md` · 3. `docs/SESSIONLOG.md` (top entry only) · 4. `docs/DEVBRIEF.md` · 5. `docs/RULES.md` for **this slice only** · 6. `docs/adr/` · 7. `git log --oneline -10`, current branch, failing tests
+1. `CLAUDE.md` · 2. `docs/INDEX.md` · 3. `docs/SESSIONLOG.md` (**last** entry only — the log appends, so the newest entry is at the end) · 4. `docs/DEVBRIEF.md` · 5. `docs/RULES.md` for **this slice only** · 6. `docs/adr/` · 7. `git log --oneline -10`, current branch, failing tests
 
 If a boot document is missing, say so and stop. Do not reconstruct context from the conversation.
 

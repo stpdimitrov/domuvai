@@ -15,13 +15,7 @@ Coordination happens through pull requests, exactly as between humans.
 
 ## Boot order — every session, both people
 
-1. `CLAUDE.md`
-2. `docs/INDEX.md`
-3. `docs/SESSIONLOG.md` — top entry only
-4. `docs/DEVBRIEF.md`
-5. `docs/RULES.md` — this slice's domain only
-6. `docs/adr/`
-7. `git log --oneline -10`, current branch, failing tests
+The boot order has one home: **Boot, in order** in [`CLAUDE.md`](../CLAUDE.md). Every session loads it; the `zues-slice` skill follows it.
 
 ## The loop
 

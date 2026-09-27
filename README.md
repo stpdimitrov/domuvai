@@ -36,7 +36,7 @@ Then take one slice from [docs/TESTPLAN.md](docs/TESTPLAN.md), claim it with a G
 |---|---|---|
 | 1 | [CLAUDE.md](CLAUDE.md) | The words, the banned words, the standing rules. Loaded by every session |
 | 2 | [docs/INDEX.md](docs/INDEX.md) | What exists, what is superseded |
-| 3 | [docs/SESSIONLOG.md](docs/SESSIONLOG.md) | Top entry only — where the last session stopped |
+| 3 | [docs/SESSIONLOG.md](docs/SESSIONLOG.md) | The **last** entry only (newest at the end) — where the last session stopped |
 | 4 | [docs/FUNCTIONAL.md](docs/FUNCTIONAL.md) | **Non-developers start here.** What the app does, in business language |
 | 5 | [docs/DEVBRIEF.md](docs/DEVBRIEF.md) | **Developers start here.** The nine things you cannot break |
 | 6 | [docs/adr/](docs/adr/) | Every decision, why, and what would reverse it |
