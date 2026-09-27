@@ -1,1994 +1,2956 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "domuvai api",
-    "version": "0.1.0",
-    "summary": "Управление на етажна собственост по ЗУЕС",
-    "description": "One deployable, fourteen modules (ADR-003). Conventions that hold everywhere:\n\n- **`entrance_id` is the only tenant key** (ADR-005). Every resource resolves to exactly one entrance; nothing is addressable across entrances.\n- **Every write carries `Idempotency-Key`** (PM-SYS-014). A queued offline action replays without duplicating.\n- **Money is integer minor units in EUR** (PM-FEE-016). No floats anywhere.\n- **A refusal names the rule that refused** — `rule_id` in the problem body, so a client can explain the law rather than say \"invalid\".\n- **A statutory precondition cannot be skipped** (PM-SYS-006); 409 is the refusal, and the only alternative is a recorded, audited deviation.\n- **Statutory documents are Bulgarian** (PM-SYS-003) whatever the Accept-Language."
-  },
-  "servers": [
-    {
-      "url": "https://api.domuvai.bg/v1"
-    }
-  ],
-  "tags": [
-    {
-      "name": "registry",
-      "description": "Units, the owners' book, occupancy. Owns ORG and BOOK."
-    },
-    {
-      "name": "identity-org",
-      "description": "Parties, titles, mandates, the firm. Owns GOV and PMC."
-    },
-    {
-      "name": "assembly",
-      "description": "Convening, quorum, voting, protocols. Owns GA and VOTE."
-    },
-    {
-      "name": "money",
-      "description": "Charges, the fund, arrears. Owns FEE, FUND and DEBT."
-    },
-    {
-      "name": "intake",
-      "description": "Importing a firm's existing records. Owns no rules — it enforces ORG and BOOK on the way in."
-    },
-    {
-      "name": "compliance",
-      "description": "Statutory obligations and filings. Owns REG."
-    },
-    {
-      "name": "evidence",
-      "description": "Immutable documents and case files. Owns DOC."
-    }
-  ],
-  "paths": {
-    "/entrances/{entrance_id}/units": {
-      "get": {
-        "tags": [
-          "registry"
-        ],
-        "summary": "List the units of an entrance",
-        "description": "Rules: `PM-ORG-001`, `PM-ORG-002`",
-        "operationId": "get_entrances_entrance_id_units",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "registry"
-        ],
-        "summary": "Add a unit",
-        "description": "Rules: `PM-ORG-002`, `PM-ORG-009`",
-        "operationId": "post_entrances_entrance_id_units",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unit"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Unit"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/book": {
-      "get": {
-        "tags": [
-          "registry"
-        ],
-        "summary": "Read the owners' book — filtered to what the caller may see",
-        "description": "Rules: `PM-BOOK-006`, `PM-BOOK-011`, `PM-SEC-002`",
-        "operationId": "get_entrances_entrance_id_book",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/book/declarations": {
-      "post": {
-        "tags": [
-          "registry"
-        ],
-        "summary": "File an owner declaration on the ministry template",
-        "description": "Rules: `PM-BOOK-003`, `PM-BOOK-004`, `PM-BOOK-009`",
-        "operationId": "post_entrances_entrance_id_book_declarations",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/mandates": {
-      "get": {
-        "tags": [
-          "identity-org"
-        ],
-        "summary": "List office holders as at a date",
-        "description": "Rules: `PM-GOV-004`, `PM-SEC-011`",
-        "operationId": "get_entrances_entrance_id_mandates",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "identity-org"
-        ],
-        "summary": "Record an election",
-        "description": "Rules: `PM-GOV-003`, `PM-GOV-004`, `PM-GOV-005`",
-        "operationId": "post_entrances_entrance_id_mandates",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/assemblies": {
-      "post": {
-        "tags": [
-          "assembly"
-        ],
-        "summary": "Convene an assembly",
-        "description": "Rules: `PM-GA-001`, `PM-GA-002`, `PM-GA-003`, `PM-GA-006`",
-        "operationId": "post_entrances_entrance_id_assemblies",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/assemblies/{assembly_id}/notice": {
-      "post": {
-        "tags": [
-          "assembly"
-        ],
-        "summary": "Generate the notice and record the posting act with its evidence",
-        "description": "Rules: `PM-GA-004`, `PM-GA-007`, `PM-GA-008`, `PM-SYS-013`",
-        "operationId": "post_assemblies_assembly_id_notice",
-        "parameters": [
-          {
-            "name": "assembly_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/assemblies/{assembly_id}/sessions": {
-      "post": {
-        "tags": [
-          "assembly"
-        ],
-        "summary": "Open a session and record the quorum reached",
-        "description": "Rules: `PM-GA-012`, `PM-GA-013`, `PM-GA-014`, `PM-GA-015`",
-        "operationId": "post_assemblies_assembly_id_sessions",
-        "parameters": [
-          {
-            "name": "assembly_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/agenda-items/{agenda_item_id}/votes": {
-      "post": {
-        "tags": [
-          "assembly"
-        ],
-        "summary": "Cast or record a vote",
-        "description": "Rules: `PM-GA-009`, `PM-GA-018`, `PM-VOTE-014`, `PM-ORG-005`",
-        "operationId": "post_agenda_items_agenda_item_id_votes",
-        "parameters": [
-          {
-            "name": "agenda_item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/agenda-items/{agenda_item_id}/close": {
-      "post": {
-        "tags": [
-          "assembly"
-        ],
-        "summary": "Close the item and compute the tally on its stated denominator",
-        "description": "Rules: `PM-VOTE-011`, `PM-VOTE-012`, `PM-VOTE-013`, `PM-VOTE-016`",
-        "operationId": "post_agenda_items_agenda_item_id_close",
-        "parameters": [
-          {
-            "name": "agenda_item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Decision"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/assemblies/{assembly_id}/protocol": {
-      "post": {
-        "tags": [
-          "assembly"
-        ],
-        "summary": "Draw up the protocol and announce it, starting the appeal clock",
-        "description": "Rules: `PM-GA-019`, `PM-GA-020`, `PM-GA-021`, `PM-GA-023`",
-        "operationId": "post_assemblies_assembly_id_protocol",
-        "parameters": [
-          {
-            "name": "assembly_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/charge-runs": {
-      "post": {
-        "tags": [
-          "money"
-        ],
-        "summary": "Start a charge run for a period. Resumable; publishes nothing until COMPLETE",
-        "description": "Rules: `PM-FEE-012`, `PM-FEE-014`, `PM-FEE-016`",
-        "operationId": "post_entrances_entrance_id_charge_runs",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChargeRun"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/charge-runs/{charge_run_id}": {
-      "get": {
-        "tags": [
-          "money"
-        ],
-        "summary": "Read a charge run and its basis",
-        "description": "Rules: `PM-FEE-014`, `PM-FEE-018`",
-        "operationId": "get_charge_runs_charge_run_id",
-        "parameters": [
-          {
-            "name": "charge_run_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChargeRun"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/units/{unit_id}/statement": {
-      "get": {
-        "tags": [
-          "money"
-        ],
-        "summary": "The resident's itemised statement, showing how each number was derived",
-        "description": "Rules: `PM-FEE-018`, `PM-SEC-002`",
-        "operationId": "get_units_unit_id_statement",
-        "parameters": [
-          {
-            "name": "unit_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChargeRun"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/fund": {
-      "get": {
-        "tags": [
-          "money"
-        ],
-        "summary": "Repair and renewal fund, net of committed but unpaid work",
-        "description": "Rules: `PM-FUND-004`, `PM-FUND-009`",
-        "operationId": "get_entrances_entrance_id_fund",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Money"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/units/{unit_id}/obligations-certificate": {
-      "post": {
-        "tags": [
-          "money"
-        ],
-        "summary": "Issue a dated certificate of outstanding obligations, for a sale",
-        "description": "Rules: `PM-DEBT-007`",
-        "operationId": "post_units_unit_id_obligations_certificate",
-        "parameters": [
-          {
-            "name": "unit_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/arrears/{unit_id}/enforcement-packet": {
-      "post": {
-        "tags": [
-          "money"
-        ],
-        "summary": "Compose the чл. 410 packet: decision, proof of announcement, itemised claim",
-        "description": "Rules: `PM-DEBT-003`, `PM-DEBT-004`, `PM-DEBT-009`",
-        "operationId": "post_entrances_entrance_id_arrears_unit_id_enforcement_packet",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "unit_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/fee-sheet/profile": {
-      "post": {
-        "tags": [
-          "intake"
-        ],
-        "summary": "Profile a sheet's columns — propose a mapping onto the domain fields, to confirm",
-        "description": "Rules: `PM-ORG-002`, `PM-BOOK-002`",
-        "operationId": "post_entrances_entrance_id_fee_sheet_profile",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MappingProposal"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeeSheetProfile"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/imports": {
-      "post": {
-        "tags": [
-          "intake"
-        ],
-        "summary": "Record a source-file import: run the dry-run and store its verdict",
-        "description": "Rules: `PM-DOC-001`",
-        "operationId": "post_entrances_entrance_id_imports",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportDryRun"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/imports/{import_id}/dry-run": {
-      "post": {
-        "tags": [
-          "intake"
-        ],
-        "summary": "Validate, diff, and recompute a sample bill against their own figures",
-        "description": "Rules: `PM-ORG-002`, `PM-FEE-014`",
-        "operationId": "post_imports_import_id_dry_run",
-        "parameters": [
-          {
-            "name": "import_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportDryRun"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/imports/{import_id}/commit": {
-      "post": {
-        "tags": [
-          "intake"
-        ],
-        "summary": "Commit the import in one transaction",
-        "description": "Rules: `PM-BOOK-007`",
-        "operationId": "post_imports_import_id_commit",
-        "parameters": [
-          {
-            "name": "import_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/imports/{import_id}/revert": {
-      "post": {
-        "tags": [
-          "intake"
-        ],
-        "summary": "Revert an import wholesale by its id",
-        "description": "Rules: `PM-BOOK-007`",
-        "operationId": "post_imports_import_id_revert",
-        "parameters": [
-          {
-            "name": "import_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/compliance-tasks": {
-      "get": {
-        "tags": [
-          "compliance"
-        ],
-        "summary": "Statutory obligations due and overdue",
-        "description": "Rules: `PM-MNT-006`, `PM-SYS-011`",
-        "operationId": "get_entrances_entrance_id_compliance_tasks",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entrances/{entrance_id}/filings": {
-      "post": {
-        "tags": [
-          "compliance"
-        ],
-        "summary": "File with the municipality or ЕИСЕС; open until acknowledged",
-        "description": "Rules: `PM-REG-001`, `PM-REG-004`, `PM-REG-008`",
-        "operationId": "post_entrances_entrance_id_filings",
-        "parameters": [
-          {
-            "name": "entrance_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/documents/{document_id}": {
-      "get": {
-        "tags": [
-          "evidence"
-        ],
-        "summary": "Read a stored document and its hash",
-        "description": "Rules: `PM-DOC-001`, `PM-DOC-005`",
-        "operationId": "get_documents_document_id",
-        "parameters": [
-          {
-            "name": "document_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/matters/{matter_id}/case-file": {
-      "post": {
-        "tags": [
-          "evidence"
-        ],
-        "summary": "Compose a court-ready bundle in order, with an index",
-        "description": "Rules: `PM-DOC-006`",
-        "operationId": "post_matters_matter_id_case_file",
-        "parameters": [
-          {
-            "name": "matter_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Uuid"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Every write is idempotent — offline queues replay (PM-SYS-014)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Refused. The body names the rule that refused.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "A statutory precondition is not met.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
   "components": {
     "schemas": {
-      "Money": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "amount_minor",
-          "currency"
-        ],
+      "AbsencesRegisteredResponse": {
         "properties": {
-          "amount_minor": {
-            "type": "integer",
-            "description": "integer minor units — never a float (PM-FEE-016, ADR-006)"
-          },
-          "currency": {
-            "const": "EUR"
+          "absenceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
           }
-        }
-      },
-      "IdealParts": {
-        "type": "string",
-        "pattern": "^\\d{1,3}\\.\\d{1,4}$",
-        "description": "exact decimal percentage, four places per docs/RULES.md §4"
-      },
-      "LegalDate": {
-        "type": "string",
-        "format": "date",
-        "description": "Europe/Sofia calendar day (PM-SYS-004)"
-      },
-      "Uuid": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "Problem": {
-        "type": "object",
-        "additionalProperties": false,
+        },
         "required": [
-          "type",
-          "title",
-          "status"
+          "absenceIds"
         ],
-        "description": "RFC 9457. A refusal names the rule that refused.",
+        "type": "object"
+      },
+      "AgeingBucket": {
         "properties": {
-          "type": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "status": {
+          "amountMinor": {
+            "format": "int64",
             "type": "integer"
           },
-          "detail": {
+          "band": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "band"
+        ],
+        "type": "object"
+      },
+      "AnimalsRegisteredResponse": {
+        "properties": {
+          "animalIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "animalIds"
+        ],
+        "type": "object"
+      },
+      "AssignTitleRequest": {
+        "properties": {
+          "partyId": {
+            "format": "uuid",
             "type": "string"
           },
-          "rule_id": {
-            "type": "string",
-            "pattern": "^PM-[A-Z]+-\\d{3}$",
-            "description": "the rule that refused, when a rule refused"
-          }
-        }
-      },
-      "Page": {
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {}
+          "share": {
+            "type": "string"
           },
-          "next_cursor": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "titleRole": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "validTo": {
+            "type": "string"
           }
-        }
-      },
-      "Unit": {
-        "type": "object",
-        "additionalProperties": false,
+        },
         "required": [
-          "id",
-          "designation",
-          "ideal_parts_pct"
+          "partyId",
+          "share",
+          "titleRole"
         ],
+        "type": "object"
+      },
+      "BookNonUse": {
         "properties": {
-          "id": {
-            "$ref": "#/components/schemas/Uuid"
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "BookParty": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "share": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "share"
+        ],
+        "type": "object"
+      },
+      "BookUnitEntry": {
+        "properties": {
+          "builtAreaM2": {
+            "type": "string"
+          },
+          "complete": {
+            "type": "boolean"
           },
           "designation": {
             "type": "string"
           },
-          "ideal_parts_pct": {
-            "$ref": "#/components/schemas/IdealParts"
+          "householdCount": {
+            "format": "int32",
+            "type": "integer"
           },
-          "unit_type": {
+          "idealParts": {
             "type": "string"
           },
-          "area_m2": {
-            "type": "string"
+          "nonUse": {
+            "items": {
+              "$ref": "#/components/schemas/BookNonUse"
+            },
+            "type": "array"
           },
-          "separate_entrance": {
-            "type": "boolean"
+          "parties": {
+            "items": {
+              "$ref": "#/components/schemas/BookParty"
+            },
+            "type": "array"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
           }
-        }
-      },
-      "ChargeLine": {
-        "type": "object",
-        "additionalProperties": false,
+        },
         "required": [
-          "unit_id",
-          "component",
-          "allocation_key",
-          "amount",
-          "derivation"
+          "complete",
+          "designation",
+          "householdCount",
+          "idealParts",
+          "nonUse",
+          "parties",
+          "unitId"
         ],
+        "type": "object"
+      },
+      "ChargeLineResponse": {
         "properties": {
-          "unit_id": {
-            "$ref": "#/components/schemas/Uuid"
-          },
-          "component": {
-            "enum": [
-              "MANAGEMENT",
-              "MAINTENANCE",
-              "REPAIR_FUND"
-            ]
-          },
-          "allocation_key": {
-            "enum": [
-              "PER_PERSON",
-              "BY_IDEAL_PARTS",
-              "PER_UNIT"
-            ]
-          },
-          "amount": {
-            "$ref": "#/components/schemas/Money"
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
           },
           "derivation": {
-            "type": "string",
-            "description": "how the number was derived (PM-FEE-018)"
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "stream": {
+            "type": "string"
           }
-        }
-      },
-      "ChargeRun": {
-        "type": "object",
-        "additionalProperties": false,
+        },
         "required": [
-          "id",
-          "period",
-          "status",
-          "law_version",
-          "engine_version"
+          "amountMinor",
+          "derivation",
+          "key",
+          "stream"
         ],
+        "type": "object"
+      },
+      "ChargeRunIssued": {
         "properties": {
-          "id": {
-            "$ref": "#/components/schemas/Uuid"
+          "chargeRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lineCount": {
+            "format": "int32",
+            "type": "integer"
           },
           "period": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}$"
-          },
-          "status": {
-            "enum": [
-              "PENDING",
-              "RUNNING",
-              "COMPLETE",
-              "FAILED"
-            ]
-          },
-          "basis_hash": {
             "type": "string"
           },
-          "law_version": {
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chargeRunId",
+          "entranceId",
+          "lineCount",
+          "period",
+          "totalMinor"
+        ],
+        "type": "object"
+      },
+      "ChargeRunRequest": {
+        "properties": {
+          "businessMultiplier": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "entranceId": {
             "type": "string"
           },
-          "engine_version": {
+          "legalDate": {
             "type": "string"
           },
           "lines": {
-            "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ChargeLine"
-            }
-          }
-        }
-      },
-      "Decision": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "majority_rule_id",
-          "denominator",
-          "status"
-        ],
-        "properties": {
-          "id": {
-            "$ref": "#/components/schemas/Uuid"
+              "$ref": "#/components/schemas/TariffLineRequest"
+            },
+            "type": "array"
           },
-          "majority_rule_id": {
+          "period": {
             "type": "string"
           },
-          "denominator": {
-            "enum": [
-              "TOTAL",
-              "REPRESENTED"
-            ],
-            "description": "never implicit (PM-VOTE-012, ADR-008)"
-          },
-          "threshold_pct": {
-            "$ref": "#/components/schemas/IdealParts"
-          },
-          "tally_for": {
-            "$ref": "#/components/schemas/IdealParts"
-          },
-          "tally_against": {
-            "$ref": "#/components/schemas/IdealParts"
-          },
-          "status": {
-            "enum": [
-              "PROVISIONAL",
-              "FINAL",
-              "ANNULLED"
-            ],
-            "description": "PROVISIONAL until the absentee window closes (PM-VOTE-013)"
-          },
-          "execution_due": {
-            "$ref": "#/components/schemas/LegalDate"
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitRequest"
+            },
+            "type": "array"
           }
-        }
-      },
-      "ImportDryRun": {
-        "type": "object",
-        "additionalProperties": false,
+        },
         "required": [
-          "import_id",
-          "rows_created",
-          "rows_changed",
-          "violations",
-          "bill_comparison"
+          "entranceId",
+          "legalDate",
+          "lines",
+          "period",
+          "units"
         ],
+        "type": "object"
+      },
+      "ChargeRunResponse": {
         "properties": {
-          "import_id": {
-            "$ref": "#/components/schemas/Uuid"
+          "charges": {
+            "items": {
+              "$ref": "#/components/schemas/UnitChargeResponse"
+            },
+            "type": "array"
           },
-          "rows_created": {
+          "engineVersion": {
+            "type": "string"
+          },
+          "entranceId": {
+            "type": "string"
+          },
+          "lawVersion": {
+            "type": "string"
+          },
+          "legalDate": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "charges",
+          "engineVersion",
+          "entranceId",
+          "lawVersion",
+          "legalDate",
+          "period",
+          "totalMinor"
+        ],
+        "type": "object"
+      },
+      "CommitRequest": {
+        "properties": {
+          "committedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sheet": {
+            "$ref": "#/components/schemas/FeeSheetDryRunRequest"
+          }
+        },
+        "required": [
+          "committedBy",
+          "sheet"
+        ],
+        "type": "object"
+      },
+      "CommitResult": {
+        "properties": {
+          "importId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rowsChanged": {
+            "format": "int32",
             "type": "integer"
           },
-          "rows_changed": {
+          "rowsCreated": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "importId",
+          "rowsChanged",
+          "rowsCreated"
+        ],
+        "type": "object"
+      },
+      "CondominiumBook": {
+        "properties": {
+          "asOf": {
+            "format": "date",
+            "type": "string"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/BookUnitEntry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "asOf",
+          "complete",
+          "entranceId",
+          "units"
+        ],
+        "type": "object"
+      },
+      "DryRunReport": {
+        "properties": {
+          "differences": {
+            "items": {
+              "$ref": "#/components/schemas/UnitDiff"
+            },
+            "type": "array"
+          },
+          "differing": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "matched": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "reproduced": {
+            "type": "boolean"
+          },
+          "rowsParsed": {
+            "format": "int32",
             "type": "integer"
           },
           "violations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Problem"
-            }
-          },
-          "bill_comparison": {
-            "type": "object",
-            "description": "their figures against ours, per unit — Gate 1, on every import",
-            "properties": {
-              "matched": {
-                "type": "integer"
-              },
-              "differing": {
-                "type": "integer"
-              }
-            }
-          }
-        }
-      },
-      "IntakeField": {
-        "type": "string",
-        "description": "a domain field a fee sheet can carry — the target of any column mapping (ADR-012), fixed by our rules (PM-BOOK-002, PM-ORG-002), never by one spreadsheet",
-        "enum": [
-          "DESIGNATION",
-          "IDEAL_PARTS",
-          "OCCUPANTS",
-          "FEE_MINOR",
-          "BUILT_AREA",
-          "OWNER_NAME",
-          "CHILDREN_UNDER_6",
-          "ANIMALS",
-          "ABSENT_DAYS",
-          "BUSINESS_USE"
-        ]
-      },
-      "FeeSheetProfile": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "csv"
-        ],
-        "properties": {
-          "csv": {
-            "type": "string",
-            "description": "the sheet — only its header row is read, to propose a mapping"
-          }
-        }
-      },
-      "MappingProposal": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "mapping",
-          "unmapped_columns",
-          "missing_required"
-        ],
-        "description": "a proposed column → field mapping for one sheet, plus what could not be placed (ADR-012): a human confirms or corrects it and returns it on the dry-run/commit. Nothing is dropped silently, and a required field no column carries is named so the import cannot proceed",
-        "properties": {
-          "mapping": {
-            "type": "object",
-            "description": "source column, as written → domain field",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/IntakeField"
-            }
-          },
-          "unmapped_columns": {
-            "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "columns the profiler could not place — surfaced for a human, never dropped"
-          },
-          "missing_required": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IntakeField"
-            },
-            "description": "required fields no column carries — mapped by hand before the import proceeds"
+            "type": "array"
           }
-        }
-      }
-    },
-    "securitySchemes": {
-      "bearer": {
-        "type": "http",
-        "scheme": "bearer"
+        },
+        "required": [
+          "differences",
+          "differing",
+          "matched",
+          "reproduced",
+          "rowsParsed",
+          "violations"
+        ],
+        "type": "object"
+      },
+      "EntranceCreatedResponse": {
+        "properties": {
+          "condominiumId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "condominiumId",
+          "entranceId"
+        ],
+        "type": "object"
+      },
+      "EntranceView": {
+        "properties": {
+          "condominiumId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "managementForm": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "condominiumId",
+          "id",
+          "label",
+          "managementForm"
+        ],
+        "type": "object"
+      },
+      "FeeSheetDryRunRequest": {
+        "properties": {
+          "businessMultiplier": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "csv": {
+            "type": "string"
+          },
+          "legalDate": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TariffInput"
+            },
+            "type": "array"
+          },
+          "mapping": {
+            "additionalProperties": {
+              "enum": [
+                "DESIGNATION",
+                "IDEAL_PARTS",
+                "OCCUPANTS",
+                "FEE_MINOR",
+                "BUILT_AREA",
+                "OWNER_NAME",
+                "CHILDREN_UNDER_6",
+                "ANIMALS",
+                "ABSENT_DAYS",
+                "BUSINESS_USE"
+              ],
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "period": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "csv",
+          "legalDate",
+          "lines",
+          "period"
+        ],
+        "type": "object"
+      },
+      "FundAccountRegistered": {
+        "properties": {
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fundAccountId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entranceId",
+          "fundAccountId",
+          "iban",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "FundAccountView": {
+        "properties": {
+          "holderKind": {
+            "type": "string"
+          },
+          "holderName": {
+            "type": "string"
+          },
+          "holderParty": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "holderKind",
+          "holderName",
+          "iban",
+          "id",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "HouseholdRegisteredResponse": {
+        "properties": {
+          "memberIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "memberIds"
+        ],
+        "type": "object"
+      },
+      "ImportResult": {
+        "properties": {
+          "importId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/DryRunReport"
+          }
+        },
+        "required": [
+          "importId",
+          "report"
+        ],
+        "type": "object"
+      },
+      "ImportView": {
+        "properties": {
+          "differing": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rowsParsed": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sourceSha": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "violations": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "differing",
+          "id",
+          "rowsParsed",
+          "sourceSha",
+          "status",
+          "violations"
+        ],
+        "type": "object"
+      },
+      "NewAbsenceRequest": {
+        "properties": {
+          "absentFrom": {
+            "type": "string"
+          },
+          "absentTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "absentFrom",
+          "absentTo"
+        ],
+        "type": "object"
+      },
+      "NewAnimalRequest": {
+        "properties": {
+          "species": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "vetPassportNo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "species"
+        ],
+        "type": "object"
+      },
+      "NewMemberRequest": {
+        "properties": {
+          "isChildUnder6": {
+            "type": "boolean"
+          },
+          "validFrom": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "isChildUnder6"
+        ],
+        "type": "object"
+      },
+      "NewUnitRequest": {
+        "properties": {
+          "areaM2": {
+            "type": "number"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "idealParts": {
+            "type": "string"
+          },
+          "separateEntrance": {
+            "type": "boolean"
+          },
+          "unitType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "designation",
+          "idealParts",
+          "separateEntrance",
+          "unitType"
+        ],
+        "type": "object"
+      },
+      "OwnerResponse": {
+        "properties": {
+          "partyName": {
+            "type": "string"
+          },
+          "share": {
+            "type": "number"
+          },
+          "titleRole": {
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "partyName",
+          "share",
+          "titleRole",
+          "unitId"
+        ],
+        "type": "object"
+      },
+      "PartyRegisteredResponse": {
+        "properties": {
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "partyId"
+        ],
+        "type": "object"
+      },
+      "ProfileRequest": {
+        "properties": {
+          "csv": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "csv"
+        ],
+        "type": "object"
+      },
+      "ProposedMapping": {
+        "properties": {
+          "mapping": {
+            "additionalProperties": {
+              "enum": [
+                "DESIGNATION",
+                "IDEAL_PARTS",
+                "OCCUPANTS",
+                "FEE_MINOR",
+                "BUILT_AREA",
+                "OWNER_NAME",
+                "CHILDREN_UNDER_6",
+                "ANIMALS",
+                "ABSENT_DAYS",
+                "BUSINESS_USE"
+              ],
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "missingRequired": {
+            "items": {
+              "enum": [
+                "DESIGNATION",
+                "IDEAL_PARTS",
+                "OCCUPANTS",
+                "FEE_MINOR",
+                "BUILT_AREA",
+                "OWNER_NAME",
+                "CHILDREN_UNDER_6",
+                "ANIMALS",
+                "ABSENT_DAYS",
+                "BUSINESS_USE"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unmappedColumns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "mapping",
+          "missingRequired",
+          "unmappedColumns"
+        ],
+        "type": "object"
+      },
+      "RegisterAbsencesRequest": {
+        "properties": {
+          "absences": {
+            "items": {
+              "$ref": "#/components/schemas/NewAbsenceRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "absences"
+        ],
+        "type": "object"
+      },
+      "RegisterAnimalsRequest": {
+        "properties": {
+          "animals": {
+            "items": {
+              "$ref": "#/components/schemas/NewAnimalRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "animals"
+        ],
+        "type": "object"
+      },
+      "RegisterEntranceRequest": {
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "managementForm": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "label",
+          "managementForm"
+        ],
+        "type": "object"
+      },
+      "RegisterFundAccountRequest": {
+        "properties": {
+          "holderKind": {
+            "type": "string"
+          },
+          "holderName": {
+            "type": "string"
+          },
+          "holderPartyId": {
+            "type": "string"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "holderKind",
+          "holderName",
+          "iban",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "RegisterHouseholdRequest": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/NewMemberRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "members"
+        ],
+        "type": "object"
+      },
+      "RegisterPartyRequest": {
+        "properties": {
+          "fullName": {
+            "type": "string"
+          },
+          "idType": {
+            "type": "string"
+          },
+          "idValue": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fullName"
+        ],
+        "type": "object"
+      },
+      "RegisterUnitsRequest": {
+        "properties": {
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/NewUnitRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "units"
+        ],
+        "type": "object"
+      },
+      "RevertRequest": {
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "revertedBy": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "revertedBy"
+        ],
+        "type": "object"
+      },
+      "StatementLine": {
+        "properties": {
+          "allocationKey": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "component": {
+            "type": "string"
+          },
+          "derivation": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "allocationKey",
+          "amountMinor",
+          "component",
+          "derivation",
+          "period",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "StoredChargeRunRequest": {
+        "properties": {
+          "businessMultiplier": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "legalDate": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TariffLineRequest"
+            },
+            "type": "array"
+          },
+          "period": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "legalDate",
+          "lines",
+          "period"
+        ],
+        "type": "object"
+      },
+      "TariffInput": {
+        "properties": {
+          "decisionId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "rateMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "stream": {
+            "type": "string"
+          },
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decisionId",
+          "key",
+          "stream"
+        ],
+        "type": "object"
+      },
+      "TariffLineRequest": {
+        "properties": {
+          "decisionId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "rateMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "stream": {
+            "type": "string"
+          },
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decisionId",
+          "key",
+          "stream"
+        ],
+        "type": "object"
+      },
+      "TitleAssignedResponse": {
+        "properties": {
+          "titleId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "titleId"
+        ],
+        "type": "object"
+      },
+      "UnitArrears": {
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/AgeingBucket"
+            },
+            "type": "array"
+          },
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asOf",
+          "buckets",
+          "totalMinor",
+          "unitId"
+        ],
+        "type": "object"
+      },
+      "UnitChargeResponse": {
+        "properties": {
+          "chargeablePersons": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ChargeLineResponse"
+            },
+            "type": "array"
+          },
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unitId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chargeablePersons",
+          "designation",
+          "lines",
+          "totalMinor",
+          "unitId"
+        ],
+        "type": "object"
+      },
+      "UnitDiff": {
+        "properties": {
+          "deltaMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "ourMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "theirMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deltaMinor",
+          "designation",
+          "ourMinor",
+          "theirMinor"
+        ],
+        "type": "object"
+      },
+      "UnitRequest": {
+        "properties": {
+          "absentDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "animals": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "businessUse": {
+            "type": "boolean"
+          },
+          "childrenUnder6": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "idealParts": {
+            "type": "string"
+          },
+          "occupants": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "unitId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "absentDays",
+          "animals",
+          "businessUse",
+          "childrenUnder6",
+          "designation",
+          "idealParts",
+          "occupants",
+          "unitId"
+        ],
+        "type": "object"
+      },
+      "UnitStatement": {
+        "properties": {
+          "balanceMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/StatementLine"
+            },
+            "type": "array"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "balanceMinor",
+          "lines",
+          "unitId"
+        ],
+        "type": "object"
+      },
+      "UnitView": {
+        "properties": {
+          "areaM2": {
+            "type": "number"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "idealPartsPct": {
+            "type": "number"
+          },
+          "separateEntrance": {
+            "type": "boolean"
+          },
+          "unitType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "designation",
+          "id",
+          "idealPartsPct",
+          "separateEntrance",
+          "unitType"
+        ],
+        "type": "object"
+      },
+      "UnitsCreatedResponse": {
+        "properties": {
+          "unitIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "unitIds"
+        ],
+        "type": "object"
       }
     }
   },
-  "security": [
+  "info": {
+    "description": "Generated from the running code (ADR-013): it states what runs, nothing more. Each operation names the rules it serves in `x-rules`. Operations designed but not built yet are listed in `tools/build_openapi.py` (PLANNED), not here.",
+    "summary": "Управление на етажна собственост по ЗУЕС",
+    "title": "domuvai api",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/intake/entrances/{entranceId}/fee-sheet/dry-run": {
+      "post": {
+        "operationId": "post_intake_entrances_entranceId_fee_sheet_dry_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeSheetDryRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DryRunReport"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Dry-run a fee sheet — recompute every bill and compare it with the sheet's own figures",
+        "tags": [
+          "intake"
+        ],
+        "x-rules": [
+          "PM-ORG-002",
+          "PM-FEE-014"
+        ]
+      }
+    },
+    "/api/intake/entrances/{entranceId}/fee-sheet/profile": {
+      "post": {
+        "operationId": "post_intake_entrances_entranceId_fee_sheet_profile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposedMapping"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Profile a sheet's columns — propose a mapping onto the domain fields, to confirm",
+        "tags": [
+          "intake"
+        ],
+        "x-rules": [
+          "PM-ORG-002",
+          "PM-BOOK-002"
+        ]
+      }
+    },
+    "/api/intake/entrances/{entranceId}/imports": {
+      "post": {
+        "operationId": "post_intake_entrances_entranceId_imports",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeSheetDryRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record a source-file import: run the dry-run and store its verdict and content hash",
+        "tags": [
+          "intake"
+        ],
+        "x-rules": [
+          "PM-DOC-001"
+        ]
+      }
+    },
+    "/api/intake/imports/{id}": {
+      "get": {
+        "operationId": "get_intake_imports_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Read an import record — its verdict and content hash",
+        "tags": [
+          "intake"
+        ],
+        "x-rules": [
+          "PM-DOC-001"
+        ]
+      }
+    },
+    "/api/intake/imports/{id}/commit": {
+      "post": {
+        "operationId": "post_intake_imports_id_commit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Commit a reviewed import into the registry — only the exact file that was reviewed",
+        "tags": [
+          "intake"
+        ],
+        "x-rules": [
+          "PM-ORG-001",
+          "PM-ORG-002",
+          "PM-DOC-001"
+        ]
+      }
+    },
+    "/api/intake/imports/{id}/revert": {
+      "post": {
+        "operationId": "post_intake_imports_id_revert",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Revert a committed import wholesale, with its reason",
+        "tags": [
+          "intake"
+        ],
+        "x-rules": [
+          "PM-DOC-001"
+        ]
+      }
+    },
+    "/api/money/charge-runs/preview": {
+      "post": {
+        "operationId": "post_money_charge_runs_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeRunResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Compute a charge run from a stated basis — nothing is stored",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FEE-001",
+          "PM-FEE-010",
+          "PM-FEE-012",
+          "PM-ORG-002"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/charge-runs": {
+      "post": {
+        "operationId": "post_money_entrances_entranceId_charge_runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoredChargeRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeRunIssued"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Issue a charge run — stored with its basis, never altered afterwards",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FEE-012",
+          "PM-FEE-014",
+          "PM-FEE-015",
+          "PM-FEE-016"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/charge-runs/preview": {
+      "post": {
+        "operationId": "post_money_entrances_entranceId_charge_runs_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoredChargeRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeRunResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Compute a charge run from the entrance's registered units — nothing is stored",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FEE-001",
+          "PM-FEE-014"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/fund-accounts": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_fund_accounts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FundAccountView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "List the entrance's fund accounts",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-001",
+          "PM-FUND-004"
+        ]
+      },
+      "post": {
+        "operationId": "post_money_entrances_entranceId_fund_accounts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterFundAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundAccountRegistered"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Register the entrance's repair-fund account",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-001",
+          "PM-FUND-004",
+          "PM-FUND-005"
+        ]
+      }
+    },
+    "/api/money/units/{unitId}/arrears": {
+      "get": {
+        "operationId": "get_money_units_unitId_arrears",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitArrears"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "The unit's arrears, aged as of a date",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-DEBT-001",
+          "PM-DEBT-002"
+        ]
+      }
+    },
+    "/api/money/units/{unitId}/statement": {
+      "get": {
+        "operationId": "get_money_units_unitId_statement",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitStatement"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The unit's itemised statement, showing how each number was derived",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FEE-018"
+        ]
+      }
+    },
+    "/api/registry/entrances": {
+      "get": {
+        "operationId": "get_registry_entrances",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntranceView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "List the registered entrances",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-ORG-001"
+        ]
+      },
+      "post": {
+        "operationId": "post_registry_entrances",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterEntranceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntranceCreatedResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Register an entrance — the unit of ownership and isolation",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-ORG-001"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/book": {
+      "get": {
+        "operationId": "get_registry_entrances_entranceId_book",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CondominiumBook"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Read the Book of the Condominium as of a date",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-001",
+          "PM-BOOK-002"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/owners": {
+      "get": {
+        "operationId": "get_registry_entrances_entranceId_owners",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OwnerResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "The owners and users of an entrance's units as of a date — names only",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-ORG-011",
+          "PM-BOOK-011"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/units": {
+      "get": {
+        "operationId": "get_registry_entrances_entranceId_units",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UnitView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "List the units of an entrance",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-ORG-001",
+          "PM-ORG-002"
+        ]
+      },
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_units",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUnitsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitsCreatedResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Add units with their ideal parts",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-ORG-002",
+          "PM-ORG-009"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/units/{unitId}/absences": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_units_unitId_absences",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterAbsencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbsencesRegisteredResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "File an absence declaration — the long-absence exemption",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-FEE-006",
+          "PM-FEE-007"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/units/{unitId}/animals": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_units_unitId_animals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterAnimalsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnimalsRegisteredResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Record the animals kept in a unit",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-005",
+          "PM-FEE-009"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/units/{unitId}/household": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_units_unitId_household",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterHouseholdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdRegisteredResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Register a unit's household — who counts for per-person charges",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-FEE-005",
+          "PM-FEE-008"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/units/{unitId}/titles": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_units_unitId_titles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignTitleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TitleAssignedResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record a title to a unit — effective-dated, with its share",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-ORG-005",
+          "PM-ORG-011"
+        ]
+      }
+    },
+    "/api/registry/parties": {
+      "post": {
+        "operationId": "post_registry_parties",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPartyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartyRegisteredResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Register a party — a person or company that can hold a title",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-002"
+        ]
+      }
+    }
+  },
+  "tags": [
     {
-      "bearer": []
+      "description": "Importing a firm's existing records. Owns no rules — it enforces ORG and BOOK on the way in.",
+      "name": "intake"
+    },
+    {
+      "description": "Charges, the fund, arrears. Owns FEE, FUND and DEBT.",
+      "name": "money"
+    },
+    {
+      "description": "Entrances, units, households, ownership, the Book of the Condominium. Owns ORG and BOOK.",
+      "name": "registry"
     }
   ]
 }

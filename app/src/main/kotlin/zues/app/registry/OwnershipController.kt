@@ -2,7 +2,6 @@ package zues.app.registry
 
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -48,23 +47,25 @@ data class OwnerResponse(
 class OwnershipController(private val ownership: OwnershipService) {
 
     @PostMapping("/parties")
-    fun registerParty(@RequestBody request: RegisterPartyRequest): ResponseEntity<PartyRegisteredResponse> {
+    @ResponseStatus(HttpStatus.CREATED)
+    fun registerParty(@RequestBody request: RegisterPartyRequest): PartyRegisteredResponse {
         val id = ownership.registerParty(RegisterParty(request.fullName, request.idType, request.idValue))
-        return ResponseEntity.status(HttpStatus.CREATED).body(PartyRegisteredResponse(id))
+        return PartyRegisteredResponse(id)
     }
 
     @PostMapping("/entrances/{entranceId}/units/{unitId}/titles")
+    @ResponseStatus(HttpStatus.CREATED)
     fun assignTitle(
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: AssignTitleRequest,
-    ): ResponseEntity<TitleAssignedResponse> {
+    ): TitleAssignedResponse {
         val id = ownership.assignTitle(
             entranceId,
             unitId,
             AssignTitle(request.partyId, request.titleRole, request.share, request.validFrom, request.validTo),
         )
-        return ResponseEntity.status(HttpStatus.CREATED).body(TitleAssignedResponse(id))
+        return TitleAssignedResponse(id)
     }
 
     /** The owners/users of the entrance's units as of [on] (PM-ORG-011). Names only (PM-BOOK-011). */

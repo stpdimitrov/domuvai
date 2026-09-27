@@ -1,7 +1,6 @@
 package zues.app.money
 
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -20,11 +19,12 @@ import java.util.UUID
 class ChargeRunStoreController(private val store: ChargeRunStore) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun issue(
         @PathVariable entranceId: UUID,
         @RequestBody request: StoredChargeRunRequest,
-    ): ResponseEntity<ChargeRunIssued> =
-        ResponseEntity.status(HttpStatus.CREATED).body(store.issue(entranceId, request))
+    ): ChargeRunIssued =
+        store.issue(entranceId, request)
 
     /** Unlawful run, unknown key, or PER_PERSON before occupancy exists → 400. */
     @ExceptionHandler(IllegalStateException::class, IllegalArgumentException::class)

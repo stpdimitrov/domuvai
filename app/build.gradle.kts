@@ -45,8 +45,12 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    // Test-only (ADR-013): generates the published contract from the controllers; the running
+    // app serves no /v3/api-docs. 2.8.8 is the last release built on Spring Boot 3.4.
+    testImplementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.8")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    outputs.dir("build/openapi")   // OpenApiContractTest writes the raw spec here (ADR-013)
 }
