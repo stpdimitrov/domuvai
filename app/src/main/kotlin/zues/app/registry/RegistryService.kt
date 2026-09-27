@@ -32,6 +32,18 @@ data class RegisterUnit(
     val separateEntrance: Boolean = false,
 )
 
+/**
+ * One unit as a committed import delivers it (S-41b): the unit, and what the sheet said about its
+ * household and owner. [occupants] are the persons the firm charged (PM-FEE-008); [childrenUnder6]
+ * live there on top and are never charged (PM-FEE-005); [ownerName] is a name only (PM-BOOK-011).
+ */
+data class ImportedUnit(
+    val unit: RegisterUnit,
+    val occupants: Int = 0,
+    val childrenUnder6: Int = 0,
+    val ownerName: String? = null,
+)
+
 /** One resident to register in a unit's household. `validFrom` defaults to today. */
 data class RegisterMember(
     val isChildUnder6: Boolean = false,
@@ -64,6 +76,9 @@ class RegistryService(
     private val aggregates: JdbcAggregateTemplate,
     private val entrances: EntranceRepository,
     private val units: PropertyUnitRepository,
+    private val household: HouseholdMemberRepository,
+    private val titles: TitleRepository,
+    private val parties: PartyRepository,
     private val events: ApplicationEventPublisher,
     private val clock: Clock,
 ) {
@@ -117,14 +132,20 @@ class RegistryService(
      * here and again by the deferred DB trigger at commit. Idempotent on [importId] — delivery of
      * ImportCommitted is at least once, so a redelivery adopts nothing twice. Called by the
      * registry's own event listener, never by intake directly (ADR-003; MODULE-TEMPLATE law 3).
+     *
+     * Each unit's household and owner come with it (S-41b), valid from [effectiveFrom] — the
+     * import's legal date (PM-ORG-011) — and stamped with [importId] like the unit: household
+     * members for the persons charged and the children on top (PM-BOOK-002), and a name-only party
+     * holding an OWN title, share 1. Rows are never merged across units: two people share names.
      */
     @Transactional
-    fun adoptImport(entranceId: UUID, importId: UUID, commands: List<RegisterUnit>): List<UUID> {
+    fun adoptImport(entranceId: UUID, importId: UUID, effectiveFrom: LocalDate, imported: List<ImportedUnit>): List<UUID> {
         if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
         if (units.findByImportId(importId).isNotEmpty()) return emptyList()   // already adopted
-        UnitValidation.requirePartsSumTo100(commands.map { it.idealParts })
-        return commands.map { command ->
-            aggregates.insert(
+        UnitValidation.requirePartsSumTo100(imported.map { it.unit.idealParts })
+        return imported.map { row ->
+            val command = row.unit
+            val unitId = aggregates.insert(
                 PropertyUnit(
                     id = UUID.randomUUID(),
                     entranceId = entranceId,
@@ -136,14 +157,40 @@ class RegistryService(
                     importId = importId,
                 ),
             ).id
+            val members = List(row.occupants) { false } + List(row.childrenUnder6) { true }
+            members.forEach { child ->
+                aggregates.insert(
+                    HouseholdMember(
+                        id = UUID.randomUUID(), entranceId = entranceId, unitId = unitId, partyId = null,
+                        isChildUnder6 = child, validFrom = effectiveFrom, validTo = null, importId = importId,
+                    ),
+                )
+            }
+            row.ownerName?.let { name ->
+                val partyId = aggregates.insert(Party(UUID.randomUUID(), name, idType = null, idValue = null, importId = importId)).id
+                aggregates.insert(
+                    Title(
+                        id = UUID.randomUUID(), entranceId = entranceId, unitId = unitId, partyId = partyId,
+                        titleRole = TitleRole.OWN.name, share = BigDecimal.ONE, validFrom = effectiveFrom, validTo = null,
+                        importId = importId,
+                    ),
+                )
+            }
+            unitId
         }
     }
 
-    /** Undo an import: drop every unit that carried its [importId] (STAGE1-ADDENDUM §1). */
+    /**
+     * Undo an import: drop every row that carried its [importId] (STAGE1-ADDENDUM §1) — the rows
+     * that point at a unit first, then the units. A record added later and pointing at an imported
+     * unit is not the import's to drop: the unit's delete then fails and nothing is removed.
+     */
     @Transactional
     fun revertImport(importId: UUID) {
-        val adopted = units.findByImportId(importId)
-        if (adopted.isNotEmpty()) units.deleteAll(adopted)
+        household.deleteAll(household.findByImportId(importId))
+        titles.deleteAll(titles.findByImportId(importId))
+        parties.deleteAll(parties.findByImportId(importId))
+        units.deleteAll(units.findByImportId(importId))
     }
 
     /**

@@ -308,6 +308,12 @@
             "format": "uuid",
             "type": "string"
           },
+          "manualEntries": {
+            "items": {
+              "$ref": "#/components/schemas/ManualEntry"
+            },
+            "type": "array"
+          },
           "rowsChanged": {
             "format": "int32",
             "type": "integer"
@@ -319,6 +325,7 @@
         },
         "required": [
           "importId",
+          "manualEntries",
           "rowsChanged",
           "rowsCreated"
         ],
@@ -602,6 +609,41 @@
           "sourceSha",
           "status",
           "violations"
+        ],
+        "type": "object"
+      },
+      "ManualEntry": {
+        "properties": {
+          "designation": {
+            "type": "string"
+          },
+          "field": {
+            "enum": [
+              "DESIGNATION",
+              "IDEAL_PARTS",
+              "OCCUPANTS",
+              "FEE_MINOR",
+              "BUILT_AREA",
+              "OWNER_NAME",
+              "CHILDREN_UNDER_6",
+              "ANIMALS",
+              "ABSENT_DAYS",
+              "BUSINESS_USE"
+            ],
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "designation",
+          "field",
+          "rule",
+          "value"
         ],
         "type": "object"
       },
@@ -1594,14 +1636,21 @@
             "description": "Conflict"
           }
         },
-        "summary": "Commit a reviewed import into the registry — only the exact file that was reviewed",
+        "summary": "Commit a reviewed import into the registry — units, households and owners; what needs a declaration is returned for a person to record, never adopted",
         "tags": [
           "intake"
         ],
         "x-rules": [
           "PM-ORG-001",
           "PM-ORG-002",
-          "PM-DOC-001"
+          "PM-DOC-001",
+          "PM-BOOK-002",
+          "PM-FEE-005",
+          "PM-FEE-008",
+          "PM-ORG-011",
+          "PM-BOOK-011",
+          "PM-FEE-007",
+          "PM-BOOK-005"
         ]
       }
     },

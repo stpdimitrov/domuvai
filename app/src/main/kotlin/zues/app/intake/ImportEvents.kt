@@ -1,15 +1,28 @@
 package zues.app.intake
 
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 /**
- * One unit a commit adopts into the registry — the subset of a fee-sheet row the book needs to
- * create the unit: its designation and ideal parts. Occupancy, area and unit type are deliberately
- * absent: a fee sheet does not carry them, and the real pilot spreadsheet defines what does
- * (STAGE1-ADDENDUM §1). Ideal parts is an exact decimal percent string, never a float (ADR-006).
+ * One unit a commit adopts into the registry: its designation and ideal parts (ADR-006: an exact
+ * decimal percent string, never a float), plus what the sheet mapped about its area, household and
+ * owner (S-41b, ADR-012). Unit type is still absent — no sheet field carries it. What a count cannot
+ * make lawful — an absence, an animal, business use — never travels here; the commit returns it for
+ * a person to record from a declaration.
  */
-data class AdoptedUnit(val designation: String, val idealParts: String)
+data class AdoptedUnit(
+    val designation: String,
+    val idealParts: String,
+    /** exact decimal m², as the sheet wrote it (PM-BOOK-002); null when the sheet has none */
+    val builtArea: String?,
+    /** the persons the firm charged — the dry-run counts them so (PM-FEE-008) */
+    val occupants: Int,
+    /** residents on top of [occupants], never charged (PM-FEE-005) */
+    val childrenUnder6: Int,
+    /** the owner's name as written — never an identity number (PM-BOOK-011) */
+    val ownerName: String?,
+)
 
 /**
  * Raised when a REPRODUCED import is committed (STAGE1-ADDENDUM §1, step 6). Producer: intake; the
@@ -27,6 +40,8 @@ data class ImportCommitted(
     val rowsCreated: Int,
     val rowsChanged: Int,
     val units: List<AdoptedUnit>,
+    /** the import's legal date: adopted household members and owners' titles are valid from it (PM-ORG-011) */
+    val effectiveFrom: LocalDate,
 )
 
 /** Raised when a committed import is reverted; the registry drops every row that carried its id. */

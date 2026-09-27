@@ -19,10 +19,15 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import zues.app.registry.HouseholdMemberRepository
+import zues.app.registry.ImportedUnit
+import zues.app.registry.PartyRepository
 import zues.app.registry.PropertyUnitRepository
 import zues.app.registry.RegisterUnit
 import zues.app.registry.RegistryService
+import zues.app.registry.TitleRepository
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -61,6 +66,11 @@ class ImportCommitPersistenceIT {
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var units: PropertyUnitRepository
     @Autowired lateinit var registry: RegistryService
+    @Autowired lateinit var household: HouseholdMemberRepository
+    @Autowired lateinit var titles: TitleRepository
+    @Autowired lateinit var parties: PartyRepository
+
+    private val ON = LocalDate.parse("2026-05-01")
 
     private fun createEntrance(): UUID {
         val response = mvc.perform(
@@ -118,7 +128,7 @@ class ImportCommitPersistenceIT {
 
         // adoptImport is the reaction the listener runs; called directly it is synchronous (the
         // @ApplicationModuleListener wrapper is @Async — its delivery is Spring Modulith's, not ours).
-        assertThat(registry.adoptImport(entranceId, importId, commands)).hasSize(2)
+        assertThat(registry.adoptImport(entranceId, importId, ON, commands.map { ImportedUnit(it) })).hasSize(2)
 
         val adopted = units.findByEntranceId(entranceId)
         assertThat(adopted).hasSize(2)                                              // PM-ORG-001: under the entrance
@@ -127,10 +137,38 @@ class ImportCommitPersistenceIT {
         assertThat(adopted).allSatisfy { assertThat(it.unitType).isEqualTo("UNSPECIFIED") }
         assertThat(adopted.map { it.idealPartsPct }.reduce(BigDecimal::add)).isEqualByComparingTo(BigDecimal("100.0000"))
 
-        assertThat(registry.adoptImport(entranceId, importId, commands)).isEmpty()  // redelivery is idempotent
+        assertThat(registry.adoptImport(entranceId, importId, ON, commands.map { ImportedUnit(it) })).isEmpty()  // redelivery is idempotent
         assertThat(units.findByImportId(importId)).hasSize(2)
 
         registry.revertImport(importId)
+        assertThat(units.findByImportId(importId)).isEmpty()
+    }
+
+    @Test
+    fun `PM-BOOK-002 an import's household and owner are adopted stamped, and revert drops them before the units`() {
+        val entranceId = createEntrance()
+        val importId = UUID.randomUUID()
+        registry.adoptImport(
+            entranceId, importId, ON,
+            listOf(
+                ImportedUnit(
+                    RegisterUnit(designation = "об. 1", unitType = "UNSPECIFIED", areaM2 = BigDecimal("72.50"), idealParts = "60.0000"),
+                    occupants = 2, childrenUnder6 = 1, ownerName = "Иван Петров",
+                ),
+                ImportedUnit(RegisterUnit(designation = "об. 2", unitType = "UNSPECIFIED", idealParts = "40.0000")),
+            ),
+        )
+        assertThat(units.findByImportId(importId).first { it.designation == "об. 1" }.areaM2).isEqualByComparingTo("72.50")
+        assertThat(household.findByImportId(importId)).hasSize(3).filteredOn { it.isChildUnder6 }.hasSize(1)
+        val owner = parties.findByImportId(importId).single()
+        assertThat(owner.fullName).isEqualTo("Иван Петров")
+        assertThat(owner.idValue).isNull()
+        assertThat(titles.findByImportId(importId).single().partyId).isEqualTo(owner.id)
+
+        registry.revertImport(importId)            // the foreign keys refuse this if the units go first
+        assertThat(household.findByImportId(importId)).isEmpty()
+        assertThat(titles.findByImportId(importId)).isEmpty()
+        assertThat(parties.findByImportId(importId)).isEmpty()
         assertThat(units.findByImportId(importId)).isEmpty()
     }
 
@@ -139,11 +177,11 @@ class ImportCommitPersistenceIT {
         val entranceId = createEntrance()
         assertThatThrownBy {
             registry.adoptImport(
-                entranceId, UUID.randomUUID(),
+                entranceId, UUID.randomUUID(), ON,
                 listOf(
                     RegisterUnit(designation = "об. 1", unitType = "UNSPECIFIED", idealParts = "60.0000"),
                     RegisterUnit(designation = "об. 2", unitType = "UNSPECIFIED", idealParts = "30.0000"),   // 90%, not 100
-                ),
+                ).map { ImportedUnit(it) },
             )
         }.isInstanceOf(RuntimeException::class.java)
         assertThat(units.findByEntranceId(entranceId)).isEmpty()
