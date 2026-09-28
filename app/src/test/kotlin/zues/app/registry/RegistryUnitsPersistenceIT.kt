@@ -17,6 +17,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import java.util.UUID
 
 /**
  * Units persisted against real PostgreSQL: HTTP → service → Spring Data JDBC → the schema
@@ -53,6 +54,38 @@ class RegistryUnitsPersistenceIT {
             post("/api/registry/entrances").contentType(MediaType.APPLICATION_JSON).content(body),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
         return json.readTree(response).get("entranceId").asText()
+    }
+
+    private fun register(request: RegisterEntranceRequest) = json.readTree(
+        mvc.perform(post("/api/registry/entrances").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(request)))
+            .andExpect(status().isCreated).andReturn().response.contentAsString,
+    )
+
+    @Test
+    fun `PM-ORG-001 a building with three entrances keeps three independent entrances, each with its own 100%`() {
+        val first = register(RegisterEntranceRequest("ул. Шипка 14", "А", "GA"))
+        val condominiumId = UUID.fromString(first.get("condominiumId").asText())
+        val entrances = listOf(first.get("entranceId").asText()) +
+            listOf("Б", "В").map { register(RegisterEntranceRequest(null, it, "GA", condominiumId)).get("entranceId").asText() }
+
+        // Each entrance holds its own 100% (PM-ORG-002 per entrance): three full sets are lawful.
+        entrances.forEach { entranceId ->
+            mvc.perform(
+                post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON).content(
+                    json.writeValueAsString(
+                        RegisterUnitsRequest(listOf(NewUnitRequest("ап. 1", "FLAT", null, "60.0000", false), NewUnitRequest("ап. 2", "FLAT", null, "40.0000", false))),
+                    ),
+                ),
+            ).andExpect(status().isCreated)
+        }
+        mvc.perform(get("/api/registry/entrances")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[?(@.condominiumId == '$condominiumId')]", org.hamcrest.Matchers.hasSize<Any>(3)))
+
+        // A label is unique within its building: a second "Б" is refused, not a server error.
+        mvc.perform(
+            post("/api/registry/entrances").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(RegisterEntranceRequest(null, "Б", "GA", condominiumId))),
+        ).andExpect(status().isConflict)
     }
 
     @Test

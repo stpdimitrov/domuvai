@@ -949,6 +949,10 @@
           "address": {
             "type": "string"
           },
+          "condominiumId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "label": {
             "type": "string"
           },
@@ -957,7 +961,6 @@
           }
         },
         "required": [
-          "address",
           "label",
           "managementForm"
         ],
@@ -2490,6 +2493,19 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "summary": "List the registered entrances",
@@ -2548,9 +2564,22 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
-        "summary": "Register an entrance — the unit of ownership and isolation",
+        "summary": "Register an entrance — founding its building at an address, or joining an existing building",
         "tags": [
           "registry"
         ],
@@ -2768,6 +2797,19 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "summary": "List the units of an entrance",
@@ -2838,6 +2880,19 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "summary": "Add units with their ideal parts",
@@ -2919,6 +2974,19 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "summary": "File an absence declaration — the long-absence exemption",
@@ -3000,6 +3068,19 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "summary": "Record the animals kept in a unit",
@@ -3081,6 +3162,19 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "summary": "Register a unit's household — who counts for per-person charges",

@@ -1,5 +1,6 @@
 package zues.app.registry
 
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
@@ -12,10 +13,12 @@ import org.springframework.web.bind.annotation.RestController
 import java.math.BigDecimal
 import java.util.UUID
 
+/** A new building's [address], or the [condominiumId] of the building the entrance joins (PM-ORG-001). */
 data class RegisterEntranceRequest(
-    val address: String,
+    val address: String? = null,
     val label: String,
     val managementForm: String,
+    val condominiumId: UUID? = null,
 )
 
 data class EntranceCreatedResponse(
@@ -88,7 +91,7 @@ class RegistryController(private val registry: RegistryService) {
     @ResponseStatus(HttpStatus.CREATED)
     fun register(@RequestBody request: RegisterEntranceRequest): EntranceCreatedResponse {
         val created = registry.registerEntrance(
-            RegisterEntrance(request.address, request.label, request.managementForm),
+            RegisterEntrance(request.address, request.label, request.managementForm, request.condominiumId),
         )
         return EntranceCreatedResponse(created.entranceId, created.condominiumId)
     }
@@ -172,4 +175,10 @@ class RegistryController(private val registry: RegistryService) {
     @ExceptionHandler(NoSuchElementException::class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
+
+    /** A label its building already uses for another entrance, or a designation its entrance already has. */
+    @ExceptionHandler(DataIntegrityViolationException::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun onIntegrity(e: DataIntegrityViolationException): Map<String, String> =
+        mapOf("error" to "already registered: an entrance label repeats in its building, or a unit designation in its entrance")
 }

@@ -26,7 +26,7 @@ KNOWN = {r['id'] for r in RULES['rules']}
 RUNNING = {
  # ---- registry
  ('post', '/api/registry/entrances'):
-   ('Register an entrance — the unit of ownership and isolation', ['PM-ORG-001']),
+   ('Register an entrance — founding its building at an address, or joining an existing building', ['PM-ORG-001']),
  ('get', '/api/registry/entrances'):
    ('List the registered entrances', ['PM-ORG-001']),
  ('post', '/api/registry/entrances/{entranceId}/units'):
