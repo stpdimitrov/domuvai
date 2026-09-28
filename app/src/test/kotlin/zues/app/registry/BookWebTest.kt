@@ -21,14 +21,16 @@ import java.util.UUID
 
 /**
  * The book endpoint with the service mocked — no database. Proves the route binds and returns the
- * book, and that a malformed `on` date is a 400 (parsed before the service is ever called).
+ * book, that with no date it is read as of today in Sofia, and that a malformed `on` date is a 400
+ * (parsed before the service is ever called).
  */
 @WebMvcTest(BookController::class)
 class BookWebTest {
 
     @TestConfiguration
     class FixedClock {
-        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-06-01T00:00:00Z"), ZoneOffset.UTC)
+        // 00:30 on 1 June in Sofia (UTC+3 in summer); still 31 May in UTC
+        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-05-31T21:30:00Z"), ZoneOffset.UTC)
     }
 
     @Autowired lateinit var mvc: MockMvc
@@ -56,6 +58,16 @@ class BookWebTest {
             .andExpect(jsonPath("$.complete").value(true))
             .andExpect(jsonPath("$.units[0].designation").value("ап. 1"))
             .andExpect(jsonPath("$.units[0].complete").value(true))
+    }
+
+    @Test
+    fun `PM-SYS-004 with no date given the book is read as of today in Sofia`() {
+        whenever(book.forEntrance(eq(entranceId), any())).thenAnswer {
+            CondominiumBook(entranceId, it.getArgument(1), emptyList(), complete = true)
+        }
+        mvc.perform(get("/api/registry/entrances/$entranceId/book"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.asOf").value("2026-06-01"))
     }
 
     @Test

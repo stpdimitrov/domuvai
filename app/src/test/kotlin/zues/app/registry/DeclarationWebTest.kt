@@ -29,7 +29,8 @@ class DeclarationWebTest {
 
     @TestConfiguration
     class FixedClock {
-        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-06-10T00:00:00Z"), ZoneOffset.UTC)
+        // 00:30 on 10 June in Sofia (UTC+3 in summer); still 9 June in UTC
+        @Bean fun clock(): Clock = Clock.fixed(Instant.parse("2026-06-09T21:30:00Z"), ZoneOffset.UTC)
     }
 
     private val entranceId = UUID.randomUUID()
@@ -52,7 +53,7 @@ class DeclarationWebTest {
     }
 
     @Test
-    fun `GET overdue defaults to today and names the holder only`() {
+    fun `PM-SYS-004 GET overdue defaults to today in Sofia and names the holder only`() {
         whenever(declarations.overdue(entranceId, LocalDate.parse("2026-06-10"))).thenReturn(
             listOf(OverdueDeclaration(unitId, "ап. 1", "Мария Георгиева", "OWN", LocalDate.parse("2026-05-01"), LocalDate.parse("2026-05-18"))),
         )
