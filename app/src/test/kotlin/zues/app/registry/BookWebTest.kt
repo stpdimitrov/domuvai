@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Clock
@@ -20,9 +21,9 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 /**
- * The book endpoint with the service mocked — no database. Proves the route binds and returns the
- * book, that with no date it is read as of today in Sofia, and that a malformed `on` date is a 400
- * (parsed before the service is ever called).
+ * The book endpoints with the services mocked — no database. Proves the route binds and returns the
+ * book, that with no date it is read as of today in Sofia, that the retention pass runs as of that
+ * day, and that a malformed `on` date is a 400 (parsed before the service is ever called).
  */
 @WebMvcTest(BookController::class)
 class BookWebTest {
@@ -36,6 +37,7 @@ class BookWebTest {
     @Autowired lateinit var mvc: MockMvc
 
     @MockitoBean lateinit var book: BookService
+    @MockitoBean lateinit var retention: BookRetentionService
 
     private val entranceId = UUID.randomUUID()
 
@@ -68,6 +70,18 @@ class BookWebTest {
         mvc.perform(get("/api/registry/entrances/$entranceId/book"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.asOf").value("2026-06-01"))
+    }
+
+    @Test
+    fun `PM-BOOK-010 POST retention anonymises what is due today in Sofia and says what it did`() {
+        whenever(retention.anonymiseDue(entranceId, LocalDate.parse("2026-06-01"))).thenReturn(
+            RetentionApplied(LocalDate.parse("2026-06-01"), householdUnlinked = 1, animalPassportsCleared = 2),
+        )
+        mvc.perform(post("/api/registry/entrances/$entranceId/book/retention"))   // no date: the caller cannot bring it forward
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.on").value("2026-06-01"))
+            .andExpect(jsonPath("$.householdUnlinked").value(1))
+            .andExpect(jsonPath("$.animalPassportsCleared").value(2))
     }
 
     @Test

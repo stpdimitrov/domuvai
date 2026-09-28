@@ -436,6 +436,17 @@
         ],
         "type": "object"
       },
+      "EndStayRequest": {
+        "properties": {
+          "on": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "on"
+        ],
+        "type": "object"
+      },
       "EntranceCreatedResponse": {
         "properties": {
           "condominiumId": {
@@ -1113,6 +1124,28 @@
         ],
         "type": "object"
       },
+      "RetentionApplied": {
+        "properties": {
+          "animalPassportsCleared": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "householdUnlinked": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "on": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "animalPassportsCleared",
+          "householdUnlinked",
+          "on"
+        ],
+        "type": "object"
+      },
       "RevertRequest": {
         "properties": {
           "reason": {
@@ -1158,6 +1191,28 @@
           "derivation",
           "period",
           "quantity"
+        ],
+        "type": "object"
+      },
+      "StayEnded": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "date",
+            "type": "string"
+          },
+          "validTo": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "validFrom",
+          "validTo"
         ],
         "type": "object"
       },
@@ -2879,6 +2934,67 @@
         ]
       }
     },
+    "/api/registry/entrances/{entranceId}/book/retention": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_book_retention",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionApplied"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Anonymise the book's personal data past its retention window — today in Sofia, irreversible",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-010"
+        ]
+      }
+    },
     "/api/registry/entrances/{entranceId}/owners": {
       "get": {
         "operationId": "get_registry_entrances_entranceId_owners",
@@ -3314,6 +3430,109 @@
         ]
       }
     },
+    "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_units_unitId_animals_animalId_end",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "animalId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndStayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StayEnded"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record the day an animal left the unit",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-005",
+          "PM-BOOK-008"
+        ]
+      }
+    },
     "/api/registry/entrances/{entranceId}/units/{unitId}/household": {
       "post": {
         "operationId": "post_registry_entrances_entranceId_units_unitId_household",
@@ -3405,6 +3624,108 @@
         "x-rules": [
           "PM-FEE-005",
           "PM-FEE-008"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_units_unitId_household_memberId_end",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "memberId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndStayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StayEnded"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record the day a resident left — their occupancy range closes",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-008"
         ]
       }
     },

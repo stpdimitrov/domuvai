@@ -66,6 +66,20 @@ private val CONSTANTS: List<Constant> = listOf(
         todoLegal = "Record the currently approved declaration template — the minister's order under чл. 7 " +
             "ал. 7 ЗУЕС (number, date, effective date) — as a dated entry; `ministry-template-1` is a placeholder.",
     ),
+    // PM-BOOK-010 — the book keeps personal data only while its basis lasts, then anonymises it, with
+    // a window per field group, in months from the day the stay ended. No statute sets these: the
+    // owner's default (2026-09-28) is 3 months where no law says otherwise, unconfirmed until counsel
+    // does. Former owners and users have no entry — a claim for charges they owe outlives their title.
+    Constant(
+        "BOOK_RETENTION_HOUSEHOLD_MONTHS", "3", "2026-09-28", "GDPR art. 5(1)(e); owner decision 2026-09-28", false,
+        rule = "PM-BOOK-010",
+        todoLegal = "Confirm no statute requires keeping a former occupant's link to a named person longer than 3 months.",
+    ),
+    Constant(
+        "BOOK_RETENTION_ANIMAL_MONTHS", "3", "2026-09-28", "GDPR art. 5(1)(e); owner decision 2026-09-28", false,
+        rule = "PM-BOOK-010",
+        todoLegal = "Confirm no statute requires keeping a departed animal's veterinary passport number longer than 3 months.",
+    ),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */
