@@ -1196,3 +1196,18 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Read first next time** — this entry, #31, `app/src/main/kotlin/zues/app/registry/RegistryService.kt` (`adoptImport` / `revertImport`).
 
 ---
+
+## WF-02 · 2026-09-28 · lanes are claimed, not assigned (`tools/lanes.py`)
+
+**Why** — the first real parallel run (S-41b and S-42, 2026-09-27) worked where the protocol was explicit — different modules, no code collision — and failed in two places it was silent. **GitHub ignores the `merge=union` driver**, so the second PR to merge showed a `SESSIONLOG.md` conflict; and **both slices wrote migration `V202609271200`**, which no text merge flags, the local gates cannot see (the ITs skip without Docker) and GitHub runs no CI on while a PR conflicts — Flyway would not have started. Fixed on #33 by merging `main` into it and restamping its migration. The owner also asked that lanes not be hardcoded to people.
+
+**Did**
+- **`tools/lanes.py`** — the live lane map, read from GitHub: a lane (a module, or `web`) is held while an open `lane:<lane>` issue has an assignee; free lanes show their next `TESTPLAN.md` slice; a PR working in a lane nobody holds, or someone else holds, is flagged. `check <lane>` and `claim <lane> --title … --body-file <contract>` (claims a free lane; two claims at once — the lower issue number holds). Unassigned `lane:` issues are findings, not claims. `git config zues.lane` is a preference, never a reservation. The module list is imported from `testplan.py`, never retyped; the generated web client counts as shared.
+- **Schema gate** — fails on a duplicate or malformed migration version (V1, or a real `yyyyMMddHHmm` UTC minute). Proved against the replayed S-42 collision, month 13, `V2`, and bad name characters — each exit 1; clean, exit 0.
+- **Rules** — `CLAUDE.md` (boot step 8, the claim rule, the real-UTC-minute stamp, the GitHub-union rebase, findings as unassigned issues, pushing to another's branch only by agreement); the `zues-slice` skill's claim and close steps; `WORKING.md` (the A/B/C developer table replaced by the claim protocol). #29 labelled `lane:money`.
+
+**Open** — at pilot, with a long-lived database: a migration merged after a later-stamped one is applied out of order — decide Flyway `outOfOrder` versus restamping on rebase. The remaining owner actions still apply (`gh auth login` per developer, now also for `tools/lanes.py`; branch protection).
+
+**Read first next time** — `CLAUDE.md` (*Working in parallel*), then run `python3 tools/lanes.py`.
+
+---

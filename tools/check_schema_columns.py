@@ -14,6 +14,7 @@ the entity with `@Column("...")`; the check honours it. Mark a property that is 
 not a column with a trailing `// not-a-column` comment.
 """
 import re, sys, pathlib
+from datetime import datetime
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MIGRATIONS = ROOT / 'app/src/main/resources/db/migration'
@@ -23,6 +24,7 @@ CONSTRAINT_KEYWORDS = {'UNIQUE', 'CHECK', 'PRIMARY', 'FOREIGN', 'CONSTRAINT', 'E
 TABLE = re.compile(r'@Table\("([^"]+)"\)')
 COLUMN = re.compile(r'@Column\("([^"]+)"\)')
 PROP = re.compile(r'\bval\s+(\w+)\s*:')
+MIGRATION_NAME = re.compile(r'^V(\d+)__[a-z0-9_]+\.sql$')
 # Additive migrations (V2, V3…) may add a column to an existing table rather than recreate it.
 ALTER_ADD = re.compile(r'ALTER TABLE\s+\w+\.(\w+)\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?(\w+)', re.IGNORECASE)
 
@@ -32,6 +34,29 @@ def migrations_sql() -> str:
     Schema changes land in a new file per change (never edit an applied migration), so parallel
     developers do not fight over one file; the gate reads them all."""
     return "\n".join(p.read_text() for p in sorted(MIGRATIONS.glob('V*.sql')))
+
+
+def migration_problems() -> list[str]:
+    """Every migration has a version of its own: `V1` is the baseline, every later one the real UTC
+    minute it was written (yyyyMMddHHmm). Two developers who pick the same minute — or the same
+    round placeholder — collide, and Flyway refuses to start. Nothing else sees it in time: the
+    persistence ITs skip without Docker, and GitHub runs no CI on a conflicting PR (S-42, 2026-09-28)."""
+    problems, seen = [], {}
+    for path in sorted(MIGRATIONS.glob('V*.sql')):
+        m = MIGRATION_NAME.match(path.name)
+        if not m:
+            problems.append(f"  {path.name} — name it V<yyyyMMddHHmm>__short_desc.sql")
+            continue
+        version = m.group(1)
+        if version != '1':
+            try:
+                datetime.strptime(version, '%Y%m%d%H%M')
+            except ValueError:
+                problems.append(f"  {path.name} — {version} is not a UTC minute (yyyyMMddHHmm)")
+        if version in seen:
+            problems.append(f"  {path.name} — version {version} is already {seen[version]}")
+        seen.setdefault(version, path.name)
+    return problems
 
 
 def to_column(prop: str) -> str:
@@ -118,6 +143,13 @@ def entities(text: str):
 
 
 def main() -> int:
+    versions = migration_problems()
+    if versions:
+        print(f"MIGRATION VERSIONS — {len(versions)} problem(s):")
+        print("\n".join(versions))
+        print("\nFlyway refuses two migrations with one version, so the app would not start. "
+              "Restamp the newer file with the real UTC minute: date -u +%Y%m%d%H%M")
+        return 1
     tables = parse_schema(migrations_sql())
     checked, bad = 0, []
     for path in SRC.rglob('*.kt'):
@@ -139,7 +171,8 @@ def main() -> int:
         print("\nName the column explicitly with @Column(\"...\") on the property, "
               "or fix the schema. If the property is not persisted, mark it `// not-a-column`.")
         return 1
-    print(f"OK  {checked} entit(ies) map only to columns the schema has  ·  {len(tables)} tables read")
+    print(f"OK  {checked} entit(ies) map only to columns the schema has  ·  {len(tables)} tables read"
+          f"  ·  {len(list(MIGRATIONS.glob('V*.sql')))} migration versions, all distinct")
     return 0
 
 

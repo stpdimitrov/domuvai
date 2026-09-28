@@ -17,9 +17,9 @@ If a boot document is missing, say so and stop. Do not reconstruct context from 
 
 ## 2. Claim, then branch
 
-- The slice is a GitHub Issue from `docs/TESTPLAN.md`. Confirm it is claimed by this developer.
-- Check that no open PR touches this slice's module: `gh pr list --state open`. If one does, stop — one module per developer at a time.
-- `git fetch && git switch -c slice/S-nn-<name> origin/main`. Never work on `main`.
+- Run `python3 tools/lanes.py`. Work only in a **free** lane — nobody is assigned one — and heed its warnings (a PR working in a lane nobody holds).
+- Write the slice contract (§3) to a file, then claim the lane with it: `python3 tools/lanes.py claim <lane> --title "S-nn <name> (<lane> · <rule ids>)" --body-file <contract.md>`. If it names another holder, or says you lost the race, stop and pick another lane.
+- `git fetch && git switch -c slice/S-nn-<name> origin/main`. Never work on `main`. The PR says `Closes #n`, so merging it frees the lane.
 
 ## 3. State the slice contract — before writing code
 
@@ -53,7 +53,7 @@ Append to `docs/SESSIONLOG.md` — at the end, never editing an earlier entry �
 **Read first next time** — two or three documents
 ```
 
-Then `git fetch && git rebase origin/main`, push the branch, and open a PR whose description is the slice contract. On a conflict in a generated doc, take `origin/main`'s copy and re-run the generator — never hand-merge. Merge only when CI is green. Never push to `main`.
+Then `git fetch && git rebase origin/main`, push the branch, and open a PR whose description is the slice contract and says `Closes #n`. If GitHub later shows a conflict in `docs/SESSIONLOG.md`, rebase again — see `CLAUDE.md`. On a conflict in a generated doc, take `origin/main`'s copy and re-run the generator — never hand-merge. Merge only when CI is green. Never push to `main`.
 
 ## 8. When a rule and existing code disagree
 

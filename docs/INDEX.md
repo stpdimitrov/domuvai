@@ -14,7 +14,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | 02a | [STAGE1-ADDENDUM.md](STAGE1-ADDENDUM.md) | `intake`, resumable charge runs, staleness alarms |
 | 03 | [ARCHDETAIL.md](ARCHDETAIL.md) | Five detailed drawings |
 | 04 | [SEQUENCE.md](SEQUENCE.md) | **The plan.** 36 actions, 6 phases, four gates |
-| 05 | [WORKING.md](WORKING.md) | How two people work without sharing AI context |
+| 05 | [WORKING.md](WORKING.md) | How several developers' sessions split the work without sharing AI context — lanes claimed live (`tools/lanes.py`) |
 | 06 | [SAASPLAN.md](SAASPLAN.md) | Who pays, how much, the 90-day pilot |
 | 07 | [UIPROMPTS.md](UIPROMPTS.md) | Design prompts, mobile and desktop |
 | 08 | [MODULE-TEMPLATE.md](MODULE-TEMPLATE.md) | The extraction-ready module shape every slice follows (Kotlin · Spring Modulith) |
