@@ -1357,3 +1357,19 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — H-05, this entry; then `python3 tools/lanes.py`.
 
 ---
+
+## WF-03 · 2026-09-28 · a gate keeps a legal "today" on the Sofia day (PM-SYS-004)
+
+**Did** — gate 10/10 `legal today` (`tools/check_legal_today.py`): main code reads a calendar date off a clock only through the kernel's `toSofiaDate`. It fails on `LocalDate` / `LocalDateTime` / `ZonedDateTime` / `OffsetDateTime` / `YearMonth` / `Year` / `MonthDay` `.now(…)` and `LocalDate` / `LocalDateTime` `.ofInstant(…)` in `*/src/main`; comments and KDoc are skipped, and a deliberate use takes a trailing `// allow-clock-date` that says why. Tests are not checked — they pin their own dates. `CLAUDE.md` names the idiom under Hard constraints and the check under Exit checks. The gate pack's header no longer types a stale count ("six checks").
+
+**Rules covered** — PM-SYS-004 (a guard, not a test; named-test coverage stays 39 of 233).
+
+**Tests added** — none in the suite. The guard was run against failures: on `main` before #41 it flags exactly the five #38 sites; on a probe file with three violations, a comment, KDoc, an escape and the right idiom, it flags the three and nothing else. On today's `main` it passes.
+
+**Decisions** — none; the owner asked for the guard after #38 (2026-09-28).
+
+**Open** — registry: S-G1-03c (PM-BOOK-010) waits for the owner's retention windows; otherwise as H-05.
+
+**Read first next time** — H-05, F-38, this entry; then `python3 tools/lanes.py`.
+
+---
