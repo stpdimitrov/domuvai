@@ -23,6 +23,8 @@ data class Title(
     val share: BigDecimal,     // 0 < share <= 1
     val validFrom: LocalDate,
     val validTo: LocalDate?,
+    /** Provenance if adopted from a fee-sheet import (STAGE1-ADDENDUM §1); null if registered directly. */
+    val importId: UUID? = null,
 )
 
 /** Whether the party owns the unit or only uses it. */
@@ -31,4 +33,5 @@ enum class TitleRole { OWN, USR }
 interface TitleRepository : ListCrudRepository<Title, UUID> {
     fun findByEntranceId(entranceId: UUID): List<Title>
     fun findByUnitId(unitId: UUID): List<Title>
+    fun findByImportId(importId: UUID): List<Title>
 }

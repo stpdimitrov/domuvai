@@ -1175,6 +1175,28 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 
 ---
 
+## S-41b · 2026-09-27 · intake commit adopts the mapped optional fields (ADR-012)
+
+**Did** — a committed import now adopts more than designation and ideal parts. `FeeSheet` keeps the optional columns a mapping names (as written; a blank cell is absent) and refuses what the registry could not hold: an area with more than two decimals or not positive, a child count that is not whole, an owner cell carrying nine-plus digits (an ЕГН/ЛНЧ/ЕИК — PM-BOOK-011). `ImportCommitted` carries each unit's area, occupants, children and owner name plus the import's legal date; `registry` adopts, per unit and stamped with `import_id`: the area, the persons charged as anonymous household members plus the children on top, flagged (PM-FEE-005/008), and a name-only party holding an `OWN` title, share 1, from the legal date (PM-ORG-011). **Absences, animals and business use are not adopted** — the commit returns them as `manualEntries` naming the rule (PM-FEE-007 · PM-BOOK-005 · PM-ORG-009). Owner decisions D1–D3 on #31 (2026-09-27).
+
+**Revert fixed before it broke** — no child table cascades from `registry.unit`, so the first import with household or owner rows would have made `revert` fail on the foreign keys. Migration `V202609271200__import_provenance.sql` stamps `household_member`, `party` and `title` with `import_id`; revert drops them first, then the units. A record added later and pointing at an imported unit is not the import's: the delete then fails and rolls back, so nothing is lost — but the refusal is not yet reported back to the caller (the listener is asynchronous).
+
+**Rules covered** — PM-BOOK-002 · PM-FEE-005 · PM-FEE-008 · PM-ORG-011 · PM-BOOK-011 · PM-FEE-007 · PM-BOOK-005.
+
+**Tests added** — `ImportServiceTest`: `PM-BOOK-002 a commit carries…`, `PM-FEE-007 PM-BOOK-005 an absence or animal count is returned…`. `ImportAdoptionTest` (new, registry, mocks): `PM-FEE-008 PM-FEE-005 the persons charged…`, `PM-ORG-011 PM-BOOK-011 an adopted owner is a name-only party…`, a bare unit adopts alone, revert order. `FeeSheetTest`: optional columns read as written; unstorable area/children refused; `PM-BOOK-011 an owner cell carrying an identity number…`. `ImportCommitPersistenceIT`: `PM-BOOK-002 an import's household and owner are adopted stamped, and revert drops them before the units` (Docker — CI).
+
+**Contract** — `CommitResult` gained `manualEntries`; the generated spec and the web client (`web/lib/api/schema.d.ts`) were regenerated in this PR, as ADR-011 §2.2 now requires.
+
+**Decisions** — none new (ADR-012; D1–D3 on #31).
+
+**Finding, for `money` (S-42's owner, #29)** — `ChargeRunService.kt:58` feeds registry's `separateEntrance` (PM-ORG-009) to the engine as `businessUse`, which applies PM-FEE-010's multiplier meant for business use *through the common parts*. One flag stands for two legal cases; a sheet's business-use column stays unadopted until it is split.
+
+**Open** — report a refused revert back to the caller; merge / re-import into a populated entrance; the business-use flag split (above).
+
+**Read first next time** — this entry, #31, `app/src/main/kotlin/zues/app/registry/RegistryService.kt` (`adoptImport` / `revertImport`).
+
+---
+
 ## S-42 · 2026-09-27 · payment persistence — record a payment, oldest debt first (PM-DEBT-008)
 
 **Did**
@@ -1186,7 +1208,7 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 - The payment row stores the rule applied, the designation, and a `basis` (rule · remainder rule · amount · date · the open debts it saw) with `basis_hash`, `law_version` and `engine_version` (ADR-006 l.40, ADR-001 amendment).
 - `ArrearsService` now reads **as of** its date: it counts only postings dated on or before `asOf` and bands a credit with the debt it settled. The statement is unchanged.
 - `PaymentPosted` is published in the write's transaction.
-- New migration `V202609271200__money_payment.sql`.
+- New migration `V202609281000__money_payment.sql`.
 - Claim: stpdimitrov/domuvai#29.
 
 **Rules covered** — PM-DEBT-008 (MUST): now implemented, where it was test-only since S-37. PM-DEBT-001: its as-of reading is corrected. Traceability 34/233 covered · 35 referenced; TESTPLAN 200 remaining.

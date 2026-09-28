@@ -26,8 +26,11 @@ data class HouseholdMember(
     @Column("is_child_under_6") val isChildUnder6: Boolean,
     val validFrom: LocalDate,
     val validTo: LocalDate?,
+    /** Provenance if adopted from a fee-sheet import (STAGE1-ADDENDUM §1); null if registered directly. */
+    val importId: UUID? = null,
 )
 
 interface HouseholdMemberRepository : ListCrudRepository<HouseholdMember, UUID> {
     fun findByUnitId(unitId: UUID): List<HouseholdMember>
+    fun findByImportId(importId: UUID): List<HouseholdMember>
 }

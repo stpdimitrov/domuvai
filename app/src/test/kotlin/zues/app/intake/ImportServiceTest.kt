@@ -14,6 +14,7 @@ import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Optional
 import java.util.UUID
@@ -110,6 +111,50 @@ class ImportServiceTest {
         assertThat(event.firstValue.units.map { it.idealParts }).containsExactly("60.0000", "40.0000")
         assertThat(event.firstValue.committedBy).isEqualTo(committedBy)
         assertThat(event.firstValue.rowsCreated).isEqualTo(2)
+    }
+
+    // Every optional column mapped: area, owner and children are adopted; absence, animals and
+    // business use cannot be — each needs a declaration a count is not.
+    private fun commitRich(): Pair<CommitResult, ImportCommitted> {
+        val req = FeeSheetDryRunRequest(
+            period = "2026-05", legalDate = "2026-05-01",
+            lines = listOf(TariffInput("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
+            csv = "designation,ideal_parts,occupants,fee_minor,area,owner,children,absent_days,animals,business\n" +
+                "ап. 1,60.0000,2,6000,72.50,Иван Петров,1,45,2,\n" +
+                "ап. 2,40.0000,1,4000,,,,,,да",
+        )
+        val importId = UUID.randomUUID()
+        whenever(imports.findById(importId))
+            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0)))
+        whenever(aggregates.update(any<ImportRow>())).thenAnswer { it.getArgument<ImportRow>(0) }
+        val result = service.commit(importId, committedBy, req)
+        val event = argumentCaptor<ImportCommitted>()
+        verify(events).publishEvent(event.capture())
+        return result to event.firstValue
+    }
+
+    @Test
+    fun `PM-BOOK-002 a commit carries each unit's built area, household and owner to the registry`() {
+        val (_, event) = commitRich()
+        val (first, second) = event.units
+        assertThat(first.builtArea).isEqualTo("72.50")
+        assertThat(first.ownerName).isEqualTo("Иван Петров")
+        assertThat(first.occupants).isEqualTo(2)
+        assertThat(first.childrenUnder6).isEqualTo(1)
+        assertThat(second.builtArea).isNull()                                // a blank cell is absent, never zero
+        assertThat(second.ownerName).isNull()
+        assertThat(second.childrenUnder6).isZero()
+        assertThat(event.effectiveFrom).isEqualTo(LocalDate.parse("2026-05-01"))   // the import's legal date
+    }
+
+    @Test
+    fun `PM-FEE-007 PM-BOOK-005 an absence or animal count is returned for a declaration, never adopted`() {
+        val (result, _) = commitRich()
+        assertThat(result.manualEntries).containsExactly(
+            ManualEntry("ап. 1", IntakeField.ABSENT_DAYS, "45", "PM-FEE-007"),
+            ManualEntry("ап. 1", IntakeField.ANIMALS, "2", "PM-BOOK-005"),
+            ManualEntry("ап. 2", IntakeField.BUSINESS_USE, "да", "PM-ORG-009"),
+        )
     }
 
     @Test

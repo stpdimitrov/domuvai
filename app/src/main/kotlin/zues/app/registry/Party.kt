@@ -17,9 +17,13 @@ data class Party(
     val fullName: String,
     val idType: String?,       // IdType, or null
     val idValue: String?,      // ЕГН / БУЛСТАТ / passport no — PM-BOOK-011: not for resident-visible lists
+    /** Provenance if adopted from a fee-sheet import (STAGE1-ADDENDUM §1); null if registered directly. */
+    val importId: UUID? = null,
 )
 
 /** The identifier kinds чл. 7 keeps for a party. */
 enum class IdType { EGN, LNCH, BULSTAT, PASSPORT }
 
-interface PartyRepository : ListCrudRepository<Party, UUID>
+interface PartyRepository : ListCrudRepository<Party, UUID> {
+    fun findByImportId(importId: UUID): List<Party>
+}
