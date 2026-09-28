@@ -1288,3 +1288,21 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Read first next time** — #35, this entry, `app/src/main/kotlin/zues/app/registry/OwnershipService.kt`.
 
 ---
+
+## S-G1-03b · 2026-09-28 · book declarations — the 15-day window and the versioned template (registry)
+
+**Did** — declarations for entry in the book (#37, `lane:registry`). `POST …/book/declarations` files one for a unit by a party; the **system** dates it (the Sofia day, PM-SYS-004 — the filing date decides timeliness) and records the **template version in force** that day (PM-BOOK-004). `GET …/book/declarations/overdue?on=` lists owners and users whose title is in force and whose deadline has passed with none of theirs filed between acquisition and `on` — a later filing never rewrites what was owed on `on`. The deadline is `BOOK_DECLARATION_DAYS` (15, чл. 7 ал. 3 ЗУЕС, confirmed) through `statutoryDeadline`, so it rolls off weekends and holidays (PM-SYS-005). Two dated constants in `:law`: `BOOK_DECLARATION_DAYS` and `BOOK_DECLARATION_TEMPLATE` — the latter a placeholder, **unconfirmed**, until the owner supplies the minister's current order (чл. 7 ал. 7). New table `registry.book_declaration` (`V202609281808`). The A9 planned declarations operation is now running (16 planned left). `tools/lanes.py` treats `law/…/Constants.kt` as shared, as WORKING.md already said.
+
+**Rules covered** — PM-BOOK-003 · PM-BOOK-004 (named-test coverage 37 → 39 of 233).
+
+**Tests added** — `DeclarationServiceTest` (new): `PM-BOOK-003 day 16 without a declaration is overdue when day 15 is a working day`, `PM-BOOK-003 a deadline that lands on a weekend rolls to the next working day`, `PM-BOOK-003 only a declaration filed between acquisition and the date asked clears it`, `PM-BOOK-004 a declaration records the system's filing day and the template in force`, `PM-SYS-004 a filing just after midnight in Sofia is dated the Sofia day`, bad kind / foreign unit. `DeclarationWebTest` (new): 201 with date and version, overdue defaults to today, 400s. `BookPersistenceIT`: `PM-BOOK-003 PM-BOOK-004 a filed declaration persists…` (Docker — CI).
+
+**Decisions** — owner D1–D3 on #37 (2026-09-28): an overdue read now, a task once a task module exists (PM-SYS-011); the acquisition trigger only — change detection later; the template version is a placeholder until the order is known. The TESTPLAN's "day 16 = overdue" holds only when day 15 is a working day — both cases tested.
+
+**Found** — the rest of `registry` dates "today" in UTC, not Sofia (PM-SYS-004): the absence filing date decides PM-FEE-007 timeliness. Filed as an unassigned `lane:registry` finding (the lane map counts it).
+
+**Open** — S-G1-03c (PM-BOOK-010, retention) needs the owner's retention windows; PM-BOOK-009 self-service waits for the auth provider; the template text and the minister's order for PM-BOOK-004.
+
+**Read first next time** — #37, this entry, `app/src/main/kotlin/zues/app/registry/DeclarationService.kt`.
+
+---

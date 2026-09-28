@@ -54,6 +54,18 @@ private val CONSTANTS: List<Constant> = listOf(
     // PM-DEBT-002 — where a decision sets no execution term, obligations fall due 14 days after
     // it is announced. A clear statutory figure, so it is confirmed.
     Constant("PAYMENT_TERM_DAYS", "14", "2009-01-01", "чл. 38 ал. 1 ЗУЕС", true, rule = "PM-DEBT-002"),
+    // PM-BOOK-003 — owners and users declare for the book within 15 days of acquiring title or use.
+    // The statute states the figure, so it is confirmed; it runs through statutoryDeadline (PM-SYS-005).
+    Constant("BOOK_DECLARATION_DAYS", "15", "2009-01-01", "чл. 7 ал. 3 ЗУЕС", true, rule = "PM-BOOK-003"),
+    // PM-BOOK-004 — the declaration is on the template the minister approves (чл. 7 ал. 7), so the
+    // template is dated and versioned like any legal value, and each declaration records the version
+    // in force on its filing date. Which order is current is not in this repository: the value is a
+    // placeholder identifier, unconfirmed, never an asserted order number.
+    Constant(
+        "BOOK_DECLARATION_TEMPLATE", "ministry-template-1", "2009-01-01", "чл. 7 ал. 7 ЗУЕС", false, rule = "PM-BOOK-004",
+        todoLegal = "Record the currently approved declaration template — the minister's order under чл. 7 " +
+            "ал. 7 ЗУЕС (number, date, effective date) — as a dated entry; `ministry-template-1` is a placeholder.",
+    ),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */

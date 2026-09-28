@@ -278,6 +278,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/registry/entrances/{entranceId}/book/declarations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** File a declaration for entry in the book — dated by the system, on the template in force */
+        post: operations["post_registry_entrances_entranceId_book_declarations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/registry/entrances/{entranceId}/book/declarations/overdue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Owners and users past their declaration deadline on a date — names only */
+        get: operations["get_registry_entrances_entranceId_book_declarations_overdue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/registry/entrances/{entranceId}/owners": {
         parameters: {
             query?: never;
@@ -508,6 +542,13 @@ export interface components {
             entranceId: string;
             units: components["schemas"]["BookUnitEntry"][];
         };
+        DeclarationFiled: {
+            /** Format: date */
+            filedOn: string;
+            /** Format: uuid */
+            id: string;
+            templateVersion: string;
+        };
         DryRunReport: {
             differences: components["schemas"]["UnitDiff"][];
             /** Format: int32 */
@@ -543,6 +584,13 @@ export interface components {
                 [key: string]: "DESIGNATION" | "IDEAL_PARTS" | "OCCUPANTS" | "FEE_MINOR" | "BUILT_AREA" | "OWNER_NAME" | "CHILDREN_UNDER_6" | "ANIMALS" | "ABSENT_DAYS" | "BUSINESS_USE";
             };
             period: string;
+        };
+        FileDeclarationRequest: {
+            kind: string;
+            /** Format: uuid */
+            partyId: string;
+            /** Format: uuid */
+            unitId: string;
         };
         FundAccountRegistered: {
             /** Format: uuid */
@@ -608,6 +656,17 @@ export interface components {
             idealParts: string;
             separateEntrance: boolean;
             unitType: string;
+        };
+        OverdueDeclaration: {
+            /** Format: date */
+            acquiredOn: string;
+            designation: string;
+            /** Format: date */
+            dueOn: string;
+            partyName: string;
+            titleRole: string;
+            /** Format: uuid */
+            unitId: string;
         };
         OwnerResponse: {
             partyName: string;
@@ -1642,6 +1701,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CondominiumBook"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_registry_entrances_entranceId_book_declarations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileDeclarationRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeclarationFiled"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_registry_entrances_entranceId_book_declarations_overdue: {
+        parameters: {
+            query?: {
+                on?: string;
+            };
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverdueDeclaration"][];
                 };
             };
             /** @description Bad Request */
