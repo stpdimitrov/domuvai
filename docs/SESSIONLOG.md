@@ -1341,3 +1341,19 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`; for the next slice, #38.
 
 ---
+
+## F-38 · 2026-09-28 · registry "today" is the Sofia day (PM-SYS-004)
+
+**Did** — fixed finding #38 (`lane:registry`, found in S-G1-03b). Every "today" `registry` stamps or falls back to is now the Europe/Sofia calendar day — `LocalDate.parse(toSofiaDate(clock.instant()))` — not `LocalDate.now(clock)` on the app's UTC clock, which gave yesterday from 00:00 to about 03:00 Sofia time. Five sites: an absence's `filedOn` (PM-FEE-007 judges a filing's timeliness on it); the default `validFrom` of a household member, an animal and a title; the book's default date. No `LocalDate.now` is left anywhere in the code.
+
+**Rules covered** — PM-SYS-004 (already covered; named-test coverage stays 39 of 233).
+
+**Tests added** — `LegalTodayTest` (new; the clock at 00:30 Sofia, 21:30 UTC the evening before): `PM-SYS-004 an absence filed just after midnight in Sofia is dated the Sofia day, not the UTC one`, `PM-SYS-004 a resident or an animal given no start date starts on the Sofia day`, `PM-SYS-004 a title given no start date starts on the Sofia day`. `BookWebTest`: `PM-SYS-004 with no date given the book is read as of today in Sofia`. `DeclarationWebTest`: its clock moved to 00:30 Sofia, so `PM-SYS-004 GET overdue defaults to today in Sofia…` now proves what it names. All four new tests failed on the old code; reverting the declarations default made the fifth fail.
+
+**Decisions** — none; the fix is the one #38 named.
+
+**Open** — nothing stops a new `LocalDate.now(clock)` from landing: a check in `tools/` would keep it out of every lane (cross-lane, so not done here). Registry next: S-G1-03c (PM-BOOK-010) once the owner gives retention windows; otherwise as H-05.
+
+**Read first next time** — H-05, this entry; then `python3 tools/lanes.py`.
+
+---

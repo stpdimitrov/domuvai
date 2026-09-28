@@ -5,6 +5,7 @@ import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.kernel.IdealParts
+import zues.kernel.toSofiaDate
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.LocalDate
@@ -49,13 +50,13 @@ data class ImportedUnit(
     val ownerName: String? = null,
 )
 
-/** One resident to register in a unit's household. `validFrom` defaults to today. */
+/** One resident to register in a unit's household. `validFrom` defaults to today in Sofia (PM-SYS-004). */
 data class RegisterMember(
     val isChildUnder6: Boolean = false,
     val validFrom: String? = null,
 )
 
-/** One animal to register in a unit. `validFrom` defaults to today. */
+/** One animal to register in a unit. `validFrom` defaults to today in Sofia (PM-SYS-004). */
 data class RegisterAnimal(
     val species: String,
     val vetPassportNo: String? = null,
@@ -217,7 +218,7 @@ class RegistryService(
         if (unit.entranceId != entranceId) {
             throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
         }
-        val today = LocalDate.now(clock)
+        val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
         return members.map { member ->
             aggregates.insert(
                 HouseholdMember(
@@ -244,7 +245,7 @@ class RegistryService(
         if (unit.entranceId != entranceId) {
             throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
         }
-        val today = LocalDate.now(clock)
+        val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
         return animals.map { animal ->
             aggregates.insert(
                 Animal(
@@ -263,8 +264,9 @@ class RegistryService(
     /**
      * File absence declarations for a unit — the record a per-person exemption requires (Rule:
      * PM-FEE-007; the exemption itself is PM-FEE-006). Each is a closed span; `filedOn` is
-     * stamped from the clock, so timeliness turns on when the system received the filing, not on
-     * a date the caller claims. The unit must exist and belong to the entrance.
+     * stamped from the clock as the Sofia calendar day (PM-SYS-004), so timeliness turns on when
+     * the system received the filing, not on a date the caller claims. The unit must exist and
+     * belong to the entrance.
      */
     @Transactional
     fun registerAbsence(entranceId: UUID, unitId: UUID, declarations: List<RegisterAbsence>): List<UUID> {
@@ -272,7 +274,7 @@ class RegistryService(
         if (unit.entranceId != entranceId) {
             throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
         }
-        val filedOn = LocalDate.now(clock)
+        val filedOn = LocalDate.parse(toSofiaDate(clock.instant()))             // a Sofia calendar day (PM-SYS-004)
         return declarations.map { declaration ->
             val from = LocalDate.parse(declaration.absentFrom)
             val to = LocalDate.parse(declaration.absentTo)

@@ -3,6 +3,7 @@ package zues.app.registry
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import zues.kernel.toSofiaDate
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.LocalDate
@@ -15,8 +16,8 @@ data class RegisterParty(
     val idValue: String? = null,
 )
 
-/** Assign a party a title over a unit (Rule: PM-ORG-005, PM-ORG-011). `validFrom` defaults to today;
- *  `validTo` bounds it — a sale ends the seller's title on the day the buyer's begins. */
+/** Assign a party a title over a unit (Rule: PM-ORG-005, PM-ORG-011). `validFrom` defaults to today
+ *  in Sofia (PM-SYS-004); `validTo` bounds it — a sale ends the seller's title on the day the buyer's begins. */
 data class AssignTitle(
     val partyId: UUID,
     val titleRole: String,
@@ -76,7 +77,7 @@ class OwnershipService(
         require(share > BigDecimal.ZERO && share <= BigDecimal.ONE) {         // Rule: PM-ORG-005
             "share must be within (0, 1]: ${command.share}"
         }
-        val from = command.validFrom?.let { LocalDate.parse(it) } ?: LocalDate.now(clock)
+        val from = command.validFrom?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant()))
         val to = command.validTo?.let { LocalDate.parse(it) }
         require(to == null || to > from) { "validTo ($to) must be after validFrom ($from)" }
         return aggregates.insert(

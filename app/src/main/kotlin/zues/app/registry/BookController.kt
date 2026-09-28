@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.kernel.toSofiaDate
 import java.time.Clock
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -15,7 +16,7 @@ import java.util.UUID
 
 /**
  * Reads the Book of the Condominium for an entrance (PM-BOOK-001 — the electronic book is the
- * system of record). The book resolves as of a date; omit it and it is today.
+ * system of record). The book resolves as of a date; omit it and it is today in Sofia (PM-SYS-004).
  */
 @RestController
 @RequestMapping("/api/registry/entrances/{entranceId}/book")
@@ -23,7 +24,7 @@ class BookController(private val book: BookService, private val clock: Clock) {
 
     @GetMapping
     fun book(@PathVariable entranceId: UUID, @RequestParam(required = false) on: String?): CondominiumBook =
-        book.forEntrance(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.now(clock))
+        book.forEntrance(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())))
 
     /** No such entrance. */
     @ExceptionHandler(NoSuchElementException::class)
