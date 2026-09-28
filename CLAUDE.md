@@ -17,7 +17,7 @@ All behaviour is governed by `docs/RULES.md` (machine-readable mirror `docs/rule
 - Every stored charge, decision or compliance task carries `basis`, `basis_hash`, `law_version` **and `engine_version`**. (ADR-001 amendment)
 - Money is integer minor units in EUR (PM-FEE-016). No floats. Pre-2026 BGN records keep the original amount, the 1.95583 rate and the converted value. (ADR-006)
 - Ideal parts are exact decimals summing to 100% per entrance. No floats. (ADR-006)
-- Deadlines use Europe/Sofia calendar days through one shared utility (PM-SYS-004/005).
+- Deadlines use Europe/Sofia calendar days through one shared utility (PM-SYS-004/005). A legal "today" is `LocalDate.parse(toSofiaDate(clock.instant()))`, never `LocalDate.now(clock)` — the clock runs in UTC.
 - Votes, decisions, money postings and personal-data access are append-only and audited (PM-VOTE-014, PM-SEC-004).
 
 ### Words, and the banned ones
@@ -96,6 +96,7 @@ One module per slice. Max ~400 lines of reviewable diff. If it will not fit, spl
 - No banned word in an identifier
 - No unverified rule's number as a literal — config lookup + `TODO(legal): PM-XXX-000`
 - **No legal number anywhere outside `@zues/law`**
+- No calendar date read off a clock except through `toSofiaDate` (PM-SYS-004)
 - No cross-module database access; no import between modules except through a module's published API (Spring Modulith package boundary; ADR-003)
 - Counts and lists in docs are generated, never typed
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A13 — the gate pack. Same six checks locally and in CI.
+# A13 — the gate pack. The same checks locally and in CI.
 # Drift is not something anyone has to remember. It is a red build.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -8,15 +8,16 @@ cd "$(dirname "$0")/.."
 fail=0
 run() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; shift; "$@" || { fail=1; printf '\033[31m  ✗ failed\033[0m\n'; }; }
 
-run "1/9  tests"                ./gradlew test --console=plain
-run "2/9  event contracts"      bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
-run "3/9  functional spec"      bash -c 'cd tools && python3 build_functional.py'
-run "4/9  traceability"         python3 tools/traceability.py
-run "5/9  test plan"            python3 tools/testplan.py
-run "6/9  openapi"              python3 tools/build_openapi.py
-run "7/9  banned words"         python3 tools/check_banned_words.py
-run "8/9  legal thresholds"     python3 tools/check_legal_literals.py
-run "9/9  schema columns"       python3 tools/check_schema_columns.py
+run "1/10  tests"               ./gradlew test --console=plain
+run "2/10  event contracts"     bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
+run "3/10  functional spec"     bash -c 'cd tools && python3 build_functional.py'
+run "4/10  traceability"        python3 tools/traceability.py
+run "5/10  test plan"           python3 tools/testplan.py
+run "6/10  openapi"             python3 tools/build_openapi.py
+run "7/10  banned words"        python3 tools/check_banned_words.py
+run "8/10  legal thresholds"    python3 tools/check_legal_literals.py
+run "9/10  schema columns"      python3 tools/check_schema_columns.py
+run "10/10 legal today"         python3 tools/check_legal_today.py
 
 # Only GENERATED paths belong here. A hand-written document changing is normal;
 # flagging it would make this gate noise, and noise gets switched off.
