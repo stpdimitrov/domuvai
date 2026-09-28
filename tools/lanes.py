@@ -32,8 +32,10 @@ LANES = sorted(set(MODULE.values()) | {p.name.replace('_', '-') for p in APP.ite
 # module runs (FEE rules), so it is money's lane.
 DIR_LANE = {'charges': 'money', 'kernel': 'kernel', 'law': 'law', 'web': 'web'}
 APP_PATH = re.compile(r'^app/src/(?:main|test)/kotlin/zues/app/([a-z_]+)/')
-# Generated from the contract, so every lane that changes an endpoint regenerates it (ADR-011 §2.2).
-SHARED = {'web/lib/api/schema.d.ts'}
+# Shared by every lane: the web client is generated from the contract, so any lane that changes an
+# endpoint regenerates it (ADR-011 §2.2); and every legal number lives in one coordinated file
+# (ADR-001, WORKING.md), so a slice adding a dated constant is not working in the `law` lane.
+SHARED = {'web/lib/api/schema.d.ts', 'law/src/main/kotlin/zues/law/Constants.kt'}
 SLICE = re.compile(r'^### (S-\S+) · `([\w-]+)` · (.+?) · (\d+) rule')
 
 

@@ -375,6 +375,27 @@
         ],
         "type": "object"
       },
+      "DeclarationFiled": {
+        "properties": {
+          "filedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "templateVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "filedOn",
+          "id",
+          "templateVersion"
+        ],
+        "type": "object"
+      },
       "DryRunReport": {
         "properties": {
           "differences": {
@@ -502,6 +523,27 @@
           "legalDate",
           "lines",
           "period"
+        ],
+        "type": "object"
+      },
+      "FileDeclarationRequest": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "partyId",
+          "unitId"
         ],
         "type": "object"
       },
@@ -732,6 +774,40 @@
           "idealParts",
           "separateEntrance",
           "unitType"
+        ],
+        "type": "object"
+      },
+      "OverdueDeclaration": {
+        "properties": {
+          "acquiredOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "dueOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "partyName": {
+            "type": "string"
+          },
+          "titleRole": {
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "acquiredOn",
+          "designation",
+          "dueOn",
+          "partyName",
+          "titleRole",
+          "unitId"
         ],
         "type": "object"
       },
@@ -2655,6 +2731,151 @@
         "x-rules": [
           "PM-BOOK-001",
           "PM-BOOK-002"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/book/declarations": {
+      "post": {
+        "operationId": "post_registry_entrances_entranceId_book_declarations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileDeclarationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeclarationFiled"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "File a declaration for entry in the book — dated by the system, on the template in force",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-003",
+          "PM-BOOK-004"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/book/declarations/overdue": {
+      "get": {
+        "operationId": "get_registry_entrances_entranceId_book_declarations_overdue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OverdueDeclaration"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Owners and users past their declaration deadline on a date — names only",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-003",
+          "PM-BOOK-011"
         ]
       }
     },

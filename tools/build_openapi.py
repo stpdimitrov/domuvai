@@ -41,6 +41,11 @@ RUNNING = {
    ('File an absence declaration — the long-absence exemption', ['PM-FEE-006', 'PM-FEE-007']),
  ('get', '/api/registry/entrances/{entranceId}/book'):
    ('Read the Book of the Condominium as of a date', ['PM-BOOK-001', 'PM-BOOK-002']),
+ ('post', '/api/registry/entrances/{entranceId}/book/declarations'):
+   ('File a declaration for entry in the book — dated by the system, on the template in force',
+    ['PM-BOOK-003', 'PM-BOOK-004']),
+ ('get', '/api/registry/entrances/{entranceId}/book/declarations/overdue'):
+   ('Owners and users past their declaration deadline on a date — names only', ['PM-BOOK-003', 'PM-BOOK-011']),
  ('post', '/api/registry/parties'):
    ('Register a party — a person or company that can hold a title', ['PM-BOOK-002']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/titles'):
@@ -91,8 +96,6 @@ RUNNING = {
 
 # Designed in A9, not built yet — method, path as designed, module, summary, rules. Never published.
 PLANNED = [
- ('post', '/entrances/{entrance_id}/book/declarations', 'registry',
-  'File an owner declaration on the ministry template', ['PM-BOOK-003', 'PM-BOOK-004', 'PM-BOOK-009']),
  ('get', '/entrances/{entrance_id}/mandates', 'identity-org',
   'List office holders as at a date', ['PM-GOV-004', 'PM-SEC-011']),
  ('post', '/entrances/{entrance_id}/mandates', 'identity-org',

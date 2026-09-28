@@ -15,6 +15,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import zues.law.constantOn
 import java.time.LocalDate
 
 /**
@@ -47,6 +48,22 @@ class BookPersistenceIT {
     @Autowired lateinit var registry: RegistryService
     @Autowired lateinit var ownership: OwnershipService
     @Autowired lateinit var book: BookService
+    @Autowired lateinit var declarations: DeclarationService
+
+    @Test
+    fun `PM-BOOK-003 PM-BOOK-004 a filed declaration persists with its template version and clears what was owed`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 3", "А", "GA")).entranceId
+        val unit = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val party = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        ownership.assignTitle(entrance, unit, AssignTitle(party, "OWN", validFrom = "2020-01-01"))
+        val dayAfterDeadline = LocalDate.parse("2020-01-17")         // acquired 1 Jan 2020; the window closed on the 16th
+        assertThat(declarations.overdue(entrance, dayAfterDeadline).single().partyName).isEqualTo("Мария Георгиева")
+
+        val filed = declarations.file(entrance, unit, party, "ACQUISITION")
+        assertThat(filed.templateVersion).isEqualTo(constantOn("BOOK_DECLARATION_TEMPLATE", filed.filedOn.toString()).value)
+        assertThat(declarations.overdue(entrance, filed.filedOn)).isEmpty()         // filed: nothing owed now
+        assertThat(declarations.overdue(entrance, dayAfterDeadline)).hasSize(1)     // and what was owed then still holds
+    }
 
     @Test
     fun `PM-BOOK-001 002 the book assembles a unit's record and marks completeness`() {
