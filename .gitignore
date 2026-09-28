@@ -20,3 +20,4 @@ package-lock.json
 # IDE and notes-app state — per machine, never shared
 .idea/
 .obsidian/
+.kotlin/

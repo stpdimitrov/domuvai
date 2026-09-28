@@ -43,6 +43,21 @@ class ArrearsServiceTest {
     }
 
     @Test
+    fun `PM-DEBT-001 a payment after the read date has not reduced the arrears, one before it is banded with its debt`() {
+        val debt = overdueBy(45, 3000)
+        fun paid(on: LocalDate, amount: Long) = PostingRow(
+            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "RECEIVABLE", unitId, -amount, "EUR", on,
+            settlesValueDate = debt.valueDate,
+        )
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(
+            listOf(debt, paid(asOf.minusDays(1), 1000), paid(asOf.plusDays(1), 2000)),
+        )
+        val report = service.forUnit(unitId, asOf)
+        assertThat(report.totalMinor).isEqualTo(2000)
+        assertThat(report.buckets.associate { it.band to it.amountMinor }["31-60"]).isEqualTo(2000)
+    }
+
+    @Test
     fun `a charge not yet due is CURRENT, not an arrear`() {
         whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(receivable(500, asOf)))
         val report = service.forUnit(unitId, asOf)
