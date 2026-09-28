@@ -23,7 +23,7 @@ The boot order has one home: **Boot, in order** in [`CLAUDE.md`](../CLAUDE.md). 
 slice contract → branch → code + tests → exit checks → PR → review → merge → session log
 ```
 
-- One module per slice. One branch per slice. One PR per slice. **No two developers open the same module at once** — claim the slice first (a GitHub Issue from `docs/TESTPLAN.md`).
+- One module per slice. One branch per slice. One PR per slice. **No two developers open the same lane at once** — claim it first (`tools/lanes.py`, see *Splitting the work*).
 - **Never push to `main`.** Push the branch, open the PR, let CI gate it, merge when green — branch protection requires it. The direct-to-`main` shortcut a lone session may take does not scale past one person (the second push is rejected).
 - **Rebase on `origin/main` before you push or update a PR**, so conflicts surface in your session, not at merge.
 - **The slice contract is the PR description** — the reviewer sees intent and the quoted rule texts, not just a diff.
@@ -42,21 +42,23 @@ Different modules barely touch, but a few shared files change on almost every sl
 | File(s) | On a conflict |
 |---|---|
 | Generated docs — `TRACEABILITY.md`, `TESTPLAN.md`, `FUNCTIONAL.md`, `api/openapi.json`, `docs/events/*` | They are derived — never hand-merge. Take `origin/main`'s copy, re-run the generators (the gate pack does), commit the regenerated result. |
-| Schema | Do not edit an applied migration. Each schema change is a **new** file `V<yyyyMMddHHmm>__desc.sql`; `V1__init.sql` is the baseline. The schema gate reads every `V*.sql` (`CREATE TABLE` and `ALTER TABLE … ADD COLUMN`), so two developers' schema work never shares a file. |
-| `docs/SESSIONLOG.md` | Append-only, `merge=union` (`.gitattributes`) — both entries survive. Add yours at the end; never edit an earlier one. |
+| Schema | Do not edit an applied migration. Each schema change is a **new** file `V<yyyyMMddHHmm>__desc.sql`, stamped with the real UTC minute (`date -u +%Y%m%d%H%M`); `V1__init.sql` is the baseline. The schema gate reads every `V*.sql` (`CREATE TABLE` and `ALTER TABLE … ADD COLUMN`) and fails on a duplicate version — S-41b and S-42 both wrote `…1200` on the same day, which no text merge flags and Flyway refuses. |
+| `docs/SESSIONLOG.md` | Append-only, `merge=union` (`.gitattributes`) — both entries survive. Add yours at the end; never edit an earlier one. GitHub ignores the union driver, so the PR that merges second shows a conflict: rebase locally and git resolves it, your entry last. |
 | `law/…/Constants.kt`, `rules.json` | Structured and rarely changed — coordinate the change; do **not** union-merge (it would break the syntax). |
 
 ## Splitting the work
 
-The foundation (the A-plan) is built; work is now module slices from `docs/TESTPLAN.md`. Split by **module** — the only place code truly collides — so each developer owns a different lane and there is almost nothing to merge:
+The foundation (the A-plan) is built; work is now module slices from `docs/TESTPLAN.md`. Split by **module** — the only place code truly collides — so two developers are never in one lane and there is almost nothing to merge. A lane is a module (ADR-003) or the `web` deployable.
 
-| Developer | Module lane (example) |
-|---|---|
-| **A** | `money` · `rail` — the ledger |
-| **B** | `assembly` · governance — the decision |
-| **C** | `registry` · `intake` — the record and the import |
+**Lanes are claimed, not assigned** — there is no table of names to keep current, and it works the same for one developer or three:
 
-Only three of fourteen modules have code, so there is ample non-overlapping surface; rebalance the lanes as modules fill. Three developers give roughly **50–65%** of single-developer calendar, not a third — integration, review and event-contract coordination eat the rest, and the coordination cost rises with the third person.
+- `python3 tools/lanes.py` prints the live map, read from GitHub: who holds each lane, the free lanes with their next `TESTPLAN.md` slice, and warnings — a PR working in a lane nobody holds, or held by someone else.
+- A lane is **held** while an open issue labelled `lane:<lane>` has an assignee: the slice issue, opened by `tools/lanes.py claim` with the slice contract as its body. The PR's `Closes #n` frees it on merge.
+- Two sessions claiming one free lane at once: the lower issue number holds it, and `claim` tells the other to close theirs.
+- A **finding** for another lane is the same label with no assignee: counted on the map, claimed by nobody until someone takes it into a slice.
+- A developer who prefers a lane sets `git config zues.lane <lane>`: it is listed first, never reserved.
+
+Only three of fourteen modules have code, so there is ample non-overlapping surface. Three developers give roughly **50–65%** of single-developer calendar, not a third — integration, review and event-contract coordination eat the rest, and the coordination cost rises with the third person.
 
 ## Skills
 

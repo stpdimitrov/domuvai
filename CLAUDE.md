@@ -66,7 +66,7 @@ Context drift across sessions is the main risk. Conversation context is never sh
 
 ### Boot, in order
 
-1. `CLAUDE.md` · 2. `docs/INDEX.md` · 3. `docs/SESSIONLOG.md` (**last** entry only — the log appends, so the newest entry is at the end) · 4. `docs/DEVBRIEF.md` · 5. `docs/RULES.md` for **this slice only** · 6. `docs/adr/` · 7. `git log --oneline -10`, current branch, failing tests
+1. `CLAUDE.md` · 2. `docs/INDEX.md` · 3. `docs/SESSIONLOG.md` (**last** entry only — the log appends, so the newest entry is at the end) · 4. `docs/DEVBRIEF.md` · 5. `docs/RULES.md` for **this slice only** · 6. `docs/adr/` · 7. `git log --oneline -10`, current branch, failing tests · 8. `python3 tools/lanes.py` — who holds which lane right now, and each free lane's next slice
 
 If a boot document is missing, say so and stop. Do not reconstruct context from the conversation.
 
@@ -112,11 +112,12 @@ Append to `docs/SESSIONLOG.md` and commit it with the slice. Never edit an earli
 Up to three developers build here at once, each in their own Claude Code session. Sessions share nothing but this repo, so every rule below is enforced by the repo, not by anyone's memory.
 
 - **Never push to `main`. Branch → PR → CI green → merge.** Direct-to-`main` cannot work for more than one person — the second push is rejected — and it skips the gate every merge must pass. Push the `slice/S-nn-*` branch, open a PR (the slice contract is its description), let CI run the gate pack, merge when green. Branch protection requires it.
-- **One module per developer at a time.** The module is the parallelism boundary (ADR-003). Before starting, claim the slice — a GitHub Issue from `docs/TESTPLAN.md` — and check that no open PR touches your module. Never open a module someone else has in flight.
+- **One lane per developer at a time — claimed, not assigned.** A lane is a module (ADR-003) or `web`; nobody is given one. `python3 tools/lanes.py` shows who holds what, live from GitHub. Pick a **free** lane only, and claim it before branching: `python3 tools/lanes.py claim <lane> --title "S-nn <name> (<lane> · <rule ids>)" --body-file <contract.md>` opens the slice issue — labelled `lane:<lane>`, assigned to you, the slice contract as its body. If `claim` or `check` names another holder, stop and pick another lane. The PR says `Closes #n`, so merging it frees the lane. `git config zues.lane <lane>` marks a preference, never a reservation.
 - **Rebase before you push or update a PR:** `git fetch && git rebase origin/main`, so conflicts surface in your session where you can resolve them, not at merge time.
 - **Generated docs are regenerated, never hand-merged** — `docs/TRACEABILITY.md`, `docs/TESTPLAN.md`, `docs/FUNCTIONAL.md`, `docs/api/openapi.json`, `docs/events/*`. On a conflict, take `origin/main`'s version and re-run the generators (the gate pack does this), then commit. Hand-merging them corrupts the structure.
-- **Schema changes go in a NEW migration file** — `V<yyyyMMddHHmm>__short_desc.sql`, never an edit to an applied migration. `V1__init.sql` is the baseline; one file per change, so two developers' schema work never touches the same file. The schema-columns gate reads every `V*.sql` (both `CREATE TABLE` and `ALTER TABLE … ADD COLUMN`).
-- **`docs/SESSIONLOG.md` is append-only and union-merges** (`.gitattributes`): add your slice's entry at the end, never edit an earlier one — two appends concatenate instead of conflicting.
+- **Schema changes go in a NEW migration file** — `V<yyyyMMddHHmm>__short_desc.sql`, never an edit to an applied migration. Stamp it with the **real UTC minute** it was written — `date -u +%Y%m%d%H%M` — never a round placeholder: two developers who both pick `…1200` collide, and Flyway will not start. `V1__init.sql` is the baseline; one file per change, so two developers' schema work never touches the same file. The schema gate reads every `V*.sql` (both `CREATE TABLE` and `ALTER TABLE … ADD COLUMN`) and fails on a duplicate or malformed version.
+- **`docs/SESSIONLOG.md` is append-only and union-merges** (`.gitattributes`): add your slice's entry at the end, never edit an earlier one — two appends concatenate instead of conflicting. **GitHub ignores the union driver**, so the second of two PRs to merge shows a conflict there: its author rebases locally (`git fetch && git rebase origin/main`) — git resolves it and their entry lands last — and pushes with `--force-with-lease` (their own branch only).
+- **A problem found in another lane is an issue, not a fix**: `gh issue create --label lane:<lane>` with no assignee. Unassigned, it is a finding the lane map counts — not a claim. Push to someone else's branch only by agreement: merge `main` into it (no force push) and tell them to pull.
 
 Full protocol and the work split: `docs/WORKING.md`.
 
