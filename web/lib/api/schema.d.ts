@@ -312,6 +312,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/registry/entrances/{entranceId}/book/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anonymise the book's personal data past its retention window — today in Sofia, irreversible */
+        post: operations["post_registry_entrances_entranceId_book_retention"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/registry/entrances/{entranceId}/owners": {
         parameters: {
             query?: never;
@@ -381,6 +398,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record the day an animal left the unit */
+        post: operations["post_registry_entrances_entranceId_units_unitId_animals_animalId_end"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/registry/entrances/{entranceId}/units/{unitId}/household": {
         parameters: {
             query?: never;
@@ -392,6 +426,23 @@ export interface paths {
         put?: never;
         /** Register a unit's household — who counts for per-person charges */
         post: operations["post_registry_entrances_entranceId_units_unitId_household"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record the day a resident left — their occupancy range closes */
+        post: operations["post_registry_entrances_entranceId_units_unitId_household_memberId_end"];
         delete?: never;
         options?: never;
         head?: never;
@@ -559,6 +610,9 @@ export interface components {
             /** Format: int32 */
             rowsParsed: number;
             violations: string[];
+        };
+        EndStayRequest: {
+            on: string;
         };
         EntranceCreatedResponse: {
             /** Format: uuid */
@@ -746,6 +800,14 @@ export interface components {
         RegisterUnitsRequest: {
             units: components["schemas"]["NewUnitRequest"][];
         };
+        RetentionApplied: {
+            /** Format: int32 */
+            animalPassportsCleared: number;
+            /** Format: int32 */
+            householdUnlinked: number;
+            /** Format: date */
+            on: string;
+        };
         RevertRequest: {
             reason: string;
             /** Format: uuid */
@@ -759,6 +821,14 @@ export interface components {
             derivation: string;
             period: string;
             quantity: number;
+        };
+        StayEnded: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            validFrom: string;
+            /** Format: date */
+            validTo: string;
         };
         StoredChargeRunRequest: {
             /** Format: int32 */
@@ -1821,6 +1891,50 @@ export interface operations {
             };
         };
     };
+    post_registry_entrances_entranceId_book_retention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionApplied"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     get_registry_entrances_entranceId_owners: {
         parameters: {
             query: {
@@ -2112,6 +2226,67 @@ export interface operations {
             };
         };
     };
+    post_registry_entrances_entranceId_units_unitId_animals_animalId_end: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                unitId: string;
+                animalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndStayRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StayEnded"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     post_registry_entrances_entranceId_units_unitId_household: {
         parameters: {
             query?: never;
@@ -2135,6 +2310,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HouseholdRegisteredResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_registry_entrances_entranceId_units_unitId_household_memberId_end: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                unitId: string;
+                memberId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndStayRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StayEnded"];
                 };
             };
             /** @description Bad Request */

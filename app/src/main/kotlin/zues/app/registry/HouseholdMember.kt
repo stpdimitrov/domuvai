@@ -33,4 +33,5 @@ data class HouseholdMember(
 interface HouseholdMemberRepository : ListCrudRepository<HouseholdMember, UUID> {
     fun findByUnitId(unitId: UUID): List<HouseholdMember>
     fun findByImportId(importId: UUID): List<HouseholdMember>
+    fun findByEntranceId(entranceId: UUID): List<HouseholdMember>
 }

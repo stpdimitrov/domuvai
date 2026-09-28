@@ -39,8 +39,14 @@ RUNNING = {
    ('Record the animals kept in a unit', ['PM-BOOK-005', 'PM-FEE-009']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/absences'):
    ('File an absence declaration — the long-absence exemption', ['PM-FEE-006', 'PM-FEE-007']),
+ ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end'):
+   ('Record the day a resident left — their occupancy range closes', ['PM-BOOK-008']),
+ ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end'):
+   ('Record the day an animal left the unit', ['PM-BOOK-005', 'PM-BOOK-008']),
  ('get', '/api/registry/entrances/{entranceId}/book'):
    ('Read the Book of the Condominium as of a date', ['PM-BOOK-001', 'PM-BOOK-002']),
+ ('post', '/api/registry/entrances/{entranceId}/book/retention'):
+   ("Anonymise the book's personal data past its retention window — today in Sofia, irreversible", ['PM-BOOK-010']),
  ('post', '/api/registry/entrances/{entranceId}/book/declarations'):
    ('File a declaration for entry in the book — dated by the system, on the template in force',
     ['PM-BOOK-003', 'PM-BOOK-004']),

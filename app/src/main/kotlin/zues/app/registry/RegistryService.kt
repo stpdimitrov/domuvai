@@ -291,4 +291,31 @@ class RegistryService(
             ).id
         }
     }
+
+    /**
+     * Record the day a resident left: their occupancy range closes there, so the fee engine stops
+     * counting them from that day (Rule: PM-BOOK-008), and the book's retention window for them
+     * starts (PM-BOOK-010). The day is the one declared, not the filing day. A stay already ended is
+     * not ended again; the resident must be in the unit and the entrance.
+     */
+    @Transactional
+    fun endHouseholdStay(entranceId: UUID, unitId: UUID, memberId: UUID, on: LocalDate): HouseholdMember {
+        val member = household.findById(memberId).orElse(null)
+            ?.takeIf { it.entranceId == entranceId && it.unitId == unitId }
+            ?: throw NoSuchElementException("no resident $memberId in unit $unitId")
+        check(member.validTo == null) { "resident $memberId already left on ${member.validTo}" }
+        require(on > member.validFrom) { "the move-out ($on) must be after the move-in (${member.validFrom})" }
+        return aggregates.update(member.copy(validTo = on))
+    }
+
+    /** Record the day an animal left the unit — its range in the animals section closes (Rule: PM-BOOK-005, PM-BOOK-008). */
+    @Transactional
+    fun endAnimalStay(entranceId: UUID, unitId: UUID, animalId: UUID, on: LocalDate): Animal {
+        val animal = aggregates.findById(animalId, Animal::class.java)
+            ?.takeIf { it.entranceId == entranceId && it.unitId == unitId }
+            ?: throw NoSuchElementException("no animal $animalId in unit $unitId")
+        check(animal.validTo == null) { "animal $animalId already left on ${animal.validTo}" }
+        require(on > animal.validFrom) { "the move-out ($on) must be after the move-in (${animal.validFrom})" }
+        return aggregates.update(animal.copy(validTo = on))
+    }
 }

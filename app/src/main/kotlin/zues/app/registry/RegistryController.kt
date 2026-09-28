@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.math.BigDecimal
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
 import java.util.UUID
 
 /** A new building's [address], or the [condominiumId] of the building the entrance joins (PM-ORG-001). */
@@ -81,6 +83,11 @@ data class NewAbsenceRequest(
 )
 
 data class AbsencesRegisteredResponse(val absenceIds: List<UUID>)
+
+/** The day a resident or an animal left the unit, as declared — ISO date, the first day not there. */
+data class EndStayRequest(val on: String)
+
+data class StayEnded(val id: UUID, val validFrom: LocalDate, val validTo: LocalDate)
 
 /** The registry module's HTTP edge — entrances and their units. */
 @RestController
@@ -160,14 +167,39 @@ class RegistryController(private val registry: RegistryService) {
         return AbsencesRegisteredResponse(ids)
     }
 
+    @PostMapping("/{entranceId}/units/{unitId}/household/{memberId}/end")
+    fun endHouseholdStay(
+        @PathVariable entranceId: UUID,
+        @PathVariable unitId: UUID,
+        @PathVariable memberId: UUID,
+        @RequestBody request: EndStayRequest,
+    ): StayEnded {
+        val on = LocalDate.parse(request.on)
+        return registry.endHouseholdStay(entranceId, unitId, memberId, on).let { StayEnded(it.id, it.validFrom, on) }
+    }
+
+    @PostMapping("/{entranceId}/units/{unitId}/animals/{animalId}/end")
+    fun endAnimalStay(
+        @PathVariable entranceId: UUID,
+        @PathVariable unitId: UUID,
+        @PathVariable animalId: UUID,
+        @RequestBody request: EndStayRequest,
+    ): StayEnded {
+        val on = LocalDate.parse(request.on)
+        return registry.endAnimalStay(entranceId, unitId, animalId, on).let { StayEnded(it.id, it.validFrom, on) }
+    }
+
     @GetMapping("/{entranceId}/units")
     fun listUnits(@PathVariable entranceId: UUID): List<UnitView> =
         registry.listUnits(entranceId).map {
             UnitView(it.id, it.designation, it.unitType, it.areaM2, it.idealPartsPct, it.separateEntrance)
         }
 
-    /** Ideal parts that do not sum to 100%, or a malformed value, are a bad request (PM-ORG-002). */
-    @ExceptionHandler(IllegalStateException::class, IllegalArgumentException::class)
+    /**
+     * Ideal parts that do not sum to 100%, or a malformed value, are a bad request (PM-ORG-002); so
+     * are a malformed date, a move-out not after the move-in, and a stay already ended.
+     */
+    @ExceptionHandler(IllegalStateException::class, IllegalArgumentException::class, DateTimeParseException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: RuntimeException): Map<String, String> = mapOf("error" to (e.message ?: "invalid request"))
 

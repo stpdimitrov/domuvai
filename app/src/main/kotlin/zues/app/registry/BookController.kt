@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -20,11 +21,23 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api/registry/entrances/{entranceId}/book")
-class BookController(private val book: BookService, private val clock: Clock) {
+class BookController(
+    private val book: BookService,
+    private val retention: BookRetentionService,
+    private val clock: Clock,
+) {
 
     @GetMapping
     fun book(@PathVariable entranceId: UUID, @RequestParam(required = false) on: String?): CondominiumBook =
         book.forEntrance(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())))
+
+    /**
+     * Anonymise what the book no longer has a basis to keep, as of today in Sofia (PM-BOOK-010,
+     * PM-SYS-004). It takes no date, so nothing can be anonymised early. Irreversible.
+     */
+    @PostMapping("/retention")
+    fun applyRetention(@PathVariable entranceId: UUID): RetentionApplied =
+        retention.anonymiseDue(entranceId, LocalDate.parse(toSofiaDate(clock.instant())))
 
     /** No such entrance. */
     @ExceptionHandler(NoSuchElementException::class)

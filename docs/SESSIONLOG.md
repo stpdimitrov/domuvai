@@ -1373,3 +1373,19 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — H-05, F-38, this entry; then `python3 tools/lanes.py`.
 
 ---
+
+## S-G1-03c · 2026-09-28 · book retention — move-out, then anonymised three months on (registry)
+
+**Did** — the book can record that a stay ended, and drops who it was three months later (#43, `lane:registry`). Found while planning: nothing could end a stay — occupants and animals were added but never moved out, so a moved-out occupant was counted in every charge, and no retention window could ever start. `POST …/household/{memberId}/end` and `…/animals/{animalId}/end` close the range on the declared day (PM-BOOK-008); the fee engine stops counting from that day. `POST …/book/retention` anonymises what is past its window, as of today in Sofia, taking no date from the caller: a household row's link to a named person, an animal's veterinary passport number. Unit, dates, child flag and species stay, so a past charge still reproduces (PM-FEE-014). The windows are `:law` constants, one per field group — `BOOK_RETENTION_HOUSEHOLD_MONTHS`, `BOOK_RETENTION_ANIMAL_MONTHS` = 3, the owner's default (2026-09-28), unconfirmed (`TODO(legal): PM-BOOK-010`). A malformed date on a registry write is now a 400, not a 500.
+
+**Rules covered** — PM-BOOK-010 (named-test coverage 39 → 40 of 233); PM-BOOK-008 gains its write side. 31 operations run, 16 planned.
+
+**Tests added** — `BookRetentionTest` (new): `PM-BOOK-010 a former occupant's household record is anonymised after the retention window` (a day short, then on the day), `PM-BOOK-010 a departed animal loses its passport number after the window, and keeps its species and dates`, `PM-BOOK-010 a current stay is never anonymised, however long it has lasted`, a second pass changes nothing, unknown entrance. `MoveOutTest` (new): `PM-BOOK-008 a resident's move-out closes their occupancy range on the declared day`, the animal's, the refusals. Web: end → 200 / 400; `PM-BOOK-010 POST retention anonymises what is due today in Sofia…`. `BookRetentionPersistenceIT` (Docker — CI): the count drops after the move-out; three months on the identifiers go while April's counts hold. Moving the window boundary by a day, and dropping the ended-stay check, each failed their tests.
+
+**Decisions** — owner D1–D5 on #43 (2026-09-28): 3 months where no law says otherwise; former owners and users (name, ЕГН) and their declarations held — a claim for charges they owe outlives the title, and for how long is counsel's; anonymised means the identifier goes and the fee facts stay; applied on request, a daily job later; move-out first.
+
+**Open** — counsel (owner input 3): how long a former owner's identity may be kept for a claim, and confirm the 3-month windows. No household row names a person today (occupants are counts), so the live effect is on animals' passport numbers. The person record's own retention is cross-module — votes, the board and money refer to it. Registry's remaining Gate-1 rules: PM-ORG-009 waits on owner input 5 (the business-use split); PM-ORG-008 (common parts per building type) and PM-BOOK-012 (book vs billed headcount) are free SHOULDs; the rest wait on auth (PM-BOOK-006/007/009), the closed complex (PM-ORG-006/007), assembly (PM-ORG-003/012) or ADR-004 (PM-ORG-010).
+
+**Read first next time** — #43, this entry, `app/src/main/kotlin/zues/app/registry/BookRetention.kt`.
+
+---

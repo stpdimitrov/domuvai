@@ -25,4 +25,5 @@ data class Animal(
 
 interface AnimalRepository : ListCrudRepository<Animal, UUID> {
     fun findByUnitId(unitId: UUID): List<Animal>
+    fun findByEntranceId(entranceId: UUID): List<Animal>
 }
