@@ -20,6 +20,41 @@ class FeeSheetTest {
     }
 
     @Test
+    fun `mapped optional columns are read as written, and a blank cell is absent`() {
+        val parsed = FeeSheet.parse(
+            "designation,ideal_parts,occupants,fee_minor,area,owner\nап. 1,60.0000,2,6000,72.50,Иван Петров\nап. 2,40.0000,1,4000,,",
+        )
+        assertThat(parsed.violations).isEmpty()
+        assertThat(parsed.rows[0].optional).containsExactlyInAnyOrderEntriesOf(
+            mapOf(IntakeField.BUILT_AREA to "72.50", IntakeField.OWNER_NAME to "Иван Петров"),
+        )
+        assertThat(parsed.rows[1].optional).isEmpty()
+    }
+
+    @Test
+    fun `an area the registry cannot hold or a child count that is not whole makes its row a violation`() {
+        val parsed = FeeSheet.parse(
+            "designation,ideal_parts,occupants,fee_minor,area,children\n" +
+                "ап. 1,60.0000,2,6000,72.505,0\n" +     // three decimals: area_m2 holds two — never rounded silently
+                "ап. 2,40.0000,1,4000,50,1.5\n" +       // half a child
+                "ап. 3,10.0000,1,1000,-3,0",             // not a positive area
+        )
+        assertThat(parsed.rows).isEmpty()
+        assertThat(parsed.violations).hasSize(3)
+    }
+
+    @Test
+    fun `PM-BOOK-011 an owner cell carrying an identity number makes its row a violation`() {
+        val parsed = FeeSheet.parse(
+            "designation,ideal_parts,occupants,fee_minor,owner\n" +
+                "ап. 1,60.0000,2,6000,Иван Петров 7501010010\n" +   // an ЕГН written into the name
+                "ап. 2,40.0000,1,4000,„Строй 2000“ ЕООД",            // digits in a company name are fine
+        )
+        assertThat(parsed.rows.map { it.designation }).containsExactly("ап. 2")
+        assertThat(parsed.violations).singleElement().asString().contains("row 2")
+    }
+
+    @Test
     fun `a missing column is a whole-sheet violation`() {
         val parsed = FeeSheet.parse("designation,occupants,fee_minor\nап. 1,2,6000")
         assertThat(parsed.rows).isEmpty()

@@ -6,13 +6,23 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.security.MessageDigest
 import java.time.Clock
+import java.time.LocalDate
 import java.util.UUID
 
 /** What recording an import returns: the stored id and the full dry-run report behind the verdict. */
 data class ImportResult(val importId: UUID, val report: DryRunReport)
 
-/** What committing an import returns: the id and how many unit rows the commit adopts. */
-data class CommitResult(val importId: UUID, val rowsCreated: Int, val rowsChanged: Int)
+/**
+ * A value the sheet carried that a commit must not adopt, because the law requires a declaration a
+ * count is not: a person records it from the declaration. [rule] names why.
+ */
+data class ManualEntry(val designation: String, val field: IntakeField, val value: String, val rule: String)
+
+/**
+ * What committing an import returns: the id, how many unit rows the commit adopts, and what the
+ * sheet carried that must be recorded by hand — surfaced, never dropped, never fabricated.
+ */
+data class CommitResult(val importId: UUID, val rowsCreated: Int, val rowsChanged: Int, val manualEntries: List<ManualEntry>)
 
 /**
  * Records a fee-sheet import durably. The dry-run runs exactly as in the stateless path (S-31),
@@ -80,12 +90,24 @@ class ImportService(
             throw ImportStateException("import $importId no longer reproduces the firm's figures; refusing to commit")
         }
         aggregates.update(record.copy(status = "COMMITTED"))
-        val units = sheet.rows.map { AdoptedUnit(it.designation, it.idealParts) }
+        val units = sheet.rows.map {
+            AdoptedUnit(
+                designation = it.designation,
+                idealParts = it.idealParts,
+                builtArea = it.optional[IntakeField.BUILT_AREA],
+                occupants = it.occupants,
+                childrenUnder6 = it.optional[IntakeField.CHILDREN_UNDER_6]?.toInt() ?: 0,
+                ownerName = it.optional[IntakeField.OWNER_NAME],
+            )
+        }
+        val manual = sheet.rows.flatMap { row ->
+            NOT_ADOPTED.mapNotNull { (field, rule) -> row.optional[field]?.let { ManualEntry(row.designation, field, it, rule) } }
+        }
         // rows_changed is 0: adoption is insert-only into a fresh entrance; merge is a later slice.
         events.publishEvent(
-            ImportCommitted(record.entranceId, importId, importId, committedBy, units.size, 0, units),
+            ImportCommitted(record.entranceId, importId, importId, committedBy, units.size, 0, units, LocalDate.parse(request.legalDate)),
         )
-        return CommitResult(importId, units.size, 0)
+        return CommitResult(importId, units.size, 0, manual)
     }
 
     /**
@@ -104,6 +126,20 @@ class ImportService(
         aggregates.update(reverted)
         events.publishEvent(ImportReverted(record.entranceId, importId, revertedBy, clock.instant(), reason))
         return reverted
+    }
+
+    private companion object {
+        /**
+         * What a sheet may carry but a commit must not adopt. An absence exempts only on a filed
+         * declaration (PM-FEE-007); an animal is entered from the owner's declaration with its
+         * passport data (PM-BOOK-005); and business use has no registry field of its own — the one
+         * flag there is a separate street entrance (PM-ORG-009).
+         */
+        val NOT_ADOPTED = listOf(
+            IntakeField.ABSENT_DAYS to "PM-FEE-007",
+            IntakeField.ANIMALS to "PM-BOOK-005",
+            IntakeField.BUSINESS_USE to "PM-ORG-009",
+        )
     }
 
     /** Content-address the source — what the firm actually gave us (STAGE1-ADDENDUM §1, step 1). */

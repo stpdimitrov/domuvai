@@ -35,7 +35,7 @@ class ImportCommitWebTest {
 
     @Test
     fun `POST commit adopts the import and returns the row count`() {
-        whenever(imports.commit(eq(importId), any(), any())).thenReturn(CommitResult(importId, 2, 0))
+        whenever(imports.commit(eq(importId), any(), any())).thenReturn(CommitResult(importId, 2, 0, emptyList()))
         mvc.perform(post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON).content(commitBody))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.rowsCreated").value(2))

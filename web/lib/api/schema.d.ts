@@ -81,7 +81,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Commit a reviewed import into the registry — only the exact file that was reviewed */
+        /** Commit a reviewed import into the registry — units, households and owners; what needs a declaration is returned for a person to record, never adopted */
         post: operations["post_intake_imports_id_commit"];
         delete?: never;
         options?: never;
@@ -455,6 +455,7 @@ export interface components {
         CommitResult: {
             /** Format: uuid */
             importId: string;
+            manualEntries: components["schemas"]["ManualEntry"][];
             /** Format: int32 */
             rowsChanged: number;
             /** Format: int32 */
@@ -541,6 +542,13 @@ export interface components {
             status: string;
             /** Format: int32 */
             violations: number;
+        };
+        ManualEntry: {
+            designation: string;
+            /** @enum {string} */
+            field: "DESIGNATION" | "IDEAL_PARTS" | "OCCUPANTS" | "FEE_MINOR" | "BUILT_AREA" | "OWNER_NAME" | "CHILDREN_UNDER_6" | "ANIMALS" | "ABSENT_DAYS" | "BUSINESS_USE";
+            rule: string;
+            value: string;
         };
         NewAbsenceRequest: {
             absentFrom: string;

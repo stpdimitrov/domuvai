@@ -4,6 +4,7 @@ import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
 import zues.app.intake.ImportCommitted
 import zues.app.intake.ImportReverted
+import java.math.BigDecimal
 
 /**
  * The consuming half of intake's commit seam. `intake` writes its own record and announces a
@@ -23,8 +24,15 @@ class ImportAdoption(private val registry: RegistryService) {
         registry.adoptImport(
             event.entranceId,
             event.importId,
+            event.effectiveFrom,
             event.units.map {
-                RegisterUnit(designation = it.designation, unitType = IMPORTED_UNIT_TYPE, idealParts = it.idealParts)
+                ImportedUnit(
+                    RegisterUnit(
+                        designation = it.designation, unitType = IMPORTED_UNIT_TYPE,
+                        areaM2 = it.builtArea?.let(::BigDecimal), idealParts = it.idealParts,
+                    ),
+                    occupants = it.occupants, childrenUnder6 = it.childrenUnder6, ownerName = it.ownerName,
+                )
             },
         )
     }

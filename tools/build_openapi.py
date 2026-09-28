@@ -76,8 +76,10 @@ RUNNING = {
  ('get', '/api/intake/imports/{id}'):
    ('Read an import record — its verdict and content hash', ['PM-DOC-001']),
  ('post', '/api/intake/imports/{id}/commit'):
-   ('Commit a reviewed import into the registry — only the exact file that was reviewed',
-    ['PM-ORG-001', 'PM-ORG-002', 'PM-DOC-001']),
+   ('Commit a reviewed import into the registry — units, households and owners; '
+    'what needs a declaration is returned for a person to record, never adopted',
+    ['PM-ORG-001', 'PM-ORG-002', 'PM-DOC-001', 'PM-BOOK-002', 'PM-FEE-005', 'PM-FEE-008',
+     'PM-ORG-011', 'PM-BOOK-011', 'PM-FEE-007', 'PM-BOOK-005']),
  ('post', '/api/intake/imports/{id}/revert'):
    ('Revert a committed import wholesale, with its reason', ['PM-DOC-001']),
 }
