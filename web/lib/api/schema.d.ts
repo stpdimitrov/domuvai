@@ -175,6 +175,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a payment — oldest debt first unless the payer designates one; the rule applied is stored */
+        post: operations["post_money_entrances_entranceId_payments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/money/entrances/{entranceId}/payments/{paymentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A payment's allocation — the rule applied and what each debt received */
+        get: operations["get_money_entrances_entranceId_payments_paymentId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/units/{unitId}/arrears": {
         parameters: {
             query?: never;
@@ -375,6 +409,11 @@ export interface components {
             /** Format: int64 */
             amountMinor: number;
             band: string;
+        };
+        AllocatedPart: {
+            /** Format: int64 */
+            amountMinor: number;
+            debtDate: string;
         };
         AnimalsRegisteredResponse: {
             animalIds: string[];
@@ -581,6 +620,23 @@ export interface components {
             /** Format: uuid */
             partyId: string;
         };
+        PaymentView: {
+            allocation: components["schemas"]["AllocatedPart"][];
+            allocationRule: string;
+            /** Format: int64 */
+            amountMinor: number;
+            designatedDebtDate?: string;
+            /** Format: uuid */
+            entranceId: string;
+            /** Format: uuid */
+            paymentId: string;
+            receivedInto: string;
+            /** Format: int64 */
+            unallocatedMinor: number;
+            /** Format: uuid */
+            unitId: string;
+            valueDate: string;
+        };
         ProfileRequest: {
             csv: string;
         };
@@ -590,6 +646,15 @@ export interface components {
             };
             missingRequired: ("DESIGNATION" | "IDEAL_PARTS" | "OCCUPANTS" | "FEE_MINOR" | "BUILT_AREA" | "OWNER_NAME" | "CHILDREN_UNDER_6" | "ANIMALS" | "ABSENT_DAYS" | "BUSINESS_USE")[];
             unmappedColumns: string[];
+        };
+        RecordPaymentRequest: {
+            /** Format: int64 */
+            amountMinor: number;
+            designatedDebtDate?: string;
+            receivedInto: string;
+            /** Format: uuid */
+            unitId: string;
+            valueDate: string;
         };
         RegisterAbsencesRequest: {
             absences: components["schemas"]["NewAbsenceRequest"][];
@@ -1249,6 +1314,123 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_money_entrances_entranceId_payments: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_payments_paymentId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -32,6 +32,22 @@
         ],
         "type": "object"
       },
+      "AllocatedPart": {
+        "properties": {
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "debtDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "debtDate"
+        ],
+        "type": "object"
+      },
       "AnimalsRegisteredResponse": {
         "properties": {
           "animalIds": {
@@ -755,6 +771,60 @@
         ],
         "type": "object"
       },
+      "PaymentView": {
+        "properties": {
+          "allocation": {
+            "items": {
+              "$ref": "#/components/schemas/AllocatedPart"
+            },
+            "type": "array"
+          },
+          "allocationRule": {
+            "type": "string"
+          },
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "designatedDebtDate": {
+            "type": "string"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "paymentId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "receivedInto": {
+            "type": "string"
+          },
+          "unallocatedMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "valueDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "allocation",
+          "allocationRule",
+          "amountMinor",
+          "entranceId",
+          "paymentId",
+          "receivedInto",
+          "unallocatedMinor",
+          "unitId",
+          "valueDate"
+        ],
+        "type": "object"
+      },
       "ProfileRequest": {
         "properties": {
           "csv": {
@@ -815,6 +885,34 @@
           "mapping",
           "missingRequired",
           "unmappedColumns"
+        ],
+        "type": "object"
+      },
+      "RecordPaymentRequest": {
+        "properties": {
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "designatedDebtDate": {
+            "type": "string"
+          },
+          "receivedInto": {
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "valueDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "receivedInto",
+          "unitId",
+          "valueDate"
         ],
         "type": "object"
       },
@@ -2080,6 +2178,181 @@
           "PM-FUND-001",
           "PM-FUND-004",
           "PM-FUND-005"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/payments": {
+      "post": {
+        "operationId": "post_money_entrances_entranceId_payments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record a payment — oldest debt first unless the payer designates one; the rule applied is stored",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-DEBT-008"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/payments/{paymentId}": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_payments_paymentId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "paymentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "A payment's allocation — the rule applied and what each debt received",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-DEBT-008"
         ]
       }
     },
