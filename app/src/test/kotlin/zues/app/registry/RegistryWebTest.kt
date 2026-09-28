@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.http.MediaType
@@ -41,6 +42,20 @@ class RegistryWebTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.entranceId").value(entranceId.toString()))
             .andExpect(jsonPath("$.condominiumId").value(condominiumId.toString()))
+    }
+
+    @Test
+    fun `POST an entrance into an existing building passes the building through`() {
+        val entranceId = UUID.randomUUID()
+        val condominiumId = UUID.randomUUID()
+        whenever(registry.registerEntrance(any())).thenReturn(EntranceCreated(entranceId, condominiumId))
+
+        mvc.perform(
+            post("/api/registry/entrances")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"label":"Б","managementForm":"GA","condominiumId":"$condominiumId"}"""),
+        ).andExpect(status().isCreated).andExpect(jsonPath("$.condominiumId").value(condominiumId.toString()))
+        verify(registry).registerEntrance(RegisterEntrance(null, "Б", "GA", condominiumId))
     }
 
     @Test

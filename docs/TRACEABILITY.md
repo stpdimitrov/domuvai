@@ -5,21 +5,21 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 35 | 15% |
-| **Proved by a test named after the rule** | **34** | **15%** |
-| No implementation and no test | 196 | 84% |
+| Referenced in code (`// Rule:`) | 36 | 15% |
+| **Proved by a test named after the rule** | **37** | **16%** |
+| No implementation and no test | 194 | 83% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
-## ORG — Structure & ideal parts  ·  3/12 covered
+## ORG — Structure & ideal parts  ·  5/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-ORG-001` | — | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
+| `PM-ORG-001` | `app/src/test/kotlin/zues/app/registry/EntranceRegistrationTest.kt:34` | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
 | `PM-ORG-002` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:43` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:49` |  |
 | `PM-ORG-003` | — | — |  |
-| `PM-ORG-004` | — | — |  |
-| `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:59` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:18` |  |
+| `PM-ORG-004` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:51` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:45` |  |
+| `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:68` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:18` |  |
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
@@ -28,7 +28,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:62` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:18` |  |
 | `PM-ORG-012` | — | — |  |
 
-## BOOK — Owners' book & residents  ·  4/12 covered
+## BOOK — Owners' book & residents  ·  5/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -39,7 +39,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:151` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
 | `PM-BOOK-006` | — | — |  |
 | `PM-BOOK-007` | — | — |  |
-| `PM-BOOK-008` | — | — |  |
+| `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/UnitsAdapterTest.kt:66` | — |  |
 | `PM-BOOK-009` | — | — |  |
 | `PM-BOOK-010` | — | — |  |
 | `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:78` |  |
@@ -131,7 +131,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:49` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:13` |  |
 | `PM-FEE-006` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:99` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` | ⚠ |
 | `PM-FEE-007` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:151` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` |  |
-| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:54` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:198` |  |
+| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:54` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:211` |  |
 | `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:121` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
 | `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
 | `PM-FEE-011` | — | — |  |

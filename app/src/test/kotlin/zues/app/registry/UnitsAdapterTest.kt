@@ -63,6 +63,22 @@ class UnitsAdapterTest {
     }
 
     @Test
+    fun `PM-BOOK-008 a short stay and a move-out change the headcount only inside their date ranges`() {
+        whenever(household.findByUnitId(unitId)).thenReturn(
+            listOf(
+                member(child = false),                                                                  // resident throughout
+                member(child = false, to = LocalDate.of(2026, 5, 20)),                                  // moves out on the 20th
+                member(child = false, from = LocalDate.of(2026, 5, 10), to = LocalDate.of(2026, 5, 15)), // a short stay
+            ),
+        )
+        fun headcountOn(day: Int) = adapter.forEntrance(entranceId, LocalDate.of(2026, 5, day)).single().occupants
+        assertThat(headcountOn(1)).isEqualTo(2)     // before the stay
+        assertThat(headcountOn(12)).isEqualTo(3)    // inside it
+        assertThat(headcountOn(15)).isEqualTo(2)    // a range ends before its end date: [from, to)
+        assertThat(headcountOn(25)).isEqualTo(1)    // after the move-out
+    }
+
+    @Test
     fun `PM-FEE-005 children under six are reported separately from the count`() {
         whenever(household.findByUnitId(unitId)).thenReturn(
             listOf(member(child = false), member(child = true), member(child = true)),

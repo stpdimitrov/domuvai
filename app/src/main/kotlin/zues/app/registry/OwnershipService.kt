@@ -42,6 +42,9 @@ data class OwnerView(
  * the liable party resolves **as of** the charge, vote or arrears date, never as of today (Rule:
  * PM-ORG-011). A co-owned unit is several titles that split by share (Rule: PM-ORG-005).
  */
+/** A title holder's voting weight in an entrance on a date, for one role (Rule: PM-ORG-004). */
+data class VotingWeight(val partyId: UUID, val titleRole: String, val idealPartsPct: BigDecimal)
+
 @Service
 class OwnershipService(
     private val aggregates: JdbcAggregateTemplate,
@@ -99,6 +102,23 @@ class OwnershipService(
         val current = titles.findByEntranceId(entranceId).filter { inForce(it.validFrom, it.validTo, on) }
         val nameById = parties.findAllById(current.map { it.partyId }.distinct()).associate { it.id to it.fullName }
         return current.map { OwnerView(it.unitId, nameById[it.partyId] ?: "?", it.titleRole, it.share) }
+    }
+
+    /**
+     * Each title holder's voting weight in [entranceId] on [on]: the sum, over their titles in force
+     * that day, of the unit's ideal parts × the title's share — never a count of units (Rule:
+     * PM-ORG-004) — so a co-owned unit's weight is split by share, not counted twice (Rule:
+     * PM-ORG-005). Reported per role: who may vote, and a lawfully adopted per-unit fee key, are the
+     * assembly's to decide. Exact decimals throughout (ADR-006).
+     */
+    @Transactional(readOnly = true)
+    fun votingWeights(entranceId: UUID, on: LocalDate): List<VotingWeight> {
+        val parts = units.findByEntranceId(entranceId).associate { it.id to it.idealPartsPct }
+        return titles.findByEntranceId(entranceId)
+            .filter { inForce(it.validFrom, it.validTo, on) }
+            .groupBy { it.partyId to it.titleRole }
+            .map { (holder, held) -> VotingWeight(holder.first, holder.second, held.sumOf { parts.getValue(it.unitId) * it.share }) }
+            .sortedWith(compareByDescending<VotingWeight> { it.idealPartsPct }.thenBy { it.partyId })
     }
 
     /** In force on [on]: the half-open interval [validFrom, validTo) contains it. */

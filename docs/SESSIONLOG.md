@@ -1270,3 +1270,21 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Read first next time** — `CLAUDE.md` (*Working in parallel*), then run `python3 tools/lanes.py`.
 
 ---
+
+## S-G1-03a · 2026-09-28 · building & entrances, voting weight, occupancy ranges (registry)
+
+**Did** — the first slice claimed through `tools/lanes.py` (#35, `lane:registry`). TESTPLAN's S-G1-03 was split: only three of its ten rules are buildable in `registry` today (the split and the blocked rules are on #35). **PM-ORG-001:** an entrance now joins an existing building (`condominiumId`) instead of always founding one — one or the other, never both; each entrance stays its own isolation unit with its own 100% (ADR-005, PM-ORG-002), and a label repeated in one building is a 409, not a 500. **PM-ORG-004:** `OwnershipService.votingWeights(entrance, on)` — per title holder and role, Σ ideal parts × title share over the titles in force that day, never a count of units (co-owners split by share, PM-ORG-005); who votes stays assembly's (owner decision D2). **PM-BOOK-008:** already built (S-19/S-25) — proved by name: a short stay and a move-out change the headcount only inside their half-open ranges.
+
+**Rules covered** — PM-ORG-001 · PM-ORG-004 · PM-BOOK-008 (named-test coverage 34 → 37 of 233).
+
+**Tests added** — `EntranceRegistrationTest` (new): `PM-ORG-001 a second entrance joins its building…`, a first entrance founds it, both-or-neither refused, unknown building 404. `OwnershipServiceTest`: `PM-ORG-004 a 2-unit owner with 12% outvotes 5 owners holding 10%` (the TESTPLAN acceptance), `PM-ORG-004 PM-ORG-005 a co-owned unit splits its weight by share…`. `UnitsAdapterTest`: `PM-BOOK-008 a short stay and a move-out…`. `RegistryWebTest`: the building id passes through. `RegistryUnitsPersistenceIT`: `PM-ORG-001 a building with three entrances keeps three independent entrances, each with its own 100%` + the 409 on a repeated label (Docker — CI).
+
+**Contract** — `RegisterEntranceRequest.address` is optional and `condominiumId` new; registry endpoints document their 409. Spec and web client regenerated.
+
+**Decisions** — owner D1/D2 on #35 (2026-09-28). The banned-words gate caught `building` as a test identifier (ADR-005) — renamed to `condominiumId`.
+
+**Open** — S-G1-03b book declarations (PM-BOOK-003 · PM-BOOK-004): the 15-day window is a legal number, so `law/…/Constants.kt` changes — it is shared (WORKING.md), but `tools/lanes.py` maps `law/` to the `law` lane and will flag it; make `Constants.kt` shared in `lanes.py` first. S-G1-03c (PM-BOOK-010) needs the owner's retention windows. `votingWeights` has no HTTP read yet — add one when the assembly screen needs it.
+
+**Read first next time** — #35, this entry, `app/src/main/kotlin/zues/app/registry/OwnershipService.kt`.
+
+---

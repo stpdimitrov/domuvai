@@ -253,7 +253,7 @@ export interface paths {
         /** List the registered entrances */
         get: operations["get_registry_entrances"];
         put?: never;
-        /** Register an entrance — the unit of ownership and isolation */
+        /** Register an entrance — founding its building at an address, or joining an existing building */
         post: operations["post_registry_entrances"];
         delete?: never;
         options?: never;
@@ -663,7 +663,9 @@ export interface components {
             animals: components["schemas"]["NewAnimalRequest"][];
         };
         RegisterEntranceRequest: {
-            address: string;
+            address?: string;
+            /** Format: uuid */
+            condominiumId?: string;
             label: string;
             managementForm: string;
         };
@@ -1550,6 +1552,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
         };
     };
     post_registry_entrances: {
@@ -1587,6 +1600,17 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1743,6 +1767,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
         };
     };
     post_registry_entrances_entranceId_units: {
@@ -1782,6 +1817,17 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1840,6 +1886,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
         };
     };
     post_registry_entrances_entranceId_units_unitId_animals: {
@@ -1889,6 +1946,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
         };
     };
     post_registry_entrances_entranceId_units_unitId_household: {
@@ -1929,6 +1997,17 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

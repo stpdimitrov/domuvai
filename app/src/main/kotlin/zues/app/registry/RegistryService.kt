@@ -10,11 +10,16 @@ import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
 
-/** What the caller asks for. Validation of the enum lives at the edge (DB CHECK is the backstop). */
+/**
+ * What the caller asks for. An entrance founds a new building at [address], or joins the existing
+ * building [condominiumId] — one or the other (Rule: PM-ORG-001). Validation of the enum lives at
+ * the edge (DB CHECK is the backstop).
+ */
 data class RegisterEntrance(
-    val address: String,
+    val address: String?,
     val label: String,
     val managementForm: String,
+    val condominiumId: UUID? = null,
 )
 
 /** What the caller gets back — the ids the two inserts produced. */
@@ -84,12 +89,20 @@ class RegistryService(
 ) {
     @Transactional
     fun registerEntrance(command: RegisterEntrance): EntranceCreated {
-        val condominium = aggregates.insert(Condominium(UUID.randomUUID(), command.address))
+        // Rule: PM-ORG-001 — a building's entrances may each run their own assembly, manager and
+        // accounts, so a second entrance joins its building instead of founding another; each
+        // entrance stays its own isolation unit (ADR-005) with its own 100% of ideal parts.
+        require((command.address == null) != (command.condominiumId == null)) {
+            "give a new building's address or an existing building's condominiumId — one of the two"
+        }
+        val condominiumId = command.condominiumId
+            ?.also { if (!aggregates.existsById(it, Condominium::class.java)) throw NoSuchElementException("no building $it") }
+            ?: aggregates.insert(Condominium(UUID.randomUUID(), command.address!!)).id
         val entrance = aggregates.insert(
-            Entrance(UUID.randomUUID(), condominium.id, command.label, command.managementForm),
+            Entrance(UUID.randomUUID(), condominiumId, command.label, command.managementForm),
         )
-        events.publishEvent(EntranceRegistered(entrance.id, condominium.id, clock.instant()))
-        return EntranceCreated(entrance.id, condominium.id)
+        events.publishEvent(EntranceRegistered(entrance.id, condominiumId, clock.instant()))
+        return EntranceCreated(entrance.id, condominiumId)
     }
 
     @Transactional(readOnly = true)

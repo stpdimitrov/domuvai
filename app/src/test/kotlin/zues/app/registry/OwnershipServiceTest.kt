@@ -41,6 +41,50 @@ class OwnershipServiceTest {
         whenever(parties.existsById(partyId)).thenReturn(true)
     }
 
+    private fun unit(parts: String) = PropertyUnit(UUID.randomUUID(), entranceId, "об.", "FLAT", null, BigDecimal(parts), false)
+
+    private fun title(unit: PropertyUnit, party: UUID, role: String = "OWN", share: String = "1",
+                      from: LocalDate = LocalDate.of(2026, 1, 1), to: LocalDate? = null) =
+        Title(UUID.randomUUID(), entranceId, unit.id, party, role, BigDecimal(share), from, to)
+
+    @Test
+    fun `PM-ORG-004 a 2-unit owner with 12% outvotes 5 owners holding 10%`() {
+        val big = UUID.randomUUID()
+        val bigUnits = listOf(unit("7.0000"), unit("5.0000"))                     // two units: 12%
+        val small = List(5) { UUID.randomUUID() to unit("2.0000") }               // five owners: 2% each
+        whenever(units.findByEntranceId(entranceId)).thenReturn(bigUnits + small.map { it.second } + unit("78.0000"))
+        whenever(titles.findByEntranceId(entranceId)).thenReturn(bigUnits.map { title(it, big) } + small.map { (p, u) -> title(u, p) })
+
+        val weights = service.votingWeights(entranceId, LocalDate.of(2026, 5, 1))
+        val bigWeight = weights.single { it.partyId == big }.idealPartsPct
+        val smallWeight = weights.filter { it.partyId != big }.sumOf { it.idealPartsPct }
+        assertThat(bigWeight).isEqualByComparingTo("12")
+        assertThat(smallWeight).isEqualByComparingTo("10")
+        assertThat(bigWeight).isGreaterThan(smallWeight)                           // two units outweigh five
+        assertThat(weights.first().partyId).isEqualTo(big)
+    }
+
+    @Test
+    fun `PM-ORG-004 PM-ORG-005 a co-owned unit splits its weight by share, and only titles in force count`() {
+        val u = unit("40.0000")
+        val v = unit("60.0000")
+        val (a, b, seller, user) = List(4) { UUID.randomUUID() }
+        whenever(units.findByEntranceId(entranceId)).thenReturn(listOf(u, v))
+        whenever(titles.findByEntranceId(entranceId)).thenReturn(
+            listOf(
+                title(u, a, share = "0.5"), title(u, b, share = "0.5"),             // co-owners of 40%
+                title(v, seller, to = LocalDate.of(2026, 3, 1)),                    // sold on 1 March
+                title(v, a, from = LocalDate.of(2026, 3, 1)),                       // the buyer, from then
+                title(v, user, role = "USR"),                                       // a user: reported, not decided
+            ),
+        )
+        val weights = service.votingWeights(entranceId, LocalDate.of(2026, 5, 1)).associateBy { it.partyId to it.titleRole }
+        assertThat(weights.getValue(a to "OWN").idealPartsPct).isEqualByComparingTo("80")     // 20 + 60
+        assertThat(weights.getValue(b to "OWN").idealPartsPct).isEqualByComparingTo("20")
+        assertThat(weights).doesNotContainKey(seller to "OWN")
+        assertThat(weights.getValue(user to "USR").idealPartsPct).isEqualByComparingTo("60")
+    }
+
     @Test
     fun `PM-BOOK-002 a party is registered with its name`() {
         val captor = argumentCaptor<Party>()
