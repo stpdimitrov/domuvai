@@ -1389,3 +1389,19 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — #43, this entry, `app/src/main/kotlin/zues/app/registry/BookRetention.kt`.
 
 ---
+
+## S-G1-03c-r · 2026-09-29 · review fixes — a backdated move-out cannot bring anonymisation forward (registry)
+
+**Did** — a fresh-context review of S-G1-03c (#44, merged before these fixes landed) found that the declared move-out day alone started the retention window, so a backdated or mistyped date anonymised at once — and a wrong date could never be corrected. Now a move-out also stamps the Sofia day it was recorded (`end_recorded_on`, migration `V202609282105`), and the window runs from the later of the two; ending a stay again corrects its day. The animal range gains the CHECK the household range had. Comments and the API summary say what the pass anonymises — a resident's link to a named person, an animal's passport number — not "the book's personal data".
+
+**Rules covered** — PM-BOOK-010, PM-BOOK-008 (no new rule; named-test coverage stays 40 of 233).
+
+**Tests added** — `BookRetentionTest`: `PM-BOOK-010 a backdated move-out does not bring anonymisation forward`, `… each field group runs on its own window`, `… a window from the end of a long month closes on the last day of a short one`; a stay ending in the future counts as current. `MoveOutTest`: the stored row carries the recorded Sofia day; a correction; the refusals for animals too; both ownership axes for both. `BookWebTest`: a caller's `on` is ignored. `BookRetentionPersistenceIT`: nothing goes a day before three months from the record. Six mutations the old tests let through — swapped group windows, an unpersisted animal end, the animal refusal dropped, one ownership axis dropped, the floor dropped, a caller date honoured — each now fails its test.
+
+**Decisions** — none new; D4 ("nothing is anonymised early") now holds for the move-out day too.
+
+**Open** — as S-G1-03c.
+
+**Read first next time** — this entry, S-G1-03c, `app/src/main/kotlin/zues/app/registry/BookRetention.kt`.
+
+---

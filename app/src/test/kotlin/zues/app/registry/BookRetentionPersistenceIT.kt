@@ -22,8 +22,9 @@ import java.util.UUID
 
 /**
  * A move-out and the retention after it against real PostgreSQL, read back through the port money
- * uses: the closed range stops the count (PM-BOOK-008), and the pass three months on removes the
- * identifiers while the counts a charge was computed from stay (PM-BOOK-010). Docker-gated.
+ * uses: the closed range stops the count (PM-BOOK-008), and the pass three months after the move-out
+ * was recorded — not after the declared, earlier day — removes the identifiers while the counts a
+ * charge was computed from stay (PM-BOOK-010). Docker-gated.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -68,7 +69,7 @@ class BookRetentionPersistenceIT {
     private fun countedOn(entranceId: UUID, day: String) = units.forEntrance(entranceId, LocalDate.parse(day)).single()
 
     @Test
-    fun `PM-BOOK-008 PM-BOOK-010 a move-out closes the stay, and three months on the book drops who it was, not what was charged`() {
+    fun `PM-BOOK-008 PM-BOOK-010 a move-out closes the stay, and three months after the record the book drops who it was, not what was charged`() {
         val entranceId = postFor("/api/registry/entrances", """{"address":"ул. Цар Симеон 9","label":"А","managementForm":"GA"}""", "entranceId")
         val unitId = postFor(
             "/api/registry/entrances/$entranceId/units",
@@ -88,7 +89,10 @@ class BookRetentionPersistenceIT {
         assertThat(countedOn(entranceId, "2026-06-01").occupants).isZero()               // gone from the count after the move-out
         assertThat(countedOn(entranceId, "2026-06-01").animals).isZero()
 
-        val applied = retention.anonymiseDue(entranceId, LocalDate.parse("2026-10-01"))  // more than three months after 1 May
+        val recorded = listOf(household.findById(resident.id).get().endRecordedOn!!, animals.findById(animalId).get().endRecordedOn!!)
+        val early = retention.anonymiseDue(entranceId, recorded.min().plusMonths(3).minusDays(1))   // 1 May is long past; the record is not
+        assertThat(early.householdUnlinked + early.animalPassportsCleared).isZero()
+        val applied = retention.anonymiseDue(entranceId, recorded.max().plusMonths(3))
         assertThat(applied.householdUnlinked).isEqualTo(1)
         assertThat(applied.animalPassportsCleared).isEqualTo(1)
 

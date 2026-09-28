@@ -13,7 +13,8 @@ data class RetentionApplied(val on: LocalDate, val householdUnlinked: Int, val a
 /**
  * The book keeps personal data only while its legal basis lasts, then anonymises it, with a window
  * per field group (Rule: PM-BOOK-010). For a resident or an animal the basis is the stay, so the
- * window runs from the day it ended (PM-BOOK-008), read from `:law` as of the day of the pass.
+ * window runs from the day it ended (PM-BOOK-008) — or from the day that was recorded, if later, so a
+ * backdated move-out cannot bring it forward — read from `:law` as of the day of the pass.
  * Anonymising removes the identifier and keeps the facts a charge was computed from — unit, dates,
  * the child-under-six flag, the species — so a past charge still reproduces (PM-FEE-014).
  *
@@ -31,20 +32,24 @@ class BookRetentionService(
     fun anonymiseDue(entranceId: UUID, on: LocalDate): RetentionApplied {
         if (!aggregates.existsById(entranceId, Entrance::class.java)) throw NoSuchElementException("no entrance $entranceId")
         // TODO(legal): PM-BOOK-010 — both windows are the owner's 3-month default; counsel confirms no statute needs longer.
-        val householdMonths = months("BOOK_RETENTION_HOUSEHOLD_MONTHS", on)
-        val animalMonths = months("BOOK_RETENTION_ANIMAL_MONTHS", on)
+        val householdMonths = windowMonths("BOOK_RETENTION_HOUSEHOLD_MONTHS", on)
+        val animalMonths = windowMonths("BOOK_RETENTION_ANIMAL_MONTHS", on)
         val unlinked = household.findByEntranceId(entranceId)
-            .filter { it.partyId != null && past(it.validTo, householdMonths, on) }
+            .filter { it.partyId != null && past(it.validTo, it.endRecordedOn, householdMonths, on) }
             .onEach { aggregates.update(it.copy(partyId = null)) }
         val cleared = animals.findByEntranceId(entranceId)
-            .filter { it.vetPassportNo != null && past(it.validTo, animalMonths, on) }
+            .filter { it.vetPassportNo != null && past(it.validTo, it.endRecordedOn, animalMonths, on) }
             .onEach { aggregates.update(it.copy(vetPassportNo = null)) }
         return RetentionApplied(on, unlinked.size, cleared.size)
     }
 
-    private fun months(code: String, on: LocalDate): Long = numberOn(code, on.toString()).toLong()
+    /** A field group's window in months, from `:law` as of [on]. */
+    protected fun windowMonths(constant: String, on: LocalDate): Long = numberOn(constant, on.toString()).toLong()
 
-    /** A stay that ended on [ended] is past a window of [months] on [on]; a current stay never is. */
-    private fun past(ended: LocalDate?, months: Long, on: LocalDate): Boolean =
-        ended != null && !on.isBefore(ended.plusMonths(months))
+    /**
+     * Past a window of [months] on [on], counted from the later of the day the stay ended and the
+     * day that was recorded. A current stay never is.
+     */
+    private fun past(ended: LocalDate?, recorded: LocalDate?, months: Long, on: LocalDate): Boolean =
+        ended != null && !on.isBefore(maxOf(ended, recorded ?: ended).plusMonths(months))
 }
