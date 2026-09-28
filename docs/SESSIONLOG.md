@@ -1306,3 +1306,38 @@ Neither breaks correctness; both are convergence debt, scheduled below.
 **Read first next time** — #37, this entry, `app/src/main/kotlin/zues/app/registry/DeclarationService.kt`.
 
 ---
+
+## H-05 · 2026-09-28 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at the merge of this docs PR; before it, `main` was `ea7f538` (S-G1-03b). Everything below is merged. No PR is open; no lane is claimed.
+
+**What shipped since H-04 (2026-09-23)**
+- **Contract & frontend convergence — ADR-011 §2.2 now holds.** WEB-10 (#24) gates `web/` in CI. ADR-013 (#25) + API-01 (#26): `docs/api/openapi.json` is generated from the controllers (springdoc, test-only); `tools/build_openapi.py` is the rule map (`RUNNING` / `PLANNED`); code and contract cannot disagree. WEB-11 (#30): the generated TS client (`web/lib/api/`, server-only) with a CI drift check; `/entrance/charges` live on the engine (a labelled demo basis).
+- **Gate-1 backend.** S-41b (#32): an import commit adopts area, household and name-only owners; absences, animals and business use come back as `manualEntries`; revert fixed via `import_id` stamps. S-42 (#33, Steliyan): payment persistence (PM-DEBT-008). S-G1-03a (#36): buildings with several entrances (PM-ORG-001), voting weights (PM-ORG-004), occupancy ranges proved (PM-BOOK-008). S-G1-03b (#39): book declarations (PM-BOOK-003/004).
+- **Process — WF-02 (#34).** Lanes are claimed, not assigned: `python3 tools/lanes.py` (map · `check` · `claim`); a `lane:<lane>` issue with an assignee is a claim, without one a finding. The schema gate fails on a duplicate migration version. Steliyan's #27/#28: boot from the repo; the log's *last* entry is the resume point.
+
+**Where the plan stands.** The five steps of H-04's evaluation are done (web CI → ADR-013 → contract from code → generated client → the backend path). Work now runs by lane:
+- **registry (us):** **#38 next** — `registry` dates "today" in UTC, not the Sofia day (PM-SYS-004); the absence filing date behind PM-FEE-007 is the one that matters. ~45 min. Then S-G1-03c (PM-BOOK-010) once the owner gives retention windows. Blocked: PM-BOOK-006/007/009 (the auth provider), PM-ORG-006/007 (closed complex: money + evidence + compliance).
+- **money (Steliyan; free to claim):** S-42a ledger guard (PM-PMC-008) · a fund balance read (→ `/entrance/fund` live) · arrears per entrance (→ `/debts` live) · payments completion · S-43 after counsel.
+- **web:** wire `/debts` and `/entrance/fund` once those reads exist.
+- **Numbers:** 39 of 233 rules have a named test; 28 operations run, 16 are planned.
+
+**Owner inputs outstanding**
+1. Retention windows per field group — unblocks PM-BOOK-010.
+2. The minister's current order for the declaration template (чл. 7 ал. 7) — replaces the placeholder `ministry-template-1`.
+3. Counsel: ЗЗД чл. 76 payment order (blocks S-43); ADR-004 / ADR-007 as before.
+4. The auth provider (Keycloak marked) — unblocks login and PM-BOOK-006/007/009.
+5. The business-multiplier split (`ChargeRunService.kt:58` feeds `separateEntrance` as `businessUse`) — decide, then registry adds the field and money maps it.
+Also: branch protection (do not require `web / build` — it is path-filtered); `gh auth login` for every developer (the lane map needs it); optionally a local Docker (Colima) so ITs and a live backend run here.
+
+**Operating lessons**
+- GitHub ignores `merge=union`: the PR that merges second rebases locally, and its log entry lands last.
+- Migrations are stamped with the real UTC minute (`date -u +%Y%m%d%H%M`); S-41b and S-42 both wrote `…271200`, which Flyway refuses — the gate now catches it.
+- No Docker here: ITs skip locally and run in CI. The desktop app's Auto-fix wakes a session on a CI failure, not on success — look at a PR again after ~5 min.
+- Auto mode blocks pushing to a teammate's branch; the owner's personal `.claude/settings.local.json` allows `git push origin *:slice/*`. Use it only by agreement: merge `main` in, never force.
+- Banned identifiers bite in tests too (`building` → `condominiumId`, ADR-005). A legal "today" is `toSofiaDate(clock.instant())`, never `LocalDate.now(clock)`.
+- A `next dev` server may still run at `localhost:3000` — stop it with `pkill -f "next dev"`.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`; for the next slice, #38.
+
+---
