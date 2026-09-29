@@ -250,9 +250,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects */
+        get: operations["get_money_entrances_entranceId_fund_handover_statements"];
         put?: never;
-        /** Issue the repair fund's handover statement at a change of manager — opening, received, paid out and closing from the ledger, beside the bank's own balance, with the unpaid disbursements the incoming side inherits; stored as issued */
+        /** Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash */
         post: operations["post_money_entrances_entranceId_fund_handover_statements"];
         delete?: never;
         options?: never;
@@ -267,7 +268,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A fund handover statement as it was issued, with the hash of its canonical basis */
+        /** A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with */
         get: operations["get_money_entrances_entranceId_fund_handover_statements_statementId"];
         put?: never;
         post?: never;
@@ -844,6 +845,8 @@ export interface components {
             /** Format: uuid */
             incomingPartyId: string;
             inherited: components["schemas"]["InheritedDisbursement"][];
+            /** Format: date-time */
+            issuedAt: string;
             /** Format: date */
             issuedOn: string;
             /** Format: int64 */
@@ -857,6 +860,7 @@ export interface components {
             reconciled: boolean;
         };
         HandoverStatementView: {
+            basis: string;
             basisHash: string;
             engineVersion: string;
             /** Format: uuid */
@@ -898,7 +902,7 @@ export interface components {
         };
         IssueHandoverRequest: {
             /** Format: int64 */
-            bankBalanceMinor: number;
+            bankBalanceMinor?: number;
             from?: string;
             handoverOn: string;
             /** Format: uuid */
@@ -1892,6 +1896,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisbursementView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_fund_handover_statements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoverStatementView"][];
                 };
             };
             /** @description Bad Request */

@@ -87,10 +87,12 @@ RUNNING = {
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel'):
    ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason", ['PM-FUND-007', 'PM-FUND-009']),
  ('post', '/api/money/entrances/{entranceId}/fund/handover-statements'):
-   ("Issue the repair fund's handover statement at a change of manager — opening, received, paid out and closing from the ledger, beside the bank's own balance, with the unpaid disbursements the incoming side inherits; stored as issued",
+   ("Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash",
     ['PM-FUND-010']),
+ ('get', '/api/money/entrances/{entranceId}/fund/handover-statements'):
+   ("The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects", ['PM-FUND-010']),
  ('get', '/api/money/entrances/{entranceId}/fund/handover-statements/{statementId}'):
-   ('A fund handover statement as it was issued, with the hash of its canonical basis', ['PM-FUND-010']),
+   ('A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with', ['PM-FUND-010']),
  ('post', '/api/money/entrances/{entranceId}/payments'):
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
     ['PM-DEBT-008']),

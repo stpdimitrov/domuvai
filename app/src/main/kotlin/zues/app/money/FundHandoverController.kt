@@ -20,10 +20,10 @@ data class IssueHandoverRequest(
     val from: String? = null,                     // the period's first day; without it, from the fund's first record
     val outgoingPartyId: UUID,
     val incomingPartyId: UUID,
-    val bankBalanceMinor: Long,
+    val bankBalanceMinor: Long? = null,           // required: the balance on the bank's own statement, never a default
 )
 
-/** The repair fund's handover statements (Rule: PM-FUND-010): issued once, read back as issued. */
+/** The repair fund's handover statements (Rule: PM-FUND-010): issued once, read back as issued, listed newest first. */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/fund/handover-statements")
 class FundHandoverController(private val handovers: FundHandoverService) {
@@ -35,14 +35,18 @@ class FundHandoverController(private val handovers: FundHandoverService) {
             entranceId,
             IssueHandover(
                 LocalDate.parse(request.handoverOn), request.from?.let(LocalDate::parse),
-                request.outgoingPartyId, request.incomingPartyId, request.bankBalanceMinor,
+                request.outgoingPartyId, request.incomingPartyId,
+                requireNotNull(request.bankBalanceMinor) { "bankBalanceMinor is the balance on the bank's own statement for the handover date — required" },
             ),
         )
+
+    @GetMapping
+    fun list(@PathVariable entranceId: UUID): List<HandoverStatementView> = handovers.list(entranceId)
 
     @GetMapping("/{statementId}")
     fun find(@PathVariable entranceId: UUID, @PathVariable statementId: UUID): HandoverStatementView = handovers.find(entranceId, statementId)
 
-    /** A handover date after today, a period starting after it, or one party on both sides → 400. */
+    /** A missing bank balance, a handover date after today, a period starting after it, or one party on both sides → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid handover"))

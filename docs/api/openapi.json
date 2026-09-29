@@ -827,6 +827,10 @@
             },
             "type": "array"
           },
+          "issuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "issuedOn": {
             "format": "date",
             "type": "string"
@@ -864,6 +868,7 @@
           "iban",
           "incomingPartyId",
           "inherited",
+          "issuedAt",
           "issuedOn",
           "openingMinor",
           "outgoingPartyId",
@@ -875,6 +880,9 @@
       },
       "HandoverStatementView": {
         "properties": {
+          "basis": {
+            "type": "string"
+          },
           "basisHash": {
             "type": "string"
           },
@@ -893,6 +901,7 @@
           }
         },
         "required": [
+          "basis",
           "basisHash",
           "engineVersion",
           "id",
@@ -1024,7 +1033,6 @@
           }
         },
         "required": [
-          "bankBalanceMinor",
           "handoverOn",
           "incomingPartyId",
           "outgoingPartyId"
@@ -3034,6 +3042,81 @@
       }
     },
     "/api/money/entrances/{entranceId}/fund/handover-statements": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_fund_handover_statements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HandoverStatementView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-010"
+        ]
+      },
       "post": {
         "operationId": "post_money_entrances_entranceId_fund_handover_statements",
         "parameters": [
@@ -3108,7 +3191,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Issue the repair fund's handover statement at a change of manager — opening, received, paid out and closing from the ledger, beside the bank's own balance, with the unpaid disbursements the incoming side inherits; stored as issued",
+        "summary": "Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash",
         "tags": [
           "money"
         ],
@@ -3191,7 +3274,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "A fund handover statement as it was issued, with the hash of its canonical basis",
+        "summary": "A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with",
         "tags": [
           "money"
         ],
