@@ -154,10 +154,10 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FUND-003` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:47` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
 | `PM-FUND-004` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:92` | `app/src/main/kotlin/zues/app/money/FundAccount.kt:9` |  |
 | `PM-FUND-005` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:85` | `app/src/main/kotlin/zues/app/money/FundAccountService.kt:53` |  |
-| `PM-FUND-006` | `app/src/test/kotlin/zues/app/money/FundServiceTest.kt:61` | `app/src/main/kotlin/zues/app/money/FundController.kt:27` |  |
-| `PM-FUND-007` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:68` | `app/src/main/kotlin/zues/app/money/FundController.kt:27` |  |
-| `PM-FUND-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:68` | `app/src/main/kotlin/zues/app/money/FundController.kt:27` |  |
-| `PM-FUND-009` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:68` | `app/src/main/kotlin/zues/app/money/FundController.kt:26` |  |
+| `PM-FUND-006` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:114` | `app/src/main/kotlin/zues/app/money/FundController.kt:27` |  |
+| `PM-FUND-007` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:93` | `app/src/main/kotlin/zues/app/money/FundController.kt:27` |  |
+| `PM-FUND-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:93` | `app/src/main/kotlin/zues/app/money/FundController.kt:27` |  |
+| `PM-FUND-009` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:93` | `app/src/main/kotlin/zues/app/money/FundController.kt:26` |  |
 | `PM-FUND-010` | — | — |  |
 | `PM-FUND-011` | — | — |  |
 

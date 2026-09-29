@@ -164,7 +164,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The repair and renewal fund — its balance, net of committed but unpaid disbursements */
+        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements */
         get: operations["get_money_entrances_entranceId_fund"];
         put?: never;
         post?: never;
@@ -201,7 +201,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign off a disbursement from the repair fund — its purpose, and a GA decision or an emergency */
+        /** Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two */
         post: operations["post_money_entrances_entranceId_fund_disbursements"];
         delete?: never;
         options?: never;

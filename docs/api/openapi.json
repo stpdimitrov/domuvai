@@ -2370,7 +2370,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "The repair and renewal fund — its balance, net of committed but unpaid disbursements",
+        "summary": "The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements",
         "tags": [
           "money"
         ],
@@ -2591,7 +2591,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Sign off a disbursement from the repair fund — its purpose, and a GA decision or an emergency",
+        "summary": "Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two",
         "tags": [
           "money"
         ],
