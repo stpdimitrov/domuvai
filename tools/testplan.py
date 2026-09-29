@@ -42,13 +42,15 @@ MODALITY_RANK = {'MUST': 0, 'MUST NOT': 0, 'SHOULD': 1, 'MAY': 2}
 SLICE_SIZE = 10        # rules per slice — one module, ~400 lines of diff
 
 RULE_RE = re.compile(r'PM-[A-Z]+-\d{3}')
-TEST_RE = re.compile(r"fun\s+`(PM-[A-Z]+-\d{3})")
+# The whole test name: `PM-FEE-004 PM-FUND-003 …` covers both rules, as traceability.py counts it.
+TEST_RE = re.compile(r"fun\s+`(PM-[A-Z]+-\d{3}[^`]*)`")
 
 def covered() -> set[str]:
     out = set()
     for p in ROOT.rglob('*.kt'):
         if 'build' in p.parts or 'node_modules' in p.parts: continue
-        out |= set(TEST_RE.findall(p.read_text()))
+        for name in TEST_RE.findall(p.read_text()):
+            out |= set(RULE_RE.findall(name))
     return out
 
 def main() -> int:

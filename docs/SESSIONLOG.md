@@ -1405,3 +1405,19 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — this entry, S-G1-03c, `app/src/main/kotlin/zues/app/registry/BookRetention.kt`.
 
 ---
+
+## WF-04 · 2026-09-29 · the test plan credits every rule a test names
+
+**Did** — `tools/testplan.py` read only the first rule ID of a test name, so `PM-FEE-004 PM-FUND-003 …` left PM-FUND-003 listed as remaining while `traceability.py` counted it covered — two generators, two numbers. It now reads the whole name, as traceability does: both say 40 covered, 193 remaining, and S-G1-02 no longer lists PM-FUND-003.
+
+**Rules covered** — none new (PM-FUND-003 was already proved by `ChargesTest`).
+
+**Tests added** — none; the evidence is the regenerated TESTPLAN (39 → 40 covered, PM-FUND-003 gone) matching TRACEABILITY.
+
+**Decisions** — none.
+
+**Open** — the next slice: S-G1-02 in `money` (concierge PM-FEE-011, key traceable to a protocol PM-FEE-003).
+
+**Read first next time** — this entry; then `python3 tools/lanes.py`.
+
+---
