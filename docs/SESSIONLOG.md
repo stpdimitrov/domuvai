@@ -1439,3 +1439,38 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — #47, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`.
 
 ---
+
+## H-06 · 2026-09-29 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at the merge of this docs PR; before it, `main` was `f1288d4` (S-G1-02a). One slice is in flight: **S-G1-02b** (the repair fund, #50, `lane:money` held) — built, committed and pushed on `slice/S-G1-02b-fund-disbursements` (`dd97eca`), all gates green locally, no PR yet. A fresh-context review of it was running when this was written. Next: apply the review's findings, open the PR (`Closes #50`), switch auto-merge on.
+
+**What shipped since H-05**
+- **#41 F-38** — registry "today" is the Sofia day (PM-SYS-004). **#42 WF-03** — gate 10/10 `legal today`: no calendar date read off a clock except through `toSofiaDate`.
+- **#44 S-G1-03c + #45** — move-out for residents and animals (PM-BOOK-008); book retention 3 months after the *recorded* move-out (PM-BOOK-010; the owner's default, `TODO(legal)`); former owners' data held for counsel.
+- **#46 WF-04** — the test plan credits every rule a test names.
+- **#49 S-G1-02a** — concierge is a named maintenance line, not a fourth stream (PM-FEE-011 within PM-FEE-001); every charge line names its GA decision (PM-FEE-003); `ENGINE_VERSION` 0.2.0.
+- Finding **#48** (`lane:intake`): the intake dry-run cannot name a concierge line.
+
+**Where the plan stands** — on `main`: 42 of 233 rules have a named test; Gate 1 is 39 of 70; 31 operations run, 16 planned. With S-G1-02b: 46 of 233, Gate 1 43 of 70, 33 running, 15 planned. Every lane is free except `money` (#50).
+- **money:** after S-G1-02b, S-G1-02c — pay a disbursement out (its ledger posting) and cancel one; the fund handover statement (PM-FUND-010). Then PM-FEE-017 (consumption lines). PM-FUND-002 waits for the national minimum wage as dated `:law` values, with their source.
+- **registry:** free SHOULDs PM-ORG-008 (common parts per building type) and PM-BOOK-012 (book vs billed headcount); PM-ORG-009 waits on owner input 4; the rest on auth, the closed complex, assembly or ADR-004.
+- **web:** `/entrance/fund` can go live once S-G1-02b merges. **intake:** #48.
+
+**Owner inputs outstanding**
+1. The minister's current order for the declaration template (PM-BOOK-004's placeholder).
+2. Counsel: ЗЗД чл. 76 (S-43); ADR-004 / ADR-007; how long a former owner's identity may be kept for a claim, and confirm the 3-month retention windows (PM-BOOK-010).
+3. The auth provider (Keycloak marked) — unblocks PM-BOOK-006/007/009.
+4. The business-multiplier split (PM-ORG-009, `ChargeRunService.kt:58`).
+5. The national minimum wage by year, with its source (PM-FUND-002).
+The retention windows were answered on 2026-09-28: 3 months where no law says otherwise.
+
+**Operating procedure (new since H-05)**
+- **Review before the PR.** A fresh-context subagent reviews the staged diff against the rule texts; fix, then open the PR. #44 merged before its review, and #45 had to fix it.
+- **Merging is automatic.** After opening a PR, switch auto-merge on (squash); the ruleset **Claude** on `main` requires `gates` (active since 2026-09-29), so it waits for CI. If GitHub answers "clean status", CI is already green: `gh pr merge N --squash`. Then sync `main`.
+- **Conflicts are fixed without asking.** Merge `origin/main` in — no rebase, no force-push; a generated doc takes main's copy and is regenerated; the session log takes main's file with the branch's entry appended last — the union driver can share one `---` between two entries, so rebuild it rather than trust it.
+- Banned identifiers bite on locals too: a `val balance` fails gate 7 even when it is derived from postings (ADR-006) — name it for what it holds.
+- Repository settings (auto-merge, rulesets) and Claude's own permissions are the owner's to change; the auto-mode classifier refuses Claude doing either.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py`, `gh pr list`, and the branch `slice/S-G1-02b-fund-disbursements`.
+
+---
