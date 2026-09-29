@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **41** (18%) |
-| Remaining | **192** |
+| Proved by a test named after the rule | **42** (18%) |
+| Remaining | **191** |
 | Proposed slices at ~10 rules each | **20** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-32 rule(s) remaining across 3 slice(s).
+31 rule(s) remaining across 3 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -31,13 +31,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-SYS-008` | SHOULD | One number a manager can act on. |
 | `PM-SYS-011` | SHOULD | Tasks appear without anyone remembering to create them. |
 
-### S-G1-02 · `money` · FEE · FUND · 11 rule(s) · ⚠ 1 unconfirmed
+### S-G1-02 · `money` · FEE · FUND · 10 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-FUND-002` | MUST ⚠ | Minimum wage is a dated configuration value; a below-minimum tariff is rejected with the computed floor shown. |
 | `PM-FEE-013` | MUST | Budget vs actual report is a first-class screen. |
-| `PM-FUND-003` | MUST | A unit holding 4.20% of ideal parts is charged 4.20% of the period's fund contribution. |
 | `PM-FUND-006` | MUST | Every fund disbursement requires a purpose code and a linked decision or passport measure. |
 | `PM-FUND-007` | MUST | Two-factor approval: decision reference + authorised signatory. |
 | `PM-FUND-008` | MUST | Emergency path checks available balance before releasing the work order. |

@@ -1406,6 +1406,22 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 
 ---
 
+## WF-04 · 2026-09-29 · the test plan credits every rule a test names
+
+**Did** — `tools/testplan.py` read only the first rule ID of a test name, so `PM-FEE-004 PM-FUND-003 …` left PM-FUND-003 listed as remaining while `traceability.py` counted it covered — two generators, two numbers. It now reads the whole name, as traceability does: both say 40 covered, 193 remaining, and S-G1-02 no longer lists PM-FUND-003.
+
+**Rules covered** — none new (PM-FUND-003 was already proved by `ChargesTest`).
+
+**Tests added** — none; the evidence is the regenerated TESTPLAN (39 → 40 covered, PM-FUND-003 gone) matching TRACEABILITY.
+
+**Decisions** — none.
+
+**Open** — the next slice: S-G1-02 in `money` (concierge PM-FEE-011, key traceable to a protocol PM-FEE-003).
+
+**Read first next time** — this entry; then `python3 tools/lanes.py`.
+
+---
+
 ## S-G1-02a · 2026-09-29 · concierge follows maintenance; every charge line names its decision (money)
 
 **Did** — two Gate-1 fee rules in the engine (#47, `lane:money`). A concierge (портиер) line is a **named line inside MAINTENANCE** (`CostItem.CONCIERGE`), not a fourth stream — PM-FEE-001 separates exactly three, and the chart of accounts keeps three roots (concierge income posts to `INCOME:MAINTENANCE`). It must use the key of the tariff's own maintenance lines (maintenance's default when there are none), so it takes maintenance's exemptions and business multiplier (PM-FEE-011); another key, another stream, a second concierge line, or maintenance itself split over two keys is rejected — whatever the line order. Every computed and stored charge line names the GA decision behind it (PM-FEE-003), not only the run's basis. Storage (`V202609290541`): `charge_line.item` (CONCIERGE, only on MAINTENANCE) and `charge_line.decision_id` (required on every line written from now on — a NOT VALID check, so older lines keep their trace in the basis); a line is unique per run, unit, stream and item, so a resumed run still writes nothing twice. The basis JSON writes `item` only when a line has one, so a past run's hash still reproduces (PM-FEE-014) — pinned against `main`'s serializer. A unit statement orders a period's lines deterministically. `ENGINE_VERSION` 0.1.0 → 0.2.0. `law/…/Keys.kt` is a shared file in `tools/lanes.py` and `WORKING.md`.
