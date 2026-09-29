@@ -1538,3 +1538,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — #59, this entry, `app/src/main/kotlin/zues/app/money/FundHandover.kt`.
 
 ---
+
+## S-G1-02e · 2026-09-29 · consumption lines: metered water and heating beside the statutory keys (money)
+
+**Did** — per-unit metered components (#62, `lane:money`, PM-FEE-017). A charge run may carry consumption lines — `WATER` or `HEATING`, each with one price per unit of measure (m³, kWh) in minor units and its GA decision (PM-FEE-012) — and each unit's own readings (up to three decimals, kept as thousandths). Each unit is billed its reading × the price, half-up to the cent, as a MAINTENANCE line (never a fourth stream, PM-FEE-001) marked `METERED` — not a statutory key: no tariff line may take it, and a metered item cannot be allocated by a key. The keyed lines are untouched. A unit with no reading is billed nothing on that line and listed in the run's `missingReadings`; nothing is estimated. Both paths carry it: the stated-basis preview and the registry-sourced preview and issue (`StoredChargeRunRequest.consumption` / `readings`). An issued metered line is stored with its reading as `quantity`, so the statement and the ledger (RECEIVABLE, INCOME:MAINTENANCE) take it like any line. The basis carries readings and prices only when present, so every earlier basis hashes as before (the golden hash is unchanged). Migration `V202609291726` admits `METERED`, `WATER` and `HEATING` on `charge_line` and ties `METERED` to a metered item and back.
+
+**Rules covered** — PM-FEE-017 (named-test coverage 47 → 48 of 233).
+
+**Tests added** — `ChargesTest`: `PM-FEE-017 a consumption line bills each unit for its own reading, half-up to the cent, and changes no other line`, `PM-FEE-017 an unread meter is billed nothing and listed, never estimated`, `PM-FEE-017 a business unit pays what its meter read, not a multiple of it`, `PM-FEE-017 a consumption line needs its GA decision, a metered item and one price, and no statutory line is metered`. `ChargeCalculatorTest`: readings reach the engine exactly; a reading has at most three decimals, is not negative, names a unit of the run once. `ChargeRunServiceTest`: a stored run bills a registered unit's reading and refuses one for a unit it does not hold. `BasisJsonTest`: a metered run carries its readings and prices. `PostingsTest`: a metered line is the unit's receivable and maintenance income. `ChargeRunPersistenceIT` (Docker — CI): a metered line stored as MAINTENANCE / METERED with its reading as quantity; the schema keeps METERED for metered items and back. Twenty-two mutations each failed their tests.
+
+**Decisions** — owner D1–D5 on #62 (2026-09-29): a MAINTENANCE line typed by its kind; quantity (3 decimals) × price in minor units, half-up per unit; an unread meter billed nothing and listed; a GA decision per consumption line; the building-meter difference out. Read in the slice, flagged to the owner: the business-use multiplier (PM-FEE-010, "3 to 5 times the standard rate") does not touch a metered line — a unit pays what its own meter read.
+
+**Open** — The building-meter difference (main meter less the units' meters) needs its own decision. A price finer than a cent per unit of measure (common for kWh) cannot be stated yet — D2 fixed minor units. Intake of consumption columns (#48, intake lane). The web charges screen shows `METERED` lines as any line; `missingReadings` has no screen yet (web lane).
+
+**Read first next time** — #62, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`.
+
+---

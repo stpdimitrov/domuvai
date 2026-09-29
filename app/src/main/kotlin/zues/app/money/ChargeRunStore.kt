@@ -75,7 +75,11 @@ class ChargeRunStore(
                         unitId = UUID.fromString(charge.unitId),
                         component = line.stream.name,
                         allocationKey = line.key.name,
-                        quantity = quantityFor(line.key, unit, charge.chargeablePersons),
+                        quantity = if (line.key == AllocationKey.METERED) {           // Rule: PM-FEE-017 — the reading itself
+                            readingQuantity(run.basis.units.first { it.unitId == charge.unitId }.readings.getValue(line.item!!))
+                        } else {
+                            quantityFor(line.key, unit, charge.chargeablePersons)
+                        },
                         amountMinor = line.amount.amountMinor,
                         currency = "EUR",
                         derivation = line.derivation,
@@ -101,5 +105,6 @@ class ChargeRunStore(
         AllocationKey.BY_IDEAL_PARTS -> BigDecimal(unit.idealParts).setScale(6)
         AllocationKey.PER_UNIT -> BigDecimal.ONE.setScale(6)
         AllocationKey.PER_PERSON -> BigDecimal(persons).setScale(6)
+        AllocationKey.METERED -> throw IllegalStateException("a metered line's quantity is its reading (PM-FEE-017)")
     }
 }

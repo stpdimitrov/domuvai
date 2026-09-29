@@ -6,6 +6,7 @@ import zues.charges.PropertyUnit
 import zues.charges.Tariff
 import zues.charges.TariffLine
 import zues.charges.computeChargeRun
+import zues.charges.ConsumptionLine
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
 import zues.law.CostItem
@@ -61,5 +62,26 @@ class BasisJsonTest {
     fun `a different tariff produces a different basis hash`() {
         assertThat(BasisJson.hash(BasisJson.of(run(20_000))))
             .isNotEqualTo(BasisJson.hash(BasisJson.of(run(10_000))))
+    }
+
+    @Test
+    fun `PM-FEE-017 a metered run carries its readings and prices in its basis`() {
+        val metered = computeChargeRun(
+            "entrance-1",
+            listOf(
+                PropertyUnit("u1", "ап. 1", IdealParts.of("60.0000"), occupants = 0, readings = mapOf(CostItem.WATER to 12_345L)),
+                PropertyUnit("u2", "ап. 2", IdealParts.of("40.0000"), occupants = 0),
+            ),
+            Tariff(
+                "entrance-1", "2026-05", "2026-05-01",
+                listOf(TariffLine(CostStream.MAINTENANCE, AllocationKey.BY_IDEAL_PARTS, "GA-2026-1", totalMinor = 10_000)),
+                consumption = listOf(ConsumptionLine(CostItem.WATER, 230, "GA-2026-9")),
+            ),
+        )
+        val json = BasisJson.of(metered)
+        assertThat(json).contains("\"consumption\":[{\"decisionId\":\"GA-2026-9\",\"item\":\"WATER\",\"priceMinor\":230}]")
+        assertThat(json).contains("\"readings\":{\"WATER\":12345}")
+        assertThat(json.split("\"readings\"")).hasSize(2)                                // only the unit that has readings
+        assertThat(BasisJson.hash(json)).isNotEqualTo(BasisJson.hash(BasisJson.of(run(10_000))))
     }
 }

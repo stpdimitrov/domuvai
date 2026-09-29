@@ -61,13 +61,13 @@ RUNNING = {
    ("The owners and users of an entrance's units as of a date — names only", ['PM-ORG-011', 'PM-BOOK-011']),
  # ---- money
  ('post', '/api/money/charge-runs/preview'):
-   ('Compute a charge run from a stated basis — nothing is stored',
-    ['PM-FEE-001', 'PM-FEE-010', 'PM-FEE-012', 'PM-ORG-002']),
+   ('Compute a charge run from a stated basis, metered consumption included — nothing is stored',
+    ['PM-FEE-001', 'PM-FEE-010', 'PM-FEE-012', 'PM-FEE-017', 'PM-ORG-002']),
  ('post', '/api/money/entrances/{entranceId}/charge-runs/preview'):
-   ("Compute a charge run from the entrance's registered units — nothing is stored", ['PM-FEE-001', 'PM-FEE-014']),
+   ("Compute a charge run from the entrance's registered units and the stated meter readings — nothing is stored", ['PM-FEE-001', 'PM-FEE-014', 'PM-FEE-017']),
  ('post', '/api/money/entrances/{entranceId}/charge-runs'):
-   ('Issue a charge run — stored with its basis, never altered afterwards',
-    ['PM-FEE-012', 'PM-FEE-014', 'PM-FEE-015', 'PM-FEE-016']),
+   ('Issue a charge run — stored with its basis, meter readings included, never altered afterwards',
+    ['PM-FEE-012', 'PM-FEE-014', 'PM-FEE-015', 'PM-FEE-016', 'PM-FEE-017']),
  ('get', '/api/money/units/{unitId}/statement'):
    ("The unit's itemised statement, showing how each number was derived", ['PM-FEE-018']),
  ('get', '/api/money/units/{unitId}/arrears'):
