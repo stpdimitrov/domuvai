@@ -25,10 +25,10 @@ import java.time.LocalDate
 import java.util.UUID
 
 /**
- * The repair fund against real PostgreSQL: money paid into the fund's account is its balance, a
- * signed-off disbursement is committed and no longer available (PM-FUND-009), an emergency beyond the
- * available balance is refused (PM-FUND-008), and the table itself refuses a disbursement with neither a
- * decision nor an emergency (PM-FUND-007). Docker-gated.
+ * The repair fund against real PostgreSQL: money paid into the fund's account is its balance and cash is
+ * not, a signed-off disbursement is committed and no longer available (PM-FUND-009), an emergency beyond
+ * the available balance is refused (PM-FUND-008), and each of the table's own checks refuses its
+ * violation (PM-FUND-006…008). Docker-gated.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -64,8 +64,17 @@ class FundPersistenceIT {
     private fun disburse(entranceId: UUID, body: String) =
         mvc.perform(post("/api/money/entrances/$entranceId/fund/disbursements").contentType(MediaType.APPLICATION_JSON).content(body))
 
-    @Test
-    fun `PM-FUND-007 PM-FUND-008 PM-FUND-009 money in is the balance, a signed-off disbursement is committed, an emergency is capped`() {
+    private fun pay(entranceId: UUID, unitId: UUID, amountMinor: Long, into: String) =
+        mvc.perform(
+            post("/api/money/entrances/$entranceId/payments").header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"unitId":"$unitId","amountMinor":$amountMinor,"valueDate":"2026-09-01","receivedInto":"$into"}"""),
+        ).andExpect(status().isCreated)
+
+    private data class Seeded(val entranceId: UUID, val unitId: UUID, val chair: UUID, val fundAccountId: UUID)
+
+    /** An entrance with one flat and a repair fund account held by its chair. */
+    private fun entranceWithFund(): Seeded {
         val entranceId = postFor("/api/registry/entrances", """{"address":"ул. Оборище 12","label":"А","managementForm":"GA"}""", "entranceId")
         val unitId = postFor(
             "/api/registry/entrances/$entranceId/units",
@@ -73,15 +82,18 @@ class FundPersistenceIT {
         )
         val chair = postFor("/api/registry/parties", """{"fullName":"Иван Петров"}""", "partyId")
         val iban = "BG80BNBG${"%014d".format(System.nanoTime() % 100_000_000_000_000)}"
-        postFor(
+        val fundAccountId = postFor(
             "/api/money/entrances/$entranceId/fund-accounts",
             """{"iban":"$iban","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"MANAGER","holderPartyId":"$chair"}""", "fundAccountId",
         )
-        mvc.perform(
-            post("/api/money/entrances/$entranceId/payments").header("Idempotency-Key", UUID.randomUUID().toString())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"unitId":"$unitId","amountMinor":50000,"valueDate":"2026-09-01","receivedInto":"REPAIR_RENEWAL"}"""),
-        ).andExpect(status().isCreated)
+        return Seeded(entranceId, unitId, chair, fundAccountId)
+    }
+
+    @Test
+    fun `PM-FUND-007 PM-FUND-008 PM-FUND-009 money in is the balance, a signed-off disbursement is committed, an emergency is capped`() {
+        val (entranceId, unitId, chair) = entranceWithFund()
+        pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
+        pay(entranceId, unitId, 7_000, "CASH")                                         // cash is not in the fund's account
 
         disburse(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
             .andExpect(status().isCreated)
@@ -96,14 +108,28 @@ class FundPersistenceIT {
             .andExpect(jsonPath("$.committedMinor").value(50_000))
             .andExpect(jsonPath("$.availableMinor").value(0))
             .andExpect(jsonPath("$.disbursements.length()").value(2))
+    }
 
-        val fundAccountId = jdbc.queryForObject("SELECT fund_account_id FROM fund_disbursement WHERE entrance_id = ? LIMIT 1", UUID::class.java, entranceId)
-        assertThatThrownBy {                                                          // neither a decision nor an emergency
-            jdbc.update(
-                "INSERT INTO fund_disbursement (id, entrance_id, fund_account_id, amount_minor, purpose, authorised_by, status, committed_on) " +
-                    "VALUES (?, ?, ?, 100, 'WORKS', ?, 'COMMITTED', ?)",
-                UUID.randomUUID(), entranceId, fundAccountId, chair, LocalDate.parse("2026-09-29"),
-            )
-        }.isInstanceOf(DataIntegrityViolationException::class.java)
+    @Test
+    fun `PM-FUND-006 PM-FUND-007 PM-FUND-008 the table refuses a disbursement without its basis, one check at a time`() {
+        val (entranceId, _, chair, fundAccountId) = entranceWithFund()
+        fun insert(purpose: String, decision: String?, emergency: String?, measure: String?) = jdbc.update(
+            "INSERT INTO fund_disbursement (id, entrance_id, fund_account_id, amount_minor, purpose, decision_id, emergency_justification, " +
+                "passport_measure, authorised_by, status, committed_on) VALUES (?, ?, ?, 100, ?, ?, ?, ?, ?, 'COMMITTED', ?)",
+            UUID.randomUUID(), entranceId, fundAccountId, purpose, decision, emergency, measure, chair, LocalDate.parse("2026-09-29"),
+        )
+        for ((row, constraint) in listOf(
+            listOf("WORKS", null, null, null) to "fund_disbursement_decision_or_emergency",
+            listOf("WORKS", "GA-2026-7", "the roof leaks", null) to "fund_disbursement_decision_or_emergency",
+            listOf("GA_PURPOSE", null, "the roof leaks", null) to "fund_disbursement_emergency_is_works",
+            listOf("PASSPORT_MEASURE", "GA-2026-7", null, null) to "fund_disbursement_measure_named",
+            listOf("WORKS", "   ", null, null) to "fund_disbursement_decision_not_blank",
+            listOf("WORKS", null, " ", null) to "fund_disbursement_justification_not_blank",
+            listOf("PASSPORT_MEASURE", "GA-2026-7", null, "\t") to "fund_disbursement_measure_not_blank",
+        )) {
+            assertThatThrownBy { insert(row[0]!!, row[1], row[2], row[3]) }
+                .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
+        }
+        insert("WORKS", null, "the roof leaks", null)                                    // an emergency repair, justified, is accepted
     }
 }

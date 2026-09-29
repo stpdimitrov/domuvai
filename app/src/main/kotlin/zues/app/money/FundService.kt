@@ -52,11 +52,14 @@ data class FundView(
 /** An emergency disbursement the fund's available balance does not cover (Rule: PM-FUND-008). */
 class FundShortfall(message: String) : RuntimeException(message)
 
+/** A fund account whose holder is not a registered party, so nobody can sign off a disbursement (Rule: PM-FUND-007). */
+class FundUnsignable(message: String) : RuntimeException(message)
+
 /**
  * The repair and renewal fund's disbursements and balance. A disbursement is for a lawful purpose
  * (Rule: PM-FUND-006) and is signed off by the party holding the fund's account on a GA decision (Rule:
- * PM-FUND-007) — or, without one, as an emergency with its justification, and only while the available
- * balance covers it (Rule: PM-FUND-008). The balance is what the fund's bank account has received, read
+ * PM-FUND-007) — or, without one, as an emergency repair with its justification, and only while the
+ * available balance covers it (Rule: PM-FUND-008). The balance is what the fund's bank account has received, read
  * from the ledger (paying out is S-G1-02c); committed but unpaid disbursements are not available (Rule:
  * PM-FUND-009). The money moves in the fund's own bank account, never through the platform (ADR-007).
  */
@@ -80,7 +83,7 @@ class FundService(
             "a passport-measure disbursement names the measure (PM-FUND-006)"
         }
         val holder = fund.holderParty                                                   // Rule: PM-FUND-007
-            ?: throw IllegalStateException("the fund account's holder is not a registered party, so nobody can sign off a disbursement (PM-FUND-007)")
+            ?: throw FundUnsignable("the fund account's holder is not a registered party, so nobody can sign off a disbursement (PM-FUND-007)")
         require(command.authorisedBy == holder) { "only the party holding the fund's account signs off a disbursement (PM-FUND-007)" }
         val decided = !command.decisionId.isNullOrBlank()
         val emergency = !command.emergencyJustification.isNullOrBlank()
@@ -88,6 +91,9 @@ class FundService(
             "a disbursement rests on a GA decision, or is an emergency with its justification — one of the two (PM-FUND-007, PM-FUND-008)"
         }
         if (emergency) {                                                                // Rule: PM-FUND-008
+            require(purpose == DisbursementPurpose.WORKS) {
+                "only repair works may be ordered as an emergency, without a GA decision (PM-FUND-008)"
+            }
             val available = view(entranceId).availableMinor
             if (command.amountMinor > available) {
                 throw FundShortfall("an emergency disbursement of ${command.amountMinor} exceeds the ${available} available (PM-FUND-008)")

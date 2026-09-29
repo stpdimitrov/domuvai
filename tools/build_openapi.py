@@ -77,9 +77,9 @@ RUNNING = {
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("List the entrance's fund accounts", ['PM-FUND-001', 'PM-FUND-004']),
  ('get', '/api/money/entrances/{entranceId}/fund'):
-   ('The repair and renewal fund — its balance, net of committed but unpaid disbursements', ['PM-FUND-004', 'PM-FUND-009']),
+   ('The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements', ['PM-FUND-004', 'PM-FUND-009']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements'):
-   ('Sign off a disbursement from the repair fund — its purpose, and a GA decision or an emergency',
+   ('Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two',
     ['PM-FUND-006', 'PM-FUND-007', 'PM-FUND-008']),
  ('post', '/api/money/entrances/{entranceId}/payments'):
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',

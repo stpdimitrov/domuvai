@@ -17,7 +17,7 @@ data class CommitDisbursementRequest(
     val amountMinor: Long,
     val purpose: String,                          // WORKS | PASSPORT_MEASURE | GA_PURPOSE
     val authorisedBy: UUID,                       // the party holding the fund's account (PM-FUND-007)
-    val decisionId: String? = null,               // the GA decision — or, instead,
+    val decisionId: String? = null,               // the GA decision — or, instead, for WORKS only,
     val emergencyJustification: String? = null,   // an emergency's written justification (PM-FUND-008)
     val passportMeasure: String? = null,          // required for PASSPORT_MEASURE (PM-FUND-006)
 )
@@ -55,7 +55,7 @@ class FundController(private val fund: FundService) {
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
     /** An emergency the available balance does not cover, or an account holder nobody can sign for → 409. */
-    @ExceptionHandler(FundShortfall::class, IllegalStateException::class)
+    @ExceptionHandler(FundShortfall::class, FundUnsignable::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: RuntimeException): Map<String, String> = mapOf("error" to (e.message ?: "conflicts with the fund's state"))
 
