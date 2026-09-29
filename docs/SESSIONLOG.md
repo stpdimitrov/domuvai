@@ -1522,3 +1522,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — #55, this entry, `app/src/main/kotlin/zues/app/money/FundHandover.kt`.
 
 ---
+
+## S-G1-02d-r · 2026-09-29 · the handover statement: the fresh-context review's fixes (money)
+
+**Did** — #56 was merged before its fresh-context review was applied; this lands the review (#59, `lane:money`, PM-FUND-010), as S-G1-03c-r did for #44. **Bug:** an omitted `bankBalanceMinor` bound to 0, so a fund whose ledger closes at 0 could be stored `reconciled` from a figure nobody entered — it is now required (400). Reading back re-derives the canonical basis from what was stored and refuses one that no longer matches its hash (`StatementTampered`); the view returns the `basis` text beside `basisHash`, so anyone can check the one against the other. Statements carry `issued_at` and `GET …/handover-statements` lists them newest first, so a correction never hides the one it corrects; the repository only reads. Paid out is the disbursements' payout journals and received is net, so a reversed receipt is not read as paid out. Migration `V202609291704` adds `issued_at`, drops the received sign check and re-keys the index — the merged `V202609291407` is untouched. Wording: the account and ledger stay with the entrance; re-titling to the incoming holder is not done here.
+
+**Rules covered** — PM-FUND-010 (coverage unchanged, 47 of 233; its "signed by both parties" is #57).
+
+**Tests added** — `FundHandoverTest`: `PM-FUND-010 a stored statement that no longer matches its hash is refused, not served`, and a fuller ledger — a payout before the period, a reversed receipt, payouts and cancellations on the handover day and after it, a tie on the sign-off day, the operating account first — behind the existing seven. `FundHandoverWebTest`: a missing bank balance is a 400; the list. `FundPersistenceIT`: an unreconciled statement end to end, an unregistered side (409), the list newest first, the hash checked against the returned basis; `reconciles` tried from both sides, a one-day period and negative net receipts accepted. The review's 26 surviving mutations were answered by 22 targeted ones plus the 13 earlier that still applied — each fails its tests.
+
+**Decisions** — none new; D1–D5 on #55 stand.
+
+**Open** — #57 (signing by both sides, evidence lane); #58 (the fund's write endpoints take no `Idempotency-Key`). Insert-only tables refuse UPDATE and DELETE but not TRUNCATE (a database-role matter). Next in the money lane: S-G1-02e, consumption lines (PM-FEE-017), contract with the owner.
+
+**Read first next time** — #59, this entry, `app/src/main/kotlin/zues/app/money/FundHandover.kt`.
+
+---

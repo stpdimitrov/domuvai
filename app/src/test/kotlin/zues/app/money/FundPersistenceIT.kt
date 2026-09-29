@@ -210,18 +210,20 @@ class FundPersistenceIT {
     }
 
     @Test
-    fun `PM-FUND-010 a handover statement is stored as issued, reconciled against the bank, and never changed`() {
+    fun `PM-FUND-010 a handover statement is stored as issued, reconciled against the bank or not, and never changed`() {
         val (entranceId, unitId, chair) = entranceWithFund()
         val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
         val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
         act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isOk)
         signedOff(entranceId, """{"amountMinor":5000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-8"}""")   // unpaid: inherited
-
-        val issued = mvc.perform(
-            post("/api/money/entrances/$entranceId/fund/handover-statements").contentType(MediaType.APPLICATION_JSON)
-                .content("""{"handoverOn":"$signedOn","outgoingPartyId":"$chair","incomingPartyId":"$successor","bankBalanceMinor":30000}"""),
+        val statements = "/api/money/entrances/$entranceId/fund/handover-statements"
+        fun issue(incoming: UUID, bank: Long) = mvc.perform(
+            post(statements).contentType(MediaType.APPLICATION_JSON)
+                .content("""{"handoverOn":"$signedOn","outgoingPartyId":"$chair","incomingPartyId":"$incoming","bankBalanceMinor":$bank}"""),
         )
+
+        val first = issue(successor, 30_000)
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.statement.receivedMinor").value(50_000))
             .andExpect(jsonPath("$.statement.paidOutMinor").value(20_000))
@@ -230,16 +232,32 @@ class FundPersistenceIT {
             .andExpect(jsonPath("$.statement.committedMinor").value(5_000))
             .andExpect(jsonPath("$.statement.inherited.length()").value(1))
             .andReturn().response.contentAsString
-        val id = UUID.fromString(json.readTree(issued).get("id").asText())
-        val hash = json.readTree(issued).get("basisHash").asText()
+        val second = issue(successor, 29_000)                                            // the bank shows less: stored all the same
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.statement.reconciled").value(false))
+            .andExpect(jsonPath("$.statement.differenceMinor").value(-1_000))
+            .andReturn().response.contentAsString
+        issue(UUID.randomUUID(), 30_000)                                                // an unregistered incoming side
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.error").value("the statement conflicts with the fund's records, or a party named on it is not registered"))
+        val firstId = UUID.fromString(json.readTree(first).get("id").asText())
+        val secondId = json.readTree(second).get("id").asText()
+        val hash = json.readTree(first).get("basisHash").asText()
 
-        jdbc.update("UPDATE fund_handover_statement SET closing_minor = 0, received_minor = 0 WHERE id = ?", id)   // ignored
-        jdbc.update("DELETE FROM fund_handover_statement WHERE id = ?", id)                                         // ignored
-        mvc.perform(get("/api/money/entrances/$entranceId/fund/handover-statements/$id"))
+        jdbc.update("UPDATE fund_handover_statement SET closing_minor = 0, received_minor = 0 WHERE id = ?", firstId)   // ignored
+        jdbc.update("DELETE FROM fund_handover_statement WHERE id = ?", firstId)                                         // ignored
+        val readBack = mvc.perform(get("$statements/$firstId"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.basisHash").value(hash))
             .andExpect(jsonPath("$.statement.closingMinor").value(30_000))
-        assertThat(jdbc.queryForObject("SELECT closing_minor FROM fund_handover_statement WHERE id = ?", Long::class.java, id)).isEqualTo(30_000)
+            .andReturn().response.contentAsString
+        assertThat(BasisJson.hash(json.readTree(readBack).get("basis").asText())).isEqualTo(hash)   // anyone can check the hash
+        assertThat(jdbc.queryForObject("SELECT closing_minor FROM fund_handover_statement WHERE id = ?", Long::class.java, firstId)).isEqualTo(30_000)
+        mvc.perform(get(statements))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].id").value(secondId))                             // newest first: the correction
+            .andExpect(jsonPath("$[1].id").value(firstId.toString()))
     }
 
     @Test
@@ -251,7 +269,7 @@ class FundPersistenceIT {
             "handover_on" to "DATE '2026-09-15'", "outgoing_party" to "'$chair'", "incoming_party" to "'$successor'",
             "opening_minor" to "0", "received_minor" to "100", "paid_out_minor" to "40", "closing_minor" to "60", "bank_minor" to "60",
             "committed_minor" to "0", "basis" to "'{}'", "basis_hash" to "'h'", "law_version" to "'1.3'", "engine_version" to "'0.2.0'",
-            "issued_on" to "DATE '2026-09-29'",
+            "issued_on" to "DATE '2026-09-29'", "issued_at" to "now()",
         )
         fun insert(overrides: Map<String, String>) = (valid + overrides).let { row ->
             jdbc.update("INSERT INTO fund_handover_statement (${row.keys.joinToString()}) VALUES (${row.values.joinToString()})")
@@ -259,14 +277,16 @@ class FundPersistenceIT {
         for ((overrides, constraint) in listOf(
             mapOf("incoming_party" to "'$chair'") to "fund_handover_statement_parties_differ",
             mapOf("closing_minor" to "61") to "fund_handover_statement_reconciles",
+            mapOf("closing_minor" to "59") to "fund_handover_statement_reconciles",
             mapOf("period_from" to "DATE '2026-09-16'") to "fund_handover_statement_period",
             mapOf("issued_on" to "DATE '2026-09-14'") to "fund_handover_statement_not_ahead",
-            mapOf("received_minor" to "-1", "closing_minor" to "-41") to "fund_handover_statement_received_not_negative",
             mapOf("paid_out_minor" to "-1", "closing_minor" to "101") to "fund_handover_statement_paid_out_not_negative",
             mapOf("committed_minor" to "-1") to "fund_handover_statement_committed_not_negative",
         )) {
             assertThatThrownBy { insert(overrides) }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
         }
-        insert(emptyMap())                                                                // a reconciled statement between two sides is accepted
+        insert(emptyMap())                                                                // reconciled, between two sides: accepted
+        insert(mapOf("period_from" to "DATE '2026-09-15'"))                              // a one-day period
+        insert(mapOf("received_minor" to "-10", "closing_minor" to "-50"))               // net receipts may be negative: a reversal
     }
 }

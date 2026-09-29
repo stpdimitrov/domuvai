@@ -158,7 +158,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FUND-007` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:94` | `app/src/main/kotlin/zues/app/money/FundController.kt:35` |  |
 | `PM-FUND-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:94` | `app/src/main/kotlin/zues/app/money/FundController.kt:35` |  |
 | `PM-FUND-009` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:94` | `app/src/main/kotlin/zues/app/money/FundController.kt:34` |  |
-| `PM-FUND-010` | `app/src/test/kotlin/zues/app/money/FundHandoverTest.kt:59` | `app/src/main/kotlin/zues/app/money/FundHandover.kt:18` |  |
+| `PM-FUND-010` | `app/src/test/kotlin/zues/app/money/FundHandoverTest.kt:87` | `app/src/main/kotlin/zues/app/money/FundHandover.kt:21` |  |
 | `PM-FUND-011` | — | — |  |
 
 ## DEBT — Arrears & enforcement  ·  3/12 covered
