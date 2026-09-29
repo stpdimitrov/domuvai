@@ -77,7 +77,7 @@ class BookWebTest {
         whenever(retention.anonymiseDue(entranceId, LocalDate.parse("2026-06-01"))).thenReturn(
             RetentionApplied(LocalDate.parse("2026-06-01"), householdUnlinked = 1, animalPassportsCleared = 2),
         )
-        mvc.perform(post("/api/registry/entrances/$entranceId/book/retention"))   // no date: the caller cannot bring it forward
+        mvc.perform(post("/api/registry/entrances/$entranceId/book/retention").param("on", "2030-01-01"))  // ignored: no caller date
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.on").value("2026-06-01"))
             .andExpect(jsonPath("$.householdUnlinked").value(1))

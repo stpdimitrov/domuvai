@@ -197,7 +197,7 @@ class RegistryController(private val registry: RegistryService) {
 
     /**
      * Ideal parts that do not sum to 100%, or a malformed value, are a bad request (PM-ORG-002); so
-     * are a malformed date, a move-out not after the move-in, and a stay already ended.
+     * are a malformed date and a move-out not after the move-in.
      */
     @ExceptionHandler(IllegalStateException::class, IllegalArgumentException::class, DateTimeParseException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

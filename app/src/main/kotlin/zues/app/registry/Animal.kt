@@ -21,6 +21,8 @@ data class Animal(
     val vetPassportNo: String?,
     val validFrom: LocalDate,
     val validTo: LocalDate?,
+    /** The day the system recorded the move-out; the retention window never starts before it (PM-BOOK-010). */
+    val endRecordedOn: LocalDate? = null,
 )
 
 interface AnimalRepository : ListCrudRepository<Animal, UUID> {

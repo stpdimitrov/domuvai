@@ -28,6 +28,8 @@ data class HouseholdMember(
     val validTo: LocalDate?,
     /** Provenance if adopted from a fee-sheet import (STAGE1-ADDENDUM §1); null if registered directly. */
     val importId: UUID? = null,
+    /** The day the system recorded the move-out; the retention window never starts before it (PM-BOOK-010). */
+    val endRecordedOn: LocalDate? = null,
 )
 
 interface HouseholdMemberRepository : ListCrudRepository<HouseholdMember, UUID> {

@@ -39,9 +39,9 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:151` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
 | `PM-BOOK-006` | — | — |  |
 | `PM-BOOK-007` | — | — |  |
-| `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:71` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:297` |  |
+| `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:297` |  |
 | `PM-BOOK-009` | — | — |  |
-| `PM-BOOK-010` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:71` | `app/src/main/kotlin/zues/app/registry/BookRetention.kt:10` |  |
+| `PM-BOOK-010` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/BookRetention.kt:10` |  |
 | `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:78` |  |
 | `PM-BOOK-012` | — | — |  |
 

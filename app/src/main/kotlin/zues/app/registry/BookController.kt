@@ -32,8 +32,10 @@ class BookController(
         book.forEntrance(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())))
 
     /**
-     * Anonymise what the book no longer has a basis to keep, as of today in Sofia (PM-BOOK-010,
-     * PM-SYS-004). It takes no date, so nothing can be anonymised early. Irreversible.
+     * Anonymise the field groups past their retention window — a resident's link to a named person,
+     * an animal's passport number — as of today in Sofia (PM-BOOK-010, PM-SYS-004). It takes no date,
+     * and no window starts before its move-out was recorded, so nothing is anonymised early.
+     * Irreversible.
      */
     @PostMapping("/retention")
     fun applyRetention(@PathVariable entranceId: UUID): RetentionApplied =

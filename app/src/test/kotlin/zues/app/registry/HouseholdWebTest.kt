@@ -67,8 +67,8 @@ class HouseholdWebTest {
     }
 
     @Test
-    fun `ending a stay already ended, or on a malformed date, is a 400`() {
-        whenever(registry.endHouseholdStay(any(), any(), any(), any())).thenThrow(IllegalStateException("already left"))
+    fun `a move-out not after the move-in, or a malformed date, is a 400`() {
+        whenever(registry.endHouseholdStay(any(), any(), any(), any())).thenThrow(IllegalArgumentException("move-out before move-in"))
         mvc.perform(endStay(UUID.randomUUID(), "2026-05-01")).andExpect(status().isBadRequest)
         mvc.perform(endStay(UUID.randomUUID(), "01.05.2026")).andExpect(status().isBadRequest)
     }

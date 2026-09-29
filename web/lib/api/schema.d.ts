@@ -321,7 +321,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Anonymise the book's personal data past its retention window — today in Sofia, irreversible */
+        /** Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible */
         post: operations["post_registry_entrances_entranceId_book_retention"];
         delete?: never;
         options?: never;
@@ -407,7 +407,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record the day an animal left the unit */
+        /** Record or correct the day an animal left the unit */
         post: operations["post_registry_entrances_entranceId_units_unitId_animals_animalId_end"];
         delete?: never;
         options?: never;
@@ -441,7 +441,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record the day a resident left — their occupancy range closes */
+        /** Record or correct the day a resident left — their occupancy range closes */
         post: operations["post_registry_entrances_entranceId_units_unitId_household_memberId_end"];
         delete?: never;
         options?: never;

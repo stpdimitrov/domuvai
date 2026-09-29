@@ -2986,7 +2986,7 @@
             "description": "Not Found"
           }
         },
-        "summary": "Anonymise the book's personal data past its retention window — today in Sofia, irreversible",
+        "summary": "Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible",
         "tags": [
           "registry"
         ],
@@ -3523,7 +3523,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record the day an animal left the unit",
+        "summary": "Record or correct the day an animal left the unit",
         "tags": [
           "registry"
         ],
@@ -3720,7 +3720,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record the day a resident left — their occupancy range closes",
+        "summary": "Record or correct the day a resident left — their occupancy range closes",
         "tags": [
           "registry"
         ],
