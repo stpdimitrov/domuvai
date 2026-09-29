@@ -109,6 +109,15 @@ class FundWebTest {
             whenever(fund.cancel(eq(entranceId), eq(disbursementId), any())).thenThrow(error)
             mvc.perform(act("cancel", """{"cancelledBy":"$chair","reason":"revoked"}""")).andExpect(status().`is`(expected))
         }
-        mvc.perform(act("pay", """{"paidOn":"15.09.2026","paidBy":"$chair"}""")).andExpect(status().isBadRequest)   // not an ISO date
+        mvc.perform(act("pay", """{"paidOn":"15.09.2026","paidBy":"$chair"}"""))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("paidOn must be an ISO date (YYYY-MM-DD)"))
+    }
+
+    @Test
+    fun `a malformed id is a 400 naming the value, not the framework's classes`() {
+        mvc.perform(get("/api/money/entrances/x/fund"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("Invalid UUID string: x"))
     }
 }

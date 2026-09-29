@@ -484,6 +484,10 @@
             "format": "uuid",
             "type": "string"
           },
+          "paidBy": {
+            "format": "uuid",
+            "type": "string"
+          },
           "paidOn": {
             "format": "date",
             "type": "string"

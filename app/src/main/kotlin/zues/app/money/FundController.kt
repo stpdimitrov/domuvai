@@ -61,10 +61,14 @@ class FundController(private val fund: FundService) {
     fun cancel(@PathVariable entranceId: UUID, @PathVariable disbursementId: UUID, @RequestBody request: CancelDisbursementRequest): DisbursementView =
         fund.cancel(entranceId, disbursementId, CancelDisbursement(request.cancelledBy, request.reason))
 
-    /** An unknown purpose, a missing basis, measure or reason, a bad date, or a party who does not hold the account → 400. */
-    @ExceptionHandler(IllegalArgumentException::class, DateTimeParseException::class)
+    /** An unknown purpose, a missing basis, measure or reason, a date out of bounds, or a party who does not hold the account → 400. */
+    @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    fun onInvalid(e: RuntimeException): Map<String, String> = mapOf("error" to (e.message ?: "invalid disbursement"))
+    fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid disbursement"))
+
+    @ExceptionHandler(DateTimeParseException::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    fun onBadDate(e: DateTimeParseException): Map<String, String> = mapOf("error" to "paidOn must be an ISO date (YYYY-MM-DD)")
 
     /** No repair and renewal fund account for the entrance, or no such disbursement in it → 404. */
     @ExceptionHandler(NoSuchElementException::class)

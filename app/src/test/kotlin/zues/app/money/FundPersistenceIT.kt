@@ -131,6 +131,17 @@ class FundPersistenceIT {
             assertThatThrownBy { insert(row[0]!!, row[1], row[2], row[3]) }
                 .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
         }
+        for ((values, constraint) in listOf(
+            "0, 'WORKS'" to "fund_disbursement_amount_minor_check",
+            "100, 'PARTY'" to "fund_disbursement_purpose_check",
+        )) {
+            assertThatThrownBy {
+                jdbc.update(
+                    "INSERT INTO fund_disbursement (id, entrance_id, fund_account_id, amount_minor, purpose, decision_id, authorised_by, status, committed_on) " +
+                        "VALUES (gen_random_uuid(), '$entranceId', '$fundAccountId', $values, 'GA-2026-7', '$chair', 'COMMITTED', DATE '2026-09-29')",
+                )
+            }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
+        }
         insert("WORKS", null, "the roof leaks", null)                                    // an emergency repair, justified, is accepted
     }
 
@@ -155,6 +166,7 @@ class FundPersistenceIT {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("PAID"))
             .andExpect(jsonPath("$.paidOn").value(signedOn))
+            .andExpect(jsonPath("$.paidBy").value(chair.toString()))
         act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isConflict)   // once
         act(entranceId, roof, "cancel", """{"cancelledBy":"$chair","reason":"the roofer found no leak"}""")
             .andExpect(status().isOk)
@@ -175,22 +187,25 @@ class FundPersistenceIT {
     fun `PM-FUND-007 PM-FUND-009 the table refuses a payout or a cancellation it cannot account for, one check at a time`() {
         val (entranceId, _, chair) = entranceWithFund()
         val (open, signedOn) = signedOff(entranceId, """{"amountMinor":100,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
-        val day = LocalDate.parse(signedOn)
-        for ((sql, constraint) in listOf(
-            "UPDATE fund_disbursement SET paid_on = ? WHERE id = ?" to "fund_disbursement_paid_dated",
-            "UPDATE fund_disbursement SET status = 'PAID', paid_on = ?::date - 1 WHERE id = ?" to "fund_disbursement_paid_after_signed",
-            "UPDATE fund_disbursement SET status = 'CANCELLED', cancelled_on = ? WHERE id = ?" to "fund_disbursement_cancel_recorded",
+        val day = "DATE '$signedOn'"
+        fun update(set: String) = jdbc.update("UPDATE fund_disbursement SET $set WHERE id = '$open'")
+        for ((set, constraint) in listOf(
+            "status = 'SETTLED'" to "fund_disbursement_status_check",
+            "paid_on = $day, paid_by = '$chair'" to "fund_disbursement_paid_dated",                       // a date, but not PAID
+            "status = 'PAID'" to "fund_disbursement_paid_dated",                                           // PAID, but no date
+            "status = 'PAID', paid_on = $day" to "fund_disbursement_paid_by_recorded",
+            "status = 'PAID', paid_on = $day - 1, paid_by = '$chair'" to "fund_disbursement_paid_after_signed",
+            "status = 'CANCELLED'" to "fund_disbursement_cancelled_dated",
+            "status = 'CANCELLED', cancelled_on = $day, cancel_reason = 'revoked'" to "fund_disbursement_cancelled_by_recorded",
+            "status = 'CANCELLED', cancelled_on = $day, cancelled_by = '$chair'" to "fund_disbursement_cancel_reason_recorded",
+            "status = 'CANCELLED', cancelled_on = $day, cancelled_by = '$chair', cancel_reason = ' '" to "fund_disbursement_cancel_reason_not_blank",
+            "status = 'CANCELLED', cancelled_on = $day - 1, cancelled_by = '$chair', cancel_reason = 'revoked'" to "fund_disbursement_cancelled_after_signed",
+            "amount_minor = 99" to "stands as signed off, and is not rewritten",
         )) {
-            assertThatThrownBy { jdbc.update(sql, day, open) }
-                .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
+            assertThatThrownBy { update(set) }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
         }
-        assertThatThrownBy {
-            jdbc.update(
-                "UPDATE fund_disbursement SET status = 'CANCELLED', cancelled_on = ?, cancelled_by = ?, cancel_reason = ' ' WHERE id = ?", day, chair, open,
-            )
-        }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("fund_disbursement_cancel_reason_not_blank")
-        jdbc.update(                                                                       // a cancellation, fully recorded, is accepted
-            "UPDATE fund_disbursement SET status = 'CANCELLED', cancelled_on = ?, cancelled_by = ?, cancel_reason = 'revoked' WHERE id = ?", day, chair, open,
-        )
+        update("status = 'CANCELLED', cancelled_on = $day, cancelled_by = '$chair', cancel_reason = 'revoked'")   // fully recorded: accepted
+        assertThatThrownBy { update("status = 'COMMITTED', cancelled_on = NULL, cancelled_by = NULL, cancel_reason = NULL") }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("is already CANCELLED, and closes once")
     }
 }

@@ -10,6 +10,8 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -133,7 +135,7 @@ class FundServiceTest {
         assertThat(service.view(entranceId).availableMinor).isEqualTo(30_000)
         val paid = pay(works, on = "2026-09-15")
         assertThat(paid.status).isEqualTo("PAID")
-        assertThat(paid.paidOn).isEqualTo(LocalDate.parse("2026-09-15"))
+        assertThat(updated.single()).isEqualTo(works.copy(status = "PAID", paidOn = LocalDate.parse("2026-09-15"), paidBy = chair))
         assertThat(journal.map { it.journalId to it.valueDate }.toSet()).containsExactly(works.id to LocalDate.parse("2026-09-15"))
         holding(inAccount = 50_000, rows = updated.toList(), out = journal.filter { it.account == "BANK:REPAIR_RENEWAL" })
         val after = service.view(entranceId)
@@ -149,7 +151,8 @@ class FundServiceTest {
         assertThatThrownBy { pay(works, on = "2026-09-30") }.isInstanceOf(IllegalArgumentException::class.java)         // after today
         assertThatThrownBy { pay(works, on = "2026-08-31") }.isInstanceOf(IllegalArgumentException::class.java)         // before the sign-off
         assertThat(journal).isEmpty()                                                                                // a refused payout posts nothing
-        assertThat(pay(works, on = "2026-09-29").amountMinor).isEqualTo(20_000)                // today in Sofia, still the 28th in UTC
+        assertThat(pay(works, on = "2026-09-01").amountMinor).isEqualTo(20_000)                // the sign-off day itself
+        assertThat(pay(signedOff(1_000), on = "2026-09-29").paidOn).isEqualTo(LocalDate.parse("2026-09-29"))   // today in Sofia, still the 28th in UTC
         for (closed in listOf(signedOff(status = "PAID"), signedOff(status = "CANCELLED"))) {
             assertThatThrownBy { pay(closed) }.isInstanceOf(DisbursementClosed::class.java)
         }
@@ -157,7 +160,7 @@ class FundServiceTest {
         whenever(disbursements.findById(elsewhere.id)).thenReturn(Optional.of(elsewhere))
         assertThatThrownBy { pay(elsewhere) }.isInstanceOf(NoSuchElementException::class.java)                     // another entrance's
         assertThatThrownBy { pay(disbursement(1_000)) }.isInstanceOf(NoSuchElementException::class.java)           // none on record
-        assertThat(journal).hasSize(2)
+        assertThat(journal).hasSize(4)
     }
 
     @Test
@@ -165,9 +168,9 @@ class FundServiceTest {
         val works = signedOff(20_000)
         val cancelled = cancel(works)
         assertThat(cancelled.status).isEqualTo("CANCELLED")
-        assertThat(cancelled.cancelledOn).isEqualTo(LocalDate.parse("2026-09-29"))                 // the Sofia day
-        assertThat(cancelled.cancelledBy).isEqualTo(chair)
-        assertThat(cancelled.cancelReason).isEqualTo("the GA revoked decision GA-2026-7")
+        assertThat(updated.single()).isEqualTo(
+            works.copy(status = "CANCELLED", cancelledOn = LocalDate.parse("2026-09-29"), cancelledBy = chair, cancelReason = "the GA revoked decision GA-2026-7"),
+        )                                                                                          // stamped with the Sofia day
         assertThat(journal).isEmpty()                                                              // no money moved
         holding(inAccount = 50_000, rows = updated.toList())
         assertThat(service.view(entranceId).availableMinor).isEqualTo(50_000)
@@ -181,6 +184,10 @@ class FundServiceTest {
         for (closed in listOf(signedOff(status = "PAID"), signedOff(status = "CANCELLED"))) {
             assertThatThrownBy { cancel(closed) }.isInstanceOf(DisbursementClosed::class.java)
         }
+        val elsewhere = disbursement(1_000).copy(entranceId = UUID.randomUUID())
+        whenever(disbursements.findById(elsewhere.id)).thenReturn(Optional.of(elsewhere))
+        assertThatThrownBy { cancel(elsewhere) }.isInstanceOf(NoSuchElementException::class.java)                  // another entrance's
+        assertThatThrownBy { cancel(disbursement(1_000)) }.isInstanceOf(NoSuchElementException::class.java)        // none on record
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(fund.copy(holderParty = null)))
         assertThatThrownBy { cancel(works) }.isInstanceOf(FundUnsignable::class.java)
         assertThatThrownBy { pay(works) }.isInstanceOf(FundUnsignable::class.java)
@@ -188,7 +195,7 @@ class FundServiceTest {
     }
 
     @Test
-    fun `the entrance is locked before a disbursement is read, so two payouts cannot close it twice`() {
+    fun `PM-FUND-007 the entrance is locked before a disbursement is read, so two payouts cannot close it twice`() {
         val first = signedOff()
         val second = signedOff()
         pay(first)
@@ -213,6 +220,24 @@ class FundServiceTest {
         assertThat(view.committedMinor).isEqualTo(25_000)                                     // a paid one is no longer committed
         assertThat(view.availableMinor).isEqualTo(25_000)
         assertThat(view.disbursements.map { it.committedOn.toString() }).containsExactly("2026-09-01", "2026-09-10", "2026-09-20")
+    }
+
+    @Test
+    fun `PM-FUND-009 a payout may take the recorded balance below zero, since the bank is the truth`() {
+        val works = signedOff(20_000)
+        holding(inAccount = 10_000, rows = listOf(works))                                      // receipts not yet all recorded
+        assertThat(pay(works).status).isEqualTo("PAID")
+        holding(inAccount = 10_000, rows = updated.toList(), out = journal.filter { it.account == "BANK:REPAIR_RENEWAL" })
+        assertThat(service.view(entranceId).balanceMinor).isEqualTo(-10_000)                  // shown, not hidden
+    }
+
+    @Test
+    fun `PM-FUND-009 the fund is read from one snapshot, so a payout cannot fall between the balance and what is committed`() {
+        // Two statements at READ COMMITTED paired the old balance with the new committed, overstating what is available
+        // (seen by the S-G1-02c review against Postgres: 28 of 42 reads during 150 payouts).
+        val view = FundService::class.java.getMethod("view", UUID::class.java).getAnnotation(Transactional::class.java)
+        assertThat(view.isolation).isEqualTo(Isolation.REPEATABLE_READ)
+        assertThat(view.readOnly).isTrue()
     }
 
     @Test

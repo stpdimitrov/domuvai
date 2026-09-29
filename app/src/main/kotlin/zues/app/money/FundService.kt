@@ -3,6 +3,7 @@ package zues.app.money
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import zues.kernel.toSofiaDate
 import java.time.Clock
@@ -36,6 +37,7 @@ data class DisbursementView(
     val status: String,
     val committedOn: LocalDate,
     val paidOn: LocalDate? = null,
+    val paidBy: UUID? = null,
     val cancelledOn: LocalDate? = null,
     val cancelledBy: UUID? = null,
     val cancelReason: String? = null,
@@ -43,7 +45,7 @@ data class DisbursementView(
     companion object {
         fun of(row: FundDisbursementRow) = DisbursementView(
             row.id, row.amountMinor, row.purpose, row.decisionId, row.passportMeasure, row.emergencyJustification,
-            row.authorisedBy, row.status, row.committedOn, row.paidOn, row.cancelledOn, row.cancelledBy, row.cancelReason,
+            row.authorisedBy, row.status, row.committedOn, row.paidOn, row.paidBy, row.cancelledOn, row.cancelledBy, row.cancelReason,
         )
     }
 }
@@ -131,7 +133,7 @@ class FundService(
 
     /**
      * Records that the fund's bank paid a signed-off disbursement out (Rule: PM-FUND-007): exactly the amount
-     * signed off, once, on the bank's value date — not after today, not before the sign-off. Its journal credits
+     * signed off, once, on the bank's value date — not after today, not before the sign-off — naming who recorded it. Its journal credits
      * the fund's bank account, so the balance and what is committed fall alike and what is available does not
      * move (Rule: PM-FUND-009). The balance may go below zero: the bank is the truth, and a negative balance
      * shows receipts not yet recorded.
@@ -144,7 +146,7 @@ class FundService(
         val today = today()
         require(!command.paidOn.isAfter(today)) { "a payout cannot be dated after today ($today)" }
         require(!command.paidOn.isBefore(row.committedOn)) { "a payout cannot be dated before the sign-off (${row.committedOn})" }
-        val paid = aggregates.update(row.copy(status = DisbursementStatus.PAID.name, paidOn = command.paidOn))
+        val paid = aggregates.update(row.copy(status = DisbursementStatus.PAID.name, paidOn = command.paidOn, paidBy = command.paidBy))
         Ledger.forPayout(paid, command.paidOn).forEach { aggregates.insert(it) }
         return DisbursementView.of(paid)
     }
@@ -169,7 +171,8 @@ class FundService(
         return DisbursementView.of(cancelled)
     }
 
-    @Transactional(readOnly = true)
+    /** One snapshot for both reads, so a payout committing between them cannot pair the old balance with the new committed. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     fun view(entranceId: UUID): FundView {
         val fund = fundAccount(entranceId)
         val inAccount = postings.findByEntranceIdAndAccount(entranceId, Ledger.receivedAccount(ReceivedInto.REPAIR_RENEWAL))

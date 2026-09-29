@@ -701,6 +701,8 @@ export interface components {
             emergencyJustification?: string;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            paidBy?: string;
             /** Format: date */
             paidOn?: string;
             passportMeasure?: string;
