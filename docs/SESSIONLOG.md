@@ -1539,6 +1539,37 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 
 ---
 
+## H-07 · 2026-09-29 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at `b8d58de` (#61) or later. In flight: **S-G1-02e** (consumption lines, #62, `lane:money` held) — PR #63, fresh-context review applied, auto-merge on, `gates` running when this was written; it merges itself. Look at it once (`gh pr view 63`) and carry on per the slice skill §7: merged → sync `main`; green but open → merge; failing → fix. Then the owner's answers below, then the next slice.
+
+**Shipped since H-06** (squash-merged):
+- #52 S-G1-02b — the repair fund: sign off a disbursement; balance and available (PM-FUND-006…009).
+- #54 S-G1-02c — pay a disbursement out, or cancel it (PM-FUND-007, PM-FUND-009).
+- #56 S-G1-02d — the fund handover statement (PM-FUND-010); merged before its review, so #60 S-G1-02d-r landed the review.
+- #61 — delivery is the session's job: the slice skill §7; `main` is merged in, never rebased.
+- #63 S-G1-02e — metered water and heating (PM-FEE-017): in flight, above.
+
+**Numbers** (with #63) — named-test coverage 48 of 233; Gate 1 45 of 70 (left: S-G1-01 kernel 10, S-G1-03 registry 11, and in S-G1-02 PM-FUND-002 — awaiting the minimum wage — PM-FEE-013, PM-FEE-019, PM-FUND-011). The API runs 38 operations (registry 16, money 16, intake 6), 15 planned.
+
+**The owner's open questions** (asked 2026-09-29, one word each; both are built as proposed, a "no" is a small follow-up):
+- (a) The business-use multiplier (PM-FEE-010, "the standard rate") is not applied to a metered line — a unit pays what its meter read.
+- (b) Issuing waits for every reading, rather than locking the period with an unread unit unbilled.
+
+**Next slice, proposed** — make `/entrance/fund` live (web lane): its backend is complete (the fund view, sign off / pay out / cancel, handover statements — 8 operations). Then `/debts` (arrears, statement, payments).
+
+**Frontend ↔ backend, as of today** — the web calls 4 of the 38 running operations: only `/entrance/charges` is live. `/entrance`, `/portfolio`, `/debts` and `/entrance/fund` render sample data though their backend exists; `/assembly` and `/compliance` are ahead of any backend. Drift is gated where the client is used (the generated client and `next build` in CI — it caught #63's required-field regression). No sign-in yet (owner input 3), so signatories are named by the caller; no end-to-end test runs the web against a live API.
+
+**Findings open** — #57 signing the handover statement by both sides (evidence lane) · #58 idempotency keys on the fund's write endpoints (money lane) · #48 the intake dry-run drops `item` (intake lane).
+
+**Owner inputs outstanding** (unchanged from H-06): 1. the ministry template order · 2. counsel items · 3. the auth provider · 4. the business-multiplier split · 5. the national minimum wage by year, with its source (PM-FUND-002).
+
+**Operating procedure** — the slice skill's §6–§7 (`.claude/skills/zues-slice/SKILL.md`) is the delivery procedure: review before merge (a draft opened for early CI is the session's to mark ready); auto-merge on; failures and conflicts fixed without asking (merge `main` in — never rebase or force-push); CI is never polled — the open PR is looked at once at each wake-up; the owner never merges a PR or reports a merge; after the merge, sync `main`, then the next slice. When the API contract changes, build the web too (`cd web && npm run build`). A PR merged before its review gets an `S-nn-r` slice.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`.
+
+---
+
 ## S-G1-02e · 2026-09-29 · consumption lines: metered water and heating beside the statutory keys (money)
 
 **Did** — per-unit metered components (#62, `lane:money`, PM-FEE-017). A charge run may carry consumption lines — `WATER` (m³) or `HEATING` (kWh), each with one price per unit of measure in minor units and its GA decision (PM-FEE-012) — and each unit's own readings: plain digits, at most six before the point and three after (what a stored quantity, numeric(12,6), holds), kept as thousandths. Each unit is billed its reading × the price, half-up to the cent, overflow refused, as a MAINTENANCE line (never a fourth stream, PM-FEE-001) marked `METERED` — documented as not a statutory key; no tariff line may take it and a metered item cannot be allocated by a key (a runtime guard: a nullable key would have rippled into the API and the web). Its derivation names the reading and the unit of measure ("water · 12.345 m³ × 2.30 €/m³ (metered)"). The keyed lines are untouched. An unread meter bills nothing and is listed in the preview's `missingReadings`; nothing is estimated. **Issuing waits for every reading** (400): an issued period is final (PM-FEE-015), so an unread unit would stay unbilled for good. A reading for an item the tariff does not price is refused, not dropped. Both paths carry it; the request fields are optional in the contract, so existing callers keep working. An issued metered line keeps its reading as `quantity`, and the statement shows its item. The basis carries `readingsThousandths` and the prices only when present, so every earlier basis hashes as before. `ENGINE_VERSION` 0.3.0. Migration `V202609291726` admits `METERED`, `WATER` and `HEATING` on `charge_line` and ties `METERED` to a metered item and back.
