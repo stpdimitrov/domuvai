@@ -537,7 +537,9 @@ export interface components {
         ChargeLineResponse: {
             /** Format: int64 */
             amountMinor: number;
+            decisionId: string;
             derivation: string;
+            item?: string;
             key: string;
             stream: string;
         };
@@ -848,6 +850,7 @@ export interface components {
         };
         TariffLineRequest: {
             decisionId: string;
+            item?: string;
             key: string;
             /** Format: int64 */
             rateMinor?: number;

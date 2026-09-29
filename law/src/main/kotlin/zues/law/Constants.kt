@@ -14,7 +14,7 @@ typealias LegalDate = String
 const val CATALOGUE_VERSION: String = "1.3"
 
 /** Bumped whenever the pure functions change, so a receipt pins the code too. ADR-001 amendment. */
-const val ENGINE_VERSION: String = "0.1.0"
+const val ENGINE_VERSION: String = "0.2.0"   // 0.2.0: a concierge line in maintenance (PM-FEE-011); a decision on every line (PM-FEE-003)
 
 data class Constant(
     val code: String,

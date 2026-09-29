@@ -11,6 +11,7 @@ import zues.charges.chargeablePersons
 import zues.charges.computeChargeRun
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
+import zues.law.CostItem
 import zues.law.CostStream
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -69,7 +70,10 @@ class ChargeRunService(private val units: Units) {
             period = request.period,
             legalDate = request.legalDate,
             lines = request.lines.map {
-                TariffLine(CostStream.valueOf(it.stream), AllocationKey.valueOf(it.key), it.decisionId, it.rateMinor, it.totalMinor)
+                TariffLine(
+                    CostStream.valueOf(it.stream), AllocationKey.valueOf(it.key), it.decisionId, it.rateMinor, it.totalMinor,
+                    it.item?.let { item -> CostItem.valueOf(item) },
+                )
             },
             businessMultiplier = request.businessMultiplier,
         )

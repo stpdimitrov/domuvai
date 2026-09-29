@@ -2,8 +2,10 @@ package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
@@ -99,6 +101,43 @@ class ChargeRunPersistenceIT {
         assertThat(lines).hasSize(2)
         assertThat(lines.map { it.component }).containsOnly("MAINTENANCE")
         assertThat(lines.sumOf { it.amountMinor }).isEqualTo(10_000)
+    }
+
+    @Test
+    fun `PM-FEE-011 PM-FEE-003 a concierge line is stored as a second maintenance line, and every line names its decision`() {
+        val entranceId = createEntrance().also { registerUnits(it) }
+        val withConcierge = StoredChargeRunRequest(
+            period = "2026-06", legalDate = "2026-06-01",
+            lines = listOf(
+                TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
+                TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-2", totalMinor = 5_000, item = "CONCIERGE"),
+            ),
+        )
+        val response = mvc.perform(
+            post("/api/money/entrances/$entranceId/charge-runs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(withConcierge)),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val lines = chargeLines.findByChargeRunId(UUID.fromString(json.readTree(response).get("chargeRunId").asText()))
+
+        assertThat(lines).hasSize(4)                                             // two per unit, one of them the concierge
+        assertThat(lines.map { it.component }).containsOnly("MAINTENANCE")
+        assertThat(lines.filter { it.item == "CONCIERGE" }.sumOf { it.amountMinor }).isEqualTo(5_000)
+        assertThat(lines.map { it.decisionId }).containsOnly("GA-2026-1", "GA-2026-2")
+    }
+
+    @Test
+    fun `PM-FEE-011 PM-FEE-003 the schema refuses a concierge line outside maintenance, and a new line without its decision`() {
+        val entranceId = createEntrance().also { registerUnits(it) }
+        val line = chargeLines.findByChargeRunId(issueRun(entranceId)).first()
+        fun insert(component: String, item: String?, decision: String?) = jdbc.update(
+            "INSERT INTO charge_line (id, entrance_id, charge_run_id, unit_id, component, allocation_key, quantity, " +
+                "amount_minor, currency, derivation, item, decision_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EUR', 'probe', ?, ?)",
+            UUID.randomUUID(), line.entranceId, line.chargeRunId, line.unitId, component, line.allocationKey, line.quantity, 1L, item, decision,
+        )
+        assertThatThrownBy { insert("REPAIR_FUND", "CONCIERGE", "GA-2026-1") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThatThrownBy { insert("MANAGEMENT", null, null) }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThat(insert("MANAGEMENT", null, "GA-2026-9")).isEqualTo(1)       // the same row with its decision is stored
     }
 
     @Test

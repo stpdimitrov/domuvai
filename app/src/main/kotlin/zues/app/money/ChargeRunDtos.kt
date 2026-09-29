@@ -20,6 +20,7 @@ data class TariffLineRequest(
     val decisionId: String,    // the GA decision that adopted it (PM-FEE-012)
     val rateMinor: Long? = null,
     val totalMinor: Long? = null,
+    val item: String? = null,  // CONCIERGE — a named maintenance cost (PM-FEE-011)
 )
 
 data class UnitRequest(
@@ -57,4 +58,6 @@ data class ChargeLineResponse(
     val key: String,
     val amountMinor: Long,
     val derivation: String,
+    val decisionId: String,    // the GA decision that set the key and rate (PM-FEE-003)
+    val item: String? = null,  // CONCIERGE, or none for the stream's own line
 )

@@ -26,7 +26,7 @@ data class ChargeRunRow(
 )
 
 /**
- * A stored charge line — one typed amount per unit and cost stream. Immutable: an issued
+ * A stored charge line — one typed amount per unit, cost stream and named item (PM-FEE-011). Immutable: an issued
  * charge is never rewritten (Rule: PM-FEE-015), enforced by a rule on the table itself.
  */
 @Table("charge_line")
@@ -41,6 +41,10 @@ data class ChargeLineRow(
     val amountMinor: Long,
     val currency: String,
     val derivation: String,
+    /** The GA decision that set the line's key and rate (PM-FEE-003); empty for lines stored before it was kept. */
+    val decisionId: String? = null,
+    /** A named cost within the stream, e.g. CONCIERGE in MAINTENANCE (PM-FEE-011); empty for the stream's own line. */
+    val item: String? = null,
 )
 
 interface ChargeRunRepository : ListCrudRepository<ChargeRunRow, UUID> {

@@ -8,6 +8,7 @@ import zues.charges.TariffLine
 import zues.charges.computeChargeRun
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
+import zues.law.CostItem
 import zues.law.CostStream
 import java.time.LocalDate
 import java.util.UUID
@@ -40,6 +41,17 @@ class PostingsTest {
     )
 
     private fun postings() = Ledger.forRun(run(), entranceId, journalId, LocalDate.parse("2026-05-01"))
+
+    @Test
+    fun `PM-FEE-001 concierge income posts to the maintenance root, so the ledger keeps three income roots`() {
+        val withConcierge = run().basis.tariff.let { t ->
+            t.copy(lines = t.lines + TariffLine(CostStream.MAINTENANCE, AllocationKey.BY_IDEAL_PARTS, "GA-2026-2", totalMinor = 5_000, item = CostItem.CONCIERGE))
+        }
+        val run = computeChargeRun(entranceId.toString(), run().basis.units, withConcierge)
+        val income = Ledger.forRun(run, entranceId, journalId, LocalDate.parse("2026-05-01")).filter { it.unitId == null }
+        assertThat(income.map { it.account }).containsExactlyInAnyOrder("INCOME:MANAGEMENT", "INCOME:MAINTENANCE")
+        assertThat(income.single { it.account == "INCOME:MAINTENANCE" }.amountMinor).isEqualTo(-25_000)   // 20 000 + the concierge's 5 000
+    }
 
     @Test
     fun `the double-entry journal balances to zero (ADR-006)`() {

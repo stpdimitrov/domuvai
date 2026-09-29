@@ -1405,3 +1405,21 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — this entry, S-G1-03c, `app/src/main/kotlin/zues/app/registry/BookRetention.kt`.
 
 ---
+
+## S-G1-02a · 2026-09-29 · concierge follows maintenance; every charge line names its decision (money)
+
+**Did** — two Gate-1 fee rules in the engine (#47, `lane:money`). A concierge (портиер) line is a **named line inside MAINTENANCE** (`CostItem.CONCIERGE`), not a fourth stream — PM-FEE-001 separates exactly three, and the chart of accounts keeps three roots (concierge income posts to `INCOME:MAINTENANCE`). It must use the key of the tariff's own maintenance lines (maintenance's default when there are none), so it takes maintenance's exemptions and business multiplier (PM-FEE-011); another key, another stream, a second concierge line, or maintenance itself split over two keys is rejected — whatever the line order. Every computed and stored charge line names the GA decision behind it (PM-FEE-003), not only the run's basis. Storage (`V202609290541`): `charge_line.item` (CONCIERGE, only on MAINTENANCE) and `charge_line.decision_id` (required on every line written from now on — a NOT VALID check, so older lines keep their trace in the basis); a line is unique per run, unit, stream and item, so a resumed run still writes nothing twice. The basis JSON writes `item` only when a line has one, so a past run's hash still reproduces (PM-FEE-014) — pinned against `main`'s serializer. A unit statement orders a period's lines deterministically. `ENGINE_VERSION` 0.1.0 → 0.2.0. `law/…/Keys.kt` is a shared file in `tools/lanes.py` and `WORKING.md`.
+
+**Rules covered** — PM-FEE-011, PM-FEE-003 (named-test coverage 40 → 42 of 233).
+
+**Tests added** — `ChargesTest`: `PM-FEE-011 a concierge line uses maintenance's key and inherits its exemptions and multiplier` (with the derivation label and the default-key case), `… on another key than maintenance's, or in another stream, is rejected` (also named twice, and maintenance split over two keys in either order), `PM-FEE-003 the assembly may choose any of the three keys, and every line names the decision that chose it`, `… changing the key without a linked protocol is rejected`. `ChargeCalculatorTest`: `PM-FEE-001 a concierge line is a maintenance line, so there are still three streams`. `PostingsTest`: `PM-FEE-001 concierge income posts to the maintenance root, so the ledger keeps three income roots`. `ChargeRunServiceTest`: `PM-FEE-011 a concierge line reaches the engine named…`. `BasisJsonTest`: an item-less basis serializes without `item`, and hashes to the value `main`'s serializer gives (`4c0a3997…`). `ChargeRunWebTest`: the preview names each line's decision. `ChargeRunPersistenceIT` (Docker — CI): a concierge line stored as a second maintenance line with every decision; the schema refuses a concierge line outside maintenance and a new line without a decision. Four mutations (the key check off, the stream check off, the decision dropped, `item` always serialized) each failed their tests.
+
+**Review** — a fresh-context review, before the PR: one bug outside this lane — the intake dry-run cannot name a line, so a sheet's concierge column is checked as plain maintenance (finding #48, `lane:intake`). In this lane: duplicate concierge lines previewed fine and then broke the unique index at issue (now rejected up front); "maintenance's key" depended on line order (now all of maintenance's own lines); the schema did not require a decision or tie concierge to maintenance (now it does); five tests proved less than their names (tightened, hash pinned).
+
+**Decisions** — owner D1–D3 on #47 (2026-09-29). **D1 corrected while building:** proposed as a fourth cost stream, it would have broken PM-FEE-001; the rule won — concierge is a named maintenance line, with the effect the owner approved.
+
+**Open** — #48 (intake names a concierge column). The web charges screen has no concierge column yet (web lane; the unit total includes it). The rest of S-G1-02: PM-FEE-017 (consumption lines), the fund rules (PM-FUND-006…010); PM-FUND-002 needs the national minimum wage as dated `:law` values, from a source (owner input).
+
+**Read first next time** — #47, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`.
+
+---

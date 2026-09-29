@@ -8,6 +8,7 @@ import zues.charges.TariffLine
 import zues.charges.computeChargeRun
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
+import zues.law.CostItem
 import zues.law.CostStream
 
 /**
@@ -35,6 +36,25 @@ class BasisJsonTest {
         val second = BasisJson.of(run(10_000))
         assertThat(second).isEqualTo(first)
         assertThat(BasisJson.hash(second)).isEqualTo(BasisJson.hash(first))
+    }
+
+    @Test
+    fun `PM-FEE-014 a basis with no named line serializes as it did before lines could be named`() {
+        assertThat(BasisJson.of(run(10_000))).doesNotContain("item")   // so a past run's hash is reproduced unchanged
+        val named = computeChargeRun(
+            "entrance-1", listOf(PropertyUnit("u1", "ап. 1", IdealParts.of("100.0000"), occupants = 1)),
+            Tariff("entrance-1", "2026-05", "2026-05-01", listOf(
+                TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_PERSON, "GA-2026-1", rateMinor = 300L),
+                TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_PERSON, "GA-2026-2", rateMinor = 200L, item = CostItem.CONCIERGE),
+            )),
+        )
+        assertThat(BasisJson.of(named)).contains("CONCIERGE")
+    }
+
+    @Test
+    fun `PM-FEE-014 an unnamed basis hashes exactly as it did before lines could be named`() {
+        // Pinned from the serializer as it stood before items existed: any change to the format fails here.
+        assertThat(BasisJson.hash(BasisJson.of(run(10_000)))).isEqualTo("4c0a399738100ad09501766fdaf1b5337834d886b7aa0b01f035717f82a6ac1e")
     }
 
     @Test

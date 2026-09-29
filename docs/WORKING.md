@@ -44,7 +44,7 @@ Different modules barely touch, but a few shared files change on almost every sl
 | Generated docs — `TRACEABILITY.md`, `TESTPLAN.md`, `FUNCTIONAL.md`, `api/openapi.json`, `docs/events/*` | They are derived — never hand-merge. Take `origin/main`'s copy, re-run the generators (the gate pack does), commit the regenerated result. |
 | Schema | Do not edit an applied migration. Each schema change is a **new** file `V<yyyyMMddHHmm>__desc.sql`, stamped with the real UTC minute (`date -u +%Y%m%d%H%M`); `V1__init.sql` is the baseline. The schema gate reads every `V*.sql` (`CREATE TABLE` and `ALTER TABLE … ADD COLUMN`) and fails on a duplicate version — S-41b and S-42 both wrote `…1200` on the same day, which no text merge flags and Flyway refuses. |
 | `docs/SESSIONLOG.md` | Append-only, `merge=union` (`.gitattributes`) — both entries survive. Add yours at the end; never edit an earlier one. GitHub ignores the union driver, so the PR that merges second shows a conflict: rebase locally and git resolves it, your entry last. |
-| `law/…/Constants.kt`, `rules.json` | Structured and rarely changed — coordinate the change; do **not** union-merge (it would break the syntax). |
+| `law/…/Constants.kt`, `law/…/Keys.kt`, `rules.json` | Structured and rarely changed — coordinate the change; do **not** union-merge (it would break the syntax). |
 
 ## Splitting the work
 

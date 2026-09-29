@@ -36,6 +36,18 @@ class ChargeRunServiceTest {
     }
 
     @Test
+    fun `PM-FEE-011 a concierge line reaches the engine named, so its key is checked against maintenance's`() {
+        val request = StoredChargeRunRequest(
+            period = "2026-05", legalDate = "2026-05-01",
+            lines = listOf(
+                TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
+                TariffLineRequest("MAINTENANCE", "PER_UNIT", "GA-2026-2", rateMinor = 500, item = "CONCIERGE"),
+            ),
+        )
+        assertThatThrownBy { service.preview(entranceId, request) }.hasMessageContaining("PM-FEE-011")
+    }
+
+    @Test
     fun `a by-ideal-parts run allocates the pot across the stored units`() {
         val response = service.preview(
             entranceId,

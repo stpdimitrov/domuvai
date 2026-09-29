@@ -79,6 +79,8 @@ class ChargeRunStore(
                         amountMinor = line.amount.amountMinor,
                         currency = "EUR",
                         derivation = line.derivation,
+                        decisionId = line.decisionId,
+                        item = line.item?.name,
                     ),
                 )
                 lineCount++
