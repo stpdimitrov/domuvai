@@ -290,12 +290,10 @@
           }
         },
         "required": [
-          "consumption",
           "entranceId",
           "legalDate",
           "lines",
           "period",
-          "readings",
           "units"
         ],
         "type": "object"
@@ -1697,11 +1695,9 @@
           }
         },
         "required": [
-          "consumption",
           "legalDate",
           "lines",
-          "period",
-          "readings"
+          "period"
         ],
         "type": "object"
       },

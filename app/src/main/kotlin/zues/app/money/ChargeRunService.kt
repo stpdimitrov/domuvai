@@ -23,8 +23,8 @@ data class StoredChargeRunRequest(
     val legalDate: String,
     val businessMultiplier: Int? = null,
     val lines: List<TariffLineRequest>,
-    val consumption: List<ConsumptionLineRequest> = emptyList(),
-    val readings: List<ReadingRequest> = emptyList(),
+    val consumption: List<ConsumptionLineRequest>? = null,   // optional: a run without metered costs omits it (PM-FEE-017)
+    val readings: List<ReadingRequest>? = null,
 )
 
 /** A computed run together with the registry units it was computed from (the store needs both). */
@@ -49,7 +49,7 @@ class ChargeRunService(private val units: Units) {
         if (stored.isEmpty()) {
             throw NoSuchElementException("entrance $entranceId has no registered units")
         }
-        val readings = readingsByUnit(request.readings, stored.map { it.unitId.toString() }.toSet())   // Rule: PM-FEE-017
+        val readings = readingsByUnit(request.readings.orEmpty(), stored.map { it.unitId.toString() }.toSet())   // Rule: PM-FEE-017
         val propertyUnits = stored.map {
             PropertyUnit(
                 unitId = it.unitId.toString(),
@@ -80,7 +80,7 @@ class ChargeRunService(private val units: Units) {
                 )
             },
             businessMultiplier = request.businessMultiplier,
-            consumption = request.consumption.map { it.toDomain() },
+            consumption = request.consumption.orEmpty().map { it.toDomain() },
         )
         return ComputedRun(computeChargeRun(entranceId.toString(), propertyUnits, tariff), stored)
     }

@@ -12,8 +12,8 @@ data class ChargeRunRequest(
     val businessMultiplier: Int? = null,
     val lines: List<TariffLineRequest>,
     val units: List<UnitRequest>,
-    val consumption: List<ConsumptionLineRequest> = emptyList(),
-    val readings: List<ReadingRequest> = emptyList(),
+    val consumption: List<ConsumptionLineRequest>? = null,   // optional: a run without metered costs omits it (PM-FEE-017)
+    val readings: List<ReadingRequest>? = null,
 )
 
 /** A metered cost, priced per unit of measure by GA decision (PM-FEE-017). */

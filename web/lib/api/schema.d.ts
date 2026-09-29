@@ -665,12 +665,12 @@ export interface components {
         ChargeRunRequest: {
             /** Format: int32 */
             businessMultiplier?: number;
-            consumption: components["schemas"]["ConsumptionLineRequest"][];
+            consumption?: components["schemas"]["ConsumptionLineRequest"][];
             entranceId: string;
             legalDate: string;
             lines: components["schemas"]["TariffLineRequest"][];
             period: string;
-            readings: components["schemas"]["ReadingRequest"][];
+            readings?: components["schemas"]["ReadingRequest"][];
             units: components["schemas"]["UnitRequest"][];
         };
         ChargeRunResponse: {
@@ -1082,11 +1082,11 @@ export interface components {
         StoredChargeRunRequest: {
             /** Format: int32 */
             businessMultiplier?: number;
-            consumption: components["schemas"]["ConsumptionLineRequest"][];
+            consumption?: components["schemas"]["ConsumptionLineRequest"][];
             legalDate: string;
             lines: components["schemas"]["TariffLineRequest"][];
             period: string;
-            readings: components["schemas"]["ReadingRequest"][];
+            readings?: components["schemas"]["ReadingRequest"][];
         };
         TariffInput: {
             decisionId: string;

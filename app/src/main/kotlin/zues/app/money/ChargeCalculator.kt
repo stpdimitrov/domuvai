@@ -20,7 +20,7 @@ object ChargeCalculator {
 
     // Rule: PM-FEE-001 — every produced line is typed to one of the three cost streams.
     fun run(request: ChargeRunRequest): ChargeRunResponse {
-        val readings = readingsByUnit(request.readings, request.units.map { it.unitId }.toSet())   // Rule: PM-FEE-017
+        val readings = readingsByUnit(request.readings.orEmpty(), request.units.map { it.unitId }.toSet())   // Rule: PM-FEE-017
         val units = request.units.map { it.toDomain().copy(readings = readings[it.unitId].orEmpty()) }
         val tariff = Tariff(
             entranceId = request.entranceId,
@@ -28,7 +28,7 @@ object ChargeCalculator {
             legalDate = request.legalDate,
             lines = request.lines.map { it.toDomain() },
             businessMultiplier = request.businessMultiplier,
-            consumption = request.consumption.map { it.toDomain() },
+            consumption = request.consumption.orEmpty().map { it.toDomain() },
         )
         return computeChargeRun(request.entranceId, units, tariff).toResponse()
     }
