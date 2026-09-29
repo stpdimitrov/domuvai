@@ -69,4 +69,21 @@ class PostingsTest {
         assertThat(income.map { it.account }).containsExactlyInAnyOrder("INCOME:MANAGEMENT", "INCOME:MAINTENANCE")
         assertThat(-income.sumOf { it.amountMinor }).isEqualTo(30_000)   // the whole run is credited
     }
+
+    @Test
+    fun `PM-FUND-009 a payout's journal credits the fund's bank account, debits its spending and balances to zero`() {
+        val works = FundDisbursementRow(
+            UUID.randomUUID(), entranceId, UUID.randomUUID(), 12_345, "EUR", "WORKS", "GA-2026-7", null, null,
+            UUID.randomUUID(), "PAID", LocalDate.parse("2026-09-01"),
+        )
+        val payout = Ledger.forPayout(works, LocalDate.parse("2026-09-15"))
+        assertThat(payout.map { it.account to it.amountMinor }).containsExactly("BANK:REPAIR_RENEWAL" to -12_345L, "EXPENSE:REPAIR_FUND" to 12_345L)
+        assertThat(payout.sumOf { it.amountMinor }).isZero()
+        assertThat(payout).allSatisfy {
+            assertThat(it.journalId).isEqualTo(works.id)                     // the payout is found by its disbursement
+            assertThat(it.entranceId).isEqualTo(entranceId)
+            assertThat(it.valueDate).isEqualTo(LocalDate.parse("2026-09-15"))  // the bank's value date, not the sign-off's
+            assertThat(it.unitId).isNull()
+        }
+    }
 }

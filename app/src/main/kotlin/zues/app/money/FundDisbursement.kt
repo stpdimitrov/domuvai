@@ -9,7 +9,9 @@ import java.util.UUID
 /**
  * A disbursement from the repair and renewal fund (Rule: PM-FUND-006): its purpose, what authorises it —
  * a GA decision (Rule: PM-FUND-007) or an emergency with its justification (Rule: PM-FUND-008) — and the
- * party who signed it off. COMMITTED until paid, and committed money is not available (Rule: PM-FUND-009).
+ * party who signed it off. COMMITTED until paid out or cancelled, and committed money is not available
+ * (Rule: PM-FUND-009). A payout is dated on the bank's value date and names who recorded it; a cancellation records
+ * who withdrew it and why. It closes once, and the table refuses reopening it or rewriting what was signed off.
  */
 @Table("fund_disbursement")
 data class FundDisbursementRow(
@@ -25,6 +27,11 @@ data class FundDisbursementRow(
     val authorisedBy: UUID,
     val status: String,                     // DisbursementStatus
     val committedOn: LocalDate,
+    val paidOn: LocalDate? = null,
+    val paidBy: UUID? = null,
+    val cancelledOn: LocalDate? = null,
+    val cancelledBy: UUID? = null,
+    val cancelReason: String? = null,
 )
 
 /** What fund money may be spent on (Rule: PM-FUND-006). */
@@ -37,7 +44,7 @@ enum class DisbursementPurpose {
     GA_PURPOSE,
 }
 
-enum class DisbursementStatus { COMMITTED, PAID }
+enum class DisbursementStatus { COMMITTED, PAID, CANCELLED }
 
 interface FundDisbursementRepository : ListCrudRepository<FundDisbursementRow, UUID> {
     fun findByEntranceId(entranceId: UUID): List<FundDisbursementRow>

@@ -171,6 +171,22 @@
         ],
         "type": "object"
       },
+      "CancelDisbursementRequest": {
+        "properties": {
+          "cancelledBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cancelledBy",
+          "reason"
+        ],
+        "type": "object"
+      },
       "ChargeLineResponse": {
         "properties": {
           "amountMinor": {
@@ -443,6 +459,17 @@
             "format": "uuid",
             "type": "string"
           },
+          "cancelReason": {
+            "type": "string"
+          },
+          "cancelledBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "cancelledOn": {
+            "format": "date",
+            "type": "string"
+          },
           "committedOn": {
             "format": "date",
             "type": "string"
@@ -455,6 +482,14 @@
           },
           "id": {
             "format": "uuid",
+            "type": "string"
+          },
+          "paidBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "paidOn": {
+            "format": "date",
             "type": "string"
           },
           "passportMeasure": {
@@ -978,6 +1013,22 @@
         },
         "required": [
           "partyId"
+        ],
+        "type": "object"
+      },
+      "PayDisbursementRequest": {
+        "properties": {
+          "paidBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "paidOn": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "paidBy",
+          "paidOn"
         ],
         "type": "object"
       },
@@ -2599,6 +2650,194 @@
           "PM-FUND-006",
           "PM-FUND-007",
           "PM-FUND-008"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel": {
+      "post": {
+        "operationId": "post_money_entrances_entranceId_fund_disbursements_disbursementId_cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelDisbursementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisbursementView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-007",
+          "PM-FUND-009"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay": {
+      "post": {
+        "operationId": "post_money_entrances_entranceId_fund_disbursements_disbursementId_pay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "disbursementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayDisbursementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisbursementView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-007",
+          "PM-FUND-009"
         ]
       }
     },

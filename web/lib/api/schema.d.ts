@@ -209,6 +209,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason */
+        post: operations["post_money_entrances_entranceId_fund_disbursements_disbursementId_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account */
+        post: operations["post_money_entrances_entranceId_fund_disbursements_disbursementId_pay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/entrances/{entranceId}/payments": {
         parameters: {
             query?: never;
@@ -568,6 +602,11 @@ export interface components {
             /** Format: uuid */
             unitId: string;
         };
+        CancelDisbursementRequest: {
+            /** Format: uuid */
+            cancelledBy: string;
+            reason: string;
+        };
         ChargeLineResponse: {
             /** Format: int64 */
             amountMinor: number;
@@ -651,12 +690,21 @@ export interface components {
             amountMinor: number;
             /** Format: uuid */
             authorisedBy: string;
+            cancelReason?: string;
+            /** Format: uuid */
+            cancelledBy?: string;
+            /** Format: date */
+            cancelledOn?: string;
             /** Format: date */
             committedOn: string;
             decisionId?: string;
             emergencyJustification?: string;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            paidBy?: string;
+            /** Format: date */
+            paidOn?: string;
             passportMeasure?: string;
             purpose: string;
             status: string;
@@ -806,6 +854,11 @@ export interface components {
         PartyRegisteredResponse: {
             /** Format: uuid */
             partyId: string;
+        };
+        PayDisbursementRequest: {
+            /** Format: uuid */
+            paidBy: string;
+            paidOn: string;
         };
         PaymentView: {
             allocation: components["schemas"]["AllocatedPart"][];
@@ -1614,6 +1667,126 @@ export interface operations {
         responses: {
             /** @description Created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisbursementView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_money_entrances_entranceId_fund_disbursements_disbursementId_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                disbursementId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelDisbursementRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisbursementView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_money_entrances_entranceId_fund_disbursements_disbursementId_pay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                disbursementId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayDisbursementRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
