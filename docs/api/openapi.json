@@ -309,6 +309,36 @@
         ],
         "type": "object"
       },
+      "CommitDisbursementRequest": {
+        "properties": {
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "authorisedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "decisionId": {
+            "type": "string"
+          },
+          "emergencyJustification": {
+            "type": "string"
+          },
+          "passportMeasure": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "authorisedBy",
+          "purpose"
+        ],
+        "type": "object"
+      },
       "CommitRequest": {
         "properties": {
           "committedBy": {
@@ -400,6 +430,50 @@
           "filedOn",
           "id",
           "templateVersion"
+        ],
+        "type": "object"
+      },
+      "DisbursementView": {
+        "properties": {
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "authorisedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "committedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "decisionId": {
+            "type": "string"
+          },
+          "emergencyJustification": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "passportMeasure": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "authorisedBy",
+          "committedOn",
+          "id",
+          "purpose",
+          "status"
         ],
         "type": "object"
       },
@@ -619,6 +693,48 @@
           "iban",
           "id",
           "purpose"
+        ],
+        "type": "object"
+      },
+      "FundView": {
+        "properties": {
+          "availableMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "balanceMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "committedMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "disbursements": {
+            "items": {
+              "$ref": "#/components/schemas/DisbursementView"
+            },
+            "type": "array"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "holderName": {
+            "type": "string"
+          },
+          "iban": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "availableMinor",
+          "balanceMinor",
+          "committedMinor",
+          "disbursements",
+          "entranceId",
+          "holderName",
+          "iban"
         ],
         "type": "object"
       },
@@ -2189,6 +2305,81 @@
         ]
       }
     },
+    "/api/money/entrances/{entranceId}/fund": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_fund",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "The repair and renewal fund — its balance, net of committed but unpaid disbursements",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-004",
+          "PM-FUND-009"
+        ]
+      }
+    },
     "/api/money/entrances/{entranceId}/fund-accounts": {
       "get": {
         "operationId": "get_money_entrances_entranceId_fund_accounts",
@@ -2322,6 +2513,92 @@
           "PM-FUND-001",
           "PM-FUND-004",
           "PM-FUND-005"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/fund/disbursements": {
+      "post": {
+        "operationId": "post_money_entrances_entranceId_fund_disbursements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitDisbursementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisbursementView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Sign off a disbursement from the repair fund — its purpose, and a GA decision or an emergency",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-006",
+          "PM-FUND-007",
+          "PM-FUND-008"
         ]
       }
     },

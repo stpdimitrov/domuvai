@@ -76,6 +76,11 @@ RUNNING = {
    ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("List the entrance's fund accounts", ['PM-FUND-001', 'PM-FUND-004']),
+ ('get', '/api/money/entrances/{entranceId}/fund'):
+   ('The repair and renewal fund — its balance, net of committed but unpaid disbursements', ['PM-FUND-004', 'PM-FUND-009']),
+ ('post', '/api/money/entrances/{entranceId}/fund/disbursements'):
+   ('Sign off a disbursement from the repair fund — its purpose, and a GA decision or an emergency',
+    ['PM-FUND-006', 'PM-FUND-007', 'PM-FUND-008']),
  ('post', '/api/money/entrances/{entranceId}/payments'):
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
     ['PM-DEBT-008']),
@@ -124,8 +129,6 @@ PLANNED = [
   ['PM-GA-019', 'PM-GA-020', 'PM-GA-021', 'PM-GA-023']),
  ('get', '/charge-runs/{charge_run_id}', 'money',
   'Read a charge run and its basis', ['PM-FEE-014', 'PM-FEE-018']),
- ('get', '/entrances/{entrance_id}/fund', 'money',
-  'Repair and renewal fund, net of committed but unpaid work', ['PM-FUND-004', 'PM-FUND-009']),
  ('post', '/units/{unit_id}/obligations-certificate', 'money',
   'Issue a dated certificate of outstanding obligations, for a sale', ['PM-DEBT-007']),
  ('post', '/entrances/{entrance_id}/arrears/{unit_id}/enforcement-packet', 'money',

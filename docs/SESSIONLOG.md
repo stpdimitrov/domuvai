@@ -1439,3 +1439,19 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 **Read first next time** — #47, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`.
 
 ---
+
+## S-G1-02b · 2026-09-29 · the repair fund: sign off a disbursement; balance and available (money)
+
+**Did** — the repair and renewal fund's disbursements (#50, `lane:money`). `POST …/fund/disbursements` signs one off: a purpose code — `WORKS` (чл. 48–49 works and equipment), `PASSPORT_MEASURE` (its measure reference required), `GA_PURPOSE` (PM-FUND-006); signed by the party holding the fund's account (PM-FUND-004) on a GA decision (PM-FUND-007) — or, without one, as an emergency with its written justification, only while the available balance covers it (PM-FUND-008). `GET …/fund` shows the balance, what is committed and what is available (PM-FUND-009): the balance is what the fund's bank account received minus what it paid out, read from the ledger (`BANK:REPAIR_RENEWAL` postings); committed is the signed-off, unpaid disbursements. New table `money.fund_disbursement` (`V202609290715`) — its checks refuse a disbursement with neither a decision nor an emergency, or with both, and a passport measure without its reference. The A9 planned fund view now runs (15 planned left). The platform records; the money moves in the fund's own account (ADR-007).
+
+**Rules covered** — PM-FUND-006, PM-FUND-007, PM-FUND-008, PM-FUND-009 (named-test coverage 42 → 46 of 233).
+
+**Tests added** — `FundServiceTest` (new): `PM-FUND-006 a disbursement names a lawful purpose, and a passport measure names the measure`, `PM-FUND-007 only the party holding the fund's account signs off, and on a GA decision`, `PM-FUND-008 an emergency needs no decision, but its justification and the available balance to cover it`, `PM-FUND-009 the fund shows its balance and, net of committed disbursements, what is available`, a decided disbursement may take available below zero, no fund account. `FundWebTest` (new): the view, 201, and 409 / 400 / 404. `FundPersistenceIT` (Docker — CI): a payment into the fund is its balance, a signed-off disbursement is committed, an emergency beyond what is available is a 409, and the table refuses a disbursement with no basis. Five mutations (signatory, emergency cap, paid counted as committed, measure reference, the 409 mapping) each failed their tests.
+
+**Decisions** — owner D1–D4 on #50 (2026-09-29): a GA decision always, except an emergency; the signatory is the fund account's holder party (until identity-org's mandates); a decided disbursement is not capped by what is available; paying out and cancelling are the next slice.
+
+**Open** — S-G1-02c: pay a disbursement out (its ledger posting, balance down, no longer committed) and cancel one; the fund handover statement (PM-FUND-010). The web `/entrance/fund` screen can now go live (web lane). Maintenance work orders will commit through this record (maintenance lane).
+
+**Read first next time** — #50, this entry, `app/src/main/kotlin/zues/app/money/FundService.kt`.
+
+---
