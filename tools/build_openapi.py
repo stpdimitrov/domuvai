@@ -81,6 +81,11 @@ RUNNING = {
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements'):
    ('Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two',
     ['PM-FUND-006', 'PM-FUND-007', 'PM-FUND-008']),
+ ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay'):
+   ("Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account",
+    ['PM-FUND-007', 'PM-FUND-009']),
+ ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel'):
+   ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason", ['PM-FUND-007', 'PM-FUND-009']),
  ('post', '/api/money/entrances/{entranceId}/payments'):
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
     ['PM-DEBT-008']),

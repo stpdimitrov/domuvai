@@ -4,6 +4,7 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
 import zues.charges.ChargeRun
+import zues.law.CostStream
 import java.time.LocalDate
 import java.util.UUID
 
@@ -43,6 +44,7 @@ object Ledger {
     const val RECEIVABLE = "RECEIVABLE"
     const val ADVANCE = "ADVANCE"
     fun incomeAccount(stream: String) = "INCOME:$stream"
+    fun expenseAccount(stream: String) = "EXPENSE:$stream"
 
     /** The account a payment landed in: one of the entrance's bank accounts, or the cash box. */
     fun receivedAccount(into: ReceivedInto) = if (into == ReceivedInto.CASH) "CASH" else "BANK:${into.name}"
@@ -88,6 +90,19 @@ object Ledger {
             ?.let { listOf(leg(ADVANCE, payment.unitId, -it)) } ?: emptyList()
         return listOf(received) + settled + advance
     }
+
+    /**
+     * Turns a disbursement's payout into its journal (Rule: PM-FUND-009): the fund's bank account is
+     * credited and the fund's spending debited, both on the bank's value date. The journal id is the
+     * disbursement's own, so its payout is found by it; the legs balance to zero (ADR-006).
+     */
+    fun forPayout(disbursement: FundDisbursementRow, paidOn: LocalDate): List<PostingRow> =
+        listOf(
+            receivedAccount(ReceivedInto.REPAIR_RENEWAL) to -disbursement.amountMinor,
+            expenseAccount(CostStream.REPAIR_FUND.name) to disbursement.amountMinor,
+        ).map { (account, amountMinor) ->
+            PostingRow(UUID.randomUUID(), disbursement.entranceId, disbursement.id, account, null, amountMinor, disbursement.currency, paidOn)
+        }
 
     fun forRun(run: ChargeRun, entranceId: UUID, journalId: UUID, valueDate: LocalDate): List<PostingRow> {
         val debits = run.charges.flatMap { charge ->

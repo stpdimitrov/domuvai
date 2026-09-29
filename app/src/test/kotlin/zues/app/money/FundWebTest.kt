@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDate
 import java.util.UUID
 
-/** The fund endpoints with the service mocked — no database. Proves the routes bind and the errors map. */
+/** The fund endpoints with the service mocked — no database. Proves the routes bind, each field reaches the service, and the errors map. */
 @WebMvcTest(FundController::class)
 class FundWebTest {
 
@@ -70,5 +70,45 @@ class FundWebTest {
         whenever(fund.commit(eq(entranceId), any())).thenThrow(DataIntegrityViolationException("violates check constraint \"fund_disbursement_x\""))
         mvc.perform(postDisbursement())
             .andExpect(jsonPath("$.error").value("the disbursement conflicts with the fund's records"))   // the database's text stays inside
+    }
+
+    private val disbursementId = UUID.randomUUID()
+
+    private fun act(verb: String, body: String) = post("/api/money/entrances/$entranceId/fund/disbursements/$disbursementId/$verb")
+        .contentType(MediaType.APPLICATION_JSON).content(body)
+
+    @Test
+    fun `POST pay and cancel hand each field to the service and return the disbursement`() {
+        val paid = DisbursementView(
+            disbursementId, 20_000, "WORKS", "GA-2026-7", null, null, chair, "PAID", LocalDate.parse("2026-09-01"), paidOn = LocalDate.parse("2026-09-15"),
+        )
+        whenever(fund.pay(eq(entranceId), eq(disbursementId), any())).thenReturn(paid)
+        whenever(fund.cancel(eq(entranceId), eq(disbursementId), any())).thenReturn(
+            paid.copy(status = "CANCELLED", paidOn = null, cancelledOn = LocalDate.parse("2026-09-29"), cancelledBy = chair, cancelReason = "revoked"),
+        )
+        mvc.perform(act("pay", """{"paidOn":"2026-09-15","paidBy":"$chair"}"""))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("PAID"))
+            .andExpect(jsonPath("$.paidOn").value("2026-09-15"))
+        verify(fund).pay(entranceId, disbursementId, PayDisbursement(LocalDate.parse("2026-09-15"), chair))
+        mvc.perform(act("cancel", """{"cancelledBy":"$chair","reason":"the GA revoked decision GA-2026-7"}"""))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("CANCELLED"))
+            .andExpect(jsonPath("$.cancelReason").value("revoked"))
+        verify(fund).cancel(entranceId, disbursementId, CancelDisbursement(chair, "the GA revoked decision GA-2026-7"))
+    }
+
+    @Test
+    fun `a closed disbursement is a 409, an unknown one a 404, a bad date or signatory a 400`() {
+        for ((error, expected) in listOf(
+            DisbursementClosed("already paid") to 409, NoSuchElementException("no such disbursement") to 404,
+            IllegalArgumentException("after today") to 400,
+        )) {
+            whenever(fund.pay(eq(entranceId), eq(disbursementId), any())).thenThrow(error)
+            mvc.perform(act("pay", """{"paidOn":"2026-09-15","paidBy":"$chair"}""")).andExpect(status().`is`(expected))
+            whenever(fund.cancel(eq(entranceId), eq(disbursementId), any())).thenThrow(error)
+            mvc.perform(act("cancel", """{"cancelledBy":"$chair","reason":"revoked"}""")).andExpect(status().`is`(expected))
+        }
+        mvc.perform(act("pay", """{"paidOn":"15.09.2026","paidBy":"$chair"}""")).andExpect(status().isBadRequest)   // not an ISO date
     }
 }

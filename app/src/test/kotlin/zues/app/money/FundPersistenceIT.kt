@@ -27,8 +27,9 @@ import java.util.UUID
 /**
  * The repair fund against real PostgreSQL: money paid into the fund's account is its balance and cash is
  * not, a signed-off disbursement is committed and no longer available (PM-FUND-009), an emergency beyond
- * the available balance is refused (PM-FUND-008), and each of the table's own checks refuses its
- * violation (PM-FUND-006…008). Docker-gated.
+ * the available balance is refused (PM-FUND-008), a payout lowers the balance and what is committed alike
+ * while a cancellation frees what was committed (PM-FUND-007, PM-FUND-009), and each of the table's own
+ * checks refuses its violation (PM-FUND-006…009). Docker-gated.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -131,5 +132,65 @@ class FundPersistenceIT {
                 .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
         }
         insert("WORKS", null, "the roof leaks", null)                                    // an emergency repair, justified, is accepted
+    }
+
+    private fun signedOff(entranceId: UUID, body: String): Pair<UUID, String> {
+        val response = disburse(entranceId, body).andExpect(status().isCreated).andReturn().response.contentAsString
+        val node = json.readTree(response)
+        return UUID.fromString(node.get("id").asText()) to node.get("committedOn").asText()
+    }
+
+    private fun act(entranceId: UUID, disbursementId: UUID, verb: String, body: String) = mvc.perform(
+        post("/api/money/entrances/$entranceId/fund/disbursements/$disbursementId/$verb").contentType(MediaType.APPLICATION_JSON).content(body),
+    )
+
+    @Test
+    fun `PM-FUND-007 PM-FUND-009 a payout lowers the balance and what is committed alike, a cancellation frees what was committed`() {
+        val (entranceId, unitId, chair) = entranceWithFund()
+        pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
+        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
+        val (roof, _) = signedOff(entranceId, """{"amountMinor":10000,"purpose":"WORKS","authorisedBy":"$chair","emergencyJustification":"the roof leaks"}""")
+
+        act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""")
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("PAID"))
+            .andExpect(jsonPath("$.paidOn").value(signedOn))
+        act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isConflict)   // once
+        act(entranceId, roof, "cancel", """{"cancelledBy":"$chair","reason":"the roofer found no leak"}""")
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("CANCELLED"))
+        act(entranceId, roof, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isConflict)    // cancelled stays cancelled
+
+        mvc.perform(get("/api/money/entrances/$entranceId/fund"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.balanceMinor").value(30_000))
+            .andExpect(jsonPath("$.committedMinor").value(0))
+            .andExpect(jsonPath("$.availableMinor").value(30_000))
+        val legs = jdbc.queryForList("SELECT account, amount_minor FROM posting WHERE journal_id = ?", works)
+            .associate { it["account"] as String to (it["amount_minor"] as Number).toLong() }
+        assertThat(legs).isEqualTo(mapOf("BANK:REPAIR_RENEWAL" to -20_000L, "EXPENSE:REPAIR_FUND" to 20_000L))
+    }
+
+    @Test
+    fun `PM-FUND-007 PM-FUND-009 the table refuses a payout or a cancellation it cannot account for, one check at a time`() {
+        val (entranceId, _, chair) = entranceWithFund()
+        val (open, signedOn) = signedOff(entranceId, """{"amountMinor":100,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
+        val day = LocalDate.parse(signedOn)
+        for ((sql, constraint) in listOf(
+            "UPDATE fund_disbursement SET paid_on = ? WHERE id = ?" to "fund_disbursement_paid_dated",
+            "UPDATE fund_disbursement SET status = 'PAID', paid_on = ?::date - 1 WHERE id = ?" to "fund_disbursement_paid_after_signed",
+            "UPDATE fund_disbursement SET status = 'CANCELLED', cancelled_on = ? WHERE id = ?" to "fund_disbursement_cancel_recorded",
+        )) {
+            assertThatThrownBy { jdbc.update(sql, day, open) }
+                .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
+        }
+        assertThatThrownBy {
+            jdbc.update(
+                "UPDATE fund_disbursement SET status = 'CANCELLED', cancelled_on = ?, cancelled_by = ?, cancel_reason = ' ' WHERE id = ?", day, chair, open,
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("fund_disbursement_cancel_reason_not_blank")
+        jdbc.update(                                                                       // a cancellation, fully recorded, is accepted
+            "UPDATE fund_disbursement SET status = 'CANCELLED', cancelled_on = ?, cancelled_by = ?, cancel_reason = 'revoked' WHERE id = ?", day, chair, open,
+        )
     }
 }
