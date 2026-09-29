@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **46** (20%) |
-| Remaining | **187** |
+| Proved by a test named after the rule | **47** (20%) |
+| Remaining | **186** |
 | Proposed slices at ~10 rules each | **20** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-27 rule(s) remaining across 3 slice(s).
+26 rule(s) remaining across 3 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -31,13 +31,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-SYS-008` | SHOULD | One number a manager can act on. |
 | `PM-SYS-011` | SHOULD | Tasks appear without anyone remembering to create them. |
 
-### S-G1-02 · `money` · FEE · FUND · 6 rule(s) · ⚠ 1 unconfirmed
+### S-G1-02 · `money` · FEE · FUND · 5 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-FUND-002` | MUST ⚠ | Minimum wage is a dated configuration value; a below-minimum tariff is rejected with the computed floor shown. |
 | `PM-FEE-013` | MUST | Budget vs actual report is a first-class screen. |
-| `PM-FUND-010` | MUST | Offboarding generates a fund handover statement signed by both parties. |
 | `PM-FEE-017` | SHOULD | Consumption lines are separately typed and excluded from the statutory keys. |
 | `PM-FEE-019` | SHOULD | Two accounts, two ledgers, no transfers without a decision. |
 | `PM-FUND-011` | SHOULD | Multi-year plan with a funding gap indicator. |

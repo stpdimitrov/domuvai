@@ -773,6 +773,134 @@
         ],
         "type": "object"
       },
+      "HandoverStatement": {
+        "properties": {
+          "availableMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "bankBalanceMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "closingMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "committedMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "differenceMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "fundAccountId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "handoverOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "holderName": {
+            "type": "string"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "incomingPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "inherited": {
+            "items": {
+              "$ref": "#/components/schemas/InheritedDisbursement"
+            },
+            "type": "array"
+          },
+          "issuedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "openingMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "outgoingPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "paidOutMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "receivedMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reconciled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "availableMinor",
+          "bankBalanceMinor",
+          "closingMinor",
+          "committedMinor",
+          "differenceMinor",
+          "entranceId",
+          "fundAccountId",
+          "handoverOn",
+          "holderName",
+          "iban",
+          "incomingPartyId",
+          "inherited",
+          "issuedOn",
+          "openingMinor",
+          "outgoingPartyId",
+          "paidOutMinor",
+          "receivedMinor",
+          "reconciled"
+        ],
+        "type": "object"
+      },
+      "HandoverStatementView": {
+        "properties": {
+          "basisHash": {
+            "type": "string"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lawVersion": {
+            "type": "string"
+          },
+          "statement": {
+            "$ref": "#/components/schemas/HandoverStatement"
+          }
+        },
+        "required": [
+          "basisHash",
+          "engineVersion",
+          "id",
+          "lawVersion",
+          "statement"
+        ],
+        "type": "object"
+      },
       "HouseholdRegisteredResponse": {
         "properties": {
           "memberIds": {
@@ -836,6 +964,70 @@
           "sourceSha",
           "status",
           "violations"
+        ],
+        "type": "object"
+      },
+      "InheritedDisbursement": {
+        "properties": {
+          "amountMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "committedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "decisionId": {
+            "type": "string"
+          },
+          "disbursementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "emergencyJustification": {
+            "type": "string"
+          },
+          "passportMeasure": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "committedOn",
+          "disbursementId",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "IssueHandoverRequest": {
+        "properties": {
+          "bankBalanceMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "from": {
+            "type": "string"
+          },
+          "handoverOn": {
+            "type": "string"
+          },
+          "incomingPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outgoingPartyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bankBalanceMinor",
+          "handoverOn",
+          "incomingPartyId",
+          "outgoingPartyId"
         ],
         "type": "object"
       },
@@ -2838,6 +3030,173 @@
         "x-rules": [
           "PM-FUND-007",
           "PM-FUND-009"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/fund/handover-statements": {
+      "post": {
+        "operationId": "post_money_entrances_entranceId_fund_handover_statements",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueHandoverRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoverStatementView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Issue the repair fund's handover statement at a change of manager — opening, received, paid out and closing from the ledger, beside the bank's own balance, with the unpaid disbursements the incoming side inherits; stored as issued",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-010"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/fund/handover-statements/{statementId}": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_fund_handover_statements_statementId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "statementId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoverStatementView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "A fund handover statement as it was issued, with the hash of its canonical basis",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FUND-010"
         ]
       }
     },

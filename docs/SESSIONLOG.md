@@ -1506,3 +1506,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — #53, this entry, `app/src/main/kotlin/zues/app/money/FundService.kt`.
 
 ---
+
+## S-G1-02d · 2026-09-29 · the repair fund: the handover statement (money)
+
+**Did** — the fund's reconciled balance statement at a change of manager or management company (#55, `lane:money`, PM-FUND-010). The fund already follows the building: its account and ledger belong to the entrance (ADR-005). `POST …/fund/handover-statements` issues the statement for a handover date (not after today, Sofia), optionally from a period start. From the fund's bank-account postings it gives the opening balance before the period, what was received and paid out within it, and the closing balance, which reconciles by construction. Beside that it sets the balance on the bank's own statement, the difference, and `reconciled` only when they match. It also lists the signed-off disbursements neither paid out nor cancelled by the handover day, which the incoming side inherits, and what is available. It is stored as issued in `money.fund_handover_statement` (`V202609291407`, insert-only: the table ignores updates and deletes). The key figures are columns, with named checks (reconciles, two different sides, the period, not dated ahead of issue, no negative receipts, payouts or commitments). The whole statement is `basis` (canonical JSON), pinned by `basis_hash`, `law_version` and `engine_version`: the hash both sides will sign. `GET …/{id}` reads it back from the stored basis, never recomputed. Issuing reads the fund from one snapshot (REPEATABLE READ).
+
+**Rules covered** — PM-FUND-010 (named-test coverage 46 → 47 of 233).
+
+**Tests added** — `FundHandoverTest` (new): `PM-FUND-010 the handover statement reconciles opening, receipts and payouts to the closing balance, beside the bank's`, `PM-FUND-010 the incoming side inherits what was signed off and neither paid out nor cancelled by the handover`, `PM-FUND-010 the basis reads back as the statement it was, so its hash is what both sides sign`, `PM-FUND-010 a statement is stored as issued, with the hash of its basis, and read back from what was stored`, `PM-FUND-010 a handover is dated no later than today, its period starts by then, and two different parties hand over`, `PM-FUND-010 a statement reads the fund from one snapshot, so a payout cannot fall between its reads`. `FundHandoverWebTest` (new): each field reaches the service, GET as issued, 400 / 404 / 409 with the database's text kept inside. `FundPersistenceIT` (Docker — CI): a statement issued end to end after a payout, with an unpaid disbursement inherited; an UPDATE and a DELETE change nothing; each of the table's checks refuses its own violation, by name. Seventeen mutations (period and handover-day boundaries, signs, inheritance by paid, cancelled and signed dates, order, reconciled, difference, the three guards, the entrance filter, the snapshot, the basis, the controller) each failed their tests.
+
+**Decisions** — owner D1–D5 on #55 (2026-09-29): stored and frozen; the period runs from an optional start to the handover date, not after today; reconciled against the bank's own balance, stored even when it differs; two different registered sides, neither needing to hold the account; a correction is a new statement, never an edit.
+
+**Open** — Signing by both sides (the evidence lane; the QES provider is pending) signs `basis_hash`. The handover act and pack (PM-GOV-018, PM-PMC-010) take this statement (identity-org). Re-titling the fund account to the incoming holder. The fund's opening balance for a building that joins with money already in its fund. `S-G1-02` still has PM-FUND-002 (awaiting the minimum-wage values, owner input 5), PM-FEE-013, PM-FEE-017, PM-FEE-019 and PM-FUND-011.
+
+**Read first next time** — #55, this entry, `app/src/main/kotlin/zues/app/money/FundHandover.kt`.
+
+---

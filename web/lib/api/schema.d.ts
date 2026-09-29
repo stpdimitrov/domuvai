@@ -243,6 +243,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/fund/handover-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue the repair fund's handover statement at a change of manager — opening, received, paid out and closing from the ledger, beside the bank's own balance, with the unpaid disbursements the incoming side inherits; stored as issued */
+        post: operations["post_money_entrances_entranceId_fund_handover_statements"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/money/entrances/{entranceId}/fund/handover-statements/{statementId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A fund handover statement as it was issued, with the hash of its canonical basis */
+        get: operations["get_money_entrances_entranceId_fund_handover_statements_statementId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/entrances/{entranceId}/payments": {
         parameters: {
             query?: never;
@@ -786,6 +820,50 @@ export interface components {
             holderName: string;
             iban: string;
         };
+        HandoverStatement: {
+            /** Format: int64 */
+            availableMinor: number;
+            /** Format: int64 */
+            bankBalanceMinor: number;
+            /** Format: int64 */
+            closingMinor: number;
+            /** Format: int64 */
+            committedMinor: number;
+            /** Format: int64 */
+            differenceMinor: number;
+            /** Format: uuid */
+            entranceId: string;
+            /** Format: date */
+            from?: string;
+            /** Format: uuid */
+            fundAccountId: string;
+            /** Format: date */
+            handoverOn: string;
+            holderName: string;
+            iban: string;
+            /** Format: uuid */
+            incomingPartyId: string;
+            inherited: components["schemas"]["InheritedDisbursement"][];
+            /** Format: date */
+            issuedOn: string;
+            /** Format: int64 */
+            openingMinor: number;
+            /** Format: uuid */
+            outgoingPartyId: string;
+            /** Format: int64 */
+            paidOutMinor: number;
+            /** Format: int64 */
+            receivedMinor: number;
+            reconciled: boolean;
+        };
+        HandoverStatementView: {
+            basisHash: string;
+            engineVersion: string;
+            /** Format: uuid */
+            id: string;
+            lawVersion: string;
+            statement: components["schemas"]["HandoverStatement"];
+        };
         HouseholdRegisteredResponse: {
             memberIds: string[];
         };
@@ -805,6 +883,28 @@ export interface components {
             status: string;
             /** Format: int32 */
             violations: number;
+        };
+        InheritedDisbursement: {
+            /** Format: int64 */
+            amountMinor: number;
+            /** Format: date */
+            committedOn: string;
+            decisionId?: string;
+            /** Format: uuid */
+            disbursementId: string;
+            emergencyJustification?: string;
+            passportMeasure?: string;
+            purpose: string;
+        };
+        IssueHandoverRequest: {
+            /** Format: int64 */
+            bankBalanceMinor: number;
+            from?: string;
+            handoverOn: string;
+            /** Format: uuid */
+            incomingPartyId: string;
+            /** Format: uuid */
+            outgoingPartyId: string;
         };
         ManualEntry: {
             designation: string;
@@ -1792,6 +1892,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisbursementView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_money_entrances_entranceId_fund_handover_statements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueHandoverRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoverStatementView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_fund_handover_statements_statementId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                statementId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoverStatementView"];
                 };
             };
             /** @description Bad Request */
