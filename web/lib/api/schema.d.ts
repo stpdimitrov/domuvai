@@ -115,7 +115,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Compute a charge run from a stated basis — nothing is stored */
+        /** Compute a charge run from a stated basis, metered consumption included — nothing is stored */
         post: operations["post_money_charge_runs_preview"];
         delete?: never;
         options?: never;
@@ -132,7 +132,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Issue a charge run — stored with its basis, never altered afterwards */
+        /** Issue a charge run — stored with its basis, meter readings included, never altered afterwards */
         post: operations["post_money_entrances_entranceId_charge_runs"];
         delete?: never;
         options?: never;
@@ -149,7 +149,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Compute a charge run from the entrance's registered units — nothing is stored */
+        /** Compute a charge run from the entrance's registered units and the stated meter readings — nothing is stored */
         post: operations["post_money_entrances_entranceId_charge_runs_preview"];
         delete?: never;
         options?: never;
@@ -336,7 +336,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The unit's itemised statement, showing how each number was derived */
+        /** The unit's itemised statement, showing how each number was derived — a metered line with its reading and item */
         get: operations["get_money_units_unitId_statement"];
         put?: never;
         post?: never;
@@ -665,10 +665,12 @@ export interface components {
         ChargeRunRequest: {
             /** Format: int32 */
             businessMultiplier?: number;
+            consumption?: components["schemas"]["ConsumptionLineRequest"][];
             entranceId: string;
             legalDate: string;
             lines: components["schemas"]["TariffLineRequest"][];
             period: string;
+            readings?: components["schemas"]["ReadingRequest"][];
             units: components["schemas"]["UnitRequest"][];
         };
         ChargeRunResponse: {
@@ -677,6 +679,7 @@ export interface components {
             entranceId: string;
             lawVersion: string;
             legalDate: string;
+            missingReadings: components["schemas"]["MissingReadingResponse"][];
             period: string;
             /** Format: int64 */
             totalMinor: number;
@@ -712,6 +715,12 @@ export interface components {
             /** Format: uuid */
             entranceId: string;
             units: components["schemas"]["BookUnitEntry"][];
+        };
+        ConsumptionLineRequest: {
+            decisionId: string;
+            item: string;
+            /** Format: int64 */
+            priceMinor: number;
         };
         DeclarationFiled: {
             /** Format: date */
@@ -917,6 +926,10 @@ export interface components {
             rule: string;
             value: string;
         };
+        MissingReadingResponse: {
+            item: string;
+            unitId: string;
+        };
         NewAbsenceRequest: {
             absentFrom: string;
             absentTo: string;
@@ -991,6 +1004,11 @@ export interface components {
             missingRequired: ("DESIGNATION" | "IDEAL_PARTS" | "OCCUPANTS" | "FEE_MINOR" | "BUILT_AREA" | "OWNER_NAME" | "CHILDREN_UNDER_6" | "ANIMALS" | "ABSENT_DAYS" | "BUSINESS_USE")[];
             unmappedColumns: string[];
         };
+        ReadingRequest: {
+            item: string;
+            quantity: string;
+            unitId: string;
+        };
         RecordPaymentRequest: {
             /** Format: int64 */
             amountMinor: number;
@@ -1050,6 +1068,7 @@ export interface components {
             amountMinor: number;
             component: string;
             derivation: string;
+            item?: string;
             period: string;
             quantity: number;
         };
@@ -1064,9 +1083,11 @@ export interface components {
         StoredChargeRunRequest: {
             /** Format: int32 */
             businessMultiplier?: number;
+            consumption?: components["schemas"]["ConsumptionLineRequest"][];
             legalDate: string;
             lines: components["schemas"]["TariffLineRequest"][];
             period: string;
+            readings?: components["schemas"]["ReadingRequest"][];
         };
         TariffInput: {
             decisionId: string;

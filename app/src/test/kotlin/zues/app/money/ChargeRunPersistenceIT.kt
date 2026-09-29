@@ -141,6 +141,59 @@ class ChargeRunPersistenceIT {
     }
 
     @Test
+    fun `PM-FEE-017 a metered line is stored as a maintenance line marked METERED, its quantity the reading`() {
+        val entranceId = createEntrance()
+        val body = """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"60.0000","separateEntrance":false},""" +
+            """{"designation":"ап. 2","unitType":"FLAT","idealParts":"40.0000","separateEntrance":false}]}"""
+        val unitIds = json.readTree(
+            mvc.perform(post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated).andReturn().response.contentAsString,
+        ).get("unitIds").map { it.asText() }
+        val metered = StoredChargeRunRequest(
+            period = "2026-07", legalDate = "2026-07-01",
+            lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
+            consumption = listOf(ConsumptionLineRequest("WATER", 230, "GA-2026-9")),
+            readings = listOf(ReadingRequest(unitIds[0], "WATER", "12.345"), ReadingRequest(unitIds[1], "WATER", "0.500")),
+        )
+        val response = mvc.perform(
+            post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(metered)),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val runId = UUID.fromString(json.readTree(response).get("chargeRunId").asText())
+
+        val water = chargeLines.findByChargeRunId(runId).single { it.item == "WATER" && it.unitId.toString() == unitIds[0] }
+        assertThat(listOf(water.component, water.allocationKey, water.decisionId)).containsExactly("MAINTENANCE", "METERED", "GA-2026-9")
+        assertThat(water.quantity).isEqualByComparingTo("12.345")
+        assertThat(water.amountMinor).isEqualTo(2_839)
+        assertThat(chargeRuns.findById(runId).orElseThrow().basis.json).contains("readingsThousandths")
+
+        val unread = metered.copy(period = "2026-08", legalDate = "2026-08-01", readings = listOf(ReadingRequest(unitIds[0], "WATER", "1")))
+        mvc.perform(
+            post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(unread)),
+        ).andExpect(status().isBadRequest)                                                    // a meter unread: the period stays open
+        assertThat(chargeRuns.existsByEntranceIdAndPeriod(entranceId, "2026-08")).isFalse()
+    }
+
+    @Test
+    fun `PM-FEE-017 the schema keeps METERED for metered items, and metered items for METERED`() {
+        val entranceId = createEntrance().also { registerUnits(it) }
+        val line = chargeLines.findByChargeRunId(issueRun(entranceId)).first()
+        fun insert(component: String, key: String, item: String?) = jdbc.update(
+            "INSERT INTO charge_line (id, entrance_id, charge_run_id, unit_id, component, allocation_key, quantity, " +
+                "amount_minor, currency, derivation, item, decision_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EUR', 'probe', ?, 'GA-2026-9')",
+            UUID.randomUUID(), line.entranceId, line.chargeRunId, line.unitId, component, key, line.quantity, 1L, item,
+        )
+        assertThatThrownBy { insert("MAINTENANCE", "METERED", null) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("charge_line_metered_is_consumption")
+        assertThatThrownBy { insert("MAINTENANCE", "METERED", "CONCIERGE") }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("charge_line_metered_is_consumption")
+        assertThatThrownBy { insert("MAINTENANCE", "PER_UNIT", "WATER") }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("charge_line_metered_is_consumption")
+        assertThatThrownBy { insert("MANAGEMENT", "METERED", "WATER") }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("charge_line_item_is_maintenance")
+        assertThat(insert("MAINTENANCE", "METERED", "HEATING")).isEqualTo(1)       // a metered maintenance line is stored
+    }
+
+    @Test
     fun `PM-FEE-015 an issued charge line cannot be updated`() {
         val entranceId = createEntrance().also { registerUnits(it) }
         val line = chargeLines.findByChargeRunId(issueRun(entranceId)).first()

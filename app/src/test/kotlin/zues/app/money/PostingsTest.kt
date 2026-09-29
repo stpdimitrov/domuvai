@@ -6,6 +6,7 @@ import zues.charges.PropertyUnit
 import zues.charges.Tariff
 import zues.charges.TariffLine
 import zues.charges.computeChargeRun
+import zues.charges.ConsumptionLine
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
 import zues.law.CostItem
@@ -85,5 +86,22 @@ class PostingsTest {
             assertThat(it.valueDate).isEqualTo(LocalDate.parse("2026-09-15"))  // the bank's value date, not the sign-off's
             assertThat(it.unitId).isNull()
         }
+    }
+
+    @Test
+    fun `PM-FEE-017 a metered line is the unit's receivable and maintenance income, and the journal still balances`() {
+        val metered = computeChargeRun(
+            entranceId.toString(),
+            listOf(PropertyUnit(u1.toString(), "ап. 1", IdealParts.of("100.0000"), occupants = 0, readings = mapOf(CostItem.WATER to 2_000L))),
+            Tariff(
+                entranceId.toString(), "2026-05", "2026-05-01",
+                listOf(TariffLine(CostStream.MAINTENANCE, AllocationKey.BY_IDEAL_PARTS, "GA-2026-1", totalMinor = 10_000)),
+                consumption = listOf(ConsumptionLine(CostItem.WATER, 150, "GA-2026-9")),
+            ),
+        )
+        val journal = Ledger.forRun(metered, entranceId, journalId, LocalDate.parse("2026-05-01"))
+        assertThat(journal.sumOf { it.amountMinor }).isZero()
+        assertThat(journal.filter { it.account == "RECEIVABLE" }.sumOf { it.amountMinor }).isEqualTo(10_300)          // 100.00 + 2 m³ × 1.50
+        assertThat(journal.single { it.account == "INCOME:MAINTENANCE" }.amountMinor).isEqualTo(-10_300)
     }
 }

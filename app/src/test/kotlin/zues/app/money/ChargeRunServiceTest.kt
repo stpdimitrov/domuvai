@@ -144,4 +144,19 @@ class ChargeRunServiceTest {
         // one resident plus one animal-equivalent — the animal lifts the chargeable count
         assertThat(response.charges.single().chargeablePersons).isGreaterThan(1)
     }
+
+    @Test
+    fun `PM-FEE-017 a stored run bills a registered unit's reading, and refuses one for a unit it does not hold`() {
+        val request = StoredChargeRunRequest(
+            period = "2026-05", legalDate = "2026-05-01",
+            lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
+            consumption = listOf(ConsumptionLineRequest("HEATING", 25, "GA-2026-9")),
+            readings = listOf(ReadingRequest(u2.toString(), "HEATING", "2")),
+        )
+        val response = service.preview(entranceId, request)
+        assertThat(response.charges.single { it.unitId == u2.toString() }.lines.single { it.item == "HEATING" }.amountMinor).isEqualTo(50)
+        assertThat(response.missingReadings).containsExactly(MissingReadingResponse(u1.toString(), "HEATING"))
+        assertThatThrownBy { service.preview(entranceId, request.copy(readings = listOf(ReadingRequest(UUID.randomUUID().toString(), "HEATING", "2")))) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
 }

@@ -255,6 +255,12 @@
             "format": "int32",
             "type": "integer"
           },
+          "consumption": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumptionLineRequest"
+            },
+            "type": "array"
+          },
           "entranceId": {
             "type": "string"
           },
@@ -269,6 +275,12 @@
           },
           "period": {
             "type": "string"
+          },
+          "readings": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingRequest"
+            },
+            "type": "array"
           },
           "units": {
             "items": {
@@ -306,6 +318,12 @@
           "legalDate": {
             "type": "string"
           },
+          "missingReadings": {
+            "items": {
+              "$ref": "#/components/schemas/MissingReadingResponse"
+            },
+            "type": "array"
+          },
           "period": {
             "type": "string"
           },
@@ -320,6 +338,7 @@
           "entranceId",
           "lawVersion",
           "legalDate",
+          "missingReadings",
           "period",
           "totalMinor"
         ],
@@ -425,6 +444,26 @@
           "complete",
           "entranceId",
           "units"
+        ],
+        "type": "object"
+      },
+      "ConsumptionLineRequest": {
+        "properties": {
+          "decisionId": {
+            "type": "string"
+          },
+          "item": {
+            "type": "string"
+          },
+          "priceMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decisionId",
+          "item",
+          "priceMinor"
         ],
         "type": "object"
       },
@@ -1074,6 +1113,21 @@
         ],
         "type": "object"
       },
+      "MissingReadingResponse": {
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "unitId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "unitId"
+        ],
+        "type": "object"
+      },
       "NewAbsenceRequest": {
         "properties": {
           "absentFrom": {
@@ -1349,6 +1403,25 @@
         ],
         "type": "object"
       },
+      "ReadingRequest": {
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "unitId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "quantity",
+          "unitId"
+        ],
+        "type": "object"
+      },
       "RecordPaymentRequest": {
         "properties": {
           "amountMinor": {
@@ -1551,6 +1624,9 @@
           "derivation": {
             "type": "string"
           },
+          "item": {
+            "type": "string"
+          },
           "period": {
             "type": "string"
           },
@@ -1596,6 +1672,12 @@
             "format": "int32",
             "type": "integer"
           },
+          "consumption": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumptionLineRequest"
+            },
+            "type": "array"
+          },
           "legalDate": {
             "type": "string"
           },
@@ -1607,6 +1689,12 @@
           },
           "period": {
             "type": "string"
+          },
+          "readings": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingRequest"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -2385,7 +2473,7 @@
             "description": "Bad Request"
           }
         },
-        "summary": "Compute a charge run from a stated basis — nothing is stored",
+        "summary": "Compute a charge run from a stated basis, metered consumption included — nothing is stored",
         "tags": [
           "money"
         ],
@@ -2393,6 +2481,7 @@
           "PM-FEE-001",
           "PM-FEE-010",
           "PM-FEE-012",
+          "PM-FEE-017",
           "PM-ORG-002"
         ]
       }
@@ -2472,7 +2561,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Issue a charge run — stored with its basis, never altered afterwards",
+        "summary": "Issue a charge run — stored with its basis, meter readings included, never altered afterwards",
         "tags": [
           "money"
         ],
@@ -2480,7 +2569,8 @@
           "PM-FEE-012",
           "PM-FEE-014",
           "PM-FEE-015",
-          "PM-FEE-016"
+          "PM-FEE-016",
+          "PM-FEE-017"
         ]
       }
     },
@@ -2546,13 +2636,14 @@
             "description": "Not Found"
           }
         },
-        "summary": "Compute a charge run from the entrance's registered units — nothing is stored",
+        "summary": "Compute a charge run from the entrance's registered units and the stated meter readings — nothing is stored",
         "tags": [
           "money"
         ],
         "x-rules": [
           "PM-FEE-001",
-          "PM-FEE-014"
+          "PM-FEE-014",
+          "PM-FEE-017"
         ]
       }
     },
@@ -3541,11 +3632,12 @@
             "description": "OK"
           }
         },
-        "summary": "The unit's itemised statement, showing how each number was derived",
+        "summary": "The unit's itemised statement, showing how each number was derived — a metered line with its reading and item",
         "tags": [
           "money"
         ],
         "x-rules": [
+          "PM-FEE-017",
           "PM-FEE-018"
         ]
       }

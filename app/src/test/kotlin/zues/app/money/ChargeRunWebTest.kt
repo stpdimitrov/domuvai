@@ -54,4 +54,23 @@ class ChargeRunWebTest {
         )
             .andExpect(status().isBadRequest)
     }
+
+    @Test
+    fun `PM-FEE-017 a malformed reading is a 400 in words — never a 500, never a class name`() {
+        val metered = validRequest.copy(consumption = listOf(ConsumptionLineRequest("WATER", 230, "GA-2026-9")))
+        for (quantity in listOf("1E+400", "12345678901234567890", "-1", "12.3456")) {
+            mvc.perform(
+                post("/api/money/charge-runs/preview").contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(metered.copy(readings = listOf(ReadingRequest("u1", "WATER", quantity))))),
+            )
+                .andExpect(status().isBadRequest)
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.startsWith("a reading is up to six digits")))
+        }
+        mvc.perform(
+            post("/api/money/charge-runs/preview").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(metered.copy(readings = listOf(ReadingRequest("u1", "GAS", "1"))))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("zues."))))
+    }
 }

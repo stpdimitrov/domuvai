@@ -41,6 +41,8 @@ data class PropertyUnit(
     val absentDays: Int = 0,
     /** separate street entrance, business use. Rule: PM-ORG-009, PM-FEE-010 */
     val businessUse: Boolean = false,
+    /** what the unit's own meters read for the period, in thousandths of the unit of measure, by metered item. Rule: PM-FEE-017 */
+    val readings: Map<CostItem, Long> = emptyMap(),
 )
 
 /** A tariff exists only because the general assembly adopted it. Rule: PM-FEE-012 */
@@ -57,6 +59,17 @@ data class TariffLine(
     val item: CostItem? = null,
 )
 
+/**
+ * A metered cost billed from each unit's own reading (Rule: PM-FEE-017): one price per unit of measure,
+ * adopted by GA decision (PM-FEE-012). Never allocated by a statutory key; it changes no other line.
+ */
+data class ConsumptionLine(
+    val item: CostItem,
+    /** per unit of measure (m³, kWh), in minor units */
+    val priceMinor: Long,
+    val decisionId: String,
+)
+
 data class Tariff(
     val entranceId: String,
     val period: String,          // YYYY-MM
@@ -64,7 +77,12 @@ data class Tariff(
     val lines: List<TariffLine>,
     /** chosen within the statutory range by GA decision. Rule: PM-FEE-010 */
     val businessMultiplier: Int? = null,
+    /** metered costs, billed per unit from its reading. Rule: PM-FEE-017 */
+    val consumption: List<ConsumptionLine> = emptyList(),
 )
+
+/** A unit a consumption line could not bill: no reading for it. Nothing is estimated. Rule: PM-FEE-017 */
+data class MissingReading(val unitId: String, val item: CostItem)
 
 data class ChargeLine(
     val stream: CostStream,
@@ -102,6 +120,8 @@ data class ChargeRun(
     val charges: List<UnitCharge>,
     val total: Money,
     val basis: Basis,
+    /** units a consumption line did not bill, for want of a reading (PM-FEE-017) */
+    val missingReadings: List<MissingReading> = emptyList(),
 )
 
 /** Rule: PM-FEE-005, PM-FEE-006, PM-FEE-008, PM-FEE-009 */
@@ -119,6 +139,7 @@ private fun weightFor(u: PropertyUnit, key: AllocationKey, on: LegalDate): Long 
     AllocationKey.PER_PERSON -> chargeablePersons(u, on).toLong()
     AllocationKey.BY_IDEAL_PARTS -> u.idealParts.ppmPct.toLong()
     AllocationKey.PER_UNIT -> 1L
+    AllocationKey.METERED -> throw IllegalStateException("METERED is not a statutory key (PM-FEE-017)")
 }
 
 /** Rule: PM-FEE-010 — business use pays a multiple, on management and maintenance only */
@@ -139,6 +160,13 @@ private fun fmtWeight(key: AllocationKey, u: PropertyUnit, on: LegalDate): Strin
     AllocationKey.BY_IDEAL_PARTS -> "${u.idealParts.format()}%"
     AllocationKey.PER_PERSON -> "${chargeablePersons(u, on)} person(s)"
     AllocationKey.PER_UNIT -> "1 unit"
+    AllocationKey.METERED -> throw IllegalStateException("METERED is not a statutory key (PM-FEE-017)")
+}
+
+/** A reading kept in thousandths, written with its three decimals: 12345 → "12.345", 5 → "0.005". */
+private fun thousandths(q: Long): String {
+    val a = Math.abs(q)
+    return "${if (q < 0) "-" else ""}${a / 1_000}.${(a % 1_000).toString().padStart(3, '0')}"
 }
 
 private fun roundDiv(a: Long, b: Long): Long = (a + b / 2) / b
@@ -148,6 +176,9 @@ fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tari
     for (line in tariff.lines) {
         if (line.decisionId.isBlank()) {
             throw IllegalStateException("tariff line ${line.stream} has no GA decision — cannot bill (PM-FEE-012)")
+        }
+        if (line.key == AllocationKey.METERED || line.item?.metered == true) {           // Rule: PM-FEE-017
+            throw IllegalStateException("a metered cost is billed from each unit's reading, in the tariff's consumption lines — not by a key (PM-FEE-017)")
         }
         if (!keyIsChangeableByAssembly(line.stream) && line.key != defaultKey(line.stream)) {
             throw IllegalStateException("${line.stream} must be allocated ${defaultKey(line.stream)} (PM-FEE-004, PM-FUND-003)")
@@ -164,6 +195,27 @@ fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tari
                 .ifEmpty { setOf(defaultKey(item.stream)) }
             if (streamKeys != setOf(line.key)) {
                 throw IllegalStateException("$item must be allocated as ${item.stream} is (${streamKeys.joinToString()}) (PM-FEE-011)")
+            }
+        }
+    }
+
+    for (line in tariff.consumption) {                                                    // Rule: PM-FEE-017
+        if (line.decisionId.isBlank()) {
+            throw IllegalStateException("consumption line ${line.item} has no GA decision — cannot bill (PM-FEE-012)")
+        }
+        if (!line.item.metered) throw IllegalStateException("${line.item} is not a metered cost (PM-FEE-017)")
+        if (line.priceMinor <= 0) throw IllegalStateException("consumption line ${line.item} needs a positive price (PM-FEE-017)")
+        if (tariff.consumption.count { it.item == line.item } > 1) {
+            throw IllegalStateException("${line.item} is on more than one consumption line — a tariff prices it once (PM-FEE-017)")
+        }
+    }
+    for (u in units) {
+        for ((item, reading) in u.readings) {
+            if (!item.metered || reading < 0) {
+                throw IllegalStateException("unit ${u.designation}: a $item reading of ${thousandths(reading)} is not a meter reading (PM-FEE-017)")
+            }
+            if (tariff.consumption.none { it.item == item }) {                          // a reading nothing prices is not dropped silently
+                throw IllegalStateException("unit ${u.designation} has a $item reading, but the tariff prices no $item (PM-FEE-017)")
             }
         }
     }
@@ -204,6 +256,30 @@ fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tari
         }
     }
 
+    // Rule: PM-FEE-017 — what each unit's own meter read, times the adopted price, half-up to the cent. It is not a
+    // share of a common cost, so no key touches it; an unread meter bills nothing and is listed, never estimated.
+    // Read in S-G1-02e and put to the owner (#62), not yet decided: PM-FEE-010's multiple is of "the standard rate" —
+    // a share of the common costs — so the business multiplier is not applied to a metered line.
+    val missing = mutableListOf<MissingReading>()
+    for (line in tariff.consumption) {
+        val uom = line.item.unitOfMeasure ?: ""
+        for (u in units) {
+            val reading = u.readings[line.item]
+            if (reading == null) {
+                missing += MissingReading(u.unitId, line.item)
+                continue
+            }
+            val product = try {
+                Math.multiplyExact(reading, line.priceMinor)
+            } catch (e: ArithmeticException) {
+                throw IllegalStateException("unit ${u.designation}: ${thousandths(reading)} $uom × ${eur(line.priceMinor).format()} is out of range (PM-FEE-017)")
+            }
+            val amount = eur(roundDiv(product, 1_000))
+            val how = "${line.item.name.lowercase()} · ${thousandths(reading)} $uom × ${eur(line.priceMinor).format()}/$uom (metered)"
+            perUnit.getValue(u.unitId).add(ChargeLine(line.item.stream, AllocationKey.METERED, amount, how, line.decisionId, line.item))
+        }
+    }
+
     val charges = units.map { u ->
         val lines = perUnit.getValue(u.unitId).toList()
         UnitCharge(u.unitId, u.designation, lines, sumMoney(lines.map { it.amount }), chargeablePersons(u, on))
@@ -226,5 +302,6 @@ fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tari
                 "BUSINESS_USE_MULTIPLIER_MIN", "BUSINESS_USE_MULTIPLIER_MAX",
             ).associateWith { numberOn(it, on) },
         ),
+        missingReadings = missing,
     )
 }

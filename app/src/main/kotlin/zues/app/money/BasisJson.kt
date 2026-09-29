@@ -30,7 +30,7 @@ object BasisJson {
         "legalDate" to basis.legalDate,
         "constants" to basis.constants,
         "units" to basis.units.map {
-            sortedMapOf(
+            sortedMapOf<String, Any?>(
                 "unitId" to it.unitId,
                 "designation" to it.designation,
                 "idealPartsPpm" to it.idealParts.ppmPct,
@@ -39,9 +39,13 @@ object BasisJson {
                 "animals" to it.animals,
                 "absentDays" to it.absentDays,
                 "businessUse" to it.businessUse,
-            )
+            ).apply {                                                       // absent when empty: older bases hash as before
+                if (it.readings.isNotEmpty()) {                             // the unit is in the name, as with idealPartsPpm
+                    put("readingsThousandths", it.readings.entries.associate { (item, q) -> item.name to q }.toSortedMap())
+                }
+            }
         },
-        "tariff" to sortedMapOf(
+        "tariff" to sortedMapOf<String, Any?>(
             "entranceId" to basis.tariff.entranceId,
             "period" to basis.tariff.period,
             "legalDate" to basis.tariff.legalDate,
@@ -55,6 +59,12 @@ object BasisJson {
                     "totalMinor" to it.totalMinor,
                 ).apply { it.item?.let { item -> put("item", item.name) } }   // absent, not null: older bases hash as before
             },
-        ),
+        ).apply {
+            if (basis.tariff.consumption.isNotEmpty()) {
+                put("consumption", basis.tariff.consumption.map {
+                    sortedMapOf("item" to it.item.name, "priceMinor" to it.priceMinor, "decisionId" to it.decisionId)
+                })
+            }
+        },
     )
 }
