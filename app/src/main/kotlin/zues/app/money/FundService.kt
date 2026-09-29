@@ -1,6 +1,7 @@
 package zues.app.money
 
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.kernel.toSofiaDate
@@ -55,8 +56,8 @@ class FundShortfall(message: String) : RuntimeException(message)
  * The repair and renewal fund's disbursements and balance. A disbursement is for a lawful purpose
  * (Rule: PM-FUND-006) and is signed off by the party holding the fund's account on a GA decision (Rule:
  * PM-FUND-007) — or, without one, as an emergency with its justification, and only while the available
- * balance covers it (Rule: PM-FUND-008). The balance is what the fund's bank account received minus
- * what it paid out, read from the ledger; committed but unpaid disbursements are not available (Rule:
+ * balance covers it (Rule: PM-FUND-008). The balance is what the fund's bank account has received, read
+ * from the ledger (paying out is S-G1-02c); committed but unpaid disbursements are not available (Rule:
  * PM-FUND-009). The money moves in the fund's own bank account, never through the platform (ADR-007).
  */
 @Service
@@ -65,10 +66,13 @@ class FundService(
     private val accounts: FundAccountRepository,
     private val disbursements: FundDisbursementRepository,
     private val postings: PostingRepository,
+    private val jdbc: JdbcTemplate,
     private val clock: Clock,
 ) {
     @Transactional
     fun commit(entranceId: UUID, command: CommitDisbursement): DisbursementView {
+        // One signing-off at a time per entrance, so two emergencies cannot both pass the cap (PM-FUND-008).
+        jdbc.queryForObject("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(?, 0))", Int::class.java, "fund:$entranceId")
         val fund = fundAccount(entranceId)
         require(command.amountMinor > 0) { "amountMinor must be positive" }
         val purpose = enumValueOf<DisbursementPurpose>(command.purpose)                 // Rule: PM-FUND-006

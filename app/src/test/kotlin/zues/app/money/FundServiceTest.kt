@@ -8,6 +8,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
+import org.springframework.jdbc.core.JdbcTemplate
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -17,8 +18,8 @@ import java.util.UUID
 /**
  * The repair fund's disbursements and balance with the repositories mocked — no Spring, no database.
  * Proves the purpose, the signatory and the decision-or-emergency gate (PM-FUND-006…008), and that the
- * fund shows its balance and what is available net of committed disbursements (PM-FUND-009). The table's
- * own checks are proved by FundPersistenceIT.
+ * fund shows its balance and what is available net of committed disbursements (PM-FUND-009).
+ * FundPersistenceIT proves the table refuses a disbursement with neither a decision nor an emergency.
  */
 class FundServiceTest {
 
@@ -27,7 +28,8 @@ class FundServiceTest {
     private val disbursements: FundDisbursementRepository = mock()
     private val postings: PostingRepository = mock()
     private val lateNight = Clock.fixed(Instant.parse("2026-09-28T21:30:00Z"), ZoneOffset.UTC)   // 00:30 on 29 September in Sofia
-    private val service = FundService(aggregates, accounts, disbursements, postings, lateNight)
+    private val jdbc: JdbcTemplate = mock()
+    private val service = FundService(aggregates, accounts, disbursements, postings, jdbc, lateNight)
 
     private val entranceId = UUID.randomUUID()
     private val chair = UUID.randomUUID()
