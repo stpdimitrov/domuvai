@@ -1440,17 +1440,52 @@ Also: branch protection (do not require `web / build` — it is path-filtered); 
 
 ---
 
+## H-06 · 2026-09-29 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at the merge of this docs PR; before it, `main` was `f1288d4` (S-G1-02a). One slice is in flight: **S-G1-02b** (the repair fund, #50, `lane:money` held) — built, committed and pushed on `slice/S-G1-02b-fund-disbursements` (`dd97eca`), all gates green locally, no PR yet. A fresh-context review of it was running when this was written. Next: apply the review's findings, open the PR (`Closes #50`), switch auto-merge on.
+
+**What shipped since H-05**
+- **#41 F-38** — registry "today" is the Sofia day (PM-SYS-004). **#42 WF-03** — gate 10/10 `legal today`: no calendar date read off a clock except through `toSofiaDate`.
+- **#44 S-G1-03c + #45** — move-out for residents and animals (PM-BOOK-008); book retention 3 months after the *recorded* move-out (PM-BOOK-010; the owner's default, `TODO(legal)`); former owners' data held for counsel.
+- **#46 WF-04** — the test plan credits every rule a test names.
+- **#49 S-G1-02a** — concierge is a named maintenance line, not a fourth stream (PM-FEE-011 within PM-FEE-001); every charge line names its GA decision (PM-FEE-003); `ENGINE_VERSION` 0.2.0.
+- Finding **#48** (`lane:intake`): the intake dry-run cannot name a concierge line.
+
+**Where the plan stands** — on `main`: 42 of 233 rules have a named test; Gate 1 is 39 of 70; 31 operations run, 16 planned. With S-G1-02b: 46 of 233, Gate 1 43 of 70, 33 running, 15 planned. Every lane is free except `money` (#50).
+- **money:** after S-G1-02b, S-G1-02c — pay a disbursement out (its ledger posting) and cancel one; the fund handover statement (PM-FUND-010). Then PM-FEE-017 (consumption lines). PM-FUND-002 waits for the national minimum wage as dated `:law` values, with their source.
+- **registry:** free SHOULDs PM-ORG-008 (common parts per building type) and PM-BOOK-012 (book vs billed headcount); PM-ORG-009 waits on owner input 4; the rest on auth, the closed complex, assembly or ADR-004.
+- **web:** `/entrance/fund` can go live once S-G1-02b merges. **intake:** #48.
+
+**Owner inputs outstanding**
+1. The minister's current order for the declaration template (PM-BOOK-004's placeholder).
+2. Counsel: ЗЗД чл. 76 (S-43); ADR-004 / ADR-007; how long a former owner's identity may be kept for a claim, and confirm the 3-month retention windows (PM-BOOK-010).
+3. The auth provider (Keycloak marked) — unblocks PM-BOOK-006/007/009.
+4. The business-multiplier split (PM-ORG-009, `ChargeRunService.kt:58`).
+5. The national minimum wage by year, with its source (PM-FUND-002).
+The retention windows were answered on 2026-09-28: 3 months where no law says otherwise.
+
+**Operating procedure (new since H-05)**
+- **Review before the PR.** A fresh-context subagent reviews the staged diff against the rule texts; fix, then open the PR. #44 merged before its review, and #45 had to fix it.
+- **Merging is automatic.** After opening a PR, switch auto-merge on (squash); the ruleset **Claude** on `main` requires `gates` (active since 2026-09-29), so it waits for CI. If GitHub answers "clean status", CI is already green: `gh pr merge N --squash`. Then sync `main`.
+- **Conflicts are fixed without asking.** Merge `origin/main` in — no rebase, no force-push; a generated doc takes main's copy and is regenerated; the session log takes main's file with the branch's entry appended last — the union driver can share one `---` between two entries, so rebuild it rather than trust it.
+- Banned identifiers bite on locals too: a `val balance` fails gate 7 even when it is derived from postings (ADR-006) — name it for what it holds.
+- Repository settings (auto-merge, rulesets) and Claude's own permissions are the owner's to change; the auto-mode classifier refuses Claude doing either.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py`, `gh pr list`, and the branch `slice/S-G1-02b-fund-disbursements`.
+
+---
+
 ## S-G1-02b · 2026-09-29 · the repair fund: sign off a disbursement; balance and available (money)
 
-**Did** — the repair and renewal fund's disbursements (#50, `lane:money`). `POST …/fund/disbursements` signs one off: a purpose code — `WORKS` (чл. 48–49 works and equipment), `PASSPORT_MEASURE` (its measure reference required), `GA_PURPOSE` (PM-FUND-006); signed by the party holding the fund's account (PM-FUND-004) on a GA decision (PM-FUND-007) — or, without one, as an emergency with its written justification, only while the available balance covers it (PM-FUND-008). `GET …/fund` shows the balance, what is committed and what is available (PM-FUND-009): the balance is what the fund's bank account received minus what it paid out, read from the ledger (`BANK:REPAIR_RENEWAL` postings); committed is the signed-off, unpaid disbursements. New table `money.fund_disbursement` (`V202609290715`) — its checks refuse a disbursement with neither a decision nor an emergency, or with both, and a passport measure without its reference. The A9 planned fund view now runs (15 planned left). The platform records; the money moves in the fund's own account (ADR-007).
+**Did** — the repair and renewal fund's disbursements (#50, `lane:money`). `POST …/fund/disbursements` signs one off: a purpose code — `WORKS` (чл. 48–49 works and equipment), `PASSPORT_MEASURE` (its measure reference required), `GA_PURPOSE` (PM-FUND-006); signed by the party holding the fund's account (PM-FUND-004) on a GA decision (PM-FUND-007) — or, without one, as an emergency repair (`WORKS` only) with its written justification, only while the available balance covers it (PM-FUND-008). Signing off locks the entrance (a transaction advisory lock, as payments do), so two emergencies cannot both pass the cap. `GET …/fund` shows the balance, what is committed and what is available (PM-FUND-009): the balance is what the fund's bank account has received, read from the ledger (`BANK:REPAIR_RENEWAL` postings — paying out is S-G1-02c); committed is the signed-off, unpaid disbursements. New table `money.fund_disbursement` (`V202609290715`) with named checks, one per invariant: a decision or an emergency and never both, an emergency is `WORKS`, a passport measure names its reference, and no reference is blank. The A9 planned fund view now runs (15 planned left). The platform records; the money moves in the fund's own account (ADR-007).
 
 **Rules covered** — PM-FUND-006, PM-FUND-007, PM-FUND-008, PM-FUND-009 (named-test coverage 42 → 46 of 233).
 
-**Tests added** — `FundServiceTest` (new): `PM-FUND-006 a disbursement names a lawful purpose, and a passport measure names the measure`, `PM-FUND-007 only the party holding the fund's account signs off, and on a GA decision`, `PM-FUND-008 an emergency needs no decision, but its justification and the available balance to cover it`, `PM-FUND-009 the fund shows its balance and, net of committed disbursements, what is available`, a decided disbursement may take available below zero, no fund account. `FundWebTest` (new): the view, 201, and 409 / 400 / 404. `FundPersistenceIT` (Docker — CI): a payment into the fund is its balance, a signed-off disbursement is committed, an emergency beyond what is available is a 409, and the table refuses a disbursement with no basis. Five mutations (signatory, emergency cap, paid counted as committed, measure reference, the 409 mapping) each failed their tests.
+**Tests added** — `FundServiceTest` (new): `PM-FUND-006 a disbursement names a lawful purpose, and a passport measure names the measure`, `PM-FUND-007 only the party holding the fund's account signs off, and on a GA decision`, `PM-FUND-008 an emergency repair needs no decision, but its justification and the available balance to cover it`, `PM-FUND-008 the entrance is locked before the available balance is read, so two emergencies cannot both pass`, `PM-FUND-009 the fund shows its balance and, net of committed disbursements, what is available`, a positive amount and blank references, a decided disbursement may take available below zero, no repair fund account (even with an operating one). `FundWebTest` (new): the view, every request field reaches the service, and 409 / 400 / 404 with the database's text kept inside. `FundPersistenceIT` (Docker — CI): a payment into the fund is its balance and cash is not, a signed-off disbursement is committed, an emergency beyond what is available is a 409; and each table check refuses its own violation, by name. Mutations: five at first (signatory, emergency cap, paid counted as committed, measure reference, the 409 mapping), then nine from the fresh-context review's survivors (blank references, the purpose filter, the order, the amount, the lock, the emergency purpose, the controller's field order, the 409's text) — each failed its tests.
 
-**Decisions** — owner D1–D4 on #50 (2026-09-29): a GA decision always, except an emergency; the signatory is the fund account's holder party (until identity-org's mandates); a decided disbursement is not capped by what is available; paying out and cancelling are the next slice.
+**Decisions** — owner D1–D4 on #50 (2026-09-29): a GA decision always, except an emergency; the signatory is the fund account's holder party (until identity-org's mandates); a decided disbursement is not capped by what is available; paying out and cancelling are the next slice. D5 (owner, 2026-09-29, after the review): an emergency is repair works only — `GA_PURPOSE` and `PASSPORT_MEASURE` need a GA decision.
 
-**Open** — S-G1-02c: pay a disbursement out (its ledger posting, balance down, no longer committed) and cancel one; the fund handover statement (PM-FUND-010). The web `/entrance/fund` screen can now go live (web lane). Maintenance work orders will commit through this record (maintenance lane).
+**Open** — S-G1-02c: pay a disbursement out (its ledger posting, balance down, no longer committed) and cancel one; the fund handover statement (PM-FUND-010); reconcile `FundDisbursed.schema.json` (it requires uuid `decision_id` and `work_order_id`) when the payout publishes it. From the review, deferred: the table does not tie `fund_account_id` to the same entrance's repair fund account (the service picks it); `decision_id` is free text until assembly decisions exist; the signatory is named by the caller until sign-in (owner input 3); JSON `200.9` binds to 200 app-wide; `db/test/constraints.sh` is not run in CI. The web `/entrance/fund` screen can now go live (web lane). Maintenance work orders will commit through this record (maintenance lane).
 
 **Read first next time** — #50, this entry, `app/src/main/kotlin/zues/app/money/FundService.kt`.
 
