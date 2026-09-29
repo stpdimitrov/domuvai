@@ -157,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/fund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements */
+        get: operations["get_money_entrances_entranceId_fund"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/entrances/{entranceId}/fund-accounts": {
         parameters: {
             query?: never;
@@ -169,6 +186,23 @@ export interface paths {
         put?: never;
         /** Register the entrance's repair-fund account */
         post: operations["post_money_entrances_entranceId_fund_accounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/money/entrances/{entranceId}/fund/disbursements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two */
+        post: operations["post_money_entrances_entranceId_fund_disbursements"];
         delete?: never;
         options?: never;
         head?: never;
@@ -573,6 +607,16 @@ export interface components {
             /** Format: int64 */
             totalMinor: number;
         };
+        CommitDisbursementRequest: {
+            /** Format: int64 */
+            amountMinor: number;
+            /** Format: uuid */
+            authorisedBy: string;
+            decisionId?: string;
+            emergencyJustification?: string;
+            passportMeasure?: string;
+            purpose: string;
+        };
         CommitRequest: {
             /** Format: uuid */
             committedBy: string;
@@ -601,6 +645,21 @@ export interface components {
             /** Format: uuid */
             id: string;
             templateVersion: string;
+        };
+        DisbursementView: {
+            /** Format: int64 */
+            amountMinor: number;
+            /** Format: uuid */
+            authorisedBy: string;
+            /** Format: date */
+            committedOn: string;
+            decisionId?: string;
+            emergencyJustification?: string;
+            /** Format: uuid */
+            id: string;
+            passportMeasure?: string;
+            purpose: string;
+            status: string;
         };
         DryRunReport: {
             differences: components["schemas"]["UnitDiff"][];
@@ -665,6 +724,19 @@ export interface components {
             /** Format: uuid */
             id: string;
             purpose: string;
+        };
+        FundView: {
+            /** Format: int64 */
+            availableMinor: number;
+            /** Format: int64 */
+            balanceMinor: number;
+            /** Format: int64 */
+            committedMinor: number;
+            disbursements: components["schemas"]["DisbursementView"][];
+            /** Format: uuid */
+            entranceId: string;
+            holderName: string;
+            iban: string;
         };
         HouseholdRegisteredResponse: {
             memberIds: string[];
@@ -1378,6 +1450,61 @@ export interface operations {
             };
         };
     };
+    get_money_entrances_entranceId_fund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     get_money_entrances_entranceId_fund_accounts: {
         parameters: {
             query?: never;
@@ -1448,6 +1575,65 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_money_entrances_entranceId_fund_disbursements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitDisbursementRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisbursementView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

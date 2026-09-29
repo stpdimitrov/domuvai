@@ -29,6 +29,7 @@ data class PostingRow(
 interface PostingRepository : ListCrudRepository<PostingRow, UUID> {
     fun findByJournalId(journalId: UUID): List<PostingRow>
     fun findByUnitIdAndAccount(unitId: UUID, account: String): List<PostingRow>
+    fun findByEntranceIdAndAccount(entranceId: UUID, account: String): List<PostingRow>
 }
 
 /**
