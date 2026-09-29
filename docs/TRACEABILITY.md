@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 40 | 17% |
-| **Proved by a test named after the rule** | **40** | **17%** |
-| No implementation and no test | 191 | 82% |
+| Referenced in code (`// Rule:`) | 41 | 18% |
+| **Proved by a test named after the rule** | **42** | **18%** |
+| No implementation and no test | 190 | 82% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -120,30 +120,30 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-015` | — | — |  |
 | `PM-VOTE-016` | — | — |  |
 
-## FEE — Charges & allocation  ·  15/20 covered
+## FEE — Charges & allocation  ·  17/20 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-FEE-001` | `app/src/test/kotlin/zues/app/money/ChargeCalculatorTest.kt:29` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:20` |  |
-| `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:37` | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
-| `PM-FEE-003` | — | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
-| `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
+| `PM-FEE-001` | `app/src/test/kotlin/zues/app/money/ChargeCalculatorTest.kt:29` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:21` |  |
+| `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:38` | `law/src/main/kotlin/zues/law/Keys.kt:3` |  |
+| `PM-FEE-003` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:107` | `charges/src/main/kotlin/zues/charges/Charges.kt:75` |  |
+| `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:47` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
 | `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:49` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:13` |  |
-| `PM-FEE-006` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:99` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` | ⚠ |
+| `PM-FEE-006` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:111` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` | ⚠ |
 | `PM-FEE-007` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:151` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` |  |
-| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:54` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:212` |  |
-| `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:121` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
-| `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:54` | `charges/src/main/kotlin/zues/charges/Charges.kt:41` |  |
-| `PM-FEE-011` | — | — |  |
-| `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:70` | `charges/src/main/kotlin/zues/charges/Charges.kt:45` |  |
+| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:66` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:212` |  |
+| `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:133` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
+| `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:55` | `charges/src/main/kotlin/zues/charges/Charges.kt:42` |  |
+| `PM-FEE-011` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:107` | `charges/src/main/kotlin/zues/charges/Charges.kt:155` |  |
+| `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:71` | `charges/src/main/kotlin/zues/charges/Charges.kt:46` |  |
 | `PM-FEE-013` | — | — |  |
 | `PM-FEE-014` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:23` | `app/src/main/kotlin/zues/app/money/BasisJson.kt:10` |  |
-| `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
+| `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:144` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | — | — |  |
 | `PM-FEE-018` | `app/src/test/kotlin/zues/app/money/StatementIT.kt:71` | `app/src/main/kotlin/zues/app/money/Statement.kt:34` |  |
 | `PM-FEE-019` | — | — |  |
-| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:50` | `app/src/main/kotlin/zues/app/money/Postings.kt:38` |  |
+| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:62` | `app/src/main/kotlin/zues/app/money/Postings.kt:38` |  |
 
 ## FUND — Repair & renewal fund  ·  4/11 covered
 
@@ -151,7 +151,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 |---|---|---|---|
 | `PM-FUND-001` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/money/FundAccount.kt:10` |  |
 | `PM-FUND-002` | — | — | ⚠ |
-| `PM-FUND-003` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:46` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
+| `PM-FUND-003` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:47` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
 | `PM-FUND-004` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:92` | `app/src/main/kotlin/zues/app/money/FundAccount.kt:9` |  |
 | `PM-FUND-005` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:85` | `app/src/main/kotlin/zues/app/money/FundAccountService.kt:53` |  |
 | `PM-FUND-006` | — | — |  |

@@ -39,6 +39,7 @@ class ChargeRunWebTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.totalMinor").value(1500))
             .andExpect(jsonPath("$.charges[0].lines[0].stream").value("MANAGEMENT"))
+            .andExpect(jsonPath("$.charges[0].lines[0].decisionId").value("GA-2026-1"))   // PM-FEE-003
     }
 
     @Test

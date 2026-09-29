@@ -48,6 +48,7 @@ class StatementService(
         val periodByRun = chargeRuns.findAllById(lines.map { it.chargeRunId }.distinct())
             .associate { it.id to it.period }
         val statementLines = lines
+            .sortedWith(compareBy({ periodByRun[it.chargeRunId] ?: "?" }, { it.component }, { it.item ?: "" }))
             .map {
                 StatementLine(
                     period = periodByRun[it.chargeRunId] ?: "?",
@@ -58,7 +59,6 @@ class StatementService(
                     derivation = it.derivation,
                 )
             }
-            .sortedWith(compareBy({ it.period }, { it.component }))
         return UnitStatement(unitId, balanceMinor, statementLines)
     }
 }

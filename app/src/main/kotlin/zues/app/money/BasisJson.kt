@@ -53,7 +53,7 @@ object BasisJson {
                     "decisionId" to it.decisionId,
                     "rateMinor" to it.rateMinor,
                     "totalMinor" to it.totalMinor,
-                )
+                ).apply { it.item?.let { item -> put("item", item.name) } }   // absent, not null: older bases hash as before
             },
         ),
     )

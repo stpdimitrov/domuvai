@@ -18,7 +18,7 @@ internal fun ChargeRun.toResponse(): ChargeRunResponse = ChargeRunResponse(
             totalMinor = charge.total.amountMinor,
             chargeablePersons = charge.chargeablePersons,
             lines = charge.lines.map { line ->
-                ChargeLineResponse(line.stream.name, line.key.name, line.amount.amountMinor, line.derivation)
+                ChargeLineResponse(line.stream.name, line.key.name, line.amount.amountMinor, line.derivation, line.decisionId, line.item?.name)
             },
         )
     },

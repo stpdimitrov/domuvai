@@ -8,6 +8,7 @@ import zues.kernel.eur
 import zues.kernel.sumMoney
 import zues.law.AllocationKey
 import zues.law.CATALOGUE_VERSION
+import zues.law.CostItem
 import zues.law.CostStream
 import zues.law.ENGINE_VERSION
 import zues.law.LegalDate
@@ -52,6 +53,8 @@ data class TariffLine(
     val rateMinor: Long? = null,
     /** or a pot to allocate across the entrance */
     val totalMinor: Long? = null,
+    /** a named cost within the stream — a concierge line is a maintenance line (PM-FEE-011) */
+    val item: CostItem? = null,
 )
 
 data class Tariff(
@@ -69,6 +72,9 @@ data class ChargeLine(
     val amount: Money,
     /** how the number was derived, in words. Rule: PM-FEE-018 */
     val derivation: String,
+    /** the GA decision behind this line — its rate or pot, and its key where the assembly chooses one. Rule: PM-FEE-003 */
+    val decisionId: String,
+    val item: CostItem? = null,
 )
 
 data class UnitCharge(
@@ -146,6 +152,20 @@ fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tari
         if (!keyIsChangeableByAssembly(line.stream) && line.key != defaultKey(line.stream)) {
             throw IllegalStateException("${line.stream} must be allocated ${defaultKey(line.stream)} (PM-FEE-004, PM-FUND-003)")
         }
+        line.item?.let { item ->                                          // Rule: PM-FEE-011
+            if (line.stream != item.stream) {
+                throw IllegalStateException("$item is a ${item.stream} cost, not ${line.stream} (PM-FEE-011)")
+            }
+            if (tariff.lines.count { it.item == item } > 1) {
+                throw IllegalStateException("$item is on more than one line — a tariff names it once (PM-FEE-011)")
+            }
+            // every one of the stream's own lines, so the answer does not depend on their order
+            val streamKeys = tariff.lines.filter { it.stream == item.stream && it.item == null }.map { it.key }.toSet()
+                .ifEmpty { setOf(defaultKey(item.stream)) }
+            if (streamKeys != setOf(line.key)) {
+                throw IllegalStateException("$item must be allocated as ${item.stream} is (${streamKeys.joinToString()}) (PM-FEE-011)")
+            }
+        }
     }
 
     val on = tariff.legalDate
@@ -173,13 +193,14 @@ fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tari
             throw IllegalStateException("tariff line ${line.stream} has neither a rate nor a total")
         }
 
+        val label = line.item?.let { "${it.name.lowercase()} · " } ?: ""
         units.forEachIndexed { i, u ->
             val note = if (u.businessUse && line.stream != CostStream.REPAIR_FUND) {
                 " · business ×${multiplierFor(u, tariff, line.stream)}"
             } else {
                 ""
             }
-            perUnit.getValue(u.unitId).add(ChargeLine(line.stream, line.key, amounts[i], how(u) + note))
+            perUnit.getValue(u.unitId).add(ChargeLine(line.stream, line.key, amounts[i], label + how(u) + note, line.decisionId, line.item))
         }
     }
 

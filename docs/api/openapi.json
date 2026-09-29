@@ -177,7 +177,13 @@
             "format": "int64",
             "type": "integer"
           },
+          "decisionId": {
+            "type": "string"
+          },
           "derivation": {
+            "type": "string"
+          },
+          "item": {
             "type": "string"
           },
           "key": {
@@ -189,6 +195,7 @@
         },
         "required": [
           "amountMinor",
+          "decisionId",
           "derivation",
           "key",
           "stream"
@@ -1272,6 +1279,9 @@
       "TariffLineRequest": {
         "properties": {
           "decisionId": {
+            "type": "string"
+          },
+          "item": {
             "type": "string"
           },
           "key": {

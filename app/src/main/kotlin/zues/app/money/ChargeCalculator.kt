@@ -6,6 +6,7 @@ import zues.charges.TariffLine
 import zues.charges.computeChargeRun
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
+import zues.law.CostItem
 import zues.law.CostStream
 
 /**
@@ -47,5 +48,6 @@ object ChargeCalculator {
         decisionId = decisionId,
         rateMinor = rateMinor,
         totalMinor = totalMinor,
+        item = item?.let { CostItem.valueOf(it) },
     )
 }

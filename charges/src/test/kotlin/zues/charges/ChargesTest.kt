@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
+import zues.law.CostItem
 import zues.law.CostStream
 import zues.law.defaultKey
 import zues.law.numberOn
@@ -103,6 +104,77 @@ class ChargesTest {
         val run = computeChargeRun("e1", listOf(unit("A", "100", occupants = 2)), tariff())
         run.charges[0].lines.forEach { assertTrue(it.derivation.length > 5) }
         assertTrue(run.charges[0].lines[0].derivation.contains("2 person(s)"))
+    }
+
+    @Test
+    fun `PM-FEE-011 a concierge line uses maintenance's key and inherits its exemptions and multiplier`() {
+        val units = listOf(
+            unit("A", "40", occupants = 3, childrenUnder6 = 1),              // two chargeable persons
+            unit("B", "30", occupants = 2, absentDays = 40),                 // absent past the window: none
+            unit("C", "30", occupants = 1, businessUse = true),              // business use: a multiple
+        )
+        val lines = listOf(
+            TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_PERSON, "d1", rateMinor = 300L),
+            TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_PERSON, "d3", rateMinor = 200L, item = CostItem.CONCIERGE),
+        )
+        val run = computeChargeRun("e1", units, tariff(lines, businessMultiplier = 3))
+        run.charges.forEach { c ->
+            val (concierge, maintenance) = c.lines.partition { it.item == CostItem.CONCIERGE }
+            assertEquals(maintenance.single().amount.amountMinor / 300, concierge.single().amount.amountMinor / 200)  // the same weight
+            assertEquals(CostStream.MAINTENANCE, concierge.single().stream)    // a maintenance line: still three streams (PM-FEE-001)
+        }
+        assertEquals(listOf(400L, 0L, 600L), run.charges.map { c -> c.lines.single { it.item == CostItem.CONCIERGE }.amount.amountMinor })
+        assertTrue(run.charges.all { c -> c.lines.single { it.item == CostItem.CONCIERGE }.derivation.startsWith("concierge · ") })
+        val alone = listOf(TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_PERSON, "d3", rateMinor = 200L, item = CostItem.CONCIERGE))
+        assertEquals(400L, computeChargeRun("e1", units, tariff(alone, businessMultiplier = 3)).charges[0].total.amountMinor)  // on maintenance's default key
+    }
+
+    @Test
+    fun `PM-FEE-011 a concierge line on another key than maintenance's, or in another stream, is rejected`() {
+        val units = listOf(unit("A", "100"))
+        fun concierge(stream: CostStream, key: AllocationKey) = TariffLine(stream, key, "d3", rateMinor = 200L, item = CostItem.CONCIERGE)
+        val otherKey = listOf(TariffLine(CostStream.MAINTENANCE, AllocationKey.BY_IDEAL_PARTS, "d1", totalMinor = 10_000L),
+            concierge(CostStream.MAINTENANCE, AllocationKey.PER_PERSON))
+        assertTrue(assertThrows(IllegalStateException::class.java) { computeChargeRun("e1", units, tariff(otherKey)) }.message!!.contains("PM-FEE-011"))
+        assertThrows(IllegalStateException::class.java) {                     // no maintenance line: its default key, per person
+            computeChargeRun("e1", units, tariff(listOf(concierge(CostStream.MAINTENANCE, AllocationKey.PER_UNIT))))
+        }
+        assertThrows(IllegalStateException::class.java) {                     // typed as management
+            computeChargeRun("e1", units, tariff(listOf(concierge(CostStream.MANAGEMENT, AllocationKey.PER_PERSON))))
+        }
+        assertThrows(IllegalStateException::class.java) {                     // named twice
+            computeChargeRun("e1", units, tariff(List(2) { concierge(CostStream.MAINTENANCE, AllocationKey.PER_PERSON) }))
+        }
+        val splitMaintenance = listOf(                                         // maintenance on two keys: nothing to follow
+            TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_PERSON, "d1", rateMinor = 300L),
+            TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_UNIT, "d2", rateMinor = 100L),
+        )
+        for (lines in listOf(splitMaintenance, splitMaintenance.reversed())) {
+            assertThrows(IllegalStateException::class.java) {
+                computeChargeRun("e1", units, tariff(lines + concierge(CostStream.MAINTENANCE, AllocationKey.PER_PERSON)))
+            }
+        }
+    }
+
+    @Test
+    fun `PM-FEE-003 the assembly may choose any of the three keys, and every line names the decision that chose it`() {
+        val units = listOf(unit("A", "40", occupants = 1), unit("B", "60", occupants = 3))
+        for (key in AllocationKey.entries) {
+            val lines = listOf(
+                TariffLine(CostStream.MANAGEMENT, key, "GA-2026-03-12-4", totalMinor = 10_000L),
+                TariffLine(CostStream.MAINTENANCE, key, "GA-2026-03-12-5", totalMinor = 6_000L),
+            )
+            computeChargeRun("e1", units, tariff(lines)).charges.flatMap { it.lines }.forEach { line ->
+                assertEquals(key, line.key)
+                assertEquals(if (line.stream == CostStream.MANAGEMENT) "GA-2026-03-12-4" else "GA-2026-03-12-5", line.decisionId)
+            }
+        }
+    }
+
+    @Test
+    fun `PM-FEE-003 changing the key without a linked protocol is rejected`() {
+        val unlinked = listOf(TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_UNIT, " ", rateMinor = 300L))
+        assertThrows(IllegalStateException::class.java) { computeChargeRun("e1", listOf(unit("A", "100")), tariff(unlinked)) }
     }
 
     @Test

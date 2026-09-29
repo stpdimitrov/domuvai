@@ -34,6 +34,17 @@ class ChargeCalculatorTest {
     }
 
     @Test
+    fun `PM-FEE-001 a concierge line is a maintenance line, so there are still three streams`() {
+        val withConcierge = request().copy(
+            lines = request().lines + TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", decisionId = "GA-2026-2", totalMinor = 3_000, item = "CONCIERGE"),
+        )
+        val lines = ChargeCalculator.run(withConcierge).charges.flatMap { it.lines }
+        assertThat(lines).allMatch { it.stream in setOf("MANAGEMENT", "MAINTENANCE", "REPAIR_FUND") }
+        assertThat(lines.filter { it.item == "CONCIERGE" }).hasSize(2)            // one per unit — the item was not dropped
+            .allMatch { it.stream == "MAINTENANCE" && it.decisionId == "GA-2026-2" }
+    }
+
+    @Test
     fun `PM-FEE-014 re-running the same period reproduces identical figures`() {
         val first = ChargeCalculator.run(request())
         val second = ChargeCalculator.run(request())
