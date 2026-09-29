@@ -35,11 +35,13 @@ One module per slice, ~400 lines of reviewable diff at most. Generation is free;
 
 Run every item under **Exit checks** in `CLAUDE.md` and report each one pass/fail with evidence. A check you did not run is a fail, not a pass.
 
-## 6. Fresh-context review
+## 6. Fresh-context review — before the slice can merge
 
 Before declaring the slice done, review the diff against the rule texts as if someone else wrote it. Re-reading your own code with the intent still in mind finds nothing. Where a subagent is available, hand it the diff and the rule texts with no other context — or run `zues-audit` in a fresh session.
 
-## 7. Close — session log, then PR
+Apply the findings before the PR can merge. If you open the PR while the review runs, so CI starts on what only CI can run, open it as a **draft**; it is yours to mark ready the moment the findings are in (§7), and never the owner's to merge. A PR merged before its review was applied is not re-opened: land the review as a follow-up slice `S-nn-r` — its own claim, a new migration for any schema change, a new log entry — as S-G1-03c-r (#45) and S-G1-02d-r (#60) did.
+
+## 7. Close — session log, PR, merge. Merging is yours
 
 Append to `docs/SESSIONLOG.md` — at the end, never editing an earlier entry — and commit it with the slice:
 
@@ -53,7 +55,15 @@ Append to `docs/SESSIONLOG.md` — at the end, never editing an earlier entry �
 **Read first next time** — two or three documents
 ```
 
-Then `git fetch && git rebase origin/main`, push the branch, and open a PR whose description is the slice contract and says `Closes #n`. If GitHub later shows a conflict in `docs/SESSIONLOG.md`, rebase again — see `CLAUDE.md`. On a conflict in a generated doc, take `origin/main`'s copy and re-run the generator — never hand-merge. Merge only when CI is green. Never push to `main`.
+Then deliver it. **The owner never merges a PR, and is never asked to watch for one: from the push to the next slice, delivery is the session's job.**
+
+1. **Bring `main` in:** `git fetch && git merge origin/main` — never rebase a pushed branch, never force-push. A conflict in a generated doc: take `origin/main`'s copy and re-run the generator, never hand-merge. A conflict in `docs/SESSIONLOG.md`: rebuild it as main's file with this slice's entry appended last — the union driver can leave two entries sharing one `---`, so rebuild rather than trust it. Run the gate pack, then push the branch (never `main`). Fix conflicts without asking.
+2. **Open the PR** — the slice contract is its description, and it says `Closes #n` — and **switch auto-merge on (squash) at once**. The ruleset on `main` requires `gates`, so GitHub merges only when CI is green. If GitHub refuses auto-merge with "clean status", CI is already green: merge it now, `gh pr merge <n> --squash`. Turn the app's CI monitor on (auto-fix) for the PR.
+3. **Keep it moving until it merges.** A failing check or a conflict wakes the session through the CI monitor: fix it, run the gates, push. A draft waiting on the review is marked ready (`gh pr ready <n>`) with auto-merge on as soon as the findings are applied. Nothing is left for the owner to do.
+4. **Never poll CI** — no watch loops, no scheduled checks. The session is not woken when a PR merges, so whenever it is next woken — the owner's message, a CI event, a subagent's report — it looks at the open PR once (`gh pr view <n>`) and carries on: merged → step 5; green and still open → merge it; failing → fix it. It never asks the owner to report that a PR merged.
+5. **After the merge:** sync `main` (`git switch main && git merge --ff-only origin/main`), confirm the claim issue closed, and only then branch the next slice from `main`. Nothing is stacked on unmerged work.
+
+Repository settings (auto-merge, rulesets) and Claude's own permissions stay the owner's to change.
 
 ## 8. When a rule and existing code disagree
 
