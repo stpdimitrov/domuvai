@@ -80,8 +80,8 @@ class BasisJsonTest {
         )
         val json = BasisJson.of(metered)
         assertThat(json).contains("\"consumption\":[{\"decisionId\":\"GA-2026-9\",\"item\":\"WATER\",\"priceMinor\":230}]")
-        assertThat(json).contains("\"readings\":{\"WATER\":12345}")
-        assertThat(json.split("\"readings\"")).hasSize(2)                                // only the unit that has readings
+        assertThat(json).contains("\"readingsThousandths\":{\"WATER\":12345}")
+        assertThat(json.split("\"readingsThousandths\"")).hasSize(2)                     // only the unit that has readings
         assertThat(BasisJson.hash(json)).isNotEqualTo(BasisJson.hash(BasisJson.of(run(10_000))))
     }
 }

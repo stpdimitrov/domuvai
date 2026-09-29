@@ -13,10 +13,11 @@ import java.util.UUID
 data class StatementLine(
     val period: String,
     val component: String,        // MANAGEMENT | MAINTENANCE | REPAIR_FUND
-    val allocationKey: String,    // PER_PERSON | BY_IDEAL_PARTS | PER_UNIT
-    val quantity: BigDecimal,
+    val allocationKey: String,    // PER_PERSON | BY_IDEAL_PARTS | PER_UNIT — or METERED, a consumption line (PM-FEE-017)
+    val quantity: BigDecimal,     // the key's count, or a metered line's reading
     val amountMinor: Long,
     val derivation: String,
+    val item: String? = null,     // CONCIERGE, WATER, HEATING — or none for the stream's own line
 )
 
 /**
@@ -57,6 +58,7 @@ class StatementService(
                     quantity = it.quantity,
                     amountMinor = it.amountMinor,
                     derivation = it.derivation,
+                    item = it.item,
                 )
             }
         return UnitStatement(unitId, balanceMinor, statementLines)

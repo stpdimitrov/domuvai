@@ -55,6 +55,22 @@ class StatementServiceTest {
     }
 
     @Test
+    fun `PM-FEE-017 PM-FEE-018 a metered line shows its item and its reading`() {
+        whenever(chargeLines.findByUnitId(unitId)).thenReturn(
+            listOf(
+                ChargeLineRow(
+                    UUID.randomUUID(), UUID.randomUUID(), runId, unitId, "MAINTENANCE", "METERED", BigDecimal("12.345000"), 2_839, "EUR",
+                    "water · 12.345 m³ × 2.30 €/m³ (metered)", decisionId = "GA-2026-9", item = "WATER",
+                ),
+            ),
+        )
+        whenever(chargeRuns.findAllById(any())).thenReturn(listOf(run("2026-05")))
+        val line = service.forUnit(unitId).lines.single()
+        assertThat(listOf(line.allocationKey, line.item)).containsExactly("METERED", "WATER")
+        assertThat(line.quantity).isEqualByComparingTo("12.345")
+    }
+
+    @Test
     fun `a unit with nothing billed owes nothing`() {
         val statement = service.forUnit(unitId)   // default mocks return empty lists
         assertThat(statement.balanceMinor).isEqualTo(0)

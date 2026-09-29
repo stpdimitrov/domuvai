@@ -153,19 +153,24 @@ class ChargeRunPersistenceIT {
             period = "2026-07", legalDate = "2026-07-01",
             lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
             consumption = listOf(ConsumptionLineRequest("WATER", 230, "GA-2026-9")),
-            readings = listOf(ReadingRequest(unitIds[0], "WATER", "12.345")),
+            readings = listOf(ReadingRequest(unitIds[0], "WATER", "12.345"), ReadingRequest(unitIds[1], "WATER", "0.500")),
         )
         val response = mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(metered)),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
         val runId = UUID.fromString(json.readTree(response).get("chargeRunId").asText())
 
-        val water = chargeLines.findByChargeRunId(runId).single { it.item == "WATER" }
+        val water = chargeLines.findByChargeRunId(runId).single { it.item == "WATER" && it.unitId.toString() == unitIds[0] }
         assertThat(listOf(water.component, water.allocationKey, water.decisionId)).containsExactly("MAINTENANCE", "METERED", "GA-2026-9")
         assertThat(water.quantity).isEqualByComparingTo("12.345")
         assertThat(water.amountMinor).isEqualTo(2_839)
-        assertThat(water.unitId.toString()).isEqualTo(unitIds[0])
-        assertThat(chargeRuns.findById(runId).orElseThrow().basis.json).contains("readings")
+        assertThat(chargeRuns.findById(runId).orElseThrow().basis.json).contains("readingsThousandths")
+
+        val unread = metered.copy(period = "2026-08", legalDate = "2026-08-01", readings = listOf(ReadingRequest(unitIds[0], "WATER", "1")))
+        mvc.perform(
+            post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(unread)),
+        ).andExpect(status().isBadRequest)                                                    // a meter unread: the period stays open
+        assertThat(chargeRuns.existsByEntranceIdAndPeriod(entranceId, "2026-08")).isFalse()
     }
 
     @Test
@@ -178,6 +183,8 @@ class ChargeRunPersistenceIT {
             UUID.randomUUID(), line.entranceId, line.chargeRunId, line.unitId, component, key, line.quantity, 1L, item,
         )
         assertThatThrownBy { insert("MAINTENANCE", "METERED", null) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("charge_line_metered_is_consumption")
+        assertThatThrownBy { insert("MAINTENANCE", "METERED", "CONCIERGE") }
             .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("charge_line_metered_is_consumption")
         assertThatThrownBy { insert("MAINTENANCE", "PER_UNIT", "WATER") }
             .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("charge_line_metered_is_consumption")

@@ -21,16 +21,17 @@ fun defaultKey(stream: CostStream): AllocationKey =
 fun keyIsChangeableByAssembly(stream: CostStream): Boolean = stream != CostStream.REPAIR_FUND
 
 /**
- * A cost the law ties to a stream by name. Concierge (портиер) costs follow the allocation rules of
+ * A cost named within its stream. Concierge (портиер) costs follow the allocation rules of
  * maintenance — its key, and with it its exemptions and business multiplier — so a concierge line
- * is a maintenance line, not a fourth stream (PM-FEE-001). Rule: PM-FEE-011
+ * is a maintenance line, not a fourth stream (PM-FEE-001). Rule: PM-FEE-011. A [metered] item is
+ * billed from each unit's own reading, in its [unitOfMeasure], never by a key (Rule: PM-FEE-017).
  */
-enum class CostItem(val stream: CostStream, val metered: Boolean = false) {
+enum class CostItem(val stream: CostStream, val metered: Boolean = false, val unitOfMeasure: String? = null) {
     CONCIERGE(CostStream.MAINTENANCE),
 
-    /** Each unit's own water meter, in m³ — a metered maintenance cost, never a fourth stream (Rule: PM-FEE-017). */
-    WATER(CostStream.MAINTENANCE, metered = true),
+    /** Each unit's own water meter — a metered maintenance cost, never a fourth stream (Rule: PM-FEE-017). */
+    WATER(CostStream.MAINTENANCE, metered = true, unitOfMeasure = "m³"),
 
-    /** Each unit's own heat meter or allocator, in kWh (Rule: PM-FEE-017). */
-    HEATING(CostStream.MAINTENANCE, metered = true),
+    /** Each unit's own heat meter or allocator (Rule: PM-FEE-017). */
+    HEATING(CostStream.MAINTENANCE, metered = true, unitOfMeasure = "kWh"),
 }

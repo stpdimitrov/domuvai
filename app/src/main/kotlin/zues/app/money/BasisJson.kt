@@ -40,7 +40,9 @@ object BasisJson {
                 "absentDays" to it.absentDays,
                 "businessUse" to it.businessUse,
             ).apply {                                                       // absent when empty: older bases hash as before
-                if (it.readings.isNotEmpty()) put("readings", it.readings.entries.associate { (item, q) -> item.name to q }.toSortedMap())
+                if (it.readings.isNotEmpty()) {                             // the unit is in the name, as with idealPartsPpm
+                    put("readingsThousandths", it.readings.entries.associate { (item, q) -> item.name to q }.toSortedMap())
+                }
             }
         },
         "tariff" to sortedMapOf<String, Any?>(

@@ -336,7 +336,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The unit's itemised statement, showing how each number was derived */
+        /** The unit's itemised statement, showing how each number was derived — a metered line with its reading and item */
         get: operations["get_money_units_unitId_statement"];
         put?: never;
         post?: never;
@@ -1068,6 +1068,7 @@ export interface components {
             amountMinor: number;
             component: string;
             derivation: string;
+            item?: string;
             period: string;
             quantity: number;
         };

@@ -45,6 +45,14 @@ class ChargeRunStore(
         }
         val computed = runs.compute(entranceId, request)
         val run = computed.run
+        if (run.missingReadings.isNotEmpty()) {                                         // Rule: PM-FEE-017
+            // An issued period is final (PM-FEE-015): a unit left unread would stay unbilled for good. The preview
+            // lists what is missing; issuing waits for the readings, or for the item to leave the run.
+            throw IllegalArgumentException(
+                "no reading for " + run.missingReadings.joinToString { "${it.item} of unit ${it.unitId}" } +
+                    " — record it before issuing; nothing is estimated (PM-FEE-017)",
+            )
+        }
         val unitsById = computed.units.associateBy { it.unitId.toString() }
         val runId = UUID.randomUUID()
 

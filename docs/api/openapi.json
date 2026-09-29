@@ -1624,6 +1624,9 @@
           "derivation": {
             "type": "string"
           },
+          "item": {
+            "type": "string"
+          },
           "period": {
             "type": "string"
           },
@@ -3629,11 +3632,12 @@
             "description": "OK"
           }
         },
-        "summary": "The unit's itemised statement, showing how each number was derived",
+        "summary": "The unit's itemised statement, showing how each number was derived — a metered line with its reading and item",
         "tags": [
           "money"
         ],
         "x-rules": [
+          "PM-FEE-017",
           "PM-FEE-018"
         ]
       }

@@ -134,14 +134,14 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:66` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:212` |  |
 | `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:133` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
 | `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:55` | `charges/src/main/kotlin/zues/charges/Charges.kt:42` |  |
-| `PM-FEE-011` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:107` | `charges/src/main/kotlin/zues/charges/Charges.kt:183` |  |
+| `PM-FEE-011` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:107` | `charges/src/main/kotlin/zues/charges/Charges.kt:186` |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:71` | `charges/src/main/kotlin/zues/charges/Charges.kt:48` |  |
 | `PM-FEE-013` | — | — |  |
 | `PM-FEE-014` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:23` | `app/src/main/kotlin/zues/app/money/BasisJson.kt:10` |  |
-| `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:190` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
+| `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:197` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | `app/src/test/kotlin/zues/app/money/BasisJsonTest.kt:68` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:23` |  |
-| `PM-FEE-018` | `app/src/test/kotlin/zues/app/money/StatementIT.kt:71` | `app/src/main/kotlin/zues/app/money/Statement.kt:34` |  |
+| `PM-FEE-018` | `app/src/test/kotlin/zues/app/money/StatementIT.kt:71` | `app/src/main/kotlin/zues/app/money/Statement.kt:35` |  |
 | `PM-FEE-019` | — | — |  |
 | `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:63` | `app/src/main/kotlin/zues/app/money/Postings.kt:40` |  |
 

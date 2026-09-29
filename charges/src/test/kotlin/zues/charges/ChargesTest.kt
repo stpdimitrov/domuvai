@@ -214,8 +214,8 @@ class ChargesTest {
         assertEquals(CostStream.MAINTENANCE, a.stream)                                          // never a fourth stream (PM-FEE-001)
         assertEquals(AllocationKey.METERED, a.key)                                              // not a statutory key
         assertEquals("GA-2026-9", a.decisionId)
-        assertEquals("water · 12.345 × 1.00 € (metered)", a.derivation)
-        val without = computeChargeRun("e1", units, tariff())
+        assertEquals("water · 12.345 m³ × 1.00 €/m³ (metered)", a.derivation)
+        val without = computeChargeRun("e1", units.map { it.copy(readings = emptyMap()) }, tariff())
         for (i in units.indices) {                                                              // the keyed lines are untouched
             assertEquals(without.charges[i].lines, run.charges[i].lines.filter { it.item != CostItem.WATER })
         }
@@ -233,11 +233,14 @@ class ChargesTest {
         val run = computeChargeRun("e1", units, metered(listOf(water, heating)))
         assertEquals(listOf(MissingReading("B", CostItem.HEATING)), run.missingReadings)
         assertTrue(run.charges[1].lines.none { it.item == CostItem.HEATING })
-        assertEquals(50L, run.charges[0].lines.single { it.item == CostItem.HEATING }.amount.amountMinor)   // 2.000 kWh × 0.25 €
+        val heat = run.charges[0].lines.single { it.item == CostItem.HEATING }
+        assertEquals(50L, heat.amount.amountMinor)                                              // 2.000 kWh × 0.25 €
+        assertEquals(CostStream.MAINTENANCE, heat.stream)                                      // HEATING too is a maintenance line
+        assertEquals("heating · 2.000 kWh × 0.25 €/kWh (metered)", heat.derivation)
     }
 
     @Test
-    fun `PM-FEE-017 a business unit pays what its meter read, not a multiple of it`() {
+    fun `PM-FEE-017 PM-FEE-010 a business unit pays what its meter read, not a multiple of it`() {
         val multiplier = numberOn("BUSINESS_USE_MULTIPLIER_MIN", on).toInt()
         val shop = unit("S", "100", occupants = 1, businessUse = true).copy(readings = mapOf(CostItem.WATER to 2_000L))
         val run = computeChargeRun("e1", listOf(shop), metered(businessMultiplier = multiplier))
@@ -261,5 +264,20 @@ class ChargesTest {
         refused(tariff(defaultLines() + TariffLine(CostStream.MAINTENANCE, AllocationKey.PER_PERSON, "d1", rateMinor = 100L, item = CostItem.WATER)), saying = notByKey)
         refused(metered(), listOf(unit("A", "100").copy(readings = mapOf(CostItem.WATER to -1L))))
         refused(metered(), listOf(unit("A", "100").copy(readings = mapOf(CostItem.CONCIERGE to 1_000L))))
+        refused(tariff(), a, saying = "prices no WATER")                                        // a reading nothing prices is not dropped
+        val huge = listOf(unit("A", "100").copy(readings = mapOf(CostItem.WATER to 999_999_999L)))
+        refused(metered(listOf(water.copy(priceMinor = Long.MAX_VALUE / 1_000))), huge, saying = "out of range")   // never a wrapped, negative bill
+    }
+
+    @Test
+    fun `PM-FEE-017 a zero reading is a reading — a line of nothing owed, not a missing meter`() {
+        val units = listOf(
+            unit("A", "40").copy(readings = mapOf(CostItem.WATER to 0L)),
+            unit("B", "60").copy(readings = mapOf(CostItem.WATER to 5L)),
+        )
+        val run = computeChargeRun("e1", units, metered())
+        assertEquals(0L, run.charges[0].lines.single { it.item == CostItem.WATER }.amount.amountMinor)
+        assertTrue(run.missingReadings.isEmpty())
+        assertEquals("water · 0.005 m³ × 1.00 €/m³ (metered)", run.charges[1].lines.single { it.item == CostItem.WATER }.derivation)
     }
 }

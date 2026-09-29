@@ -72,12 +72,19 @@ class ChargeCalculatorTest {
             listOf(ReadingRequest("u1", "WATER", "12.3456")),
             listOf(ReadingRequest("u1", "WATER", "-1")),
             listOf(ReadingRequest("u1", "WATER", "twelve")),
+            listOf(ReadingRequest("u1", "WATER", "1E+400")),                            // no exponent: nothing huge reaches the arithmetic
+            listOf(ReadingRequest("u1", "WATER", "1234567")),                           // more than a stored quantity holds
+            listOf(ReadingRequest("u1", "WATER", "")),
             listOf(ReadingRequest("u1", "GAS", "1")),
+            listOf(ReadingRequest("u1", "CONCIERGE", "1")),                             // not a metered item
             listOf(ReadingRequest("u9", "WATER", "1")),
             listOf(ReadingRequest("u1", "WATER", "1"), ReadingRequest("u1", "WATER", "2")),
         )) {
             assertThatThrownBy { ChargeCalculator.run(base.copy(readings = readings)) }.isInstanceOf(IllegalArgumentException::class.java)
         }
+        assertThatThrownBy { ChargeCalculator.run(base.copy(consumption = listOf(ConsumptionLineRequest("GAS", 230, "GA-2026-9")))) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageNotContaining("zues.")      // named in words, not by class
+        assertThat(ChargeCalculator.run(base.copy(readings = listOf(ReadingRequest("u1", "WATER", "999999.999")))).missingReadings).hasSize(1)
         val whole = ChargeCalculator.run(base.copy(readings = listOf(ReadingRequest("u1", "WATER", "7"))))
         assertThat(whole.charges.single { it.unitId == "u1" }.lines.single { it.item == "WATER" }.amountMinor).isEqualTo(1_610)   // 7 m³ × 2.30 €
     }
