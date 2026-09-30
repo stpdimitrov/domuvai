@@ -10,6 +10,12 @@ export const API_URL = process.env.API_URL ?? "http://localhost:8080";
  * parameter or a body the API does not accept is a type error, not a runtime surprise. Server-only —
  * the browser never calls `api` directly; this Next.js server is the thin BFF (ADR-011).
  */
-export const api = createClient<paths>({ baseUrl: API_URL });
+/** How long one call to `api` may take before a screen reports the backend as not answering — a hung call must not hold a page. */
+const TIMEOUT_MS = 10_000;
+
+export const api = createClient<paths>({
+  baseUrl: API_URL,
+  fetch: (request) => fetch(request, { signal: AbortSignal.timeout(TIMEOUT_MS) }),
+});
 
 export type Schemas = components["schemas"];

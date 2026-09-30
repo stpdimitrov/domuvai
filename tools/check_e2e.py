@@ -44,6 +44,7 @@ CALLS = {
     ("GET", "/api/money/entrances/{entranceId}/fund-accounts"): lambda e: (f"/api/money/entrances/{e}/fund-accounts", None),
     ("GET", "/api/money/entrances/{entranceId}/fund/handover-statements"): lambda e: (
         f"/api/money/entrances/{e}/fund/handover-statements", None),
+    ("GET", "/api/money/entrances/{entranceId}/arrears"): lambda e: (f"/api/money/entrances/{e}/arrears?asOf=2026-09-30", None),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -63,11 +64,22 @@ SCREENS = {
         "€99,00 Оттеглено оттеглено", "· изпълнителят се отказа",                  # the cancelled one, and why
         "€0,00 + €1.050,00 − €480,00 = €570,00 €570,00 €0,00 Съвпада с банката 2 · €425,00",   # the handover
     ],
+    "/debts?asOf=2026-09-30": [                              # the firm sidebar still carries the design's sample names
+        "2 обекта с неплатено, 2 в просрочие · 1 вход от 1 · към 30.09.2026",
+        "ул. Шипка 14, вх. Б · 2 обекта с неплатено €156,50",  # the entrance's total (PM-DEBT-001)
+        "ап. 5 Надя Тодорова €80,00 — 15 дни — —",            # owed, the oldest debt's days overdue (PM-DEBT-002)
+        "ап. 6 Петър Георгиев €76,50 — 15 дни — —",
+    ],
+    "/debts?asOf=2026-09-05": [                              # before the due day: unpaid, but nothing overdue
+        "6 обекта с неплатено, 0 в просрочие · 1 вход от 1 · към 05.09.2026",
+        "ап. 1 Иван Петров €132,00 — в срок — —",
+    ],
 }
 # The words of every error state the live screens have. None may appear for the seeded entrance.
 ERRORS = [
     "Бекендът не отговаря", "Бекендът не подаде", "API отказа", "не е регистриран", "Няма регистриран вход",
-    "няма регистрирана сметка на фонд", "няма регистрирана оперативна сметка",
+    "няма регистрирана сметка на фонд", "няма регистрирана оперативна сметка", "не се заредиха", "не се зареди ",
+    "незаредени", "незареден",
 ]
 
 METHODS = "GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE"
@@ -92,8 +104,9 @@ def web_calls():
         where = path.relative_to(ROOT)
         if len(ANY_CALL.findall(source)) > len(literal):
             unreadable.append(f"{where}: an API call whose path is not a plain string literal")
-        unreadable += [f"{where}: {pattern.pattern!r} — call the API through the typed client, path as a literal"
-                       for pattern in UNREADABLE if pattern.search(source)]
+        if where.as_posix() != "web/lib/api/client.ts":             # the typed client itself is where fetch belongs
+            unreadable += [f"{where}: {pattern.pattern!r} — call the API through the typed client, path as a literal"
+                           for pattern in UNREADABLE if pattern.search(source)]
     return found, unreadable
 
 
