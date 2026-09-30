@@ -1637,3 +1637,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — this entry, `web/README.md` (Against the real API and a database), `tools/check_e2e.py`.
 
 ---
+
+## S-G1-02f · 2026-09-30 · the entrance's arrears in one read (money)
+
+**Did** — `GET /api/money/entrances/{entranceId}/arrears?asOf=` (#72, `lane:money`): every unit of the entrance that owes on the read date, each aged by the same code as the per-unit read (PM-DEBT-001), largest first (equal amounts by unit id), and their total; a unit owing nothing is left out. One read per entrance instead of one per unit, read from money's own postings only — the caller joins unit names and owners; an entrance with no receivable reads as owing nothing (money does not know which entrances exist). Each unit, and the per-unit read too, now carries its `oldestDebt`: the day the oldest debt still open fell due (the charge's date + the payment term in force on the read date, PM-DEBT-002 — the charge's date stands in for the announcement until the assembly module records one) and how many days overdue it is on the read date (0 while not yet due) — one object, absent when nothing is owed, so "due today" and "owes nothing" cannot be confused. A debt is open while its charge and the credits made by the read date net above zero, so a part-paid debt stays the oldest, and a credit dated after the read date has not closed it. A read date before any payment term was in force is a 400, not a 500. The contract is regenerated (39 operations), and the web client with it.
+
+**Rules covered** — PM-DEBT-001, PM-DEBT-002 (already covered; the new tests are named after them).
+
+**Tests added** — `ArrearsServiceTest`: `PM-DEBT-001 an entrance's arrears list each unit that owes, aged as its own read, largest first — one owing nothing is left out`, `PM-DEBT-002 the oldest open debt fell due the payment term after its charge — a settled one is not the oldest`, `PM-DEBT-002 a debt not yet due is 0 days overdue, and nothing owed has no oldest debt`, `PM-DEBT-002 a credit dated after the read date has not closed its debt — it is still the oldest`, `PM-DEBT-002 a read date before any payment term was in force is a bad date`. `ArrearsWebTest`: `GET an entrance's arrears returns each owing unit and the total, with the oldest debt's due day`, a malformed date a 400. `ArrearsIT` (Docker — CI): `PM-DEBT-001 an entrance's arrears list each unit that owes, with the day its oldest debt fell due`. Mutations: 12, each fails its tests.
+
+**Verified** — on local Postgres against the demo entrance, 2026-09-30: €156,50 — ап. 5 €80,00 (fell due 15.09, 15 days overdue), then ап. 6 €76,50 — no contract violation; 1990-01-01 is a 400. Gates green. The fresh-context review found the new IT paying into an account the entrance never registered (a 400 in CI — it skips locally; now cash), untested paths (a credit after the read date, equal amounts, the entrance id, the total), a 500 on an early date, and the two optional fields — all fixed.
+
+**Decisions** — owner D1–D3 on #72 (2026-09-30); the oldest debt is one nested object rather than two optional fields (the review).
+
+**Open** — #73, for the owner: PM-SYS-002 says a legal constant is the one in force on the relevant legal date — the arrears read (before and after this slice, as D2 says) takes the payment term in force on the read date; the correction is the term on each debt's own date, latent while one entry exists, and it restates D2. Also on #73: advances are not netted against later charges; a receivable with no unit would vanish. WEB-13, `/debts` live, builds on this read.
+
+**Read first next time** — this entry, #73, `app/src/main/kotlin/zues/app/money/Arrears.kt`.
+
+---

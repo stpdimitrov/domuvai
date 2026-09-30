@@ -71,7 +71,10 @@ RUNNING = {
  ('get', '/api/money/units/{unitId}/statement'):
    ("The unit's itemised statement, showing how each number was derived — a metered line with its reading and item", ['PM-FEE-017', 'PM-FEE-018']),
  ('get', '/api/money/units/{unitId}/arrears'):
-   ("The unit's arrears, aged as of a date", ['PM-DEBT-001', 'PM-DEBT-002']),
+   ("The unit's arrears, aged as of a date, with the day its oldest open debt fell due", ['PM-DEBT-001', 'PM-DEBT-002']),
+ ('get', '/api/money/entrances/{entranceId}/arrears'):
+   ("The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day "
+    "its oldest open debt fell due — and their total", ['PM-DEBT-001', 'PM-DEBT-002']),
  ('post', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
