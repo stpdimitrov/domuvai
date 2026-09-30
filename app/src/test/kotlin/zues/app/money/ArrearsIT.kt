@@ -17,6 +17,9 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import zues.law.numberOn
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /**
@@ -66,11 +69,8 @@ class ArrearsIT {
         return json.readTree(response).get("unitIds").map { UUID.fromString(it.asText()) }
     }
 
-    @Test
-    fun `PM-DEBT-001 a unit's outstanding is aged as of a date`() {
-        val entranceId = createEntrance()
-        val units = registerUnits(entranceId)
-        // charge raised at value date 2026-05-01; due 14 days later, on 2026-05-15
+    /** May's run: 10_000 + 20_000 by ideal parts, raised at value date 2026-05-01 — ап. 1 (60%) owes 18_000, ап. 2 12_000. */
+    private fun issueMay(entranceId: UUID) {
         mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
                 json.writeValueAsString(
@@ -84,6 +84,13 @@ class ArrearsIT {
                 ),
             ),
         ).andExpect(status().isCreated)
+    }
+
+    @Test
+    fun `PM-DEBT-001 a unit's outstanding is aged as of a date`() {
+        val entranceId = createEntrance()
+        val units = registerUnits(entranceId)
+        issueMay(entranceId)   // due 14 days after 2026-05-01, on 2026-05-15
 
         // 2026-05-20 is 5 days past due -> the whole 18000 (ап. 1, 60%) sits in the 0-30 band
         mvc.perform(get("/api/money/units/${units[0]}/arrears").param("asOf", "2026-05-20"))
@@ -92,5 +99,27 @@ class ArrearsIT {
             .andExpect(jsonPath("$.buckets[1].band").value("0-30"))
             .andExpect(jsonPath("$.buckets[1].amountMinor").value(18_000))
             .andExpect(jsonPath("$.buckets[4].amountMinor").value(0))
+    }
+
+    @Test
+    fun `PM-DEBT-001 an entrance's arrears list each unit that owes, with the day its oldest debt fell due`() {
+        val entranceId = createEntrance()
+        val units = registerUnits(entranceId)
+        issueMay(entranceId)
+        mvc.perform(                                                     // ап. 2 pays its 12_000 in full
+            post("/api/money/entrances/$entranceId/payments").header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"unitId":"${units[1]}","amountMinor":12000,"receivedInto":"CASH","valueDate":"2026-05-10"}"""),
+        ).andExpect(status().isCreated)
+        val dueOn = LocalDate.parse("2026-05-01").plusDays(numberOn("PAYMENT_TERM_DAYS", "2026-05-20").toLong())   // PM-DEBT-002
+
+        mvc.perform(get("/api/money/entrances/$entranceId/arrears").param("asOf", "2026-05-20"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalMinor").value(18_000))
+            .andExpect(jsonPath("$.units.length()").value(1))                // ап. 2 owes nothing, so it is left out
+            .andExpect(jsonPath("$.units[0].unitId").value(units[0].toString()))
+            .andExpect(jsonPath("$.units[0].buckets[1].amountMinor").value(18_000))
+            .andExpect(jsonPath("$.units[0].oldestDebt.dueOn").value(dueOn.toString()))
+            .andExpect(jsonPath("$.units[0].oldestDebt.overdueDays").value(ChronoUnit.DAYS.between(dueOn, LocalDate.parse("2026-05-20"))))
     }
 }

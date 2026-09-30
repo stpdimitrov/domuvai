@@ -165,8 +165,8 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-DEBT-001` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:70` | `app/src/main/kotlin/zues/app/money/Arrears.kt:11` |  |
-| `PM-DEBT-002` | `law/src/test/kotlin/zues/law/LawTest.kt:44` | `app/src/main/kotlin/zues/app/money/Arrears.kt:44` |  |
+| `PM-DEBT-001` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:90` | `app/src/main/kotlin/zues/app/money/Arrears.kt:11` |  |
+| `PM-DEBT-002` | `app/src/test/kotlin/zues/app/money/ArrearsServiceTest.kt:115` | `app/src/main/kotlin/zues/app/money/Arrears.kt:42` |  |
 | `PM-DEBT-003` | — | — |  |
 | `PM-DEBT-004` | — | — |  |
 | `PM-DEBT-005` | — | — |  |

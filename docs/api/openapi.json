@@ -602,6 +602,34 @@
         ],
         "type": "object"
       },
+      "EntranceArrears": {
+        "properties": {
+          "asOf": {
+            "type": "string"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitArrears"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "asOf",
+          "entranceId",
+          "totalMinor",
+          "units"
+        ],
+        "type": "object"
+      },
       "EntranceCreatedResponse": {
         "properties": {
           "condominiumId": {
@@ -1200,6 +1228,23 @@
         ],
         "type": "object"
       },
+      "OldestDebt": {
+        "properties": {
+          "dueOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "overdueDays": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dueOn",
+          "overdueDays"
+        ],
+        "type": "object"
+      },
       "OverdueDeclaration": {
         "properties": {
           "acquiredOn": {
@@ -1783,6 +1828,9 @@
               "$ref": "#/components/schemas/AgeingBucket"
             },
             "type": "array"
+          },
+          "oldestDebt": {
+            "$ref": "#/components/schemas/OldestDebt"
           },
           "totalMinor": {
             "format": "int64",
@@ -2483,6 +2531,63 @@
           "PM-FEE-012",
           "PM-FEE-017",
           "PM-ORG-002"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/arrears": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_arrears",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntranceArrears"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day its oldest open debt fell due — and their total",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-DEBT-001",
+          "PM-DEBT-002"
         ]
       }
     },
@@ -3596,7 +3701,7 @@
             "description": "Bad Request"
           }
         },
-        "summary": "The unit's arrears, aged as of a date",
+        "summary": "The unit's arrears, aged as of a date, with the day its oldest open debt fell due",
         "tags": [
           "money"
         ],

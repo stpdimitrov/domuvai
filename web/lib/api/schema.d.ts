@@ -123,6 +123,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/arrears": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day its oldest open debt fell due — and their total */
+        get: operations["get_money_entrances_entranceId_arrears"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/entrances/{entranceId}/charge-runs": {
         parameters: {
             query?: never;
@@ -319,7 +336,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The unit's arrears, aged as of a date */
+        /** The unit's arrears, aged as of a date, with the day its oldest open debt fell due */
         get: operations["get_money_units_unitId_arrears"];
         put?: never;
         post?: never;
@@ -767,6 +784,14 @@ export interface components {
         EndStayRequest: {
             on: string;
         };
+        EntranceArrears: {
+            asOf: string;
+            /** Format: uuid */
+            entranceId: string;
+            /** Format: int64 */
+            totalMinor: number;
+            units: components["schemas"]["UnitArrears"][];
+        };
         EntranceCreatedResponse: {
             /** Format: uuid */
             condominiumId: string;
@@ -950,6 +975,12 @@ export interface components {
             separateEntrance: boolean;
             unitType: string;
         };
+        OldestDebt: {
+            /** Format: date */
+            dueOn: string;
+            /** Format: int64 */
+            overdueDays: number;
+        };
         OverdueDeclaration: {
             /** Format: date */
             acquiredOn: string;
@@ -1115,6 +1146,7 @@ export interface components {
         UnitArrears: {
             asOf: string;
             buckets: components["schemas"]["AgeingBucket"][];
+            oldestDebt?: components["schemas"]["OldestDebt"];
             /** Format: int64 */
             totalMinor: number;
             /** Format: uuid */
@@ -1506,6 +1538,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChargeRunResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_arrears: {
+        parameters: {
+            query: {
+                asOf: string;
+            };
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntranceArrears"];
                 };
             };
             /** @description Bad Request */

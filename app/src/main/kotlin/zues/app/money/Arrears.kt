@@ -28,13 +28,30 @@ data class AgeingBucket(val band: String, val amountMinor: Long)
 /**
  * A unit's outstanding, aged (Rule: PM-DEBT-001). `totalMinor` is everything still owed; the
  * buckets split it by how overdue each charge is as of the read date. Every band is present,
- * in order, so the shape is stable for a caller.
+ * in order, so the shape is stable for a caller. `oldestDebt` is the oldest debt still open — absent
+ * when nothing is owed.
  */
 data class UnitArrears(
     val unitId: UUID,
     val asOf: String,
     val totalMinor: Long,
     val buckets: List<AgeingBucket>,
+    val oldestDebt: OldestDebt? = null,
+)
+
+/** A unit's oldest debt still open (Rule: PM-DEBT-002): the day it fell due, and how far past it the read date is — 0 while not yet due. */
+data class OldestDebt(val dueOn: LocalDate, val overdueDays: Long)
+
+/**
+ * An entrance's arrears in one read (Rule: PM-DEBT-001): every unit that owes something on the read
+ * date, aged as its own read ages it, largest first, and what they owe together. A unit owing nothing
+ * is left out.
+ */
+data class EntranceArrears(
+    val entranceId: UUID,
+    val asOf: String,
+    val totalMinor: Long,
+    val units: List<UnitArrears>,
 )
 
 /**
@@ -49,17 +66,44 @@ data class UnitArrears(
 class ArrearsService(private val postings: PostingRepository) {
 
     @Transactional(readOnly = true)
-    fun forUnit(unitId: UUID, asOf: LocalDate): UnitArrears {
-        val term = numberOn("PAYMENT_TERM_DAYS", asOf.toString()).toLong()
-        val rows = postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE).filter { !it.valueDate.isAfter(asOf) }
+    fun forUnit(unitId: UUID, asOf: LocalDate): UnitArrears =
+        aged(unitId, postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE), asOf, term(asOf))
+
+    /** Rule: PM-DEBT-001 — the entrance's receivable postings, unit by unit, each aged exactly as [forUnit] ages it. */
+    @Transactional(readOnly = true)
+    fun forEntrance(entranceId: UUID, asOf: LocalDate): EntranceArrears {
+        val term = term(asOf)
+        val owing = postings.findByEntranceIdAndAccount(entranceId, Ledger.RECEIVABLE)
+            .filter { it.unitId != null }
+            .groupBy { it.unitId!! }
+            .map { (unitId, rows) -> aged(unitId, rows, asOf, term) }
+            .filter { it.totalMinor > 0 }
+            .sortedWith(compareByDescending<UnitArrears> { it.totalMinor }.thenBy { it.unitId })
+        return EntranceArrears(entranceId, asOf.toString(), owing.sumOf { it.totalMinor }, owing)
+    }
+
+    /** Rule: PM-DEBT-002 — the term in force on the read date, from dated configuration. A date before any term is a bad date, not a 500. */
+    private fun term(asOf: LocalDate): Long = try {
+        numberOn("PAYMENT_TERM_DAYS", asOf.toString()).toLong()
+    } catch (e: NoSuchElementException) {
+        throw IllegalArgumentException(e.message, e)
+    }
+
+    private fun aged(unitId: UUID, receivables: List<PostingRow>, asOf: LocalDate, term: Long): UnitArrears {
+        val rows = receivables.filter { !it.valueDate.isAfter(asOf) }
         val byBand = rows
             .groupBy { Ageing.band(ChronoUnit.DAYS.between(Ledger.debtDate(it).plusDays(term), asOf)) }
             .mapValues { (_, ps) -> ps.sumOf { it.amountMinor } }
+        // The oldest debt still open: a charge's date whose postings — the charge and the credits that settled it — net above zero.
+        val oldestDueOn = rows.groupBy { Ledger.debtDate(it) }
+            .filterValues { debt -> debt.sumOf { it.amountMinor } > 0 }
+            .keys.minOrNull()?.plusDays(term)
         return UnitArrears(
             unitId = unitId,
             asOf = asOf.toString(),
             totalMinor = rows.sumOf { it.amountMinor },
             buckets = Ageing.BANDS.map { AgeingBucket(it, byBand[it] ?: 0) },
+            oldestDebt = oldestDueOn?.let { OldestDebt(it, maxOf(0, ChronoUnit.DAYS.between(it, asOf))) },
         )
     }
 }
