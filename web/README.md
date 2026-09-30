@@ -18,6 +18,25 @@ npm run gen:api  # regenerate lib/api/schema.d.ts from docs/api/openapi.json
 Live screens call `api` from this Next.js server (never from the browser), at `API_URL`
 (default `http://localhost:8080`). With the backend down, a live screen says so instead of failing.
 
+### Against the real API and a database
+
+The whole chain on one machine — Postgres 16, the API (JDK 21), one demo entrance seeded through the API:
+
+```bash
+brew install postgresql@16
+PG="$(brew --prefix postgresql@16)/bin"
+"$PG/pg_ctl" -D "$(brew --prefix)/var/postgresql@16" -l "$(brew --prefix)/var/log/postgresql@16.log" start
+"$PG/psql" -d postgres -c "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD 'postgres'"
+"$PG/createdb" -O postgres domuvai
+./gradlew :app:bootRun                        # from the repo root; Flyway migrates the empty database
+python3 tools/seed_demo.py                    # prints the entrance id
+cd web && API_URL=http://localhost:8080 npm run dev
+```
+
+The role and password are the local defaults in `app/src/main/resources/application.yml`, nothing more.
+Then `python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 --entrance <id>`
+runs the same check as CI.
+
 ## The API client
 
 `lib/api/schema.d.ts` is **generated** from the contract (`docs/api/openapi.json`, itself generated
@@ -32,6 +51,12 @@ is a type error. When the backend changes the contract, run `npm run gen:api` an
 then `npm run build` (strict type-check of every use). A breaking API change fails here, not in
 production (ADR-011 §2.2). It is folder-scoped (ADR-011), so it does not run when neither changes — **do not make it a required status check**: a required
 check that never runs blocks the merge.
+
+`.github/workflows/e2e.yml` (E2E-01) runs **the whole chain on every PR**: Postgres → the API from its jar
+(Flyway on an empty database) → `tools/seed_demo.py` through the public API → `next start` →
+`tools/check_e2e.py`. The check validates every response the live screens use against the contract, reads the
+seeded figures off the screens, and fails when a screen calls an operation it does not cover. It runs on every
+PR, so it can be made a required check.
 
 ## Layout
 

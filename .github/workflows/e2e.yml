@@ -1,0 +1,66 @@
+name: e2e
+
+# E2E-01 — the whole chain on every PR: Postgres → the API from its jar (Flyway on an empty database) → a seed
+# through the public API → the production web server → tools/check_e2e.py, which validates every response the live
+# screens use against the published contract and reads the seeded figures off the screens themselves. Not path-
+# filtered, so it runs on every PR and could be made a required check (branch protection is the owner's).
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env: { NEXT_TELEMETRY_DISABLED: '1' }
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_DB: domuvai, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r tools/requirements.txt
+
+      - name: Build the API and the web
+        run: |
+          ./gradlew :app:bootJar
+          (cd web && npm ci && npm run build)
+
+      - name: Start the API — Flyway migrates the empty database
+        run: |
+          nohup java -jar app/build/libs/app.jar > api.log 2>&1 &
+          curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
+
+      - name: Seed one entrance through the public API
+        run: |
+          entrance=$(python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
+          echo "ENTRANCE=$entrance" >> "$GITHUB_ENV"
+
+      - name: Start the web against the API
+        working-directory: web
+        env: { API_URL: 'http://localhost:8080' }
+        run: |
+          nohup npx next start -p 3000 > ../web.log 2>&1 &
+          curl -sf -o /dev/null --max-time 10 --retry 30 --retry-connrefused --retry-delay 1 http://localhost:3000/
+
+      - name: The chain, checked — contract conformance and the figures on screen
+        run: python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 --entrance "$ENTRANCE"
+
+      - name: Logs
+        if: failure()
+        run: tail -n 150 api.log web.log
