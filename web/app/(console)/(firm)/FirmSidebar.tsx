@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// The firm-level navigation. Only Портфейл is a real route today; the rest are placeholders
-// activated as each screen lands (WEB-02…). `due` badges are overdue-count flags (ЗУЕС).
+// The firm-level navigation; `#` items are placeholders activated as each screen lands. `count` / `due` badges show
+// a figure only once an API serves it — the design's sample figures are gone (WEB-13).
 const NAV: { label: string; href: string; count?: string; due?: string }[] = [
-  { label: "Портфейл", href: "/portfolio", count: "62" },
-  { label: "Задължения", href: "/debts", due: "31" },
+  { label: "Портфейл", href: "/portfolio" },
+  { label: "Задължения", href: "/debts" },
   { label: "Начисления", href: "#" },
-  { label: "Календар на сроковете", href: "#", due: "9" },
+  { label: "Календар на сроковете", href: "#" },
   { label: "Доставчици", href: "#" },
-  { label: "Съответствие на фирмата", href: "/compliance", due: "2" },
+  { label: "Съответствие на фирмата", href: "/compliance" },
   { label: "Документи", href: "#" },
   { label: "Екип", href: "#" },
 ];

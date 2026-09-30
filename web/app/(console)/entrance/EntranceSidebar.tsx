@@ -7,17 +7,17 @@ import { usePathname } from "next/navigation";
 // календар are real routes today; the rest activate as each entrance screen lands.
 const FIRM: { label: string; href: string; due?: string }[] = [
   { label: "Портфейл", href: "/portfolio" },
-  { label: "Задължения", href: "#" },
+  { label: "Задължения", href: "/debts" },
   { label: "Съответствие на фирмата", href: "#" },
 ];
 
 const ENTRANCE: { label: string; href: string; due?: string }[] = [
-  { label: "Статутен календар", href: "/entrance", due: "3" },
+  { label: "Статутен календар", href: "/entrance" },
   { label: "Обекти и идеални части", href: "#" },
   { label: "Начисления", href: "/entrance/charges" },
   { label: "Каса и фонд", href: "/entrance/fund" },
   { label: "Общи събрания", href: "/assembly" },
-  { label: "Задължения", href: "#", due: "5" },
+  { label: "Задължения", href: "/debts" },
   { label: "Доставчици и договори", href: "#" },
   { label: "Документи", href: "#" },
   { label: "Сигнали и ремонти", href: "#" },

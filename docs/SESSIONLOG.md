@@ -1655,3 +1655,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — this entry, #73, `app/src/main/kotlin/zues/app/money/Arrears.kt`.
 
 ---
+
+## WEB-13 · 2026-09-30 · `/debts` live — arrears from the API, every entrance
+
+**Did** — the firm's arrears screen reads the API (#75, `lane:web`). One server-side aggregation: every entrance by name → its arrears as of a date (the new read, S-G1-02f), then — only where something is unpaid — its units and their owners on that date (owners only, not users), six entrances at a time. `?asOf=` (a real calendar day, else today in Sofia). A group per entrance with something unpaid: unit, owners, what is owed and the entrance's total (the API's), and the oldest debt's days overdue, coloured by its band — or "в срок" while nothing is overdue yet, so the fortnight after a run does not read as a building full of debtors. The header counts units with something unpaid, how many are overdue, and the entrances — including the ones that did not load, which are shown with their reason rather than read as clean. Interest, the escalation ladder and the next action have no backend (PM-DEBT-006, PM-DEBT-009): their columns show `—`, the ladder legend is greyed and says so, both buttons stay disabled. The sidebars lose the design's sample counts; "Задължения" links to `/debts`. Every API call now times out after 10 seconds (the client), so a hung call cannot hold a page. `lib/console.ts` gains `entrances()` (shared with `entranceAt`) and `inTurn` (a few at a time). The charges screen, too, lists owners only. **PM-DEBT-011:** this screen names debtors and amounts — `web/README.md` now says the console must not be reachable by the public before sign-in.
+
+**Verified** — on local Postgres (the demo entrance): as of 30.09, 2 units unpaid and 2 overdue — ап. 5 Надя Тодорова €80,00, ап. 6 Петър Георгиев €76,50, 15 days each, €156,50 for the entrance; as of 05.09, all 6 unpaid and none overdue ("в срок"); 31.02 falls back to today; the backend down; nobody owing. Against a stub typed to the contract: one entrance refused and one dropped — both shown in red, counted in the header ("2 входа не се заредиха") and the footer; a user's title is not listed as an owner. `tools/check_e2e.py` covers the new call and `/debts` on both dates (4 screen checks, 8 calls, all conforming) — and a raw `fetch` anywhere but the typed client still fails it. `npm run build` clean; no drift; gates green.
+
+**Rules covered** — none implemented; the screen shows PM-DEBT-001 and PM-DEBT-002 as `money` computes them, under PM-DEBT-011.
+
+**Tests added** — none in `web/` (no runner); `tools/check_e2e.py` (CI job `e2e`) gains the arrears call and two `/debts` checks.
+
+**Decisions** — owner D4–D7 on #75 (2026-09-30). The fresh-context review's nine findings: failed entrances counted and shown; "длъжник" replaced by "с неплатено" and "в просрочие" (a charge not yet due is not an arrear); a real-day check on `?asOf=`; owners only; the sample badges gone; a timeout and a cap on the fan-out; the band read documented; the grammar (1 ден, 1 вход). Put to the owner: a switch that serves the console only where it is enabled (PM-DEBT-011 today is prose in the README).
+
+**Open** — the owner's call on that switch. #73 (the payment term by each debt's date, advances, a receivable with no unit). The firm sidebar still lists the design's sample entrances and user; an entrance picker. Interest and dunning (PM-DEBT-006, PM-DEBT-009). Next screens: `/portfolio`, `/entrance`.
+
+**Read first next time** — this entry, `web/README.md`, `web/app/(console)/(firm)/debts/page.tsx`.
+
+---

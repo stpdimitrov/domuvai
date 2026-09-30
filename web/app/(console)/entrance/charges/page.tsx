@@ -63,7 +63,9 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
   if (!run.data) return { kind: "refused", message: run.error?.error ?? `HTTP ${run.response.status}` };
 
   const names = new Map<string, string[]>();
-  for (const o of owners.data ?? []) names.set(o.unitId, [...(names.get(o.unitId) ?? []), o.partyName]);
+  for (const o of owners.data ?? []) {
+    if (o.titleRole === "OWN") names.set(o.unitId, [...(names.get(o.unitId) ?? []), o.partyName]);   // an owner, not a user
+  }
   return {
     kind: "ok",
     entrance,

@@ -42,7 +42,8 @@ runs the same check as CI.
 `lib/api/schema.d.ts` is **generated** from the contract (`docs/api/openapi.json`, itself generated
 from the Kotlin controllers — ADR-013) by `openapi-typescript`; never edit it. `lib/api/client.ts` is the
 typed `openapi-fetch` client, marked `server-only`. A path, parameter or body the API does not accept
-is a type error. When the backend changes the contract, run `npm run gen:api` and commit the result.
+is a type error. Every call gives up after 10 seconds, so one hung call cannot hold a page — the screen says the
+backend did not answer. When the backend changes the contract, run `npm run gen:api` and commit the result.
 
 ## CI
 
@@ -101,8 +102,13 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   `HeroVideo`.
 - **`/portfolio`** — the console's firm-wide portfolio dashboard (screen 01). A portfolio row
   links through to the entrance detail.
-- **`/debts`** — firm-wide arrears (screen 05 Задължения): debtors grouped by entrance, each on
-  the чл. 38 ЗУЕС → чл. 410 ГПК escalation ladder (Покана → Нотариална → Решение на ОС → Заповед).
+- **`/debts`** — firm-wide arrears (screen 05 Задължения) — **live** (WEB-13): every entrance's debtors
+  from one arrears read per entrance (`GET …/arrears?asOf=`), joined to its units and to their owners on the
+  read date — what each owes, the entrance's total and the oldest debt's days overdue, as `money` computes
+  them. `?asOf=YYYY-MM-DD` (default: today, Europe/Sofia). An entrance where nobody owes is left out. The
+  design's interest, escalation ladder (Покана → Нотариална → Решение на ОС → Заповед) and next action are not
+  built — those columns show `—`, and the two buttons stay disabled. **It names debtors and their debts, so it
+  must never be reachable by the public** (PM-DEBT-011) — see TODO before launch.
 - **`/compliance`** — the firm's regulatory standing (screen 07 Съответствие): register / insurance /
   management-contract status cards, and a filings-and-declarations table.
 - **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
@@ -139,6 +145,9 @@ httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the d
 
 ## TODO before launch
 
+- **Sign-in before anyone else can reach the console** (ADR-011). `/debts` shows debtors' names and what they
+  owe, which PM-DEBT-011 forbids in any publicly accessible place. The charges and fund screens show owners,
+  amounts and bank accounts.
 - Re-host the hero clip in `HeroVideo.tsx` on a domuvai-owned origin (currently the design
   tool's CDN URL).
 - Add a lint step (ESLint is not configured yet).
