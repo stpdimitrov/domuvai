@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
+import { entranceAt, eur, reach, type EntranceAt } from "@/lib/console";
 
 export const metadata: Metadata = { title: "Начисления — Етаж" };
 
@@ -35,26 +36,18 @@ const shift = (period: string, by: number) => {
 };
 const monthName = (period: string) => `${MONTHS[Number(period.slice(5)) - 1]} ${period.slice(0, 4)}`;
 
-const eur = (minor: number) =>
-  "€" + (minor / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 4, maximumFractionDigits: 6 }) + "%";
 
 type Loaded =
   | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string> }
-  | { kind: "down" }
-  | { kind: "none" }
-  | { kind: "unknown"; id: string }
+  | Exclude<EntranceAt, { kind: "ok" }>
   | { kind: "refused"; message: string };
 
 /** One screen, one server-side aggregation (ADR-011): the run, joined to its units and owners. */
 async function load(entranceId: string | undefined, period: string, legalDate: string): Promise<Loaded> {
-  const reach = async <T,>(call: () => Promise<T>) => { try { return await call(); } catch { return null; } };
-
-  const listed = await reach(() => api.GET("/api/registry/entrances"));
-  if (!listed) return { kind: "down" };
-  const all = listed.data ?? [];
-  const entrance = entranceId ? all.find((e) => e.id === entranceId) : all[0];
-  if (!entrance) return entranceId ? { kind: "unknown", id: entranceId } : { kind: "none" };
+  const at = await entranceAt(entranceId);
+  if (at.kind !== "ok") return at;
+  const { entrance } = at;
 
   const path = { entranceId: entrance.id };
   const fetched = await reach(() => Promise.all([
@@ -129,6 +122,7 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
+            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
             {view.kind === "refused" && <>API отказа изчислението: {view.message}</>}

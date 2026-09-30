@@ -749,13 +749,50 @@
   margin-top: 8px;
 }
 
-.jr-grid {
+/* the disbursements signed off against the fund */
+.fd-grid {
   display: grid;
-  grid-template-columns: 78px 116px minmax(0, 1fr) 168px 168px 96px 96px 104px;
+  grid-template-columns: 84px 200px minmax(0, 1.4fr) 104px 96px minmax(0, 1fr);
   column-gap: 12px;
   align-items: center;
   padding: 0 16px;
-  min-width: 1080px;
+  min-width: 960px;
+}
+/* the fund's handover statements: a row, then its details and inherited disbursements beneath it */
+.ho-grid {
+  display: grid;
+  grid-template-columns: 84px 160px minmax(0, 1fr) 92px 84px 140px 100px;
+  column-gap: 12px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 960px;
+}
+.fd-grid.pf-row {
+  height: auto;
+  min-height: 36px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  line-height: 1.35;
+}
+.ho-block {
+  min-width: 960px;
+  border-bottom: 1px solid #eae9e5;
+}
+.ho-block.flagged {
+  background: #fcfaf8;
+}
+.ho-block .pf-row {
+  border-bottom: none;
+}
+.ho-note {
+  padding-bottom: 6px;
+  font: 400 11.5px/1.5 "IBM Plex Sans";
+  color: #6b6f6c;
+}
+.ho-note > div {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .mono {
   font: 400 11.5px/1 "IBM Plex Mono", monospace;

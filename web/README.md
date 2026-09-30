@@ -41,9 +41,6 @@ app/
   page.tsx         the landing (Етаж) at /  — static marketing
   HeroVideo.tsx    client component: the boomerang hero background
   globals.css      tokens + base + hover styles
-lib/api/
-  schema.d.ts      GENERATED from docs/api/openapi.json — never edit
-  client.ts        the typed, server-only client for `api`
   (console)/       the manager console — a route group (no URL segment)
     layout.tsx     the console flex shell + console.css (sidebar differs by context)
     console.css    console shell, table, timeline and card styles
@@ -56,6 +53,11 @@ lib/api/
       layout.tsx       entrance sidebar + main
       EntranceSidebar.tsx  entrance navigation (client)
       page.tsx         /entrance — the entrance detail (statutory calendar)
+lib/
+  api/schema.d.ts  GENERATED from docs/api/openapi.json — never edit
+  api/client.ts    the typed, server-only client for `api`
+  console.ts       what the live entrance screens share: the entrance from `?entrance=` (else the
+                   first by name), a call that may find the backend down, euros from minor units
 ```
 
 ## Status
@@ -86,8 +88,16 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   registered). Hover an amount for its derivation. The basis is a visibly labelled **demo** — the
   assembly module does not serve GA decisions yet — so confirming is disabled. The design's
   exemptions, coefficient and elevator columns show `—`: the API has no field for them yet.
-- **`/entrance/fund`** — cash & repair fund (screen 06 Каса и фонд): the 501 operating and 502
-  fund accounts (чл. 50 ЗУЕС) with balance / committed / available, and a double-entry journal.
+- **`/entrance/fund`** — cash & repair fund (screen 06 Каса и фонд) — **live** (WEB-12): the fund's
+  account (IBAN and holder, чл. 50 ЗУЕС) with balance, committed and available side by side
+  (`GET …/fund`); every disbursement signed off against it — purpose, basis (the GA decision, the
+  passport measure, or the emergency and its justification), amount, committed / paid / cancelled,
+  filtered by `?status=`; and the fund's handover statements as issued (`GET …/fund/handover-statements`)
+  — never called signed: the parties' signatures are not recorded yet. `?entrance=<id>` as on the
+  charges screen. Read-only: signing off, paying out, cancelling and issuing a handover need sign-in.
+  The operating account's balance and the double-entry journal have no API yet (#68): its card shows
+  the account and holder (`GET …/fund-accounts`) with `—` for every figure, and the register stands
+  in for the journal. The accounts and the statements each fail alone — the fund stays on screen.
 - **`/assembly`** — the live general assembly (screen 04 Общо събрание): a full-bleed, no-sidebar
   view — session-quorum banner, agenda, the item being voted (quorum + tally with the majority
   threshold), and live attendance with proxies. Has its own stylesheet (`assembly.css`).
