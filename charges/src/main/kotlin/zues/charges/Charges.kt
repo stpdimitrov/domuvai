@@ -258,8 +258,8 @@ fun computeChargeRun(entranceId: String, units: List<PropertyUnit>, tariff: Tari
 
     // Rule: PM-FEE-017 — what each unit's own meter read, times the adopted price, half-up to the cent. It is not a
     // share of a common cost, so no key touches it; an unread meter bills nothing and is listed, never estimated.
-    // Read in S-G1-02e and put to the owner (#62), not yet decided: PM-FEE-010's multiple is of "the standard rate" —
-    // a share of the common costs — so the business multiplier is not applied to a metered line.
+    // PM-FEE-010's multiple is of "the standard rate" — a share of the common costs — so the business multiplier is
+    // not applied to a metered line: read in S-G1-02e, confirmed by the owner on 2026-09-30 (#65).
     val missing = mutableListOf<MissingReading>()
     for (line in tariff.consumption) {
         val uom = line.item.unitOfMeasure ?: ""
