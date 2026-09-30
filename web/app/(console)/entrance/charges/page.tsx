@@ -69,7 +69,7 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     entrance,
     run: run.data,
     ideal: new Map((units.data ?? []).map((u) => [u.id, u.idealPartsPct])),
-    owners: new Map([...names].map(([unit, list]) => [unit, list.join(", ")])),
+    owners: new Map([...names].map(([unit, list]) => [unit, list.sort((a, b) => a.localeCompare(b, "bg")).join(", ")])),   // the API lists them in no fixed order
   };
 }
 

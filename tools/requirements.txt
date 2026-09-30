@@ -4,3 +4,4 @@ jsonschema>=4.20
 markdown>=3.5
 openapi-spec-validator>=0.7
 PyYAML>=6.0
+rfc3339-validator>=0.1   # the "date-time" format, for tools/check_e2e.py

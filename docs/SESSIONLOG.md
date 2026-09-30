@@ -1619,3 +1619,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — this entry, `web/README.md`, #68.
 
 ---
+
+## E2E-01 · 2026-09-30 · the whole chain, checked on every PR — web → api → Postgres
+
+**Did** — the frontend and the backend had never run together: the API was tested against Postgres per endpoint in CI, the web only against stubs (#70, `lane:web`). Postgres 16 now runs on the owner's machine (Homebrew), and a new CI job, `e2e`, runs the whole chain on every PR: Postgres → the API from its jar, Flyway migrating an empty database → `tools/seed_demo.py`, one demo entrance through the public API only (6 units, households, owners, two accounts, September's run issued, payments, four fund disbursements, a handover; once per database) → the production web server → `tools/check_e2e.py`. The check validates every response the live screens use against the published contract, formats included; reads the seeded figures off both screens, each with its label or its whole row, so the same amount elsewhere cannot stand in for it; fails on any error state; and fails when a screen calls an operation it does not cover, or makes a call it cannot read (a non-literal path, a destructured client, a raw `fetch`) — the list is compared with the calls found in `web/`. **The first real run found a drift:** the API sent `null` for every empty field — 50 values in 13 fields across 4 of the 7 calls — where the contract, and the client generated from it, say the field is absent; the screens survived only because they test truthiness. The API now leaves an empty property out of a response (`WireFormat`, the HTTP converter's own copy of the mapper). It is scoped to the wire on purpose: the shared mapper also writes the event publication registry, whose stored text must not change (a global `non_null`, tried first, would have changed it — the review caught it); a map keeps its null values. The charges screen sorts co-owners by name (the API lists them in no fixed order). `web/README.md` gives the local run.
+
+**Verified** — on this machine, the chain exactly as CI runs it (the jar, an empty database, the seed twice — the second writes nothing — `next build` + `next start`): all 7 calls conform, 4/4 and 9/9 anchored figures, "the chain holds". The check proven red on real failures: the API before the fix (13 fields, 50 nulls); a malformed date, uuid or date-time; a screen calling something the check does not cover; a non-literal path, a destructured client, a raw fetch; the API unreachable; the API stopped while the web runs (both screens' error state); a changed figure (euros with a decimal point); the fund card zeroed while the handover still shows the amount. `WireFormatTest` fails without `WireFormat` (the body carries `null`) and with a global `non_null` (the shared mapper stops writing null). Gates green.
+
+**Rules covered** — none implemented; the check reads the screens that show PM-FEE-001…005, PM-FEE-018 and PM-FUND-001, PM-FUND-004, PM-FUND-006 … PM-FUND-010.
+
+**Tests added** — `WireFormatTest`: `an empty field is left out of a response, not sent as null`; `only the wire changes — the shared mapper still writes null, and a map keeps its null values`. `tools/check_e2e.py` (CI job `e2e`).
+
+**Decisions** — owner D1–D5 on #70 (2026-09-30). D5 as built: the wire leaves an empty property out, but through the HTTP converter, not `spring.jackson.default-property-inclusion` — the shared mapper writes stored events. The job runs on every PR and `main` push, unfiltered, so it can be made a required check — the owner's (branch protection); until then a red `e2e` does not block a merge.
+
+**Open** — make `e2e` a required check (owner). The check's `DEMO_BASIS` and error words are copies of the screens' — kept short, reviewed with them. The screens left: `/debts` (needs a per-entrance arrears read in `money`), `/portfolio`, `/entrance`; an entrance picker (the sidebar still shows the design's entrance and drops `?entrance=`). #68 (journal read, operating balance). Every write waits for sign-in.
+
+**Read first next time** — this entry, `web/README.md` (Against the real API and a database), `tools/check_e2e.py`.
+
+---
