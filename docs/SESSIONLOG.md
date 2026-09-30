@@ -1585,3 +1585,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — #62, this entry, `charges/src/main/kotlin/zues/charges/Charges.kt`.
 
 ---
+
+## S-G1-02e-o · 2026-09-30 · the owner's answers on metered lines (money)
+
+**Did** — recorded the owner's answers (2026-09-30) to the two questions S-G1-02e put (#65, `lane:money`). (a) **Yes**: the business-use multiplier (PM-FEE-010, a multiple of "the standard rate", a share of the common costs) is not applied to a metered line — a business unit pays what its meter read. (b) **Yes**: a run is issued only once every meter has a reading — an issued period is final (PM-FEE-015), so an unread unit would stay unbilled for good. Both confirm what S-G1-02e built; the comment in `Charges.kt` that said "not yet decided" now says the owner confirmed it. No behaviour change.
+
+**Rules covered** — none new (PM-FEE-017 and PM-FEE-010 were covered in S-G1-02e).
+
+**Tests added** — none; `PM-FEE-017 PM-FEE-010 a business unit pays what its meter read, not a multiple of it` and `PM-FEE-017 a run is not issued while a meter is unread — the period would stay unbilled for good` already hold the answers.
+
+**Decisions** — owner (a) and (b), 2026-09-30. PM-FEE-010's range is still unverified (counsel); if counsel reads "the standard rate" to include consumption, (a) is revisited as a new slice.
+
+**Open** — the building-meter difference; a price finer than a cent per unit of measure; intake of consumption columns (#48); the web charges screen's `missingReadings`.
+
+**Read first next time** — this entry, #62, `charges/src/main/kotlin/zues/charges/Charges.kt`.
+
+---
