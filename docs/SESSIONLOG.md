@@ -1736,3 +1736,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — this entry, #73, `app/src/main/kotlin/zues/app/money/Arrears.kt`.
 
 ---
+
+## WEB-15 · 2026-10-01 · the demo form claims nothing it did not do
+
+**Did** — the landing's demo form (#83, `lane:web`; fixes #79) no longer says "Заявката е приета": the page sends a request nowhere and stores none. Where to write is the server's setting, `DOMUVAI_CONTACT_EMAIL` (`web/lib/contact.ts`), read per request like the console switch — the repository holds no address. With a plain address the form writes the request out as a letter, with the consent the visitor ticked as its last line; they open it in their own mail or copy it, the page says it reaches us only once sent, and the landing's two "[имейл — предстои]" placeholders show the address. With none — unset, or a value that is not a plain address (quoted, `mailto:` in front, carrying `?`, `#`, `%` or a comma) — there is no form: the section is headed "Демо — предстои" and says requests are not taken through the site yet. `e2e` starts the same build three times: with an address, with none, with a bad one.
+
+**Rules covered** — none in the catalogue (a finding of WEB-14's review, #79).
+
+**Tests added** — `tools/check_e2e.py` "#79 the demo request": with an address the landing offers the form and names the address in both places; with none, and with a value that is not an address, it offers neither and says so; no built file says a request was accepted, and one says the page sends nothing by itself. Six mutants, each caught: the claim back, a form with no address, one placeholder left unfilled, any value counted as an address, the "sends nothing by itself" sentence removed, the address ignored. In a browser, on the production build: an empty submit still names the four fields; a valid one shows the letter, its mail link (lines broken with CR LF, half a broken character pair dropped) and no claim.
+
+**Decisions** — none (the contract's D1–D4 on #83, on the owner's "fix #79", 2026-10-01). After the review: the letter is shown and linked rather than opened by itself, so a visitor with no mail program can copy it; the address check is an allow-list; the consent is a line of the letter; the section's heading follows the setting.
+
+**Open** — the owner's choice, still: where a request goes for good — a stored lead, a CRM, a mail provider; set `DOMUVAI_CONTACT_EMAIL` before the landing is public — without it the "Заявете демо" buttons across the landing still lead to a section that takes no requests · the check reads text, not a browser: an acceptance worded some other way would pass it · the privacy policy the consent names is still "предстои" · #48 (intake) next.
+
+**Read first next time** — `web/README.md` (The demo request), `web/app/DemoForm.tsx`.
+
+---

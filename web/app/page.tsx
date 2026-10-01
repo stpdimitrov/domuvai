@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { consoleOpen } from "@/lib/consoleSwitch";
+import { contactEmail } from "@/lib/contact";
 import HeroVideo from "./HeroVideo";
 import LandingNav from "./LandingNav";
 import Faq from "./Faq";
@@ -35,6 +36,7 @@ export default async function LandingPage() {
   await connection();                          // per request: the switch is the server's, not the build's
   const open = consoleOpen();                  // Rule: PM-DEBT-011 — no link into a console this server does not serve
   const start = open ? "/portfolio" : "#demo";
+  const contact = contactEmail();              // #79 — where to write: the server's setting, or nowhere yet
   return (
     <div style={{ minHeight: "100vh", background: "#E7E6E1", overflowX: "hidden", color: "#17191A" }}>
       <LandingNav consoleOpen={open} />
@@ -419,7 +421,7 @@ export default async function LandingPage() {
             <div style={kicker}>Фирмата</div>
             <h2 style={h2}>Правим го, защото срокът не чака</h2>
             <p style={lead}>Екип от счетоводители, юристи и разработчици, работили с етажна собственост. Видяхме как пропуснат срок или объркан фонд струват на хората повече от таксата на управителя — и написахме правилата така, че да се проверяват.</p>
-            <p style={{ margin: "16px 0 0", font: "400 15px/1.65 'IBM Plex Sans'", color: "#17191A" }}>Пишете ни на <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14 }}>[имейл — предстои]</span> или <a href="#demo" style={{ color: "#14584A", borderBottom: "1px solid #14584A" }}>заявете демо</a>.</p>
+            <p style={{ margin: "16px 0 0", font: "400 15px/1.65 'IBM Plex Sans'", color: "#17191A" }}>Пишете ни на <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14 }}>{contact ? <a href={`mailto:${contact}`} style={{ color: "#14584A" }}>{contact}</a> : "[имейл — предстои]"}</span> или <a href="#demo" style={{ color: "#14584A", borderBottom: "1px solid #14584A" }}>заявете демо</a>.</p>
           </div>
           <dl style={{ margin: 0, alignSelf: "end", borderTop: "1px solid #DEDDD9" }}>
             {[["Наименование", "„—“ ЕООД", false], ["ЕИК", "—", true], ["Седалище и адрес", "гр. —, ул. — №—", false], ["Управител", "—", false], ["Телефон", "+359 — — —", true]].map(([k, v, m]) => (
@@ -448,10 +450,10 @@ export default async function LandingPage() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "clamp(32px,5vw,64px)", background: "#F7F6F3", border: "1px solid #DEDDD9", padding: "clamp(28px,5vw,56px) clamp(20px,4vw,48px)" }}>
           <div style={{ flex: "1 1 280px", minWidth: 0 }}>
             <div style={kicker}>Демо</div>
-            <h2 style={h2}>Заявете демо</h2>
-            <p style={lead}>Показваме конзолата върху ваш вход. Ако ни изпратите таблицата си предварително, сверяваме последния месец още на срещата.</p>
+            <h2 style={h2}>{contact ? "Заявете демо" : "Демо — предстои"}</h2>
+            <p style={lead}>Показваме конзолата върху ваш вход.{contact && " Ако ни изпратите таблицата си предварително, сверяваме последния месец още на срещата."}</p>
           </div>
-          <DemoForm />
+          <DemoForm contact={contact} />
         </div>
       </section>
 
@@ -485,7 +487,7 @@ export default async function LandingPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, font: "400 14px/1.3 'IBM Plex Sans'" }}>
             <span style={{ font: "500 11px/1 'IBM Plex Sans'", textTransform: "uppercase", letterSpacing: "0.16em", color: "#5C605E" }}>Контакт</span>
-            <span style={{ font: "400 13px/1.3 'IBM Plex Mono', monospace" }}>[имейл — предстои]</span>
+            <span style={{ font: "400 13px/1.3 'IBM Plex Mono', monospace" }}>{contact ? <a href={`mailto:${contact}`} className="ln-link">{contact}</a> : "[имейл — предстои]"}</span>
             <span style={{ font: "400 13px/1.3 'IBM Plex Mono', monospace" }}>+359 — — —</span>
           </div>
         </div>

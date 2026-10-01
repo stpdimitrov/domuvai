@@ -40,11 +40,13 @@ share `.next`.
 
 ```bash
 cd web && npm run build
-DOMUVAI_CONSOLE=on API_URL=http://localhost:8080 npx next start -p 3001 &
-npx next start -p 3002 &
-for port in 3001 3002; do curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"; done
+DOMUVAI_CONSOLE=on DOMUVAI_CONTACT_EMAIL=demo@example.test API_URL=http://localhost:8080 npx next start -p 3001 &
+DOMUVAI_CONTACT_EMAIL= npx next start -p 3002 &
+DOMUVAI_CONTACT_EMAIL='mailto:nobody@example.test' npx next start -p 3003 &
+for port in 3001 3002 3003; do curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"; done
 cd .. && python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3001 \
-  --closed-web http://localhost:3002 --entrance <id>
+  --closed-web http://localhost:3002 --bad-contact-web http://localhost:3003 --contact demo@example.test \
+  --entrance <id>
 ```
 
 ### The console switch
@@ -56,7 +58,7 @@ without the switch — `web/middleware.ts` answers every path but the landing wi
 the same response for a console page and for a path that does not exist, however it is asked (a load, a client
 navigation, a prefetch, a HEAD). Only the build's static files (`/_next/static/`) pass — code and the design's
 sample text, never what the API returns. The landing shows no link into a closed console: no `Вход`, and its two
-`Започнете безплатно` buttons go to the demo form. Closed is the default, so a screen added later is closed with
+`Започнете безплатно` buttons go to the demo section. Closed is the default, so a screen added later is closed with
 the rest. The switch is read from the running server's environment, never baked into the build: one build serves
 either way.
 
@@ -64,6 +66,16 @@ Set it in the server's environment, never in a `web/.env*` file: `next start` re
 beside the build would switch the console on. Switch it on only where everyone who can reach the server may see
 every name and amount in its database — a developer's machine, CI, a demo seeded with made-up people. Never for
 real data before sign-in.
+
+### The demo request
+
+The landing sends a demo request nowhere by itself and stores none, so it never says one arrived (WEB-15, #79).
+Where to write is the server's setting: **`DOMUVAI_CONTACT_EMAIL`** in the server's environment, read per request
+like the console switch (`lib/contact.ts`); the repository holds no address. With it, the form writes the request
+out as a letter the visitor opens in their own mail, or copies — it reaches us when they send it — and the landing
+shows the address. Without it, or with a value that is not a plain address, the landing offers no form and says
+requests are not taken through the site yet — its "Заявете демо" buttons still lead to that section, so set the
+address before the landing is public. Storing a request, or sending it from the server, is the owner's choice and not built.
 
 ## The API client
 
@@ -182,6 +194,8 @@ httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the d
   owe, which PM-DEBT-011 forbids in any publicly accessible place. The charges and fund screens show owners,
   amounts and bank accounts. Until then the console is served only where it is switched on (WEB-14), and the
   API — no sign-in either — must not be reachable from the internet: the web calls it from the server only.
+- Set `DOMUVAI_CONTACT_EMAIL` where the landing is served, and decide where a demo request goes — a stored lead,
+  a CRM, a mail provider (#79). Until then the visitor sends it from their own mail (WEB-15).
 - Re-host the hero clip in `HeroVideo.tsx` on a domuvai-owned origin (currently the design
   tool's CDN URL).
 - Add a lint step (ESLint is not configured yet).
