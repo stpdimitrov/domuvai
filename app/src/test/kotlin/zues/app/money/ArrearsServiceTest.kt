@@ -233,4 +233,62 @@ class ArrearsServiceTest {
             assertThat(context.getBean(ArrearsService::class.java).forUnit(unitId, asOf).oldestDebt).isEqualTo(OldestDebt(dueOn, 20))
         }
     }
+
+    private fun advance(unit: UUID, amount: Long, on: LocalDate) =
+        PostingRow(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "ADVANCE", unit, -amount, "EUR", on)
+
+    @Test
+    fun `PM-DEBT-001 a unit's advance is netted against what it owes and shown, the debt and its bands stay gross`() {
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(overdueBy(45, 10_000)))
+        whenever(postings.findByUnitIdAndAccount(unitId, "ADVANCE")).thenReturn(
+            listOf(advance(unitId, 4_000, asOf.minusDays(60)), advance(unitId, 1_000, asOf.plusDays(1))),   // the second came later
+        )
+        val report = service.forUnit(unitId, asOf)
+        assertThat(report.totalMinor).isEqualTo(10_000)
+        assertThat(report.advanceMinor).isEqualTo(4_000)
+        assertThat(report.netMinor).isEqualTo(6_000)
+        assertThat(report.buckets.associate { it.band to it.amountMinor }["31-60"]).isEqualTo(10_000)
+    }
+
+    @Test
+    fun `PM-DEBT-001 an advance larger than the debt leaves nothing owed, never a negative`() {
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(overdueBy(5, 3_000)))
+        whenever(postings.findByUnitIdAndAccount(unitId, "ADVANCE")).thenReturn(listOf(advance(unitId, 5_000, asOf.minusDays(1))))
+        val report = service.forUnit(unitId, asOf)
+        assertThat(report.advanceMinor).isEqualTo(5_000)
+        assertThat(report.netMinor).isEqualTo(0)
+    }
+
+    @Test
+    fun `PM-DEBT-001 an entrance's arrears net each unit's advance, list a covered unit, and leave out a unit holding only an advance`() {
+        val entranceId = UUID.randomUUID()
+        val covered = UUID.randomUUID()
+        val creditOnly = UUID.randomUUID()
+        fun owed(unit: UUID, amount: Long) =
+            PostingRow(UUID.randomUUID(), entranceId, UUID.randomUUID(), "RECEIVABLE", unit, amount, "EUR", asOf.minusDays(term + 5))
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "RECEIVABLE")).thenReturn(listOf(owed(unitId, 8_000), owed(covered, 2_000)))
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "ADVANCE")).thenReturn(
+            listOf(advance(unitId, 3_000, asOf.minusDays(2)), advance(covered, 2_000, asOf.minusDays(2)), advance(creditOnly, 9_000, asOf.minusDays(2))),
+        )
+        val report = service.forEntrance(entranceId, asOf)
+        assertThat(report.units.map { it.unitId to it.netMinor }).containsExactly(unitId to 5_000L, covered to 0L)
+        assertThat(report.totalMinor).isEqualTo(10_000)
+        assertThat(report.advanceMinor).isEqualTo(5_000)
+        assertThat(report.netMinor).isEqualTo(5_000)
+    }
+
+    @Test
+    fun `PM-DEBT-001 an entrance counts only the credit that covers each unit's own debt, so total less advance is net`() {
+        val entranceId = UUID.randomUUID()
+        val overCovered = UUID.randomUUID()
+        fun owed(unit: UUID, amount: Long) =
+            PostingRow(UUID.randomUUID(), entranceId, UUID.randomUUID(), "RECEIVABLE", unit, amount, "EUR", asOf.minusDays(term + 5))
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "RECEIVABLE")).thenReturn(listOf(owed(overCovered, 3_000), owed(unitId, 8_000)))
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "ADVANCE")).thenReturn(listOf(advance(overCovered, 5_000, asOf.minusDays(2))))
+        val report = service.forEntrance(entranceId, asOf)
+        assertThat(report.units.single { it.unitId == overCovered }.advanceMinor).isEqualTo(5_000)   // the unit keeps its whole credit
+        assertThat(report.totalMinor).isEqualTo(11_000)
+        assertThat(report.advanceMinor).isEqualTo(3_000)                                             // its surplus 2,000 pays no other unit
+        assertThat(report.netMinor).isEqualTo(8_000)
+    }
 }

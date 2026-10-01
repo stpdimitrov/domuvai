@@ -785,9 +785,13 @@ export interface components {
             on: string;
         };
         EntranceArrears: {
+            /** Format: int64 */
+            advanceMinor: number;
             asOf: string;
             /** Format: uuid */
             entranceId: string;
+            /** Format: int64 */
+            netMinor: number;
             /** Format: int64 */
             totalMinor: number;
             units: components["schemas"]["UnitArrears"][];
@@ -1146,8 +1150,12 @@ export interface components {
             titleId: string;
         };
         UnitArrears: {
+            /** Format: int64 */
+            advanceMinor: number;
             asOf: string;
             buckets: components["schemas"]["AgeingBucket"][];
+            /** Format: int64 */
+            netMinor: number;
             oldestDebt?: components["schemas"]["OldestDebt"];
             /** Format: int64 */
             totalMinor: number;

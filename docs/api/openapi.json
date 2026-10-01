@@ -604,12 +604,20 @@
       },
       "EntranceArrears": {
         "properties": {
+          "advanceMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
           "asOf": {
             "type": "string"
           },
           "entranceId": {
             "format": "uuid",
             "type": "string"
+          },
+          "netMinor": {
+            "format": "int64",
+            "type": "integer"
           },
           "totalMinor": {
             "format": "int64",
@@ -623,8 +631,10 @@
           }
         },
         "required": [
+          "advanceMinor",
           "asOf",
           "entranceId",
+          "netMinor",
           "totalMinor",
           "units"
         ],
@@ -1826,6 +1836,10 @@
       },
       "UnitArrears": {
         "properties": {
+          "advanceMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
           "asOf": {
             "type": "string"
           },
@@ -1834,6 +1848,10 @@
               "$ref": "#/components/schemas/AgeingBucket"
             },
             "type": "array"
+          },
+          "netMinor": {
+            "format": "int64",
+            "type": "integer"
           },
           "oldestDebt": {
             "$ref": "#/components/schemas/OldestDebt"
@@ -1848,8 +1866,10 @@
           }
         },
         "required": [
+          "advanceMinor",
           "asOf",
           "buckets",
+          "netMinor",
           "totalMinor",
           "unitId"
         ],
