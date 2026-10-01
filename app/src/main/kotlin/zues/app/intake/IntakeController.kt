@@ -64,7 +64,7 @@ class IntakeController {
     private fun headerColumns(csv: String): List<String> =
         csv.trim().lines().firstOrNull()?.split(",")?.map { it.trim() } ?: emptyList()
 
-    /** A malformed tariff — an unknown cost stream or allocation key — is the caller's error. */
+    /** A malformed tariff — an unknown cost stream, allocation key or named cost — is the caller's error. */
     @ExceptionHandler(IllegalArgumentException::class, IllegalStateException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: RuntimeException): Map<String, String> = mapOf("error" to (e.message ?: "invalid dry-run request"))

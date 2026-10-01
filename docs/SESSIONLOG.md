@@ -1752,3 +1752,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/README.md` (The demo request), `web/app/DemoForm.tsx`.
 
 ---
+
+## S-G1-02a-i · 2026-10-01 · the dry-run names a tariff line (intake)
+
+**Did** — a dry-run tariff line can name its cost (#85, `lane:intake`; fixes #48): `TariffInput.item`, optional, passed to the engine as a charge run's line passes it. A JSON `item` was ignored before, so a concierge line was checked as unnamed maintenance on any key. Now a concierge line on another key than maintenance's, in another stream or named twice is a reported violation and the sheet is not reproduced (PM-FEE-011) — recorded NEEDS_REVIEW, and refused at commit with the reason in the message; a metered cost named on a keyed line is reported the same way (the engine's PM-FEE-017 check). A cost the law does not name is a 400, as an unknown stream or key is — and the tariff is now read before the sheet's rows, so that holds for an empty sheet too. The dry-run, the import record and the commit share the one tariff shape. The contract is regenerated (`TariffInput.item`), and the web client with it.
+
+**Rules covered** — PM-FEE-011, PM-FEE-014 (both already covered; the new tests are named after them)
+
+**Tests added** — `IntakeDryRunTest`: `PM-FEE-011 a concierge line on another key than maintenance's is a violation — the sheet is not reproduced` (#48's probe, with the unnamed line as its control), `PM-FEE-011 a concierge line in another stream, or named twice, is a violation`, `PM-FEE-014 a sheet billed with a concierge line on maintenance's key is reproduced to the cent`, `PM-FEE-017 a metered cost named on a keyed line is a violation — it is not billed as maintenance`, `a cost the law does not name is the caller's error, not a finding about the sheet — whatever the sheet holds`. `IntakeWebTest`: `PM-FEE-011 POST dry-run reports a concierge line on another key than maintenance's — the item is read, not ignored` (raw JSON), `a cost the law does not name is a 400`. `ImportServiceTest`: `PM-FEE-011 a sheet whose concierge line is on another key than maintenance's is recorded NEEDS_REVIEW`, `PM-FEE-011 a commit whose concierge line is on another key than maintenance's is refused, and says why`. `ImportWebTest`: `a malformed tariff on an import — a cost the law does not name — is a 400`. Mutations, each failing its tests: the item dropped, a cost the law does not name ignored, every named line taken for a concierge, a metered cost billed as unnamed maintenance, lower case accepted, a blank read as none, the commit dropping the item, a malformed tariff on an import a 500, the commit not saying why.
+
+**Decisions** — none (the contract's D1–D4 on #85, on the owner's "fix #48", 2026-10-01). A broken PM-FEE-011 is a reported violation, not a 400: a dry-run surfaces what is wrong with a firm's tariff. The review's findings are fixed in the slice: the tariff read before an empty sheet returns, the commit's refusal saying why, the metered, commit and import-400 paths tested.
+
+**Open** — #86, from the review: the dry-run feeds the engine no exemption data (children under six, absence, animals, business use), so a per-person line is checked on raw occupants · a sheet column per cost — #48's "let the column mapping mark a column as concierge" — needs a per-line sheet model: the sheet carries one fee per unit · the two positive tests would pass with the name dropped (the report exposes no charge lines); the negative ones carry the proof · next in money: #73 item 2, advances netted in the arrears read and shown (the owner's answer, 2026-10-01).
+
+**Read first next time** — this entry, #86, `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt`.
+
+---
