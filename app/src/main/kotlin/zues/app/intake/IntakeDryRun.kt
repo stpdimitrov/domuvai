@@ -6,6 +6,7 @@ import zues.charges.TariffLine
 import zues.charges.computeChargeRun
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
+import zues.law.CostItem
 import zues.law.CostStream
 
 /** One tariff line the firm's fees were built on — the same shape the engine bills from. */
@@ -15,6 +16,8 @@ data class TariffInput(
     val decisionId: String,      // the GA decision that adopted it (PM-FEE-012)
     val rateMinor: Long? = null,
     val totalMinor: Long? = null,
+    val item: String? = null,    // CONCIERGE — a cost named within its stream (PM-FEE-011); none for the stream's own line.
+                                 // A metered cost (WATER, HEATING) is never a keyed line: named here, it is reported (PM-FEE-017)
 )
 
 /** A unit whose recomputed fee does not match the firm's — the whole point of the dry-run. */
@@ -42,9 +45,9 @@ data class DryRunReport(
 /**
  * Recompute a firm's fee sheet through the same engine that will bill it, and compare to the
  * cent (Gate 1, PM-FEE-014). Pure: no clock, no I/O. The engine enforces the statutory guards —
- * ideal parts summing to a full share (PM-ORG-002), a tariff line needing a GA decision — and a
- * failure to compute becomes a reported violation, not a thrown error, because a dry-run's job is
- * to surface problems rather than raise them.
+ * ideal parts summing to a full share (PM-ORG-002), a tariff line needing a GA decision, a concierge
+ * line allocated as maintenance is (PM-FEE-011) — and a failure to compute becomes a reported
+ * violation, not a thrown error, because a dry-run's job is to surface problems rather than raise them.
  */
 object IntakeDryRun {
 
@@ -56,22 +59,28 @@ object IntakeDryRun {
         lines: List<TariffInput>,
         sheet: ParsedSheet,
     ): DryRunReport {
-        val rows = sheet.rows
-        val violations = sheet.violations.toMutableList()
-        if (rows.isEmpty()) {
-            return DryRunReport(0, 0, 0, emptyList(), (violations + "no rows to reproduce").distinct(), false)
-        }
-
-        // The tariff is the caller's specification, not the sheet's: a malformed one is their error.
+        // The tariff is the caller's specification, not the sheet's: a malformed one — a stream, key or
+        // cost the law does not know — is their error, whatever the sheet holds.
+        // Rule: PM-FEE-011 — a line's named cost reaches the engine, so a concierge line is checked as one
+        // and not as an unnamed maintenance line.
         val tariff = Tariff(
             entranceId = entranceId,
             period = period,
             legalDate = legalDate,
             lines = lines.map {
-                TariffLine(CostStream.valueOf(it.stream), AllocationKey.valueOf(it.key), it.decisionId, it.rateMinor, it.totalMinor)
+                TariffLine(
+                    CostStream.valueOf(it.stream), AllocationKey.valueOf(it.key), it.decisionId, it.rateMinor, it.totalMinor,
+                    it.item?.let { item -> CostItem.valueOf(item) },
+                )
             },
             businessMultiplier = businessMultiplier,
         )
+
+        val rows = sheet.rows
+        val violations = sheet.violations.toMutableList()
+        if (rows.isEmpty()) {
+            return DryRunReport(0, 0, 0, emptyList(), (violations + "no rows to reproduce").distinct(), false)
+        }
 
         // Unit construction and the run can fail on the sheet's own data (bad ideal parts, a sum
         // that is not 100%): report it rather than throw. Row order is preserved, so the recomputed

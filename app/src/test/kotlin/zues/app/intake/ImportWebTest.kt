@@ -32,6 +32,17 @@ class ImportWebTest {
     )
 
     @Test
+    fun `a malformed tariff on an import — a cost the law does not name — is a 400`() {
+        whenever(imports.record(any(), any())).thenThrow(IllegalArgumentException("No enum constant zues.law.CostItem.DOORBELL"))
+        mvc.perform(
+            post("/api/intake/entrances/$entranceId/imports").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(request)),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("No enum constant zues.law.CostItem.DOORBELL"))
+    }
+
+    @Test
     fun `POST imports returns 201 with the id and report`() {
         whenever(imports.record(any(), any()))
             .thenReturn(ImportResult(importId, DryRunReport(2, 2, 0, emptyList(), emptyList(), true)))

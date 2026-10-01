@@ -87,7 +87,9 @@ class ImportService(
             record.entranceId.toString(), request.period, request.legalDate, request.businessMultiplier, request.lines, sheet,
         )
         if (!report.reproduced) {
-            throw ImportStateException("import $importId no longer reproduces the firm's figures; refusing to commit")
+            // What stopped it is said: figures that differ, or a rule the tariff breaks (e.g. PM-FEE-011) while the figures add up.
+            val why = report.violations.ifEmpty { listOf("${report.differing} unit(s) differ") }.joinToString("; ")
+            throw ImportStateException("import $importId no longer reproduces the firm's figures ($why); refusing to commit")
         }
         aggregates.update(record.copy(status = "COMMITTED"))
         val units = sheet.rows.map {

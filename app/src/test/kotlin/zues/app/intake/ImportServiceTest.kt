@@ -57,6 +57,21 @@ class ImportServiceTest {
     }
 
     @Test
+    fun `PM-FEE-011 a sheet whose concierge line is on another key than maintenance's is recorded NEEDS_REVIEW`() {
+        val captor = argumentCaptor<ImportRow>()
+        whenever(aggregates.insert(captor.capture())).thenAnswer { it.getArgument<ImportRow>(0) }
+        val req = request(6500, 4500).let {
+            it.copy(lines = it.lines + TariffInput("MAINTENANCE", "PER_UNIT", "GA-2026-2", rateMinor = 500, item = "CONCIERGE"))
+        }
+
+        val result = service.record(entranceId, req)   // the figures add up: unnamed, the line would reproduce
+
+        assertThat(result.report.reproduced).isFalse()
+        assertThat(captor.firstValue.status).isEqualTo("NEEDS_REVIEW")
+        assertThat(captor.firstValue.violations).isEqualTo(1)
+    }
+
+    @Test
     fun `record honours a confirmed mapping for a header the profiler cannot recognise`() {
         val captor = argumentCaptor<ImportRow>()
         whenever(aggregates.insert(captor.capture())).thenAnswer { it.getArgument<ImportRow>(0) }
@@ -89,6 +104,21 @@ class ImportServiceTest {
     fun `a missing import is not found`() {
         whenever(imports.findById(any())).thenReturn(Optional.empty())
         assertThatThrownBy { service.find(UUID.randomUUID()) }.isInstanceOf(NoSuchElementException::class.java)
+    }
+
+    @Test
+    fun `PM-FEE-011 a commit whose concierge line is on another key than maintenance's is refused, and says why`() {
+        // Recorded REPRODUCED with the line unnamed; the commit names it. The figures still add up — the rule does not hold.
+        val req = request(6500, 4500).let {
+            it.copy(lines = it.lines + TariffInput("MAINTENANCE", "PER_UNIT", "GA-2026-2", rateMinor = 500, item = "CONCIERGE"))
+        }
+        val importId = UUID.randomUUID()
+        whenever(imports.findById(importId))
+            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0)))
+
+        assertThatThrownBy { service.commit(importId, committedBy, req) }
+            .isInstanceOf(ImportStateException::class.java).hasMessageContaining("PM-FEE-011")
+        verifyNoInteractions(aggregates, events)
     }
 
     @Test

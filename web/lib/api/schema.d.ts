@@ -1122,6 +1122,7 @@ export interface components {
         };
         TariffInput: {
             decisionId: string;
+            item?: string;
             key: string;
             /** Format: int64 */
             rateMinor?: number;

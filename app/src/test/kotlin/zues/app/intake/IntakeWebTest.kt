@@ -80,4 +80,28 @@ class IntakeWebTest {
             .andExpect(jsonPath("$.reproduced").value(true))
             .andExpect(jsonPath("$.matched").value(2))
     }
+
+    /** The request as a caller writes it — raw JSON, so the test proves `item` is read off the wire. */
+    private fun withConcierge(item: String, key: String, amount: String, feeA: Long, feeB: Long) =
+        post("/api/intake/entrances/$entranceId/fee-sheet/dry-run").contentType(MediaType.APPLICATION_JSON).content(
+            """{"period":"2026-05","legalDate":"2026-05-01","csv":"designation,ideal_parts,occupants,fee_minor\nап. 1,60.0000,2,$feeA\nап. 2,40.0000,1,$feeB",
+                "lines":[{"stream":"MAINTENANCE","key":"BY_IDEAL_PARTS","decisionId":"GA-2026-1","totalMinor":10000},
+                         {"stream":"MAINTENANCE","key":"$key","decisionId":"GA-2026-2",$amount,"item":"$item"}]}""",
+        )
+
+    @Test
+    fun `PM-FEE-011 POST dry-run reports a concierge line on another key than maintenance's — the item is read, not ignored`() {
+        mvc.perform(withConcierge("CONCIERGE", "PER_UNIT", "\"rateMinor\":500", 6500, 4500))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reproduced").value(false))
+            .andExpect(jsonPath("$.violations[0]").value(org.hamcrest.Matchers.containsString("PM-FEE-011")))
+        mvc.perform(withConcierge("CONCIERGE", "BY_IDEAL_PARTS", "\"totalMinor\":3000", 7800, 5200))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reproduced").value(true))
+    }
+
+    @Test
+    fun `a cost the law does not name is a 400`() {
+        mvc.perform(withConcierge("DOORBELL", "BY_IDEAL_PARTS", "\"totalMinor\":3000", 7800, 5200)).andExpect(status().isBadRequest)
+    }
 }

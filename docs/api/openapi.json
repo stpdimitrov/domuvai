@@ -1754,6 +1754,9 @@
           "decisionId": {
             "type": "string"
           },
+          "item": {
+            "type": "string"
+          },
           "key": {
             "type": "string"
           },
