@@ -1707,3 +1707,14 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`.
 
 ---
+
+## WEB-14 · 2026-10-01 · the console only where it is switched on
+
+**Did** — `web/middleware.ts`: a server serves the console only with `DOMUVAI_CONSOLE=on` in its environment, or under `next dev` (`npm run dev` binds it to `127.0.0.1`); anywhere else every path but the landing answers a 404 before any route is matched — the same response a missing page gets, however it is asked. Closed by default, so a screen added later is closed with the rest; only `/_next/static/` passes. The landing is rendered per request and shows no link into a closed console: its three `Вход` links are hidden (the mobile menu is now in the server's HTML, hidden until opened), and its two `Започнете безплатно` buttons — which also led into the console — go to the demo form (D3 named three links; there were five). `e2e` starts the same build twice, switched on and not.
+**Rules covered** — PM-DEBT-011 (the web console; notices posted at the entrance are `notify`'s)
+**Tests added** — `tools/check_e2e.py` "PM-DEBT-011 not switched on": every path in the build's route manifest but the landing answers a load, a client navigation, a prefetch and a HEAD with the 404 a missing page gets on the closed server; the open one serves each static page; the closed landing links to none of them, the open one does. Five mutants, each caught: the middleware ignoring the switch, the landing ignoring it, the landing never linking in, the mobile link unguarded, prefetches let past the middleware.
+**Decisions** — none (the contract's D1–D4, owner's yes 2026-10-01). The review's findings are fixed in the slice: a direct 404 instead of a rewrite (a root dynamic route would have answered it), routes from the manifest instead of re-deriving Next's routing, a warning against `web/.env*` files.
+**Open** — #79 the demo form says a request was accepted but sends nothing (now the closed landing's one call to action) · the API has no sign-in either: it must stay off the internet (the web calls it from the server only) until the policy module · sign-in itself (ADR-011; the provider is an owner input) · next: S-G1-02f-o, each debt's own payment term (money, #73 item 1; contract approved 2026-10-01)
+**Read first next time** — `web/README.md` (The console switch), `web/middleware.ts`
+
+---

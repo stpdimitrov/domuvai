@@ -9,8 +9,12 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
    formats included (uuid, date, date-time).
 3. Each live screen renders the seeded entrance's figures — each with its label or its row, so the same amount
    elsewhere on the page cannot stand in for it — and no error state.
+4. PM-DEBT-011: a second server from the same build, not switched on (web/lib/consoleSwitch.ts), serves no console
+   path — each in the build's route manifest, never typed, answers a load, a client navigation, a prefetch and a HEAD
+   with the 404 a missing page gets — and its landing links to none of them.
 
-Expects the entrance tools/seed_demo.py creates. Usage: check_e2e.py --api URL --web URL --entrance ID
+Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
+Usage: check_e2e.py --api URL --web URL --closed-web URL --entrance ID
 """
 import argparse
 import html
@@ -110,10 +114,59 @@ def web_calls():
     return found, unreadable
 
 
-def fetch(base, url, body=None):
+# Each way a browser asks for a page: a load, a client navigation, a prefetch, a HEAD.
+ASKS = [("a load", "GET", {}), ("a client navigation", "GET", {"RSC": "1"}),
+        ("a prefetch", "GET", {"RSC": "1", "Next-Router-Prefetch": "1"}), ("a HEAD", "HEAD", {})]
+
+
+def routes(next_dir):
+    """Every path the build serves, from Next's own route manifest — its routing rules, not a copy of them: page or route."""
+    manifest = json.loads((next_dir / "app-path-routes-manifest.json").read_text(encoding="utf-8"))
+    return {route: entry.rsplit("/", 1)[-1] for entry, route in manifest.items() if route != "/_not-found"}
+
+
+def console_closed(web, closed_web, next_dir):
+    """
+    Rule: PM-DEBT-011 — the console names debtors and what they owe, and there is no sign-in yet, so a server not
+    switched on serves none of it: every path but the landing answers each way of asking with the 404 a missing page
+    gets, and the landing links to none of them. The switched-on server serves each static page (200) and each route
+    handler (not 404), and its landing does link in — so a 404 or a missing link on the other is the switch's doing.
+    A dynamic path is checked closed only: open, an unknown id may rightly be a 404.
+    """
+    served = routes(next_dir)
+    console = sorted(r for r in served if r != "/")
+    if not console:
+        return ["PM-DEBT-011: the build's route manifest lists no console path — nothing was checked"]
+    url = lambda route: re.sub(r"\[+\.*([^\]]+)\]+", r"\1", route)            # a dynamic segment: any value will do
+    nowhere = {name: fetch(closed_web, "/no-such-page", method=method, headers=h) for name, method, h in ASKS}
+    failures = []
+    for route in console:
+        for name, method, h in ASKS:
+            got = fetch(closed_web, url(route), method=method, headers=h)
+            if got[0] != 404 or got != nowhere[name]:
+                failures.append(f"PM-DEBT-011: {url(route)} asked as {name} where the console is not switched on answers "
+                                f"HTTP {got[0]} — expected the 404 a missing page gets")
+        if "[" in route or "(" in route:
+            continue
+        opened = fetch(web, url(route))[0]
+        if (opened != 200) if served[route] == "page" else (opened == 404):
+            failures.append(f"PM-DEBT-011: {url(route)} answers HTTP {opened} where the console is switched on — its 404 proves nothing")
+    links = lambda landing: [r for r in console if f'href="{url(r)}"' in landing]
+    (status, landing), (opened, landing_open) = fetch(closed_web, "/"), fetch(web, "/")
+    failures += [f"PM-DEBT-011: the landing answers HTTP {status} where the console is not switched on"] if status != 200 else []
+    failures += [f"PM-DEBT-011: the landing links to {r}, which this server does not serve" for r in links(landing)]
+    if opened != 200 or not links(landing_open):
+        failures.append("PM-DEBT-011: the switched-on landing links to no console path — a link missing from the other proves nothing")
+    print(f"{'BAD' if failures else 'ok '} PM-DEBT-011 not switched on: {len(console)} console paths × {len(ASKS)} ways asked "
+          f"answer the 404 a missing page gets, the landing links to none")
+    return failures
+
+
+def fetch(base, url, body=None, method=None, headers=None):
     request = urllib.request.Request(
-        base + url, method="POST" if body is not None else "GET",
-        data=json.dumps(body).encode() if body is not None else None, headers={"Content-Type": "application/json"},
+        base + url, method=method or ("POST" if body is not None else "GET"),
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"Content-Type": "application/json", **(headers or {})},
     )
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
@@ -142,10 +195,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument("--api", required=True)
     parser.add_argument("--web", required=True)
+    parser.add_argument("--closed-web", required=True, help="the same build, not switched on (PM-DEBT-011)")
     parser.add_argument("--entrance", required=True)
+    parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
-    failures = []
+    failures = console_closed(web, args.closed_web.rstrip("/"), args.next_dir)
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable

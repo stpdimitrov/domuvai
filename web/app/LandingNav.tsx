@@ -15,8 +15,9 @@ function Logo({ size = 24 }: { size?: number }) {
 }
 
 /** The sticky landing nav: transparent over the hero, solid after scroll; a scroll-spy underline on
- * the current section; and a full-screen menu below 880px. `Вход` opens the console (no login screen yet). */
-export default function LandingNav() {
+ * the current section; and a full-screen menu below 880px. `Вход` opens the console (no login screen yet) — shown
+ * only where this server serves it (PM-DEBT-011). */
+export default function LandingNav({ consoleOpen }: { consoleOpen: boolean }) {
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState("");
   const [menu, setMenu] = useState(false);
@@ -84,7 +85,7 @@ export default function LandingNav() {
 
         {!mobile && (
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <Link href="/portfolio" className="ln-link" style={{ font: "500 14px/1 'IBM Plex Sans'" }}>Вход</Link>
+            {consoleOpen && <Link href="/portfolio" className="ln-link" style={{ font: "500 14px/1 'IBM Plex Sans'" }}>Вход</Link>}
             <a href="#demo" className="ln-solid" style={{ padding: "10px 20px", font: "500 14px/1 'IBM Plex Sans'", borderRadius: 8, whiteSpace: "nowrap" }}>Заявете демо</a>
           </div>
         )}
@@ -96,30 +97,29 @@ export default function LandingNav() {
         )}
       </nav>
 
-      {menu && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", background: "#E7E6E1", padding: "0 20px 24px", boxSizing: "border-box", overflowY: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 68, flex: "none" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Logo />
-              <span style={{ font: "600 16px/1 'IBM Plex Sans'", letterSpacing: "-0.02em" }}>Етаж</span>
-            </div>
-            <button type="button" aria-label="Затвори" onClick={() => setMenu(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, marginRight: -10, border: 0, background: "transparent", color: "#17191A", cursor: "pointer" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
-            </button>
+      {/* Rendered from the start and hidden until opened, so the server's HTML carries every link the landing has. */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 60, display: menu ? "flex" : "none", flexDirection: "column", background: "#E7E6E1", padding: "0 20px 24px", boxSizing: "border-box", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 68, flex: "none" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Logo />
+            <span style={{ font: "600 16px/1 'IBM Plex Sans'", letterSpacing: "-0.02em" }}>Етаж</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", marginTop: 24, borderTop: "1px solid #DEDDD9" }}>
-            {SECTIONS.map((id, i) => (
-              <a key={id} href={`#${id}`} onClick={() => setMenu(false)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, borderBottom: "1px solid #DEDDD9", fontFamily: "Literata, Georgia, serif", fontSize: 28, letterSpacing: "-0.02em", color: "#17191A" }}>
-                {LABELS[id]}<span style={{ font: "400 12px/1 'IBM Plex Mono', monospace", color: "#5C605E" }}>0{i + 1}</span>
-              </a>
-            ))}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto", paddingTop: 40 }}>
-            <a href="#demo" onClick={() => setMenu(false)} className="ln-solid" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 52, font: "500 16px/1 'IBM Plex Sans'", borderRadius: 10 }}>Заявете демо</a>
-            <Link href="/portfolio" onClick={() => setMenu(false)} className="ln-outline" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 52, font: "500 16px/1 'IBM Plex Sans'", borderRadius: 10 }}>Вход в системата</Link>
-          </div>
+          <button type="button" aria-label="Затвори" onClick={() => setMenu(false)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, marginRight: -10, border: 0, background: "transparent", color: "#17191A", cursor: "pointer" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
+          </button>
         </div>
-      )}
+        <div style={{ display: "flex", flexDirection: "column", marginTop: 24, borderTop: "1px solid #DEDDD9" }}>
+          {SECTIONS.map((id, i) => (
+            <a key={id} href={`#${id}`} onClick={() => setMenu(false)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, borderBottom: "1px solid #DEDDD9", fontFamily: "Literata, Georgia, serif", fontSize: 28, letterSpacing: "-0.02em", color: "#17191A" }}>
+              {LABELS[id]}<span style={{ font: "400 12px/1 'IBM Plex Mono', monospace", color: "#5C605E" }}>0{i + 1}</span>
+            </a>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto", paddingTop: 40 }}>
+          <a href="#demo" onClick={() => setMenu(false)} className="ln-solid" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 52, font: "500 16px/1 'IBM Plex Sans'", borderRadius: 10 }}>Заявете демо</a>
+          {consoleOpen && <Link href="/portfolio" onClick={() => setMenu(false)} className="ln-outline" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 52, font: "500 16px/1 'IBM Plex Sans'", borderRadius: 10 }}>Вход в системата</Link>}
+        </div>
+      </div>
     </>
   );
 }
