@@ -214,4 +214,39 @@ class ChargeRunPersistenceIT {
                 .content(json.writeValueAsString(runRequest)),
         ).andExpect(status().isConflict)
     }
+
+    @Test
+    fun `PM-FEE-010 the stored run charges the multiple to business through the common parts only, and a run without it is refused`() {
+        val entranceId = createEntrance()
+        val body = """{"units":[
+            {"designation":"магазин 1","unitType":"FLAT","idealParts":"40.0000","businessUse":true},
+            {"designation":"магазин 2","unitType":"FLAT","idealParts":"30.0000","businessUse":true,"separateEntrance":true},
+            {"designation":"ап. 1","unitType":"FLAT","idealParts":"30.0000","separateEntrance":true}]}"""
+        val (shop, corner, door) = json.readTree(
+            mvc.perform(post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated).andReturn().response.contentAsString,
+        ).get("unitIds").map { it.asText() }
+        val multiple = zues.law.numberOn("BUSINESS_USE_MULTIPLIER_MAX", "2026-08-01").toInt()
+        fun run(multiplier: Int?) = post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
+            json.writeValueAsString(
+                StoredChargeRunRequest(
+                    period = "2026-08", legalDate = "2026-08-01", businessMultiplier = multiplier,
+                    lines = listOf(TariffLineRequest("MAINTENANCE", "PER_UNIT", "GA-2026-1", rateMinor = 1_000)),
+                ),
+            ),
+        )
+
+        mvc.perform(run(null)).andExpect(status().isBadRequest)                          // the assembly's figure is missing
+
+        val response = mvc.perform(run(multiple)).andExpect(status().isCreated).andReturn().response.contentAsString
+        val runId = UUID.fromString(json.readTree(response).get("chargeRunId").asText())
+        val charged = chargeLines.findByChargeRunId(runId).associate { it.unitId.toString() to it.amountMinor }
+        assertThat(charged).isEqualTo(mapOf(shop to 1_000L * multiple, corner to 1_000L, door to 1_000L))
+
+        // the basis records what the engine was given: who paid the multiple, and the figure — so the run reproduces
+        val basis = json.readTree(chargeRuns.findById(runId).orElseThrow().basis.json)
+        assertThat(basis.get("units").associate { it.get("unitId").asText() to it.get("businessUse").asBoolean() })
+            .isEqualTo(mapOf(shop to true, corner to false, door to false))
+        assertThat(basis.get("tariff").get("businessMultiplier").asInt()).isEqualTo(multiple)
+    }
 }

@@ -2,7 +2,10 @@ package zues.app.money
 
 import zues.charges.ChargeRun
 import zues.charges.ConsumptionLine
+import zues.charges.PropertyUnit
+import zues.charges.TariffLine
 import zues.law.CostItem
+import zues.law.CostStream
 import java.math.BigDecimal
 
 /** Shared translation of a computed [ChargeRun] into the HTTP response — used by both the
@@ -27,6 +30,24 @@ internal fun ChargeRun.toResponse(): ChargeRunResponse = ChargeRunResponse(
     },
     missingReadings = missingReadings.map { MissingReadingResponse(it.unitId, it.item.name) },
 )
+
+/**
+ * Rule: PM-FEE-010 — the multiple for business use is "as set by the GA": a run that would charge it carries the
+ * assembly's figure, or is refused, naming the units. It is never the law's minimum by default. The multiple
+ * touches management and maintenance lines only — never the repair fund, never a metered cost — so a run with
+ * none of those charges it to no one and needs no figure. A business unit on such a line needs the figure even
+ * where its share comes to nothing (no chargeable person on a per-person line): what a share weighs is the
+ * engine's, and is not worked out twice. Whether the figure sits inside the statutory range stays the engine's
+ * check, against the law at the legal date.
+ */
+internal fun requireMultiple(units: List<PropertyUnit>, lines: List<TariffLine>, multiplier: Int?) {
+    if (multiplier != null || lines.none { it.stream != CostStream.REPAIR_FUND }) return
+    val paying = units.filter { it.businessUse }
+    require(paying.isEmpty()) {
+        "the assembly sets the multiple for business use, and this run has none (PM-FEE-010) — it would be charged to: " +
+            paying.joinToString { it.designation }
+    }
+}
 
 /** A metered cost as the engine takes it (Rule: PM-FEE-017). */
 internal fun ConsumptionLineRequest.toDomain() = ConsumptionLine(meteredItem(item), priceMinor, decisionId)

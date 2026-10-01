@@ -1802,3 +1802,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — #91, this entry, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.
 
 ---
+
+## S-G1-02g · 2026-10-01 · the multiple is charged for business through the common parts only (money)
+
+**Did** — slice 2 of 3 of the change plan #91 (#94, `lane:money`). `ChargeRunService` fed the registry's separate-street-entrance flag to the engine as business use, so PM-FEE-010's multiple went to exactly the units the rule returns to the standard rate. It now feeds `businessUse && !separateEntrance` (the registry's two facts, S-G1-03d): a unit pays the multiple when it is used for business and has no separate street entrance. The multiple is the assembly's: a run that would charge it with no `businessMultiplier` is refused with a 400 naming the units — the stored preview, the issued run and the stateless preview alike — where the engine used to take the law's minimum. A run that charges it to no one needs none: no such unit, or only repair-fund and metered lines. The stored basis records what the engine was given, as before. No change to the API's shape.
+
+**Rules covered** — PM-FEE-010 (first tests named after it in `money`; the engine's own are in `charges`).
+
+**Tests added** — `ChargeRunServiceTest`: `PM-FEE-010 business through the common parts pays the assembly's multiple — with its own street entrance, or with no business, a unit pays the standard rate`, `PM-FEE-010 a run that would charge the multiple with none given is refused, naming the units it would reach`, `PM-FEE-010 a run that charges the multiple to no one needs none`. `ChargeCalculatorTest`: `PM-FEE-010 the preview refuses a run with a business unit and no multiple, and charges the multiple once it is given`. `ChargeRunPersistenceIT` (Docker — CI): `PM-FEE-010 the stored run charges the multiple to business through the common parts only, and a run without it is refused` (the basis too). Mutations, each failing its tests: the old mapping, a separate entrance no longer returning the standard rate, either fact paying, the stored run or the preview defaulting to the law's minimum, a repair-fund-only run refused, the refusal naming every unit, a figure given being ignored.
+
+**Verified** — the persistence test passed on local Postgres 16 from a scratch copy without Testcontainers, 2026-10-01; the copy is not committed. Gates green.
+
+**Decisions** — the owner's yes on #91 (proposal 2: refuse, never default). From the review, kept as is and said in the code: a business unit on a management or maintenance line needs the figure even where its share comes to nothing — what a share weighs is the engine's, not worked out twice at the edge.
+
+**Open** — slice 3, `intake`, S-G1-02a-k: the dry-run and the commit take the sheet's business use · #95 is `web`'s: the charges screen gives no multiple, so an entrance with a business unit shows its run as refused · on #91, for the owner and counsel: a business unit with no chargeable person pays nothing on a per-person line, multiple or not; a multiple given when no unit pays it is never range-checked · the stateless preview's `businessUse` means "pays the multiple" — it has no separate-entrance field · PM-FEE-010's acceptance (a multiple per unit, a protocol reference) is not built.
+
+**Read first next time** — #91, this entry, `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt`.
+
+---

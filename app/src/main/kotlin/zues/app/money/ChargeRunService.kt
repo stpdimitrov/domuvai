@@ -59,7 +59,9 @@ class ChargeRunService(private val units: Units) {
                 childrenUnder6 = it.childrenUnder6,
                 animals = it.animals,
                 absentDays = it.absentDays,   // PM-FEE-006 — a filed absence exempts the unit (via the engine)
-                businessUse = it.separateEntrance,
+                // Rule: PM-FEE-010 — the multiple is for business or professional use reached through the common
+                // parts; a separate street entrance (PM-ORG-009) returns the unit to the standard rate.
+                businessUse = it.businessUse && !it.separateEntrance,
                 readings = readings[it.unitId.toString()].orEmpty(),
             )
         }
@@ -82,6 +84,7 @@ class ChargeRunService(private val units: Units) {
             businessMultiplier = request.businessMultiplier,
             consumption = request.consumption.orEmpty().map { it.toDomain() },
         )
+        requireMultiple(propertyUnits, tariff.lines, tariff.businessMultiplier)
         return ComputedRun(computeChargeRun(entranceId.toString(), propertyUnits, tariff), stored)
     }
 

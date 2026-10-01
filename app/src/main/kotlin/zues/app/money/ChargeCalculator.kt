@@ -14,7 +14,8 @@ import zues.law.CostStream
  * I/O — so the same request always yields the same figures (Rule: PM-FEE-014). The engine
  * enforces the statutory guards (a tariff line needs a GA decision, the ideal parts sum
  * to a full share per PM-ORG-002, the business multiplier sits inside its range) and
- * throws when they fail.
+ * throws when they fail. One guard is this edge's own: a run that would charge the multiple
+ * carries the assembly's figure, or is refused (PM-FEE-010, [requireMultiple]).
  */
 object ChargeCalculator {
 
@@ -30,6 +31,7 @@ object ChargeCalculator {
             businessMultiplier = request.businessMultiplier,
             consumption = request.consumption.orEmpty().map { it.toDomain() },
         )
+        requireMultiple(units, tariff.lines, tariff.businessMultiplier)
         return computeChargeRun(request.entranceId, units, tariff).toResponse()
     }
 

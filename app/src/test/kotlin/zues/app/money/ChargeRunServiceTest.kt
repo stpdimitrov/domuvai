@@ -159,4 +159,62 @@ class ChargeRunServiceTest {
         assertThatThrownBy { service.preview(entranceId, request.copy(readings = listOf(ReadingRequest(UUID.randomUUID().toString(), "HEATING", "2")))) }
             .isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    // --- PM-FEE-010: who pays the assembly's multiple ---
+
+    private val multiple = numberOn("BUSINESS_USE_MULTIPLIER_MAX", "2026-05-01").toInt()   // read, never typed
+    private val shop = UUID.randomUUID()      // business, reached through the common parts
+    private val corner = UUID.randomUUID()    // business, with its own street entrance
+    private val door = UUID.randomUUID()      // its own street entrance, no business
+
+    private fun business(vararg units: UnitForCharging) {
+        whenever(this.units.forEntrance(eq(entranceId), any())).thenReturn(units.toList())
+    }
+    private fun shopUnit() = UnitForCharging(shop, "магазин 1", "40.0000", separateEntrance = false, businessUse = true)
+    private fun cornerUnit() = UnitForCharging(corner, "магазин 2", "30.0000", separateEntrance = true, businessUse = true)
+    private fun doorUnit() = UnitForCharging(door, "ап. 1", "20.0000", separateEntrance = true, businessUse = false)
+    private fun flatUnit() = UnitForCharging(u2, "ап. 2", "10.0000", separateEntrance = false, businessUse = false)
+
+    private fun perUnit(multiplier: Int?, stream: String = "MAINTENANCE") = StoredChargeRunRequest(
+        period = "2026-05", legalDate = "2026-05-01", businessMultiplier = multiplier,
+        lines = listOf(TariffLineRequest(stream, "PER_UNIT", "GA-2026-1", rateMinor = 1_000)),
+    )
+
+    @Test
+    fun `PM-FEE-010 business through the common parts pays the assembly's multiple — with its own street entrance, or with no business, a unit pays the standard rate`() {
+        business(shopUnit(), cornerUnit(), doorUnit(), flatUnit())
+        val byUnit = service.preview(entranceId, perUnit(multiple)).charges.associate { it.unitId to it.totalMinor }
+        assertThat(byUnit).isEqualTo(
+            mapOf(shop.toString() to 1_000L * multiple, corner.toString() to 1_000L, door.toString() to 1_000L, u2.toString() to 1_000L),
+        )
+    }
+
+    @Test
+    fun `PM-FEE-010 a run that would charge the multiple with none given is refused, naming the units it would reach`() {
+        business(shopUnit(), cornerUnit(), doorUnit(), flatUnit())
+        assertThatThrownBy { service.preview(entranceId, perUnit(null)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("PM-FEE-010").hasMessageContaining("магазин 1")
+            .satisfies({ assertThat(it.message).doesNotContain("магазин 2", "ап. 1", "ап. 2") })
+    }
+
+    @Test
+    fun `PM-FEE-010 a run that charges the multiple to no one needs none`() {
+        business(cornerUnit(), doorUnit(), flatUnit().copy(idealParts = "50.0000"))        // no unit pays it
+        assertThat(service.preview(entranceId, perUnit(null)).charges.map { it.totalMinor }).containsOnly(1_000L)
+
+        business(shopUnit().copy(idealParts = "100.0000"))                                 // the repair fund is never multiplied
+        val fund = StoredChargeRunRequest(
+            period = "2026-05", legalDate = "2026-05-01",
+            lines = listOf(TariffLineRequest("REPAIR_FUND", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 5_000)),
+        )
+        assertThat(service.preview(entranceId, fund).totalMinor).isEqualTo(5_000)
+
+        val water = StoredChargeRunRequest(                                                // nor is a metered cost
+            period = "2026-05", legalDate = "2026-05-01", lines = emptyList(),
+            consumption = listOf(ConsumptionLineRequest("WATER", 230, "GA-2026-9")),
+            readings = listOf(ReadingRequest(shop.toString(), "WATER", "10.000")),
+        )
+        assertThat(service.preview(entranceId, water).totalMinor).isEqualTo(2_300)
+    }
 }

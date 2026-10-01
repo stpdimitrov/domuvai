@@ -39,7 +39,7 @@ data class PropertyUnit(
     val animals: Int = 0,
     /** days absent in the period, with a filed declaration. Rule: PM-FEE-006/007 */
     val absentDays: Int = 0,
-    /** separate street entrance, business use. Rule: PM-ORG-009, PM-FEE-010 */
+    /** pays the assembly's multiple: business or professional use reached through the common parts — not through a separate street entrance. Rule: PM-FEE-010 */
     val businessUse: Boolean = false,
     /** what the unit's own meters read for the period, in thousandths of the unit of measure, by metered item. Rule: PM-FEE-017 */
     val readings: Map<CostItem, Long> = emptyMap(),
