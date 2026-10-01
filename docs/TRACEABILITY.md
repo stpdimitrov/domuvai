@@ -6,24 +6,24 @@
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
 | Referenced in code (`// Rule:`) | 47 | 20% |
-| **Proved by a test named after the rule** | **48** | **21%** |
+| **Proved by a test named after the rule** | **49** | **21%** |
 | No implementation and no test | 184 | 79% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
-## ORG — Structure & ideal parts  ·  5/12 covered
+## ORG — Structure & ideal parts  ·  6/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-ORG-001` | `app/src/test/kotlin/zues/app/registry/EntranceRegistrationTest.kt:34` | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
-| `PM-ORG-002` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:44` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:49` |  |
+| `PM-ORG-002` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:44` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:51` |  |
 | `PM-ORG-003` | — | — |  |
 | `PM-ORG-004` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:51` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:46` |  |
 | `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:68` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
-| `PM-ORG-009` | — | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:27` |  |
+| `PM-ORG-009` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:86` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:27` |  |
 | `PM-ORG-010` | — | — |  |
 | `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:62` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
 | `PM-ORG-012` | — | — |  |
@@ -39,7 +39,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
 | `PM-BOOK-006` | — | — |  |
 | `PM-BOOK-007` | — | — |  |
-| `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:297` |  |
+| `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:301` |  |
 | `PM-BOOK-009` | — | — |  |
 | `PM-BOOK-010` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/BookRetention.kt:10` |  |
 | `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:78` |  |
@@ -133,7 +133,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-007` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` |  |
 | `PM-FEE-008` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:115` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:89` |  |
 | `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:133` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
-| `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:55` | `charges/src/main/kotlin/zues/charges/Charges.kt:42` |  |
+| `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:55` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:31` |  |
 | `PM-FEE-011` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:60` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:64` |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:71` | `charges/src/main/kotlin/zues/charges/Charges.kt:48` |  |
 | `PM-FEE-013` | — | — |  |

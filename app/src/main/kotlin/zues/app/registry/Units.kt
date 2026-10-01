@@ -16,6 +16,10 @@ import java.util.UUID
  * unit has on record for the run's calendar year (Rule PM-FEE-006) — from filed declarations
  * only, and only those filed in time (Rule PM-FEE-007). The engine decides what that count
  * exempts; the registry only reports what its book of declarations holds.
+ *
+ * `businessUse` and `separateEntrance` are two facts (Rules PM-FEE-010, PM-ORG-009): the unit is used for
+ * business or professional activity, and it has a separate street entrance. The registry reports both and
+ * applies no rate — which of them pays the assembly's multiple is money's to decide.
  */
 data class UnitForCharging(
     val unitId: UUID,
@@ -26,6 +30,7 @@ data class UnitForCharging(
     val childrenUnder6: Int = 0,
     val animals: Int = 0,
     val absentDays: Int = 0,
+    val businessUse: Boolean = false,
 )
 
 /** The registry module's API for reading units. Implemented in-module by [UnitsAdapter]. */
@@ -65,6 +70,7 @@ class UnitsAdapter(
                 childrenUnder6 = residents.count { it.isChildUnder6 },
                 animals = pets.size,
                 absentDays = absentDays.toInt(),
+                businessUse = unit.businessUse,
             )
         }
     }

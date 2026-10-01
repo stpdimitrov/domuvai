@@ -140,4 +140,20 @@ class UnitsAdapterTest {
         assertThat(adapter.forEntrance(entranceId, period).single().absentDays)
             .isEqualTo(ChronoUnit.DAYS.between(from, to).toInt())
     }
+
+    @Test
+    fun `PM-ORG-009 the view for charging reports business use and a separate entrance as two facts`() {
+        whenever(units.findByEntranceId(entranceId)).thenReturn(
+            listOf(
+                PropertyUnit(UUID.randomUUID(), entranceId, "магазин 1", "FLAT", null, BigDecimal("50.0000"), separateEntrance = false, businessUse = true),
+                PropertyUnit(UUID.randomUUID(), entranceId, "магазин 2", "FLAT", null, BigDecimal("30.0000"), separateEntrance = true, businessUse = true),
+                PropertyUnit(UUID.randomUUID(), entranceId, "ап. 1", "FLAT", null, BigDecimal("10.0000"), separateEntrance = true),
+                PropertyUnit(UUID.randomUUID(), entranceId, "ап. 2", "FLAT", null, BigDecimal("10.0000"), separateEntrance = false),
+            ),
+        )
+        val view = adapter.forEntrance(entranceId, period)
+        assertThat(view.map { Triple(it.designation, it.businessUse, it.separateEntrance) }).containsExactly(
+            Triple("магазин 1", true, false), Triple("магазин 2", true, true), Triple("ап. 1", false, true), Triple("ап. 2", false, false),
+        )
+    }
 }

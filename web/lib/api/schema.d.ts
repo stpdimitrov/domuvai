@@ -970,6 +970,7 @@ export interface components {
         };
         NewUnitRequest: {
             areaM2?: number;
+            businessUse: boolean;
             designation: string;
             idealParts: string;
             separateEntrance: boolean;
@@ -1194,6 +1195,7 @@ export interface components {
         };
         UnitView: {
             areaM2?: number;
+            businessUse: boolean;
             designation: string;
             /** Format: uuid */
             id: string;

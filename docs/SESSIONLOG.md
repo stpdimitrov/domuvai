@@ -1784,3 +1784,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — this entry, #86, #31 (D1–D3), `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt`.
 
 ---
+
+## S-G1-03d · 2026-10-01 · a unit's business use, apart from its separate entrance (registry)
+
+**Did** — slice 1 of 3 of the change plan #91 (#92, `lane:registry`). `registry.unit` held one flag, `separate_entrance` ("business use through a separate street entrance"), and money fed it to the engine as business use — so PM-FEE-010's multiple went to exactly the units the rule returns to the standard rate. A unit now carries two facts, and neither implies the other: `business_use` (new, migration `V202610011624__unit_business_use.sql`) and `separate_entrance` (as before). A unit already flagged `separate_entrance` is marked `business_use` too — what the flag has meant since V1. Registering a unit takes `businessUse`; the unit view and the registry's view for charging (`UnitForCharging`) return both. The registry applies no rate. **Money still feeds `separateEntrance` to the engine — nothing is charged differently until slice 2.** The contract is regenerated (`NewUnitRequest.businessUse`, `UnitView.businessUse`), and the web client with it.
+
+**Rules covered** — PM-ORG-009 (first tests named after it); PM-FEE-010 is money's, slice 2.
+
+**Tests added** — `RegistryUnitsWebTest`: `PM-ORG-009 a unit is registered with its business use and its separate entrance as two facts`, `PM-ORG-009 GET units returns business use and the separate entrance apart`. `UnitsAdapterTest`: `PM-ORG-009 the view for charging reports business use and a separate entrance as two facts`. `ImportAdoptionTest`: `PM-ORG-009 a registered unit keeps its business use and its separate entrance as given — neither sets the other`, `PM-ORG-009 an adopted unit carries the business use it was given, and no separate entrance`. `RegistryUnitsPersistenceIT` (Docker — CI): `PM-ORG-009 business use and a separate entrance persist as two facts of a unit`. Mutations, each failing its tests: registering drops business use, the request field never reaching the command, the unit view repeating the entrance flag, the charging view dropping it or taking it from the entrance flag, business use registered as a separate entrance, a separate entrance read as business use (at registering, in the request, in the charging view), adoption dropping it.
+
+**Verified** — on local Postgres 16, 2026-10-01: the earlier migrations applied by hand, one unit flagged `separate_entrance` and one not, then the new migration — the flagged one came out `business_use`, the other did not. The persistence test (in its first form, three units) passed from a scratch copy without Testcontainers, through Flyway; the copy is not committed. **No automated test covers the migration's backfill line**: every IT starts from an empty database.
+
+**Decisions** — the owner's yes on #91, 2026-10-01 (the three contracts and proposals 1–3).
+
+**Open** — slice 2, `money`, S-G1-02g: the multiple only for business use without a separate entrance; a run that needs the multiple and has none is refused · slice 3, `intake`, S-G1-02a-k: the dry-run and the commit take the sheet's business use · #91's two catalogue defects (PM-ORG-009 cites a PM-FEE-034 that does not exist; the catalogue and `law` disagree on whether PM-FEE-010's range is confirmed) · who may declare business use, and on what document, is not decided.
+
+**Read first next time** — #91, this entry, `app/src/main/kotlin/zues/app/money/ChargeRunService.kt`.
+
+---
