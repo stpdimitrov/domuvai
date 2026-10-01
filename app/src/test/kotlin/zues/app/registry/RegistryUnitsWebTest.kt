@@ -100,4 +100,30 @@ class RegistryUnitsWebTest {
             .andExpect(jsonPath("$[1].businessUse").value(false))
             .andExpect(jsonPath("$[1].separateEntrance").value(true))
     }
+
+    @Test
+    fun `PM-ORG-003 units sent without ideal parts reach the registry with none, for it to derive`() {
+        val commands = argumentCaptor<List<RegisterUnit>>()
+        whenever(registry.registerUnits(any(), commands.capture())).thenReturn(List(2) { UUID.randomUUID() })
+        mvc.perform(
+            post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON).content(
+                """{"units":[{"designation":"ап. 1","unitType":"FLAT","areaM2":60},{"designation":"ап. 2","unitType":"FLAT","areaM2":40}]}""",
+            ),
+        ).andExpect(status().isCreated)
+        assertThat(commands.firstValue.map { it.idealParts }).containsExactly(null, null)
+    }
+
+    @Test
+    fun `PM-ORG-003 GET units says whether each unit's ideal parts were declared or derived`() {
+        whenever(registry.listUnits(entranceId)).thenReturn(
+            listOf(
+                PropertyUnit(UUID.randomUUID(), entranceId, "ап. 1", "FLAT", BigDecimal("60.00"), BigDecimal("60.0000"), false, idealPartsSource = "DERIVED"),
+                PropertyUnit(UUID.randomUUID(), entranceId, "ап. 2", "FLAT", null, BigDecimal("40.0000"), false),
+            ),
+        )
+        mvc.perform(get("/api/registry/entrances/$entranceId/units"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].idealPartsSource").value("DERIVED"))
+            .andExpect(jsonPath("$[1].idealPartsSource").value("DECLARED"))
+    }
 }

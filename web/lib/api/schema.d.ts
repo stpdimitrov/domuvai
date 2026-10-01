@@ -476,7 +476,7 @@ export interface paths {
         /** List the units of an entrance */
         get: operations["get_registry_entrances_entranceId_units"];
         put?: never;
-        /** Add units with their ideal parts */
+        /** Add units with their ideal parts — declared, or derived from area and marked DERIVED */
         post: operations["post_registry_entrances_entranceId_units"];
         delete?: never;
         options?: never;
@@ -972,7 +972,7 @@ export interface components {
             areaM2?: number;
             businessUse: boolean;
             designation: string;
-            idealParts: string;
+            idealParts?: string;
             separateEntrance: boolean;
             unitType: string;
         };
@@ -1200,6 +1200,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             idealPartsPct: number;
+            idealPartsSource: string;
             separateEntrance: boolean;
             unitType: string;
         };

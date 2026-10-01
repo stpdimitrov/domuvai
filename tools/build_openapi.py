@@ -30,9 +30,10 @@ RUNNING = {
  ('get', '/api/registry/entrances'):
    ('List the registered entrances', ['PM-ORG-001']),
  ('post', '/api/registry/entrances/{entranceId}/units'):
-   ('Add units with their ideal parts', ['PM-ORG-002', 'PM-ORG-009']),
+   ('Add units with their ideal parts — declared, or derived from area and marked DERIVED',
+    ['PM-ORG-002', 'PM-ORG-003', 'PM-ORG-009']),
  ('get', '/api/registry/entrances/{entranceId}/units'):
-   ('List the units of an entrance', ['PM-ORG-001', 'PM-ORG-002']),
+   ('List the units of an entrance', ['PM-ORG-001', 'PM-ORG-002', 'PM-ORG-003']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household'):
    ("Register a unit's household — who counts for per-person charges", ['PM-FEE-005', 'PM-FEE-008']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals'):

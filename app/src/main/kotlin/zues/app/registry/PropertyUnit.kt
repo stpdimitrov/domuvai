@@ -4,7 +4,9 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
 import zues.kernel.IdealParts
+import zues.kernel.allocateByWeight
 import zues.kernel.assertPartsSumTo100
+import zues.kernel.eur
 import java.math.BigDecimal
 import java.util.UUID
 
@@ -30,7 +32,12 @@ data class PropertyUnit(
     val importId: UUID? = null,
     /** Rule: PM-FEE-010 — used for business or professional activity. A fact of its own: it does not say how the unit is reached. */
     val businessUse: Boolean = false,
+    /** Rule: PM-ORG-003 — DECLARED from the title deed, or DERIVED from the built-up area ratio. */
+    val idealPartsSource: String = IdealPartsSource.DECLARED.name,
 )
+
+/** Where a unit's ideal parts came from (PM-ORG-003). A DERIVED value carries a warning wherever it is weighed. */
+enum class IdealPartsSource { DECLARED, DERIVED }
 
 interface PropertyUnitRepository : ListCrudRepository<PropertyUnit, UUID> {
     fun findByEntranceId(entranceId: UUID): List<PropertyUnit>
@@ -64,4 +71,35 @@ object UnitValidation {
     /** ppmPct (millionths of a percent) as the numeric(7,4) percent the column stores. */
     fun toColumn(idealParts: IdealParts): BigDecimal =
         BigDecimal(idealParts.ppmPct).movePointLeft(6).setScale(4)
+}
+
+/**
+ * Rule: PM-ORG-003 — ideal parts derived from the built-up area ratio, for units whose title deeds
+ * do not state them: each unit's area over the entrance's total. Exact and float-free: areas are
+ * counted in hundredths of a square metre (the schema's numeric(10,2)), the 100% is counted in the
+ * schema's steps of 0.0001%, and the kernel's largest-remainder split (ties to the earlier unit)
+ * hands out the last steps, so the result sums to exactly 100.0000% (PM-ORG-002).
+ */
+object IdealPartsDerivation {
+
+    private const val STEPS_IN_WHOLE = 1_000_000L   // 100.0000% in steps of 0.0001%
+    private val MAX_AREA_M2 = BigDecimal("99999999.99")   // the schema's numeric(10,2); keeps the arithmetic in Long
+
+    fun byArea(areasM2: List<BigDecimal>): List<IdealParts> {
+        require(areasM2.isNotEmpty()) { "no units to derive ideal parts for (PM-ORG-003)" }
+        val weights = areasM2.map { area ->
+            require(area.signum() > 0 && area <= MAX_AREA_M2) {
+                "a unit's area must be positive and at most $MAX_AREA_M2 m² to derive its ideal parts; got $area m² (PM-ORG-003)"
+            }
+            try {
+                area.movePointRight(2).longValueExact()
+            } catch (e: ArithmeticException) {
+                throw IllegalArgumentException("an area has at most 2 decimals (schema numeric(10,2)); got $area m²")
+            }
+        }
+        // allocateByWeight splits money; here the "pot" is the 1,000,000 steps that make 100%.
+        return allocateByWeight(eur(STEPS_IN_WHOLE), weights).map { steps ->
+            IdealParts.of("${steps.amountMinor / 10_000}.${(steps.amountMinor % 10_000).toString().padStart(4, '0')}")
+        }
+    }
 }

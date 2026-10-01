@@ -1226,7 +1226,6 @@
         "required": [
           "businessUse",
           "designation",
-          "idealParts",
           "separateEntrance",
           "unitType"
         ],
@@ -1999,6 +1998,9 @@
           "idealPartsPct": {
             "type": "number"
           },
+          "idealPartsSource": {
+            "type": "string"
+          },
           "separateEntrance": {
             "type": "boolean"
           },
@@ -2011,6 +2013,7 @@
           "designation",
           "id",
           "idealPartsPct",
+          "idealPartsSource",
           "separateEntrance",
           "unitType"
         ],
@@ -4331,7 +4334,8 @@
         ],
         "x-rules": [
           "PM-ORG-001",
-          "PM-ORG-002"
+          "PM-ORG-002",
+          "PM-ORG-003"
         ]
       },
       "post": {
@@ -4408,12 +4412,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "Add units with their ideal parts",
+        "summary": "Add units with their ideal parts — declared, or derived from area and marked DERIVED",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-ORG-002",
+          "PM-ORG-003",
           "PM-ORG-009"
         ]
       }

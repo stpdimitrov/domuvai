@@ -47,6 +47,7 @@ class RegistryUnitsPersistenceIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var dataSource: javax.sql.DataSource
 
     private fun createEntrance(): String {
         val body = json.writeValueAsString(RegisterEntranceRequest("ул. Раковски 1", "А", "GA"))
@@ -134,5 +135,74 @@ class RegistryUnitsPersistenceIT {
             .andExpect(jsonPath(fact("ап. 1", "separateEntrance")).value(true))
             .andExpect(jsonPath(fact("ап. 2", "businessUse")).value(false))
             .andExpect(jsonPath(fact("ап. 2", "separateEntrance")).value(false))
+    }
+
+    private fun postUnits(entranceId: String, units: String) = mvc.perform(
+        post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON).content("""{"units":[$units]}"""),
+    )
+
+    @Test
+    fun `PM-ORG-003 units without ideal parts get them from the area ratio, marked DERIVED, summing to 100`() {
+        val entranceId = createEntrance()
+        postUnits(
+            entranceId,
+            """{"designation":"ап. 1","unitType":"FLAT","areaM2":70},{"designation":"ап. 2","unitType":"FLAT","areaM2":70},""" +
+                """{"designation":"ап. 3","unitType":"FLAT","areaM2":70}""",
+        ).andExpect(status().isCreated)
+
+        fun unit(designation: String, field: String) = "$[?(@.designation == '$designation')].$field"
+        mvc.perform(get("/api/registry/entrances/$entranceId/units"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath(unit("ап. 1", "idealPartsPct")).value(33.3334))
+            .andExpect(jsonPath(unit("ап. 2", "idealPartsPct")).value(33.3333))
+            .andExpect(jsonPath(unit("ап. 3", "idealPartsPct")).value(33.3333))
+            .andExpect(jsonPath("$[*].idealPartsSource").value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.equalTo("DERIVED"))))
+    }
+
+    @Test
+    fun `PM-ORG-003 declared ideal parts stay DECLARED`() {
+        val entranceId = createEntrance()
+        postUnits(entranceId, """{"designation":"ап. 1","unitType":"FLAT","areaM2":70,"idealParts":"100.0000"}""").andExpect(status().isCreated)
+        mvc.perform(get("/api/registry/entrances/$entranceId/units"))
+            .andExpect(jsonPath("$[0].idealPartsSource").value("DECLARED"))
+            .andExpect(jsonPath("$[0].idealPartsPct").value(100.0))
+    }
+
+    @Test
+    fun `PM-ORG-003 no derivation is guessed for a mixed set, a unit without area, or an entrance that already has units`() {
+        val mixed = createEntrance()
+        postUnits(mixed, """{"designation":"ап. 1","unitType":"FLAT","areaM2":70,"idealParts":"50.0000"},{"designation":"ап. 2","unitType":"FLAT","areaM2":70}""")
+            .andExpect(status().isBadRequest)
+        val noArea = createEntrance()
+        postUnits(noArea, """{"designation":"ап. 1","unitType":"FLAT","areaM2":70},{"designation":"ап. 2","unitType":"FLAT"}""")
+            .andExpect(status().isBadRequest)
+        val filled = createEntrance()
+        postUnits(filled, """{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000"}""").andExpect(status().isCreated)
+        postUnits(filled, """{"designation":"ап. 2","unitType":"FLAT","areaM2":70}""").andExpect(status().isBadRequest)
+
+        listOf(mixed, noArea).forEach {
+            mvc.perform(get("/api/registry/entrances/$it/units")).andExpect(jsonPath("$.length()").value(0))
+        }
+        mvc.perform(get("/api/registry/entrances/$filled/units")).andExpect(jsonPath("$.length()").value(1))
+    }
+
+    @Test
+    fun `PM-ORG-002 a unit set waits for any other write holding its entrance, so two sets cannot both make 100%`() {
+        val entranceId = createEntrance()
+        dataSource.connection.use { other ->
+            other.autoCommit = false
+            // the lock another unit-set write holds; it does not block a foreign-key check, so only
+            // the service's own lock can make the write below wait
+            other.prepareStatement("SELECT id FROM registry.entrance WHERE id = ?::uuid FOR NO KEY UPDATE").use {
+                it.setString(1, entranceId); it.executeQuery()
+            }
+            val write = java.util.concurrent.CompletableFuture.supplyAsync {
+                postUnits(entranceId, """{"designation":"ап. 1","unitType":"FLAT","areaM2":70}""").andReturn().response.status
+            }
+            Thread.sleep(1_500)
+            org.assertj.core.api.Assertions.assertThat(write.isDone).describedAs("the write must wait for the entrance lock").isFalse()
+            other.rollback()
+            org.assertj.core.api.Assertions.assertThat(write.get(30, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(201)
+        }
     }
 }
