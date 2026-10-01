@@ -77,6 +77,10 @@ shows the address. Without it, or with a value that is not a plain address, the 
 requests are not taken through the site yet — its "Заявете демо" buttons still lead to that section, so set the
 address before the landing is public. Storing a request, or sending it from the server, is the owner's choice and not built.
 
+The address is **`office@newcleardigital.com`** (the owner, 2026-10-01). No deployment exists yet, so nothing sets it
+for a public server: set `DOMUVAI_CONTACT_EMAIL=office@newcleardigital.com` in that server's environment when one
+does. On a developer's machine put the same line in `web/.env.local`, which git ignores.
+
 ## The API client
 
 `lib/api/schema.d.ts` is **generated** from the contract (`docs/api/openapi.json`, itself generated
@@ -194,8 +198,9 @@ httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the d
   owe, which PM-DEBT-011 forbids in any publicly accessible place. The charges and fund screens show owners,
   amounts and bank accounts. Until then the console is served only where it is switched on (WEB-14), and the
   API — no sign-in either — must not be reachable from the internet: the web calls it from the server only.
-- Set `DOMUVAI_CONTACT_EMAIL` where the landing is served, and decide where a demo request goes — a stored lead,
-  a CRM, a mail provider (#79). Until then the visitor sends it from their own mail (WEB-15).
+- Set `DOMUVAI_CONTACT_EMAIL=office@newcleardigital.com` where the landing is served (see "The demo request"), and
+  decide where a demo request goes — a stored lead, a CRM, a mail provider (#79). Until then the visitor sends it
+  from their own mail (WEB-15).
 - Re-host the hero clip in `HeroVideo.tsx` on a domuvai-owned origin (currently the design
   tool's CDN URL).
 - Add a lint step (ESLint is not configured yet).
