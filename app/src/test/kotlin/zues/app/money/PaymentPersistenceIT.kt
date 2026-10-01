@@ -246,4 +246,49 @@ class PaymentPersistenceIT {
         pay(otherEntrance, "p-1", """{"unitId":"$unitId","amountMinor":1000,"valueDate":"2026-05-20","receivedInto":"CASH"}""")
             .andExpect(status().isNotFound)
     }
+
+    @Test
+    fun `PM-DEBT-001 an overpayment is netted against the next charge in both arrears reads`() {
+        val (entranceId, unitId) = billedUnit()
+        pay(entranceId, "p-1", """{"unitId":"$unitId","amountMinor":40000,"valueDate":"2026-05-20","receivedInto":"CASH"}""")
+            .andExpect(status().isCreated).andExpect(jsonPath("$.unallocatedMinor").value(4_000))
+        mvc.perform(
+            post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
+                json.writeValueAsString(
+                    StoredChargeRunRequest(
+                        period = "2026-06", legalDate = "2026-06-01",
+                        lines = listOf(
+                            TariffLineRequest("MANAGEMENT", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
+                            TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 20_000),
+                        ),
+                    ),
+                ),
+            ),
+        ).andExpect(status().isCreated)
+
+        mvc.perform(get("/api/money/units/$unitId/arrears").param("asOf", "2026-06-20"))
+            .andExpect(jsonPath("$.totalMinor").value(18_000))
+            .andExpect(jsonPath("$.advanceMinor").value(4_000))
+            .andExpect(jsonPath("$.netMinor").value(14_000))
+        mvc.perform(get("/api/money/entrances/$entranceId/arrears").param("asOf", "2026-06-20"))
+            .andExpect(jsonPath("$.units[?(@.unitId == '$unitId')].netMinor").value(14_000))
+            .andExpect(jsonPath("$.totalMinor").value(54_000))     // ап. 1 owes June 18,000; ап. 2 owes 12,000 a month, unpaid, for three months
+            .andExpect(jsonPath("$.advanceMinor").value(4_000))
+            .andExpect(jsonPath("$.netMinor").value(50_000))
+    }
+
+    @Test
+    fun `PM-DEBT-001 the ledger refuses a receivable or an advance that names no unit`() {
+        val (entranceId, _) = billedUnit()
+        listOf("RECEIVABLE", "ADVANCE").forEach { account ->
+            val refused = runCatching {
+                jdbc.update(
+                    "INSERT INTO money.posting (id, entrance_id, journal_id, account, unit_id, amount_minor, value_date) " +
+                        "VALUES (gen_random_uuid(), ?::uuid, gen_random_uuid(), ?, NULL, -100, DATE '2026-05-01')",
+                    entranceId.toString(), account,
+                )
+            }.exceptionOrNull()
+            assertEquals(true, refused?.message?.contains("posting_unit_receivable_advance"), "$account: $refused")
+        }
+    }
 }

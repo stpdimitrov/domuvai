@@ -1873,3 +1873,38 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 - Re-deriving an existing entrance is not supported.
 
 **Read first next time** — this entry, #97, `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt` (`IdealPartsDerivation`).
+
+---
+
+## S-G1-02h · 2026-10-01 · advances netted in the arrears read (money)
+
+**Did**
+- Delivers #73 items 2 and 3 (claim #102).
+- **Unit read:** both arrears reads now net a unit's `ADVANCE` (the overpayment credit, S-42) against what it owes. `advanceMinor` is the credit held from payments made on or before the read date, shown positive. `netMinor = max(0, total − advance)`. `totalMinor` and the ageing buckets stay gross, since an advance settles no particular debt. No stored posting changes.
+- **Entrance read:** `advanceMinor` counts only the credit that covers each unit's own debt (`min(advance, debt)`), so `total − advance = net` holds there too. A unit's surplus can't pay another unit (PM-PMC-008) and shows only on its own figure. A unit fully covered by its advance is still listed; a unit holding only an advance is not.
+- **New migration** `V202610012100__posting_unit_required.sql`: a `RECEIVABLE` or `ADVANCE` posting must name its unit. Every writer (`forRun`, `forPayment`, `forPayout`) already did.
+- The contract and web client are regenerated, adding the new fields, both required.
+
+**Rules covered** — PM-DEBT-001.
+
+**Tests added**
+- `ArrearsServiceTest` +4:
+  - a unit's advance netted and shown, buckets gross, a later advance not counted;
+  - an advance above the debt leaves net 0;
+  - an entrance nets per unit, lists a covered unit, and leaves out a credit-only unit;
+  - an entrance counts only covering credit (total − advance = net).
+- `PaymentPersistenceIT` +2 (Postgres): an overpayment netted against the next charge in both reads, entrance totals included; the ledger refuses a receivable or advance with no unit (by constraint name).
+- **Mutations, each caught:** later advances counted; net not clamped; no DB guard; the entrance advance left uncapped.
+
+**Decisions**
+- D1–D4: the owner's go, 2026-10-01; item 2's choice dates from #73.
+- **The entrance figure:** the owner chose covering credit over full credit (2026-10-01). A fresh review found that the full credit breaks `total − advance = net` when a unit is over-covered.
+
+**Found** — the fresh review (subagent, diff + rule text only) raised the entrance mismatch (decided and fixed), the stale contract (regenerated), stale comments, and a weak integration assertion (fixed). It also suspected the fields would publish optional; the generated contract marks them required.
+
+**Open**
+- **The `/debts` screen** shows gross only. A unit fully covered by its advance still counts as "в просрочие". This is the web lane.
+- The statement still shows gross receivables.
+- Applying advances to new charges was not chosen.
+
+**Read first next time** — #73, this entry, `app/src/main/kotlin/zues/app/money/Arrears.kt`.
