@@ -86,6 +86,12 @@ object IntakeDryRun {
         // that is not 100%): report it rather than throw. Row order is preserved, so the recomputed
         // charges line up with the rows positionally.
         val computed = try {
+            // Rule: PM-FEE-008, PM-FEE-005 — the sheet's occupants are the persons the firm charged (owner's D1 on #31,
+            // extended on #86, 2026-10-01): the count already leaves out children under six and already reflects
+            // absences and animals. So the engine is given the occupants alone — feeding it the sheet's children,
+            // animal or absence cells as well would apply the same fact twice, and the commit adopts the household
+            // on this reading. The business-use multiple is not applied here either, until the live run can
+            // reproduce it (the separate-entrance flag, a money finding since S-41b; PM-FEE-010 is unconfirmed).
             val units = rows.mapIndexed { i, r ->
                 PropertyUnit(i.toString(), r.designation, IdealParts.of(r.idealParts), r.occupants)
             }

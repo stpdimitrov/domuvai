@@ -128,10 +128,10 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:38` | `law/src/main/kotlin/zues/law/Keys.kt:4` |  |
 | `PM-FEE-003` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:107` | `charges/src/main/kotlin/zues/charges/Charges.kt:93` |  |
 | `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:47` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
-| `PM-FEE-005` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:49` | `app/src/main/kotlin/zues/app/registry/HouseholdMember.kt:13` |  |
+| `PM-FEE-005` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:115` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:89` |  |
 | `PM-FEE-006` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:111` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` | ⚠ |
 | `PM-FEE-007` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` |  |
-| `PM-FEE-008` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:66` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:212` |  |
+| `PM-FEE-008` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:115` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:89` |  |
 | `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:133` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
 | `PM-FEE-010` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:55` | `charges/src/main/kotlin/zues/charges/Charges.kt:42` |  |
 | `PM-FEE-011` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:60` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:64` |  |

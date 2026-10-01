@@ -110,4 +110,28 @@ class IntakeDryRunTest {
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("CostItem")
         }
     }
+
+    @Test
+    fun `PM-FEE-008 PM-FEE-005 the sheet's occupants are the persons charged — its children, animal, absence and business cells change no recomputed fee`() {
+        // 500 a person. ап. 1 was charged on 3 persons; the sheet also says a child lives there, two animals,
+        // a long absence and a business. The 3 already is what those came to (D1 on #31, #86): none is applied again.
+        val perPerson = listOf(TariffInput("MAINTENANCE", "PER_PERSON", "GA-2026-1", rateMinor = 500))
+        val stated = FeeSheet.parse(
+            "designation,ideal_parts,occupants,fee_minor,children,animals,absent_days,business\n" +
+                "ап. 1,60.0000,3,1500,1,2,45,да\nап. 2,40.0000,1,500,,,,",
+        )
+        assertThat(stated.rows.first().optional.keys).containsExactlyInAnyOrder(      // the four cells were read, not dropped
+            IntakeField.CHILDREN_UNDER_6, IntakeField.ANIMALS, IntakeField.ABSENT_DAYS, IntakeField.BUSINESS_USE,
+        )
+        val report = IntakeDryRun.of("e1", period, on, null, perPerson, stated)
+        assertThat(report.violations).isEmpty()
+        assertThat(report.differences).isEmpty()
+        assertThat(report.reproduced).isTrue()
+
+        // by ideal parts, a business cell applies no multiple: 60/40 of 10000
+        val byParts = FeeSheet.parse(
+            "designation,ideal_parts,occupants,fee_minor,business\nап. 1,60.0000,3,6000,\nап. 2,40.0000,1,4000,да",
+        )
+        assertThat(IntakeDryRun.of("e1", period, on, null, maintenance(), byParts).reproduced).isTrue()
+    }
 }
