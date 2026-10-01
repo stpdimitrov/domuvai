@@ -83,6 +83,33 @@ class ImportAdoptionTest {
     }
 
     @Test
+    fun `PM-ORG-009 a registered unit keeps its business use and its separate entrance as given — neither sets the other`() {
+        whenever(entrances.existsById(entranceId)).thenReturn(true)
+        val written = argumentCaptor<Any>()
+        whenever(aggregates.insert(written.capture())).thenAnswer { it.arguments[0] }
+        val facts = listOf(true to false, true to true, false to true, false to false)   // business use to separate entrance
+
+        service.registerUnits(
+            entranceId,
+            facts.mapIndexed { i, (business, entrance) ->
+                RegisterUnit("обект ${i + 1}", "FLAT", idealParts = "25.0000", separateEntrance = entrance, businessUse = business)
+            },
+        )
+
+        assertThat(written.allValues.filterIsInstance<PropertyUnit>().map { it.businessUse to it.separateEntrance }).isEqualTo(facts)
+    }
+
+    @Test
+    fun `PM-ORG-009 an adopted unit carries the business use it was given, and no separate entrance`() {
+        val adopted = adopt(
+            ImportedUnit(unit("магазин", "60.0000").copy(businessUse = true)),
+            ImportedUnit(unit("ап. 1", "40.0000")),
+        ).filterIsInstance<PropertyUnit>()
+        assertThat(adopted.map { Triple(it.designation, it.businessUse, it.separateEntrance) })
+            .containsExactly(Triple("магазин", true, false), Triple("ап. 1", false, false))
+    }
+
+    @Test
     fun `a sheet row with no household and no owner adopts the unit alone`() {
         val written = adopt(ImportedUnit(unit("ап. 1", "100.0000")))
         assertThat(written).hasSize(1).allSatisfy { assertThat(it).isInstanceOf(PropertyUnit::class.java) }

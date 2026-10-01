@@ -24,10 +24,12 @@ data class PropertyUnit(
     val areaM2: BigDecimal?,
     /** exact percent, numeric(7,4) — the schema's precision, not the kernel's six decimals */
     val idealPartsPct: BigDecimal,
-    /** Rule: PM-ORG-009 — separate street entrance for business use, drives the fee multiplier */
+    /** Rule: PM-ORG-009 — the unit has a separate street entrance. It does not say the unit is used for business. */
     val separateEntrance: Boolean,
     /** Provenance if adopted from a fee-sheet import (STAGE1-ADDENDUM §1); null if registered directly. */
     val importId: UUID? = null,
+    /** Rule: PM-FEE-010 — used for business or professional activity. A fact of its own: it does not say how the unit is reached. */
+    val businessUse: Boolean = false,
 )
 
 interface PropertyUnitRepository : ListCrudRepository<PropertyUnit, UUID> {

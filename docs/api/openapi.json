@@ -1207,6 +1207,9 @@
           "areaM2": {
             "type": "number"
           },
+          "businessUse": {
+            "type": "boolean"
+          },
           "designation": {
             "type": "string"
           },
@@ -1221,6 +1224,7 @@
           }
         },
         "required": [
+          "businessUse",
           "designation",
           "idealParts",
           "separateEntrance",
@@ -1982,6 +1986,9 @@
           "areaM2": {
             "type": "number"
           },
+          "businessUse": {
+            "type": "boolean"
+          },
           "designation": {
             "type": "string"
           },
@@ -2000,6 +2007,7 @@
           }
         },
         "required": [
+          "businessUse",
           "designation",
           "id",
           "idealPartsPct",

@@ -108,4 +108,31 @@ class RegistryUnitsPersistenceIT {
             .andExpect(jsonPath("$.length()").value(2))
             .andExpect(jsonPath("$[0].idealPartsPct").exists())
     }
+
+    @Test
+    fun `PM-ORG-009 business use and a separate entrance persist as two facts of a unit`() {
+        val entranceId = createEntrance()
+        mvc.perform(
+            post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON).content(
+                """{"units":[
+                     {"designation":"магазин 1","unitType":"FLAT","idealParts":"30.0000","businessUse":true},
+                     {"designation":"магазин 2","unitType":"FLAT","idealParts":"30.0000","businessUse":true,"separateEntrance":true},
+                     {"designation":"ап. 1","unitType":"FLAT","idealParts":"20.0000","separateEntrance":true},
+                     {"designation":"ап. 2","unitType":"FLAT","idealParts":"20.0000"}
+                   ]}""",
+            ),
+        ).andExpect(status().isCreated)
+
+        fun fact(designation: String, name: String) = "$[?(@.designation == '$designation')].$name"
+        mvc.perform(get("/api/registry/entrances/$entranceId/units"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath(fact("магазин 1", "businessUse")).value(true))       // through the common parts
+            .andExpect(jsonPath(fact("магазин 1", "separateEntrance")).value(false))
+            .andExpect(jsonPath(fact("магазин 2", "businessUse")).value(true))       // with its own street entrance
+            .andExpect(jsonPath(fact("магазин 2", "separateEntrance")).value(true))
+            .andExpect(jsonPath(fact("ап. 1", "businessUse")).value(false))      // its own entrance, no business
+            .andExpect(jsonPath(fact("ап. 1", "separateEntrance")).value(true))
+            .andExpect(jsonPath(fact("ап. 2", "businessUse")).value(false))
+            .andExpect(jsonPath(fact("ап. 2", "separateEntrance")).value(false))
+    }
 }

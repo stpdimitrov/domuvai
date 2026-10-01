@@ -36,6 +36,8 @@ data class RegisterUnit(
     val areaM2: BigDecimal? = null,
     val idealParts: String,
     val separateEntrance: Boolean = false,
+    /** Rule: PM-FEE-010 — business or professional use, whether or not through a separate entrance (PM-ORG-009) */
+    val businessUse: Boolean = false,
 )
 
 /**
@@ -131,6 +133,7 @@ class RegistryService(
                     areaM2 = command.areaM2,
                     idealPartsPct = UnitValidation.toColumn(IdealParts.of(command.idealParts)),
                     separateEntrance = command.separateEntrance,
+                    businessUse = command.businessUse,
                 ),
             ).id
         }
@@ -168,6 +171,7 @@ class RegistryService(
                     areaM2 = command.areaM2,
                     idealPartsPct = UnitValidation.toColumn(IdealParts.of(command.idealParts)),
                     separateEntrance = command.separateEntrance,
+                    businessUse = command.businessUse,
                     importId = importId,
                 ),
             ).id
