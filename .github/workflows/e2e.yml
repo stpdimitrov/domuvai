@@ -3,8 +3,9 @@ name: e2e
 # E2E-01 — the whole chain on every PR: Postgres → the API from its jar (Flyway on an empty database) → a seed
 # through the public API → the production web server → tools/check_e2e.py, which validates every response the live
 # screens use against the published contract and reads the seeded figures off the screens themselves; a second web
-# server from the same build, not switched on, must serve no console page (PM-DEBT-011). Not path-filtered, so it runs
-# on every PR — a required check on main.
+# server from the same build, not switched on, must serve no console page (PM-DEBT-011). The landing offers the demo
+# form only where the server has an address to write to — the first has one, the second none, a third a value that is
+# not an address (#79). Not path-filtered, so it runs on every PR — a required check on main.
 on:
   push: { branches: [main] }
   pull_request:
@@ -52,21 +53,23 @@ jobs:
           entrance=$(python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
           echo "ENTRANCE=$entrance" >> "$GITHUB_ENV"
 
-      - name: Start the web against the API — once switched on, once not (PM-DEBT-011)
+      - name: Start the web against the API — switched on with an address to write to, with neither, with a bad address (PM-DEBT-011, #79)
         working-directory: web
         env: { API_URL: 'http://localhost:8080' }
         run: |
-          DOMUVAI_CONSOLE=on nohup npx next start -p 3000 > ../web.log 2>&1 &
+          DOMUVAI_CONSOLE=on DOMUVAI_CONTACT_EMAIL=demo@example.test nohup npx next start -p 3000 > ../web.log 2>&1 &
           nohup npx next start -p 3001 > ../web-closed.log 2>&1 &
-          for port in 3000 3001; do
+          DOMUVAI_CONTACT_EMAIL='mailto:nobody@example.test' nohup npx next start -p 3002 > ../web-bad-contact.log 2>&1 &
+          for port in 3000 3001 3002; do
             curl -sf -o /dev/null --max-time 10 --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"
           done
 
       - name: The chain, checked — contract conformance and the figures on screen
         run: |
           python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
-            --closed-web http://localhost:3001 --entrance "$ENTRANCE"
+            --closed-web http://localhost:3001 --bad-contact-web http://localhost:3002 --contact demo@example.test \
+            --entrance "$ENTRANCE"
 
       - name: Logs
         if: failure()
-        run: tail -n 150 api.log web.log web-closed.log
+        run: tail -n 150 api.log web.log web-closed.log web-bad-contact.log

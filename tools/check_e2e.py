@@ -12,9 +12,12 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 4. PM-DEBT-011: a second server from the same build, not switched on (web/lib/consoleSwitch.ts), serves no console
    path — each in the build's route manifest, never typed, answers a load, a client navigation, a prefetch and a HEAD
    with the 404 a missing page gets — and its landing links to none of them.
+5. #79: the landing sends a demo request nowhere by itself, so it never says one arrived. The first server has an
+   address to write to (web/lib/contact.ts) and offers the form with it; the second has none, a third has a value
+   that is not an address, and they offer neither.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
-Usage: check_e2e.py --api URL --web URL --closed-web URL --entrance ID
+Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
 """
 import argparse
 import html
@@ -162,6 +165,41 @@ def console_closed(web, closed_web, next_dir):
     return failures
 
 
+CLAIM = "Заявката е приета"                            # what the form said while it sent nothing (#79)
+SENDS_NOTHING = "Тази страница не изпраща нищо сама"   # what it says once the letter is written out
+NOT_YET = "Още не приемаме заявки през сайта"
+
+
+def demo_request(web, without_address, contact, next_dir):
+    """
+    #79 — the landing sends a demo request nowhere by itself: with an address to write to (DOMUVAI_CONTACT_EMAIL) it
+    offers the form and names the address in both places that had a placeholder, and the visitor sends the letter;
+    with none — unset, or a value that is not an address — it offers no form and no address, and says so.
+
+    What the form shows after submitting is never served, only shipped, so it is read from the build: no file says a
+    request was accepted, and one says the page sends nothing by itself. That is as far as text can be checked
+    without a browser — an acceptance worded some other way would pass.
+    """
+    failures = []
+    status, page = fetch(web, "/")
+    named = page.count(f'href="mailto:{contact}"')
+    if status != 200 or "<form" not in page or named < 2:
+        failures.append(f"#79: with {contact} to write to, the landing offers no form or names the address in {named} place(s), not 2")
+    for how, base in without_address.items():
+        status, page = fetch(base, "/")
+        if status != 200 or "<form" in page or "mailto:" in page:
+            failures.append(f"#79: with {how}, the landing still offers a form or an address")
+        if NOT_YET not in visible_text(page):
+            failures.append(f"#79: with {how}, the landing does not say that requests are not taken yet")
+    built = [p.read_text(encoding="utf-8") for p in sorted(next_dir.rglob("*.js")) if "cache" not in p.parts]
+    says = lambda text: sum(text in file or text.encode("unicode_escape").decode().lower() in file.lower() for file in built)
+    failures += [f"#79: {says(CLAIM)} built file(s) say {CLAIM!r} — the page sends a request nowhere"] if says(CLAIM) else []
+    failures += [f"#79: no built file says {SENDS_NOTHING!r} — the form no longer tells the visitor to send the letter"] if not says(SENDS_NOTHING) else []
+    print(f"{'BAD' if failures else 'ok '} #79 the demo request: a form and the address where there is one, neither where there "
+          f"is none, no claim of acceptance in {len(built)} built files")
+    return failures
+
+
 def fetch(base, url, body=None, method=None, headers=None):
     request = urllib.request.Request(
         base + url, method=method or ("POST" if body is not None else "GET"),
@@ -195,12 +233,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument("--api", required=True)
     parser.add_argument("--web", required=True)
-    parser.add_argument("--closed-web", required=True, help="the same build, not switched on (PM-DEBT-011)")
+    parser.add_argument("--closed-web", required=True, help="the same build, not switched on (PM-DEBT-011), with no address to write to (#79)")
+    parser.add_argument("--bad-contact-web", required=True, help="the same build, started with a DOMUVAI_CONTACT_EMAIL that is not an address (#79)")
+    parser.add_argument("--contact", required=True, help="the address --web was started with, DOMUVAI_CONTACT_EMAIL (#79)")
     parser.add_argument("--entrance", required=True)
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
     failures = console_closed(web, args.closed_web.rstrip("/"), args.next_dir)
+    without_address = {"no address to write to": args.closed_web.rstrip("/"),
+                       "a value that is not an address": args.bad_contact_web.rstrip("/")}
+    failures += demo_request(web, without_address, args.contact, args.next_dir)
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable
