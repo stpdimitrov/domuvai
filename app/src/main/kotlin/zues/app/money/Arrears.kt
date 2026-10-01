@@ -1,5 +1,6 @@
 package zues.app.money
 
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.law.numberOn
@@ -28,8 +29,8 @@ data class AgeingBucket(val band: String, val amountMinor: Long)
 /**
  * A unit's outstanding, aged (Rule: PM-DEBT-001). `totalMinor` is everything still owed; the
  * buckets split it by how overdue each charge is as of the read date. Every band is present,
- * in order, so the shape is stable for a caller. `oldestDebt` is the oldest debt still open — absent
- * when nothing is owed.
+ * in order, so the shape is stable for a caller. `oldestDebt` is the oldest debt still open — the one
+ * that fell due first — absent when nothing is owed.
  */
 data class UnitArrears(
     val unitId: UUID,
@@ -59,45 +60,51 @@ data class EntranceArrears(
  * the read date — a charge is owed until a payment posts its credit (ADR-006), and a payment made
  * after the read date had not reduced it yet. A charge falls due `PAYMENT_TERM_DAYS` after its
  * value date (Rule: PM-DEBT-002); the value date stands in for the decision's announcement until
- * the assembly module records one. Overdue days are counted from that due date, and a payment's
- * credit is banded with the debt it settled.
+ * the assembly module records one. The term is the one in force on the debt's own date, not on the
+ * read date (Rule: PM-SYS-002): the read date picks which postings count, never when a debt fell
+ * due. Overdue days are counted from that due date, and a payment's credit is banded with the debt
+ * it settled.
+ *
+ * [termOn] is the payment term in force on a date. It is passed in so that a test can supply two
+ * terms; the running service reads it from the law catalogue, the only home of the number.
  */
 @Service
-class ArrearsService(private val postings: PostingRepository) {
+class ArrearsService(private val postings: PostingRepository, private val termOn: (LocalDate) -> Long) {
+
+    @Autowired
+    constructor(postings: PostingRepository) : this(postings, ::paymentTermOn)
 
     @Transactional(readOnly = true)
     fun forUnit(unitId: UUID, asOf: LocalDate): UnitArrears =
-        aged(unitId, postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE), asOf, term(asOf))
+        aged(unitId, postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE), asOf)
 
     /** Rule: PM-DEBT-001 — the entrance's receivable postings, unit by unit, each aged exactly as [forUnit] ages it. */
     @Transactional(readOnly = true)
     fun forEntrance(entranceId: UUID, asOf: LocalDate): EntranceArrears {
-        val term = term(asOf)
         val owing = postings.findByEntranceIdAndAccount(entranceId, Ledger.RECEIVABLE)
             .filter { it.unitId != null }
             .groupBy { it.unitId!! }
-            .map { (unitId, rows) -> aged(unitId, rows, asOf, term) }
+            .map { (unitId, rows) -> aged(unitId, rows, asOf) }
             .filter { it.totalMinor > 0 }
             .sortedWith(compareByDescending<UnitArrears> { it.totalMinor }.thenBy { it.unitId })
         return EntranceArrears(entranceId, asOf.toString(), owing.sumOf { it.totalMinor }, owing)
     }
 
-    /** Rule: PM-DEBT-002 — the term in force on the read date, from dated configuration. A date before any term is a bad date, not a 500. */
-    private fun term(asOf: LocalDate): Long = try {
-        numberOn("PAYMENT_TERM_DAYS", asOf.toString()).toLong()
-    } catch (e: NoSuchElementException) {
-        throw IllegalArgumentException(e.message, e)
-    }
-
-    private fun aged(unitId: UUID, receivables: List<PostingRow>, asOf: LocalDate, term: Long): UnitArrears {
+    private fun aged(unitId: UUID, receivables: List<PostingRow>, asOf: LocalDate): UnitArrears {
         val rows = receivables.filter { !it.valueDate.isAfter(asOf) }
+        // Rule: PM-SYS-002, PM-DEBT-002 — each debt falls due the term in force on its own date after it. Only the debts
+        // raised by the read date are looked up, open or settled: a read date before any term has none, and reads as
+        // nothing owed; a debt dated before any term stops the read — the unit's and its entrance's — naming the
+        // missing constant.
+        val dueOn = rows.map { Ledger.debtDate(it) }.distinct().associateWith { it.plusDays(termOn(it)) }
         val byBand = rows
-            .groupBy { Ageing.band(ChronoUnit.DAYS.between(Ledger.debtDate(it).plusDays(term), asOf)) }
+            .groupBy { Ageing.band(ChronoUnit.DAYS.between(dueOn.getValue(Ledger.debtDate(it)), asOf)) }
             .mapValues { (_, ps) -> ps.sumOf { it.amountMinor } }
-        // The oldest debt still open: a charge's date whose postings — the charge and the credits that settled it — net above zero.
+        // The oldest debt still open: a charge's date whose postings — the charge and the credits that settled it — net
+        // above zero. The oldest is the one that fell due first, which a change of term can make a later charge.
         val oldestDueOn = rows.groupBy { Ledger.debtDate(it) }
             .filterValues { debt -> debt.sumOf { it.amountMinor } > 0 }
-            .keys.minOrNull()?.plusDays(term)
+            .keys.minOfOrNull { dueOn.getValue(it) }
         return UnitArrears(
             unitId = unitId,
             asOf = asOf.toString(),
@@ -107,3 +114,6 @@ class ArrearsService(private val postings: PostingRepository) {
         )
     }
 }
+
+/** Rule: PM-DEBT-002 — the payment term in force on a date, from dated configuration (Rule: PM-SYS-002). */
+private fun paymentTermOn(date: LocalDate): Long = numberOn("PAYMENT_TERM_DAYS", date.toString()).toLong()

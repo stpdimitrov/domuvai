@@ -5,14 +5,18 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import zues.law.numberOn
 import java.time.LocalDate
 import java.util.UUID
+import java.util.function.Supplier
 
 /**
- * Arrears ageing with the posting repository mocked — no Spring, no database. Proves outstanding
+ * Arrears ageing with the posting repository mocked — no database, and no Spring but for the one test
+ * that has Spring build the service. Proves outstanding
  * amounts land in the right band by how overdue they are (PM-DEBT-001), reading the payment term
- * from configuration (PM-DEBT-002).
+ * from configuration (PM-DEBT-002) — the one in force on each debt's own date (PM-SYS-002), which
+ * takes a lookup with two terms to show: the law has one.
  */
 class ArrearsServiceTest {
 
@@ -145,8 +149,88 @@ class ArrearsServiceTest {
         assertThat(report.oldestDebt).isEqualTo(OldestDebt(debt.valueDate.plusDays(term), 20))
     }
 
+    /** A test's own two terms, neither the law's: [before] days for a debt dated before [change], [from] days from it on. */
+    private fun twoTerms(before: Long, from: Long): (LocalDate) -> Long = { if (it.isBefore(change)) before else from }
+    private val change = LocalDate.of(2026, 6, 1)
+
+    private fun charged(on: LocalDate, amount: Long) =
+        PostingRow(UUID.randomUUID(), entranceId, UUID.randomUUID(), "RECEIVABLE", unitId, amount, "EUR", on)
+
     @Test
-    fun `PM-DEBT-002 a read date before any payment term was in force is a bad date`() {
-        assertThatThrownBy { service.forUnit(unitId, LocalDate.of(1990, 1, 1)) }.isInstanceOf(IllegalArgumentException::class.java)
+    fun `PM-SYS-002 a debt falls due by the payment term in force on its own date, not on the read date`() {
+        val may = charged(LocalDate.of(2026, 5, 10), 3_000)     // 10 days: due 20.05
+        val june = charged(LocalDate.of(2026, 6, 5), 5_000)     // 40 days: due 15.07
+        val partPaid = settles(may, 1_000).copy(valueDate = LocalDate.of(2026, 6, 20))   // dated under the new term, banded with its debt
+        val rows = listOf(may, june, partPaid)
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(rows)
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "RECEIVABLE")).thenReturn(rows)
+        val service = ArrearsService(postings, twoTerms(before = 10, from = 40))
+        val read = LocalDate.of(2026, 7, 1)                     // the term on the read date is 40 days — May's debt keeps its 10
+
+        val report = service.forUnit(unitId, read)
+
+        assertThat(report.buckets.associate { it.band to it.amountMinor })
+            .isEqualTo(mapOf("CURRENT" to 5_000L, "0-30" to 0L, "31-60" to 2_000L, "61-90" to 0L, "90+" to 0L))
+        assertThat(report.oldestDebt).isEqualTo(OldestDebt(LocalDate.of(2026, 5, 20), 42))
+        assertThat(service.forEntrance(entranceId, read).units).containsExactly(report)
+    }
+
+    @Test
+    fun `PM-DEBT-002 the oldest debt is the open one that fell due first, not the first charged`() {
+        val service = ArrearsService(postings, twoTerms(before = 40, from = 10))
+        val first = charged(LocalDate.of(2026, 5, 25), 1_000)   // 40 days: due 04.07
+        val second = charged(LocalDate.of(2026, 6, 5), 2_000)   // 10 days: due 15.06 — charged later, due sooner
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(first, second))
+
+        assertThat(service.forUnit(unitId, LocalDate.of(2026, 7, 10)).oldestDebt).isEqualTo(OldestDebt(LocalDate.of(2026, 6, 15), 25))
+
+        // Two debts that fall due on one day: both are owed, both in that day's band.
+        val sameDay = charged(LocalDate.of(2026, 5, 6), 4_000)  // 40 days: due 15.06, as `second`
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(sameDay, second))
+        val report = service.forUnit(unitId, LocalDate.of(2026, 6, 30))
+        assertThat(report.buckets.associate { it.band to it.amountMinor }["0-30"]).isEqualTo(6_000)
+        assertThat(report.totalMinor).isEqualTo(6_000)
+        assertThat(report.oldestDebt).isEqualTo(OldestDebt(LocalDate.of(2026, 6, 15), 15))
+    }
+
+    @Test
+    fun `PM-SYS-002 a read date before any payment term reads as nothing owed`() {
+        // Neither debt was raised by the read date, so neither is looked up — the 1995 one has no term to find.
+        val rows = listOf(owed(unitId, 20, 3_000), charged(LocalDate.of(1995, 1, 1), 500))
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(rows)
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "RECEIVABLE")).thenReturn(rows)
+        val early = LocalDate.of(1990, 1, 1)
+
+        val report = service.forUnit(unitId, early)
+
+        assertThat(report.totalMinor).isEqualTo(0)
+        assertThat(report.oldestDebt).isNull()
+        assertThat(service.forEntrance(entranceId, early)).isEqualTo(EntranceArrears(entranceId, early.toString(), 0, emptyList()))
+    }
+
+    @Test
+    fun `PM-SYS-002 a debt dated before any payment term stops the read, naming the missing constant`() {
+        val rows = listOf(owed(unitId, 20, 3_000), charged(LocalDate.of(1990, 1, 1), 500))
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(rows)
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "RECEIVABLE")).thenReturn(rows)
+
+        assertThatThrownBy { service.forUnit(unitId, asOf) }
+            .isInstanceOf(NoSuchElementException::class.java).hasMessageContaining("PAYMENT_TERM_DAYS")
+        assertThatThrownBy { service.forEntrance(entranceId, asOf) }
+            .isInstanceOf(NoSuchElementException::class.java).hasMessageContaining("PAYMENT_TERM_DAYS")
+    }
+
+    @Test
+    fun `PM-DEBT-002 the service Spring builds takes the payment term from the law, by the debt's date`() {
+        val debt = owed(unitId, 20, 3_000)
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(debt))
+        AnnotationConfigApplicationContext().use { context ->
+            context.registerBean(PostingRepository::class.java, Supplier { postings })
+            context.register(ArrearsService::class.java)
+            context.refresh()                                   // fails here if Spring cannot choose a constructor
+
+            val dueOn = debt.valueDate.plusDays(numberOn("PAYMENT_TERM_DAYS", debt.valueDate.toString()).toLong())
+            assertThat(context.getBean(ArrearsService::class.java).forUnit(unitId, asOf).oldestDebt).isEqualTo(OldestDebt(dueOn, 20))
+        }
     }
 }

@@ -1718,3 +1718,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/README.md` (The console switch), `web/middleware.ts`
 
 ---
+
+## S-G1-02f-o · 2026-10-01 · each debt's own payment term (money)
+
+**Did** — the arrears reads (#81, `lane:money`; #73 item 1) take the payment term in force on each debt's own date — its charge's date, standing in for the announcement — not the one on the read date (PM-SYS-002). The ageing bands and the oldest debt both go by each debt's own due day, in the unit's read and the entrance's; the oldest debt is the open one that fell due first. The read date only picks which postings count. A read date before any term is no longer a 400: no debt had been raised by then, so it reads as nothing owed. A debt dated before any term — open or settled — stops the unit's read and its entrance's with a server error naming the constant; none can exist today, since a charge cannot be computed before its constants. `ArrearsService` takes the term lookup as a parameter, so a test supplies two terms; Spring builds it with the law's, which keeps its one entry. No figure changes today — one term, 14 days, since 2009 — and the API contract is unchanged.
+
+**Rules covered** — PM-SYS-002, PM-DEBT-002
+
+**Tests added** — `ArrearsServiceTest`: `PM-SYS-002 a debt falls due by the payment term in force on its own date, not on the read date`, `PM-DEBT-002 the oldest debt is the open one that fell due first, not the first charged`, `PM-SYS-002 a read date before any payment term reads as nothing owed` (replaces "is a bad date"), `PM-SYS-002 a debt dated before any payment term stops the read, naming the missing constant`, `PM-DEBT-002 the service Spring builds takes the payment term from the law, by the debt's date`. `ArrearsWebTest`: `PM-SYS-002 a debt dated before any payment term is a server error naming the constant — not a 404, not a 400`. `ArrearsIT` (Docker — CI): `PM-SYS-002 each debt falls due by the payment term in force on its own date — a part-paid debt, read back from Postgres`, `PM-SYS-002 a read date before any payment term reads as nothing owed, not a bad request`.
+
+**Verified** — the persistence tests skip here (no Docker), so a scratch copy without Testcontainers ran them against local Postgres 16, 2026-10-01: all pass; the copy is not committed. Mutations, each failing its tests: the term on the read date (unit tests and the persistence one), a read date before any term a bad date again, the oldest as the first charged, a credit aged by its own date, a missing term read as none, the running lookup ignoring the debt's date, Spring left to the primary constructor, a missing term answered as a 404, terms looked up for debts raised after the read date. Gates green.
+
+**Decisions** — none (the contract's D1–D4, the owner's yes 2026-10-01). The review found no defect in the read; its findings are fixed in the slice: the server error pinned at the controller (seven sibling controllers answer the same exception with a 404), a test that Spring can build the service without Docker, the lookup's scope (only debts raised by the read date), an older expectation that still took the term on the read date.
+
+**Open** — #73 item 2, advances not netted (the owner's choice) · #73 item 3, a receivable with no unit (a schema check) · from the review, latent while there is one term: a payment settles the oldest debt by its charge's date (PM-DEBT-008), the arrears read now names as oldest the one that fell due first — the same debt until a term changes · `TRACEABILITY.md` now cites the arrears read for PM-SYS-002 where it cited `law` (the generator takes the first by path).
+
+**Read first next time** — this entry, #73, `app/src/main/kotlin/zues/app/money/Arrears.kt`.
+
+---
