@@ -2,8 +2,9 @@ name: e2e
 
 # E2E-01 — the whole chain on every PR: Postgres → the API from its jar (Flyway on an empty database) → a seed
 # through the public API → the production web server → tools/check_e2e.py, which validates every response the live
-# screens use against the published contract and reads the seeded figures off the screens themselves. Not path-
-# filtered, so it runs on every PR and could be made a required check (branch protection is the owner's).
+# screens use against the published contract and reads the seeded figures off the screens themselves; a second web
+# server from the same build, not switched on, must serve no console page (PM-DEBT-011). Not path-filtered, so it runs
+# on every PR — a required check on main.
 on:
   push: { branches: [main] }
   pull_request:
@@ -51,16 +52,21 @@ jobs:
           entrance=$(python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
           echo "ENTRANCE=$entrance" >> "$GITHUB_ENV"
 
-      - name: Start the web against the API
+      - name: Start the web against the API — once switched on, once not (PM-DEBT-011)
         working-directory: web
         env: { API_URL: 'http://localhost:8080' }
         run: |
-          nohup npx next start -p 3000 > ../web.log 2>&1 &
-          curl -sf -o /dev/null --max-time 10 --retry 30 --retry-connrefused --retry-delay 1 http://localhost:3000/
+          DOMUVAI_CONSOLE=on nohup npx next start -p 3000 > ../web.log 2>&1 &
+          nohup npx next start -p 3001 > ../web-closed.log 2>&1 &
+          for port in 3000 3001; do
+            curl -sf -o /dev/null --max-time 10 --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"
+          done
 
       - name: The chain, checked — contract conformance and the figures on screen
-        run: python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 --entrance "$ENTRANCE"
+        run: |
+          python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
+            --closed-web http://localhost:3001 --entrance "$ENTRANCE"
 
       - name: Logs
         if: failure()
-        run: tail -n 150 api.log web.log
+        run: tail -n 150 api.log web.log web-closed.log

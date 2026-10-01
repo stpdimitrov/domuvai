@@ -34,8 +34,36 @@ cd web && API_URL=http://localhost:8080 npm run dev
 ```
 
 The role and password are the local defaults in `app/src/main/resources/application.yml`, nothing more.
-Then `python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 --entrance <id>`
-runs the same check as CI.
+`npm run dev` always serves the console (see [The console switch](#the-console-switch)). The CI check needs a
+production build started twice — switched on, and not. Stop `npm run dev` first: the build and the dev server
+share `.next`.
+
+```bash
+cd web && npm run build
+DOMUVAI_CONSOLE=on API_URL=http://localhost:8080 npx next start -p 3001 &
+npx next start -p 3002 &
+for port in 3001 3002; do curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"; done
+cd .. && python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3001 \
+  --closed-web http://localhost:3002 --entrance <id>
+```
+
+### The console switch
+
+The console names debtors and what they owe, and there is no sign-in yet (ADR-011), so a server serves it only
+where it is switched on (WEB-14, PM-DEBT-011): **`DOMUVAI_CONSOLE=on`** in the server's environment, or
+`next dev` — which `npm run dev` binds to `127.0.0.1`, this machine alone. Anywhere else — a production server
+without the switch — `web/middleware.ts` answers every path but the landing with a 404 before any route is matched:
+the same response for a console page and for a path that does not exist, however it is asked (a load, a client
+navigation, a prefetch, a HEAD). Only the build's static files (`/_next/static/`) pass — code and the design's
+sample text, never what the API returns. The landing shows no link into a closed console: no `Вход`, and its two
+`Започнете безплатно` buttons go to the demo form. Closed is the default, so a screen added later is closed with
+the rest. The switch is read from the running server's environment, never baked into the build: one build serves
+either way.
+
+Set it in the server's environment, never in a `web/.env*` file: `next start` reads those too, so a file shipped
+beside the build would switch the console on. Switch it on only where everyone who can reach the server may see
+every name and amount in its database — a developer's machine, CI, a demo seeded with made-up people. Never for
+real data before sign-in.
 
 ## The API client
 
@@ -56,15 +84,17 @@ check that never runs blocks the merge.
 `.github/workflows/e2e.yml` (E2E-01) runs **the whole chain on every PR**: Postgres → the API from its jar
 (Flyway on an empty database) → `tools/seed_demo.py` through the public API → `next start` →
 `tools/check_e2e.py`. The check validates every response the live screens use against the contract, reads the
-seeded figures off the screens, and fails when a screen calls an operation it does not cover. It runs on every
-PR, so it can be made a required check.
+seeded figures off the screens, and fails when a screen calls an operation it does not cover. A second server
+from the same build, not switched on, must answer every path in the build's route manifest but the landing — a load,
+a client navigation, a prefetch, a HEAD — with the 404 a missing page gets, and its landing must link to none of
+them (PM-DEBT-011). It runs on every PR and is a required check on `main`.
 
 ## Layout
 
 ```
 app/
   layout.tsx       root layout, <html lang="bg">, fonts (Literata + IBM Plex Sans/Mono)
-  page.tsx         the landing (Етаж) at /  — static marketing
+  page.tsx         the landing (Етаж) at /  — rendered per request: it links into the console only where it is served
   HeroVideo.tsx    client component: the boomerang hero background
   globals.css      tokens + base + hover styles
   (console)/       the manager console — a route group (no URL segment)
@@ -84,6 +114,8 @@ lib/
   api/client.ts    the typed, server-only client for `api`
   console.ts       what the live entrance screens share: the entrance from `?entrance=` (else the
                    first by name), a call that may find the backend down, euros from minor units
+  consoleSwitch.ts is the console switched on here? (PM-DEBT-011)
+middleware.ts      where it is not, every path but the landing answers 404
 ```
 
 ## Status
@@ -108,7 +140,8 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   them. `?asOf=YYYY-MM-DD` (default: today, Europe/Sofia). An entrance where nobody owes is left out. The
   design's interest, escalation ladder (Покана → Нотариална → Решение на ОС → Заповед) and next action are not
   built — those columns show `—`, and the two buttons stay disabled. **It names debtors and their debts, so it
-  must never be reachable by the public** (PM-DEBT-011) — see TODO before launch.
+  must never be reachable by the public** (PM-DEBT-011) — served only where the console is switched on (see
+  [The console switch](#the-console-switch)), and see TODO before launch.
 - **`/compliance`** — the firm's regulatory standing (screen 07 Съответствие): register / insurance /
   management-contract status cards, and a filings-and-declarations table.
 - **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
@@ -147,7 +180,8 @@ httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the d
 
 - **Sign-in before anyone else can reach the console** (ADR-011). `/debts` shows debtors' names and what they
   owe, which PM-DEBT-011 forbids in any publicly accessible place. The charges and fund screens show owners,
-  amounts and bank accounts.
+  amounts and bank accounts. Until then the console is served only where it is switched on (WEB-14), and the
+  API — no sign-in either — must not be reachable from the internet: the web calls it from the server only.
 - Re-host the hero clip in `HeroVideo.tsx` on a domuvai-owned origin (currently the design
   tool's CDN URL).
 - Add a lint step (ESLint is not configured yet).

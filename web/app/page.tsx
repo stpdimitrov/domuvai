@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
+import { consoleOpen } from "@/lib/consoleSwitch";
 import HeroVideo from "./HeroVideo";
 import LandingNav from "./LandingNav";
 import Faq from "./Faq";
@@ -29,10 +31,13 @@ const TRUST = [
   ["Данните остават в ЕС", "Хостинг в ЕС, обработка по GDPR. Вход с е-ИД — планиран."],
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  await connection();                          // per request: the switch is the server's, not the build's
+  const open = consoleOpen();                  // Rule: PM-DEBT-011 — no link into a console this server does not serve
+  const start = open ? "/portfolio" : "#demo";
   return (
     <div style={{ minHeight: "100vh", background: "#E7E6E1", overflowX: "hidden", color: "#17191A" }}>
-      <LandingNav />
+      <LandingNav consoleOpen={open} />
 
       {/* ---- hero ---- */}
       <section id="top" style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden", minHeight: "min(100vh,max(720px,70vw))", boxSizing: "border-box" }}>
@@ -271,7 +276,7 @@ export default function LandingPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,280px),1fr))", gap: 12, marginTop: 48 }}>
           {[
             { tag: "40–80 входа", title: "Професионален домоуправител", items: ["Подрежда всички входове по най-близкия срок и по просрочените суми.", "Пуска месечните начисления за всички входове и издава фактурите.", "Води регистъра, застраховката и договорите на самата фирма."], cta: { label: "Заявете демо", href: "#demo", solid: true } },
-            { tag: "1 вход", title: "Домоуправител на един вход", items: ["Води ви стъпка по стъпка през поканата, дневния ред и протокола.", "Разпределя разходите по приетия начин и показва как е сметнато.", "Изготвя годишния отчет за съседите от записаните движения."], cta: { label: "Започнете безплатно", href: "/portfolio", solid: false } },
+            { tag: "1 вход", title: "Домоуправител на един вход", items: ["Води ви стъпка по стъпка през поканата, дневния ред и протокола.", "Разпределя разходите по приетия начин и показва как е сметнато.", "Изготвя годишния отчет за съседите от записаните движения."], cta: { label: "Започнете безплатно", href: start, solid: false } },
           ].map((r) => (
             <div key={r.title} style={{ display: "flex", flexDirection: "column", background: "#EDECE8", padding: 28, minWidth: 0 }}>
               <div style={{ font: "500 11px/1 'IBM Plex Sans'", textTransform: "uppercase", letterSpacing: "0.16em", color: "#5C605E" }}>{r.tag}</div>
@@ -378,7 +383,7 @@ export default function LandingPage() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,290px),1fr))", gap: 12, marginTop: 48, alignItems: "stretch" }}>
           {[
-            { title: "Един вход", note: "За домоуправител-доброволец", price: "€—", unit: "/ вход / месец", items: [["Календар по ЗУЕС", "Вход"], ["Начисления с основание", "Начисления"], ["Каса и фонд, отделни IBAN", "Каса и фонд"], ["Събрание с помощник", "Общо събрание"], ["Приложение за живущите", "Мобилно"]], cta: { label: "Започнете безплатно", href: "/portfolio", solid: false }, bg: "#F7F6F3", border: "#DEDDD9" },
+            { title: "Един вход", note: "За домоуправител-доброволец", price: "€—", unit: "/ вход / месец", items: [["Календар по ЗУЕС", "Вход"], ["Начисления с основание", "Начисления"], ["Каса и фонд, отделни IBAN", "Каса и фонд"], ["Събрание с помощник", "Общо събрание"], ["Приложение за живущите", "Мобилно"]], cta: { label: "Започнете безплатно", href: start, solid: false }, bg: "#F7F6F3", border: "#DEDDD9" },
             { title: "Фирма", note: "За професионален домоуправител", price: "€—", unit: "/ вход / месец", items: [["Всичко от „Един вход“", "—"], ["Всички входове по риск", "Портфейл"], ["Стълба на задълженията", "Задължения"], ["Регистър на фирмата", "Съответствие"], ["Фактуриране и повече потребители", "Начисления"]], cta: { label: "Заявете демо", href: "#demo", solid: true }, bg: "#FFFFFF", border: "#14584A" },
             { title: "Индивидуална оферта", note: "За портфейли над — входа", price: "По договаряне", unit: "", items: [["Всичко от „Фирма“", "—"], ["Пренасяне на цялата история", "Импорт"], ["Сверка на няколко месеца назад", "Начисления"], ["Условия по договор", "—"]], cta: { label: "Свържете се с нас", href: "#demo", solid: false }, bg: "#F7F6F3", border: "#DEDDD9" },
           ].map((p) => (
@@ -468,7 +473,7 @@ export default function LandingPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, font: "400 14px/1.3 'IBM Plex Sans'" }}>
             <span style={{ font: "500 11px/1 'IBM Plex Sans'", textTransform: "uppercase", letterSpacing: "0.16em", color: "#5C605E" }}>Продукт</span>
-            <Link href="/portfolio" className="ln-link">Вход в системата</Link>
+            {open && <Link href="/portfolio" className="ln-link">Вход в системата</Link>}
             <a href="#who-residents" className="ln-link">Мобилно приложение</a>
             <a href="#demo" className="ln-link">Заявете демо</a>
           </div>
