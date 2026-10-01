@@ -29,12 +29,15 @@ data class EntranceCreated(
     val condominiumId: UUID,
 )
 
-/** One unit to register under an entrance. Ideal parts is an exact decimal percent string. */
+/**
+ * One unit to register under an entrance. Ideal parts is an exact decimal percent string, or null
+ * when the title deed does not state it — then the whole set's parts are derived (PM-ORG-003).
+ */
 data class RegisterUnit(
     val designation: String,
     val unitType: String,
     val areaM2: BigDecimal? = null,
-    val idealParts: String,
+    val idealParts: String?,
     val separateEntrance: Boolean = false,
     /** Rule: PM-FEE-010 — business or professional use, whether or not through a separate entrance (PM-ORG-009) */
     val businessUse: Boolean = false,
@@ -122,8 +125,9 @@ class RegistryService(
         if (!entrances.existsById(entranceId)) {
             throw NoSuchElementException("no entrance $entranceId")
         }
-        UnitValidation.requirePartsSumTo100(commands.map { it.idealParts })
-        return commands.map { command ->
+        entrances.lockById(entranceId)   // a concurrent set for this entrance waits, then sees these units
+        val (parts, source) = idealPartsFor(entranceId, commands)
+        return commands.mapIndexed { i, command ->
             aggregates.insert(
                 PropertyUnit(
                     id = UUID.randomUUID(),
@@ -131,12 +135,38 @@ class RegistryService(
                     designation = command.designation,
                     unitType = command.unitType,
                     areaM2 = command.areaM2,
-                    idealPartsPct = UnitValidation.toColumn(IdealParts.of(command.idealParts)),
+                    idealPartsPct = UnitValidation.toColumn(parts[i]),
                     separateEntrance = command.separateEntrance,
                     businessUse = command.businessUse,
+                    idealPartsSource = source.name,
                 ),
             ).id
         }
+    }
+
+    /**
+     * The set's ideal parts: as the title deeds declare them (PM-ORG-002), or — when no unit's deed
+     * states them — derived from the built-up area ratio and marked DERIVED (Rule: PM-ORG-003). The
+     * derivation covers a whole entrance at once: a set mixing declared and missing parts, a set
+     * added to an entrance that already has units, or a unit without its area is refused, because
+     * no rule says how declared and derived shares combine.
+     */
+    private fun idealPartsFor(entranceId: UUID, commands: List<RegisterUnit>): Pair<List<IdealParts>, IdealPartsSource> {
+        val declared = commands.mapNotNull { it.idealParts }
+        if (declared.size == commands.size) {
+            UnitValidation.requirePartsSumTo100(declared)
+            return declared.map(IdealParts::of) to IdealPartsSource.DECLARED
+        }
+        require(declared.isEmpty()) {
+            "ideal parts are declared for some units and missing for others; declare all, or none to derive them from area (PM-ORG-003)"
+        }
+        require(units.findByEntranceId(entranceId).isEmpty()) {
+            "entrance $entranceId already has units; ideal parts are derived for a whole entrance at once (PM-ORG-003)"
+        }
+        val areas = commands.map {
+            requireNotNull(it.areaM2) { "unit ${it.designation} has no area; ideal parts cannot be derived without it (PM-ORG-003)" }
+        }
+        return IdealPartsDerivation.byArea(areas) to IdealPartsSource.DERIVED
     }
 
     @Transactional(readOnly = true)
@@ -158,9 +188,11 @@ class RegistryService(
     @Transactional
     fun adoptImport(entranceId: UUID, importId: UUID, effectiveFrom: LocalDate, imported: List<ImportedUnit>): List<UUID> {
         if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
+        entrances.lockById(entranceId)
         if (units.findByImportId(importId).isNotEmpty()) return emptyList()   // already adopted
-        UnitValidation.requirePartsSumTo100(imported.map { it.unit.idealParts })
-        return imported.map { row ->
+        val importedParts = imported.map { requireNotNull(it.unit.idealParts) { "an imported unit carries its ideal parts" } }
+        UnitValidation.requirePartsSumTo100(importedParts)
+        return imported.mapIndexed { i, row ->
             val command = row.unit
             val unitId = aggregates.insert(
                 PropertyUnit(
@@ -169,7 +201,7 @@ class RegistryService(
                     designation = command.designation,
                     unitType = command.unitType,
                     areaM2 = command.areaM2,
-                    idealPartsPct = UnitValidation.toColumn(IdealParts.of(command.idealParts)),
+                    idealPartsPct = UnitValidation.toColumn(IdealParts.of(importedParts[i])),
                     separateEntrance = command.separateEntrance,
                     businessUse = command.businessUse,
                     importId = importId,

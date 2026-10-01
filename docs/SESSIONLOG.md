@@ -1838,3 +1838,38 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — #91, this entry, #73.
 
 ---
+---
+
+## S-G1-03e · 2026-10-01 · derived ideal parts (registry)
+
+**Did**
+- Where no title deed states a unit's ideal parts, the registry derives them from the built-up area ratio and marks them `DERIVED` (PM-ORG-003).
+- **When:** a unit set registered into an entrance with no units yet, declaring no ideal parts at all, with every unit's area given.
+- **How:** each share is area over total area. Areas are counted in hundredths of m² and the 100% in 0.0001% steps, then split by the kernel's largest-remainder allocator (ties go to the earlier unit). So the entrance sums to exactly 100.0000% (PM-ORG-002), with no floats.
+- **Refused (400):** a mixed set, a unit without an area, an entrance that already has units, or an area beyond `numeric(10,2)`. No rule says how declared and derived shares combine.
+- New `unit.ideal_parts_source` (`DECLARED` | `DERIVED`, migration `V202610011900__unit_ideal_parts_source.sql`; existing rows `DECLARED`), returned on `GET …/units`. `NewUnitRequest.idealParts` is now optional.
+- A unit-set write (registration and import adoption) now locks its entrance row (`FOR NO KEY UPDATE`). Two sets racing into one entrance used to be able to commit 200%; this was true for declared sets too, not just derived ones.
+- The contract and the web client are regenerated. Claim: #97.
+
+**Rules covered** — PM-ORG-003 (SHOULD). The mechanism is done; its acceptance, the warning badge in voting screens, waits for `assembly`. PM-ORG-002 gains a concurrency test.
+
+**Tests added**
+- `IdealPartsDerivationTest` (3, pure): area ratio; exact 100% by largest remainder; bad areas refused.
+- `RegistryUnitsWebTest` +2: no parts reach the service as null; the view returns the source.
+- `RegistryUnitsPersistenceIT` +4 (Postgres): derived and marked; declared stays DECLARED; mixed / no area / non-empty entrance refused, writing nothing; a unit-set write waits for a lock held on its entrance.
+- **Mutations, each caught:** derived marked DECLARED; the non-empty-entrance refusal dropped; the lock dropped.
+- **The lock test first passed with the lock removed.** A `FOR UPDATE` holder also blocks the units' foreign-key check (KEY SHARE). So both the holder and the service lock are `FOR NO KEY UPDATE`, which also leaves other modules' inserts for the entrance unblocked.
+
+**Decisions** — the owner chose **A** (2026-10-01): build per the catalogue and log the counsel question.
+
+**Found**
+- **Counsel.** PM-ORG-003 cites **ЗС чл. 40**, which, as read here, apportions common parts by the units' **value**, not their built-up area. The catalogue says area, and the code follows the catalogue. The derived value is marked as such, and only offered when the deed states nothing.
+- **Fresh review (subagent, diff + rule text only).** No bugs. It raised the race (fixed), the unbounded area (fixed), and the stale contract (regenerated).
+
+**Open**
+- **The warning badge** (web, `assembly` voting screens).
+- **`DERIVED` doesn't reach the charge basis.** `UnitForCharging` and `BasisJson` carry the value, not its source, so a charge run on derived parts can't say so. Add it before charges or votes rely on derived parts. This is `money`'s lane, currently taken.
+- `allocateByWeight` is used with `Money` as a counter of percent steps; a non-money overload in `kernel` would be cleaner.
+- Re-deriving an existing entrance is not supported.
+
+**Read first next time** — this entry, #97, `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt` (`IdealPartsDerivation`).

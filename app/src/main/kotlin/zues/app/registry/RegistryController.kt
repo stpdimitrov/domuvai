@@ -41,7 +41,7 @@ data class NewUnitRequest(
     val designation: String,
     val unitType: String,
     val areaM2: BigDecimal? = null,
-    val idealParts: String,          // exact decimal percent, e.g. "4.2000"
+    val idealParts: String? = null,  // exact decimal percent, e.g. "4.2000"; omit for every unit to derive from area (PM-ORG-003)
     val separateEntrance: Boolean = false,   // PM-ORG-009 — a separate street entrance
     val businessUse: Boolean = false,        // PM-FEE-010 — business or professional use; a fact apart from the entrance
 )
@@ -56,6 +56,7 @@ data class UnitView(
     val idealPartsPct: BigDecimal,
     val separateEntrance: Boolean,
     val businessUse: Boolean,
+    val idealPartsSource: String,    // PM-ORG-003 — DECLARED | DERIVED; a DERIVED value is shown with a warning
 )
 
 data class RegisterHouseholdRequest(val members: List<NewMemberRequest>)
@@ -194,7 +195,7 @@ class RegistryController(private val registry: RegistryService) {
     @GetMapping("/{entranceId}/units")
     fun listUnits(@PathVariable entranceId: UUID): List<UnitView> =
         registry.listUnits(entranceId).map {
-            UnitView(it.id, it.designation, it.unitType, it.areaM2, it.idealPartsPct, it.separateEntrance, it.businessUse)
+            UnitView(it.id, it.designation, it.unitType, it.areaM2, it.idealPartsPct, it.separateEntrance, it.businessUse, it.idealPartsSource)
         }
 
     /**
