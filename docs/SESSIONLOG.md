@@ -1768,3 +1768,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — this entry, #86, `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt`.
 
 ---
+
+## S-G1-02a-j · 2026-10-01 · the dry-run counts the persons the firm charged — pinned (intake)
+
+**Did** — no behaviour changes (#89, `lane:intake`; resolves #86). #86 — filed from S-G1-02a-i's review — said the dry-run feeds the engine no exemption data. A first attempt fed it the sheet's children, animal, absence and business cells; its own review showed that contradicts D1 on #31 (the sheet's occupants are the persons the firm charged, children on top): the dry-run would have charged 2 persons where the household a commit adopts is charged 3. That change was discarded before any commit. The owner then answered the two open questions: animals and absences are already in the charged headcount, and the business-use multiple is not applied in a dry-run yet. `IntakeDryRun` now says, where the engine's units are built, why they carry the occupants alone, and a test fails if any of the four cells is fed to the engine.
+
+**Rules covered** — PM-FEE-008, PM-FEE-005 (already covered; the new test is named after them)
+
+**Tests added** — `IntakeDryRunTest`: `PM-FEE-008 PM-FEE-005 the sheet's occupants are the persons charged — its children, animal, absence and business cells change no recomputed fee`. Mutations, each failing it: the children subtracted, the animals added, the absence exempting, the business cell applying the multiple.
+
+**Decisions** — the owner's, 2026-10-01 (on #86): the sheet's `OCCUPANTS` already reflects absences and animals, as it already leaves out children (D1 on #31); the business-use multiple waits. The contract on #89 was rewritten to match before any code merged.
+
+**Open** — the business-use multiple in a dry-run waits on two things: `ChargeRunService` feeds the engine's `businessUse` from the registry's separate-street-entrance flag (the S-41b finding for `money`), and PM-FEE-010's range is unconfirmed · a dry-run with a business unit and no multiplier in the request would default to the law's minimum (`Charges.kt`, `multiplierFor`) — unreachable from intake while the cell is not fed · from the discarded attempt's review, in the engine and so in `money`'s lane, latent: PM-FEE-009 counts an animal on every per-person line, management included, where the rule names electricity, water, heating and cleaning; PM-FEE-006 exempts the whole unit on one absence figure; an animal count has no upper bound · a real pilot sheet is what would show how firms write these columns (ADR-012) · next in money: #73 item 2, advances netted in the arrears read and shown.
+
+**Read first next time** — this entry, #86, #31 (D1–D3), `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt`.
+
+---
