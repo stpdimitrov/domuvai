@@ -88,4 +88,15 @@ class ChargeCalculatorTest {
         val whole = ChargeCalculator.run(base.copy(readings = listOf(ReadingRequest("u1", "WATER", "7"))))
         assertThat(whole.charges.single { it.unitId == "u1" }.lines.single { it.item == "WATER" }.amountMinor).isEqualTo(1_610)   // 7 m³ × 2.30 €
     }
+
+    @Test
+    fun `PM-FEE-010 the preview refuses a run with a business unit and no multiple, and charges the multiple once it is given`() {
+        val withShop = request().let { it.copy(units = it.units + UnitRequest("u3", "магазин", idealParts = "0.0000", occupants = 1, businessUse = true)) }
+        assertThatThrownBy { ChargeCalculator.run(withShop) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-FEE-010").hasMessageContaining("магазин")
+
+        val multiple = zues.law.numberOn("BUSINESS_USE_MULTIPLIER_MIN", "2026-05-01").toInt()
+        val shop = ChargeCalculator.run(withShop.copy(businessMultiplier = multiple)).charges.single { it.unitId == "u3" }
+        assertThat(shop.lines.single { it.stream == "MANAGEMENT" }.amountMinor).isEqualTo(500L * multiple)   // 500 a person, one person
+    }
 }

@@ -47,7 +47,7 @@ data class UnitRequest(
     val childrenUnder6: Int = 0,
     val animals: Int = 0,
     val absentDays: Int = 0,
-    val businessUse: Boolean = false,
+    val businessUse: Boolean = false,   // pays the multiple: business use reached through the common parts (PM-FEE-010)
 )
 
 /** The computed charges. Money is minor units throughout (ADR-006); no floats cross the wire. */

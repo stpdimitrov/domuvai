@@ -26,7 +26,7 @@ class ChargeRunController {
     /**
      * The engine rejects an unlawful run by throwing — a tariff line with no GA decision
      * (PM-FEE-012), ideal parts that do not sum to 100% (PM-ORG-002), a business multiplier
-     * outside the statutory range (PM-FEE-010), an unknown stream or key. That is a bad
+     * outside the statutory range or missing where a unit would pay it (PM-FEE-010), an unknown stream or key. That is a bad
      * request, not a server fault.
      */
     @ExceptionHandler(IllegalStateException::class, IllegalArgumentException::class)
