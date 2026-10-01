@@ -16,16 +16,16 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-ORG-001` | `app/src/test/kotlin/zues/app/registry/EntranceRegistrationTest.kt:34` | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
-| `PM-ORG-002` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:44` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:51` |  |
+| `PM-ORG-002` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:45` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:51` |  |
 | `PM-ORG-003` | — | — |  |
 | `PM-ORG-004` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:51` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:46` |  |
 | `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/OwnershipServiceTest.kt:68` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
-| `PM-ORG-009` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:86` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:27` |  |
+| `PM-ORG-009` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:88` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:27` |  |
 | `PM-ORG-010` | — | — |  |
-| `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:62` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
+| `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:64` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
 | `PM-ORG-012` | — | — |  |
 
 ## BOOK — Owners' book & residents  ·  8/12 covered
@@ -36,13 +36,13 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-002` | `app/src/test/kotlin/zues/app/intake/ImportCommitPersistenceIT.kt:148` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:12` |  |
 | `PM-BOOK-003` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:54` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:10` |  |
 | `PM-BOOK-004` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:54` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:11` |  |
-| `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
+| `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:183` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
 | `PM-BOOK-006` | — | — |  |
 | `PM-BOOK-007` | — | — |  |
 | `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:301` |  |
 | `PM-BOOK-009` | — | — |  |
 | `PM-BOOK-010` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/BookRetention.kt:10` |  |
-| `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:78` |  |
+| `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:83` |  |
 | `PM-BOOK-012` | — | — |  |
 
 ## GOV — Governance & mandates  ·  0/18 covered
@@ -128,19 +128,19 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-002` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:38` | `law/src/main/kotlin/zues/law/Keys.kt:4` |  |
 | `PM-FEE-003` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:107` | `charges/src/main/kotlin/zues/charges/Charges.kt:93` |  |
 | `PM-FEE-004` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:47` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
-| `PM-FEE-005` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:115` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:89` |  |
+| `PM-FEE-005` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:116` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:111` |  |
 | `PM-FEE-006` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:111` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` | ⚠ |
-| `PM-FEE-007` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` |  |
-| `PM-FEE-008` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:115` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:89` |  |
+| `PM-FEE-007` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:183` | `app/src/main/kotlin/zues/app/registry/AbsenceDeclaration.kt:11` |  |
+| `PM-FEE-008` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:116` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:111` |  |
 | `PM-FEE-009` | `app/src/test/kotlin/zues/app/money/ChargeRunServiceTest.kt:133` | `app/src/main/kotlin/zues/app/registry/Animal.kt:12` |  |
-| `PM-FEE-010` | `app/src/test/kotlin/zues/app/money/ChargeCalculatorTest.kt:93` | `app/src/main/kotlin/zues/app/money/ChargeMapping.kt:35` |  |
-| `PM-FEE-011` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:60` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:64` |  |
+| `PM-FEE-010` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:105` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:23` |  |
+| `PM-FEE-011` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:61` | `app/src/main/kotlin/zues/app/intake/IntakeDryRun.kt:65` |  |
 | `PM-FEE-012` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:71` | `charges/src/main/kotlin/zues/charges/Charges.kt:48` |  |
 | `PM-FEE-013` | — | — |  |
-| `PM-FEE-014` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:24` | `app/src/main/kotlin/zues/app/money/BasisJson.kt:10` |  |
+| `PM-FEE-014` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:25` | `app/src/main/kotlin/zues/app/money/BasisJson.kt:10` |  |
 | `PM-FEE-015` | `app/src/test/kotlin/zues/app/money/ChargeRunPersistenceIT.kt:197` | `app/src/main/kotlin/zues/app/money/ChargeRunRows.kt:30` |  |
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
-| `PM-FEE-017` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:97` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:24` |  |
+| `PM-FEE-017` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:98` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:24` |  |
 | `PM-FEE-018` | `app/src/test/kotlin/zues/app/money/StatementIT.kt:71` | `app/src/main/kotlin/zues/app/money/Statement.kt:35` |  |
 | `PM-FEE-019` | — | — |  |
 | `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:63` | `app/src/main/kotlin/zues/app/money/Postings.kt:40` |  |

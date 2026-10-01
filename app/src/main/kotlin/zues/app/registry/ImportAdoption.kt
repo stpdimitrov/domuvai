@@ -30,6 +30,7 @@ class ImportAdoption(private val registry: RegistryService) {
                     RegisterUnit(
                         designation = it.designation, unitType = IMPORTED_UNIT_TYPE,
                         areaM2 = it.builtArea?.let(::BigDecimal), idealParts = it.idealParts,
+                        businessUse = it.businessUse,   // Rule: PM-FEE-010 — a sheet has no separate-entrance column, so none is set
                     ),
                     occupants = it.occupants, childrenUnder6 = it.childrenUnder6, ownerName = it.ownerName,
                 )

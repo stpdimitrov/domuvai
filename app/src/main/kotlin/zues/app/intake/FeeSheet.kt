@@ -19,7 +19,10 @@ data class FeeRow(
     val theirFeeMinor: Long,    // the fee the firm charges this unit, integer minor units
     /** The optional fields the sheet maps (ADR-012), as written; a blank cell is absent. */
     val optional: Map<IntakeField, String> = emptyMap(),
-)
+) {
+    /** Rule: PM-FEE-010 — the sheet marks the unit as used for business. A blank cell is a no; [FeeSheet.parse] lets no other cell become a row. */
+    val businessUse: Boolean get() = optional[IntakeField.BUSINESS_USE]?.let(FeeSheet::yesNo) ?: false
+}
 
 data class ParsedSheet(val rows: List<FeeRow>, val violations: List<String>)
 
@@ -30,7 +33,9 @@ object FeeSheet {
      * [MappingProfiler] proposes one from the header. Each required field — designation, ideal parts,
      * occupants and the firm's fee — must resolve to a column, or the whole sheet is a violation.
      * Optional fields are read as written when mapped; a built area or a child count that is not a
-     * number the registry can hold makes its row a violation, never a silently rounded record.
+     * number the registry can hold makes its row a violation, never a silently rounded record — and so
+     * does a business-use cell that is neither a yes nor a no: the dry-run charges on it and a commit
+     * adopts it, never on a guess.
      */
     fun parse(csv: String, mapping: Map<String, IntakeField>? = null): ParsedSheet {
         val lines = csv.trim().lines().filter { it.isNotBlank() }
@@ -80,7 +85,15 @@ object FeeSheet {
     private fun requireStorable(optional: Map<IntakeField, String>) {
         optional[IntakeField.BUILT_AREA]?.let { require(BigDecimal(it) > BigDecimal.ZERO && BigDecimal(it).scale() <= 2) }
         optional[IntakeField.CHILDREN_UNDER_6]?.let { require(it.toInt() >= 0) }
+        optional[IntakeField.BUSINESS_USE]?.let(::yesNo)
         optional[IntakeField.OWNER_NAME]?.let { require(!IDENTITY_NUMBER.containsMatchIn(it)) }
+    }
+
+    /** A yes/no cell as a firm writes it, in Bulgarian or English. Anything else is neither, and is not guessed. */
+    fun yesNo(cell: String): Boolean = when (cell.trim().lowercase()) {
+        "да", "yes", "true", "1" -> true
+        "не", "no", "false", "0" -> false
+        else -> throw IllegalArgumentException("neither yes nor no: $cell")
     }
 
     /** Nine or more digits in a row: the shape of an ЕГН, ЛНЧ or ЕИК — never part of a name. */

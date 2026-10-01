@@ -7,9 +7,9 @@ import java.util.UUID
 /**
  * One unit a commit adopts into the registry: its designation and ideal parts (ADR-006: an exact
  * decimal percent string, never a float), plus what the sheet mapped about its area, household and
- * owner (S-41b, ADR-012). Unit type is still absent — no sheet field carries it. What a count cannot
- * make lawful — an absence, an animal, business use — never travels here; the commit returns it for
- * a person to record from a declaration.
+ * owner (S-41b, ADR-012), and whether the sheet marks it as used for business (#91). Unit type is still
+ * absent — no sheet field carries it. What a count cannot make lawful — an absence, an animal — never
+ * travels here; the commit returns it for a person to record from a declaration.
  */
 data class AdoptedUnit(
     val designation: String,
@@ -22,6 +22,8 @@ data class AdoptedUnit(
     val childrenUnder6: Int,
     /** the owner's name as written — never an identity number (PM-BOOK-011) */
     val ownerName: String?,
+    /** the sheet marks the unit as used for business or professional activity (PM-FEE-010); a sheet says nothing of a separate entrance */
+    val businessUse: Boolean = false,
 )
 
 /**
