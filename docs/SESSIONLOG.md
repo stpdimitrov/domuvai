@@ -1673,3 +1673,37 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — this entry, `web/README.md`, `web/app/(console)/(firm)/debts/page.tsx`.
 
 ---
+
+## H-08 · 2026-10-01 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at `2129983` (#76) or later. Nothing in flight: no open PR, every lane free. Next: the owner's two answers below, then the next slice.
+
+**Shipped since H-07** (squash-merged, each reviewed before it merged):
+- #63 S-G1-02e — metered water and heating (PM-FEE-017). #66 S-G1-02e-o — the owner's answers (yes, yes): no business multiplier on a metered line; issuing waits for every reading.
+- #69 WEB-12 — `/entrance/fund` live: the fund card, the disbursement register, the handover statements as issued.
+- #71 E2E-01 — the whole chain checked on every PR (job `e2e`): Postgres → the API jar → `tools/seed_demo.py` → `next start` → `tools/check_e2e.py`. Its first run found the API sending `null` where the contract says a field is absent; `WireFormat` leaves it out, on the wire only.
+- #74 S-G1-02f — `GET /api/money/entrances/{entranceId}/arrears?asOf=`: an entrance's arrears in one read, each unit with its oldest open debt (PM-DEBT-001, PM-DEBT-002).
+- #76 WEB-13 — `/debts` live.
+
+**Numbers** — named-test coverage 48 of 233; Gate 1 45 of 70 (left: S-G1-01 kernel 10, S-G1-03 registry 11, S-G1-02 money 4). The API runs 39 operations (registry 16, money 17, intake 6), 15 planned.
+
+**Frontend ↔ backend, as of today** — three screens are live: `/entrance/charges`, `/entrance/fund`, `/debts`. The web calls 8 operations; on every PR `e2e` validates each real response against the contract and reads the seeded figures off the screens. Still sample data: `/portfolio` and `/entrance` (their backend is partly there), `/assembly` and `/compliance` (no backend), the firm sidebar's entrance list and signed-in person. Every API call times out after 10 s. No sign-in.
+
+**The owner's open questions** (asked 2026-09-30, one word each):
+- (a) A switch that serves the console only where it is enabled. PM-DEBT-011 forbids debtor names and amounts in any publicly accessible place; today that is prose in `web/README.md`.
+- (b) #73: take the payment term in force on each debt's own date (PM-SYS-002), not on the read date — latent while one entry exists; it restates S-G1-02f's D2.
+- And an owner action: make `e2e` a required check in branch protection. Until then a red `e2e` does not block a merge.
+
+**Findings open** — #73 (above; also advances not netted, a receivable with no unit) · #68 a journal read and the operating account's balance (money) · #58 idempotency keys on the fund's writes (money) · #57 signing the handover statement (evidence) · #48 the intake dry-run drops `item` (intake).
+
+**Owner inputs outstanding** (unchanged): 1. the ministry template order · 2. counsel items · 3. the auth provider · 4. the business-multiplier split · 5. the national minimum wage by year, with its source (PM-FUND-002).
+
+**Next slices, proposed** — after (a) and (b): `/entrance` live (units, owners, accounts; its statutory calendar waits for `compliance`) or `/portfolio`; an entrance picker (the sidebars still show the design's entrance); or back to Gate 1's backend (S-G1-01 kernel, S-G1-03 registry).
+
+**The chain on one machine** — `web/README.md` ("Against the real API and a database"): Postgres 16, the API (`bootRun` or the jar), `tools/seed_demo.py` (once per database), `npm run dev`; `tools/check_e2e.py` runs the CI check against it.
+
+**Operating procedure** — unchanged (`.claude/skills/zues-slice/SKILL.md` §6–§7): review before merge; auto-merge on; failures and conflicts fixed without asking (merge `main` in, never rebase); CI never polled — the open PR looked at once per wake-up; sync `main` after a merge; build the web when the contract changes. New since H-07: a slice that adds a web call or a screen extends `tools/check_e2e.py` — the check fails until it does.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`.
+
+---
