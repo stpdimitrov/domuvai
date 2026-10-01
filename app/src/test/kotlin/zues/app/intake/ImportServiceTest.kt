@@ -11,6 +11,7 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
+import zues.law.numberOn
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
@@ -143,15 +144,16 @@ class ImportServiceTest {
         assertThat(event.firstValue.rowsCreated).isEqualTo(2)
     }
 
-    // Every optional column mapped: area, owner and children are adopted; absence, animals and
-    // business use cannot be — each needs a declaration a count is not.
+    // Every optional column mapped: area, owner, children and business use are adopted; absence and
+    // animals cannot be — each needs a declaration a count is not. ап. 2 is a business: it pays the multiple.
+    private val multiple = numberOn("BUSINESS_USE_MULTIPLIER_MIN", "2026-05-01").toInt()   // read, never typed
     private fun commitRich(): Pair<CommitResult, ImportCommitted> {
         val req = FeeSheetDryRunRequest(
-            period = "2026-05", legalDate = "2026-05-01",
-            lines = listOf(TariffInput("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
+            period = "2026-05", legalDate = "2026-05-01", businessMultiplier = multiple,
+            lines = listOf(TariffInput("MAINTENANCE", "PER_UNIT", "GA-2026-1", rateMinor = 1_000)),
             csv = "designation,ideal_parts,occupants,fee_minor,area,owner,children,absent_days,animals,business\n" +
-                "ап. 1,60.0000,2,6000,72.50,Иван Петров,1,45,2,\n" +
-                "ап. 2,40.0000,1,4000,,,,,,да",
+                "ап. 1,60.0000,2,1000,72.50,Иван Петров,1,45,2,\n" +
+                "ап. 2,40.0000,1,${1_000 * multiple},,,,,,да",
         )
         val importId = UUID.randomUUID()
         whenever(imports.findById(importId))
@@ -183,8 +185,30 @@ class ImportServiceTest {
         assertThat(result.manualEntries).containsExactly(
             ManualEntry("ап. 1", IntakeField.ABSENT_DAYS, "45", "PM-FEE-007"),
             ManualEntry("ап. 1", IntakeField.ANIMALS, "2", "PM-BOOK-005"),
-            ManualEntry("ап. 2", IntakeField.BUSINESS_USE, "да", "PM-ORG-009"),
         )
+    }
+
+    @Test
+    fun `PM-FEE-010 a commit carries the sheet's business use to the registry — it is no longer a manual entry`() {
+        val (result, event) = commitRich()
+        assertThat(event.units.map { it.designation to it.businessUse }).containsExactly("ап. 1" to false, "ап. 2" to true)
+        assertThat(result.manualEntries.map { it.field }).doesNotContain(IntakeField.BUSINESS_USE)
+    }
+
+    @Test
+    fun `PM-FEE-010 a commit whose sheet has a business unit and no multiple is refused, and says why`() {
+        val req = FeeSheetDryRunRequest(
+            period = "2026-05", legalDate = "2026-05-01",
+            lines = listOf(TariffInput("MAINTENANCE", "PER_UNIT", "GA-2026-1", rateMinor = 1_000)),
+            csv = "designation,ideal_parts,occupants,fee_minor,business\nап. 1,60.0000,2,1000,\nап. 2,40.0000,1,${1_000 * multiple},да",
+        )
+        val importId = UUID.randomUUID()
+        whenever(imports.findById(importId))
+            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0)))
+
+        assertThatThrownBy { service.commit(importId, committedBy, req) }
+            .isInstanceOf(ImportStateException::class.java).hasMessageContaining("PM-FEE-010")
+        verifyNoInteractions(aggregates, events)
     }
 
     @Test

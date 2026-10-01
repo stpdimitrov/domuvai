@@ -100,6 +100,7 @@ class ImportService(
                 occupants = it.occupants,
                 childrenUnder6 = it.optional[IntakeField.CHILDREN_UNDER_6]?.toInt() ?: 0,
                 ownerName = it.optional[IntakeField.OWNER_NAME],
+                businessUse = it.businessUse,   // Rule: PM-FEE-010 — adopted since the registry holds it as a fact of its own (#91)
             )
         }
         val manual = sheet.rows.flatMap { row ->
@@ -134,13 +135,12 @@ class ImportService(
         /**
          * What a sheet may carry but a commit must not adopt. An absence exempts only on a filed
          * declaration (PM-FEE-007); an animal is entered from the owner's declaration with its
-         * passport data (PM-BOOK-005); and business use has no registry field of its own — the one
-         * flag there is a separate street entrance (PM-ORG-009).
+         * passport data (PM-BOOK-005). Business use was a third until the registry held it as a fact
+         * of its own (S-G1-03d); a commit adopts it now.
          */
         val NOT_ADOPTED = listOf(
             IntakeField.ABSENT_DAYS to "PM-FEE-007",
             IntakeField.ANIMALS to "PM-BOOK-005",
-            IntakeField.BUSINESS_USE to "PM-ORG-009",
         )
     }
 

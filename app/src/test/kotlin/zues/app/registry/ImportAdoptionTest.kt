@@ -7,6 +7,8 @@ import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
+import zues.app.intake.AdoptedUnit
+import zues.app.intake.ImportCommitted
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.LocalDate
@@ -106,6 +108,28 @@ class ImportAdoptionTest {
             ImportedUnit(unit("ап. 1", "40.0000")),
         ).filterIsInstance<PropertyUnit>()
         assertThat(adopted.map { Triple(it.designation, it.businessUse, it.separateEntrance) })
+            .containsExactly(Triple("магазин", true, false), Triple("ап. 1", false, false))
+    }
+
+    @Test
+    fun `PM-FEE-010 the import listener hands the sheet's business use to the registry, with no separate entrance`() {
+        whenever(entrances.existsById(entranceId)).thenReturn(true)
+        whenever(units.findByImportId(importId)).thenReturn(emptyList())
+        val written = argumentCaptor<Any>()
+        whenever(aggregates.insert(written.capture())).thenAnswer { it.arguments[0] }
+
+        ImportAdoption(service).on(
+            ImportCommitted(
+                entranceId, importId, importId, UUID.randomUUID(), 2, 0,
+                listOf(
+                    AdoptedUnit("магазин", "40.0000", null, 0, 0, null, businessUse = true),
+                    AdoptedUnit("ап. 1", "60.0000", null, 2, 0, null),
+                ),
+                on,
+            ),
+        )
+
+        assertThat(written.allValues.filterIsInstance<PropertyUnit>().map { Triple(it.designation, it.businessUse, it.separateEntrance) })
             .containsExactly(Triple("магазин", true, false), Triple("ап. 1", false, false))
     }
 

@@ -100,4 +100,16 @@ class FeeSheetTest {
         assertThat(parsed.rows[0].designation).isEqualTo("ап. 1")
         assertThat(parsed.rows[0].theirFeeMinor).isEqualTo(6000)
     }
+
+    @Test
+    fun `PM-FEE-010 a business-use cell is a yes or a no, in either language — a blank is a no, anything else makes its row a violation`() {
+        val parsed = FeeSheet.parse(
+            "designation,ideal_parts,occupants,fee_minor,business\n" +
+                "об. 1,10.0000,1,0,Да\nоб. 2,10.0000,1,0,yes\nоб. 3,10.0000,1,0,true\nоб. 4,10.0000,1,0,1\n" +
+                "об. 5,10.0000,1,0,не\nоб. 6,10.0000,1,0,No\nоб. 7,10.0000,1,0,false\nоб. 8,10.0000,1,0,0\nоб. 9,10.0000,1,0,\n" +
+                "об. 10,10.0000,1,0,магазин",                  // what the business is, not whether there is one
+        )
+        assertThat(parsed.rows.map { it.businessUse }).containsExactly(true, true, true, true, false, false, false, false, false)
+        assertThat(parsed.violations.single()).contains("row 11").contains("магазин")
+    }
 }

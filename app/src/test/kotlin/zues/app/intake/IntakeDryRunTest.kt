@@ -3,6 +3,7 @@ package zues.app.intake
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import zues.law.numberOn
 
 class IntakeDryRunTest {
 
@@ -112,26 +113,74 @@ class IntakeDryRunTest {
     }
 
     @Test
-    fun `PM-FEE-008 PM-FEE-005 the sheet's occupants are the persons charged — its children, animal, absence and business cells change no recomputed fee`() {
-        // 500 a person. ап. 1 was charged on 3 persons; the sheet also says a child lives there, two animals,
-        // a long absence and a business. The 3 already is what those came to (D1 on #31, #86): none is applied again.
+    fun `PM-FEE-008 PM-FEE-005 the sheet's occupants are the persons charged — its children, animal and absence cells change no recomputed fee`() {
+        // 500 a person. ап. 1 was charged on 3 persons; the sheet also says a child lives there, two animals
+        // and a long absence. The 3 already is what those came to (D1 on #31, #86): none is applied again.
         val perPerson = listOf(TariffInput("MAINTENANCE", "PER_PERSON", "GA-2026-1", rateMinor = 500))
         val stated = FeeSheet.parse(
-            "designation,ideal_parts,occupants,fee_minor,children,animals,absent_days,business\n" +
-                "ап. 1,60.0000,3,1500,1,2,45,да\nап. 2,40.0000,1,500,,,,",
+            "designation,ideal_parts,occupants,fee_minor,children,animals,absent_days\n" +
+                "ап. 1,60.0000,3,1500,1,2,45\nап. 2,40.0000,1,500,,,",
         )
-        assertThat(stated.rows.first().optional.keys).containsExactlyInAnyOrder(      // the four cells were read, not dropped
-            IntakeField.CHILDREN_UNDER_6, IntakeField.ANIMALS, IntakeField.ABSENT_DAYS, IntakeField.BUSINESS_USE,
+        assertThat(stated.rows.first().optional.keys).containsExactlyInAnyOrder(      // the three cells were read, not dropped
+            IntakeField.CHILDREN_UNDER_6, IntakeField.ANIMALS, IntakeField.ABSENT_DAYS,
         )
         val report = IntakeDryRun.of("e1", period, on, null, perPerson, stated)
         assertThat(report.violations).isEmpty()
         assertThat(report.differences).isEmpty()
         assertThat(report.reproduced).isTrue()
+    }
 
-        // by ideal parts, a business cell applies no multiple: 60/40 of 10000
-        val byParts = FeeSheet.parse(
-            "designation,ideal_parts,occupants,fee_minor,business\nап. 1,60.0000,3,6000,\nап. 2,40.0000,1,4000,да",
-        )
-        assertThat(IntakeDryRun.of("e1", period, on, null, maintenance(), byParts).reproduced).isTrue()
+    // --- PM-FEE-010: the sheet's business use (#91) ---
+
+    private val multiple = numberOn("BUSINESS_USE_MULTIPLIER_MAX", on).toInt()        // read, never typed
+    private fun perUnit(stream: String = "MAINTENANCE") = listOf(TariffInput(stream, "PER_UNIT", "GA-2026-1", rateMinor = 1_000))
+    private fun withShop(feeFlat: Long, feeShop: Long) = FeeSheet.parse(
+        "designation,ideal_parts,occupants,fee_minor,business\nап. 1,60.0000,2,$feeFlat,не\nмагазин,40.0000,0,$feeShop,да",
+    )
+
+    @Test
+    fun `PM-FEE-010 a unit the sheet marks as business use pays the assembly's multiple — a sheet that charged it the standard rate is named`() {
+        val report = IntakeDryRun.of("e1", period, on, multiple, perUnit(), withShop(1_000, 1_000L * multiple))
+        assertThat(report.violations).isEmpty()
+        assertThat(report.reproduced).isTrue()
+
+        val standard = IntakeDryRun.of("e1", period, on, multiple, perUnit(), withShop(1_000, 1_000))
+        assertThat(standard.differences.single())
+            .isEqualTo(UnitDiff("магазин", theirMinor = 1_000, ourMinor = 1_000L * multiple, deltaMinor = 1_000L * multiple - 1_000))
+    }
+
+    @Test
+    fun `PM-FEE-010 a sheet with a business unit and no multiple in the request is a violation — never the law's minimum`() {
+        val minimum = numberOn("BUSINESS_USE_MULTIPLIER_MIN", on).toInt()
+        val report = IntakeDryRun.of("e1", period, on, null, perUnit(), withShop(1_000, 1_000L * minimum))   // what a default would reproduce
+        assertThat(report.reproduced).isFalse()
+        assertThat(report.matched).isEqualTo(0)
+        assertThat(report.violations.single()).contains("PM-FEE-010").contains("магазин").doesNotContain("ап. 1")
+
+        // one multiplied line among the repair fund's is enough to need the figure
+        val mixed = perUnit() + TariffInput("REPAIR_FUND", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)
+        val both = IntakeDryRun.of("e1", period, on, null, mixed, withShop(7_000, 4_000 + 1_000L * minimum))
+        assertThat(both.reproduced).isFalse()
+        assertThat(both.violations.single()).contains("PM-FEE-010")
+    }
+
+    @Test
+    fun `PM-FEE-010 a multiple outside the law's range is the caller's error, whether or not a unit pays it`() {
+        val tooMany = numberOn("BUSINESS_USE_MULTIPLIER_MAX", on).toInt() + 1
+        val tooFew = numberOn("BUSINESS_USE_MULTIPLIER_MIN", on).toInt() - 1
+        for (figure in listOf(tooMany, tooFew)) {
+            for (sheet in listOf(withShop(1_000, 1_000L * figure), sheet(1_000, 1_000))) {
+                assertThatThrownBy { IntakeDryRun.of("e1", period, on, figure, perUnit(), sheet) }
+                    .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-FEE-010")
+            }
+        }
+    }
+
+    @Test
+    fun `PM-FEE-010 a sheet whose only lines are the repair fund's needs no multiple — it is never multiplied`() {
+        val fund = listOf(TariffInput("REPAIR_FUND", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000))
+        val report = IntakeDryRun.of("e1", period, on, null, fund, withShop(6_000, 4_000))
+        assertThat(report.violations).isEmpty()
+        assertThat(report.reproduced).isTrue()
     }
 }

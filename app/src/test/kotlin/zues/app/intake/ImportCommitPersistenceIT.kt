@@ -186,4 +186,32 @@ class ImportCommitPersistenceIT {
         }.isInstanceOf(RuntimeException::class.java)
         assertThat(units.findByEntranceId(entranceId)).isEmpty()
     }
+
+    @Test
+    fun `PM-FEE-010 the units a commit adopts are charged what the dry-run charged — the business unit at the multiple`() {
+        val multiple = zues.law.numberOn("BUSINESS_USE_MULTIPLIER_MAX", "2026-05-01").toInt()
+        val lines = listOf(TariffInput("MAINTENANCE", "PER_UNIT", "GA-2026-1", rateMinor = 1_000))
+        val sheet = FeeSheet.parse(
+            "designation,ideal_parts,occupants,fee_minor,business\nоб. 1,60.0000,2,1000,\nоб. 2,40.0000,0,${1_000 * multiple},да",
+        )
+        // the dry-run reproduces the sheet: the business unit at the multiple, the other at the standard rate
+        assertThat(IntakeDryRun.of("e", "2026-05", "2026-05-01", multiple, lines, sheet).reproduced).isTrue()
+
+        // what the listener hands the registry for that sheet (ImportAdoption, proved by ImportAdoptionTest): business
+        // use, no separate entrance. Called directly, as this class does throughout — the listener's delivery is async.
+        val entranceId = createEntrance()
+        registry.adoptImport(
+            entranceId, UUID.randomUUID(), ON,
+            sheet.rows.map { ImportedUnit(RegisterUnit(it.designation, "UNSPECIFIED", idealParts = it.idealParts, businessUse = it.businessUse)) },
+        )
+
+        val preview = mvc.perform(
+            post("/api/money/entrances/$entranceId/charge-runs/preview").contentType(MediaType.APPLICATION_JSON).content(
+                """{"period":"2026-05","legalDate":"2026-05-01","businessMultiplier":$multiple,
+                    "lines":[{"stream":"MAINTENANCE","key":"PER_UNIT","decisionId":"GA-2026-1","rateMinor":1000}]}""",
+            ),
+        ).andExpect(status().isOk).andReturn().response.contentAsString
+        val charged = json.readTree(preview).get("charges").associate { it.get("designation").asText() to it.get("totalMinor").asLong() }
+        assertThat(charged).isEqualTo(sheet.rows.associate { it.designation to it.theirFeeMinor })
+    }
 }

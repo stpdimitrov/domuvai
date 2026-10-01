@@ -8,6 +8,7 @@ import zues.kernel.IdealParts
 import zues.law.AllocationKey
 import zues.law.CostItem
 import zues.law.CostStream
+import zues.law.numberOn
 
 /** One tariff line the firm's fees were built on — the same shape the engine bills from. */
 data class TariffInput(
@@ -75,11 +76,32 @@ object IntakeDryRun {
             },
             businessMultiplier = businessMultiplier,
         )
+        // Rule: PM-FEE-010 — the multiple is part of that specification: outside the law's range at the legal date it
+        // is the caller's error too, whether or not a unit pays it. The numbers are the law's, read, never typed; a
+        // date with no range in force is left to the engine.
+        businessMultiplier?.let { given ->
+            val range = runCatching {
+                numberOn("BUSINESS_USE_MULTIPLIER_MIN", legalDate).toInt()..numberOn("BUSINESS_USE_MULTIPLIER_MAX", legalDate).toInt()
+            }.getOrNull()
+            require(range == null || given in range) {
+                "business multiplier $given is outside the statutory range ${range?.first}–${range?.last} (PM-FEE-010)"
+            }
+        }
 
         val rows = sheet.rows
         val violations = sheet.violations.toMutableList()
         if (rows.isEmpty()) {
             return DryRunReport(0, 0, 0, emptyList(), (violations + "no rows to reproduce").distinct(), false)
+        }
+
+        // Rule: PM-FEE-010 — the multiple is the assembly's: a sheet with a business unit needs the figure in the
+        // request, or it is not reproduced — never the law's minimum by default. `money` refuses such a run; here
+        // it is a finding about the sheet's tariff, so it is reported. The repair fund is never multiplied.
+        val business = rows.filter { it.businessUse }
+        if (business.isNotEmpty() && businessMultiplier == null && tariff.lines.any { it.stream != CostStream.REPAIR_FUND }) {
+            val missing = "the assembly sets the multiple for business use, and this request has none (PM-FEE-010) — " +
+                "marked as business use: ${business.joinToString { it.designation }}"
+            return DryRunReport(rows.size, 0, 0, emptyList(), violations + missing, false)
         }
 
         // Unit construction and the run can fail on the sheet's own data (bad ideal parts, a sum
@@ -90,10 +112,12 @@ object IntakeDryRun {
             // extended on #86, 2026-10-01): the count already leaves out children under six and already reflects
             // absences and animals. So the engine is given the occupants alone — feeding it the sheet's children,
             // animal or absence cells as well would apply the same fact twice, and the commit adopts the household
-            // on this reading. The business-use multiple is not applied here either, until the live run can
-            // reproduce it (the separate-entrance flag, a money finding since S-41b; PM-FEE-010 is unconfirmed).
+            // on this reading.
+            // Rule: PM-FEE-010 — business use is no headcount, so it is given: a unit the sheet marks pays the
+            // multiple. A sheet has no column for a separate street entrance, and a commit adopts the unit with
+            // none (PM-ORG-009), so a charge run after the commit, given the same figure, charges the same (#91).
             val units = rows.mapIndexed { i, r ->
-                PropertyUnit(i.toString(), r.designation, IdealParts.of(r.idealParts), r.occupants)
+                PropertyUnit(i.toString(), r.designation, IdealParts.of(r.idealParts), r.occupants, businessUse = r.businessUse)
             }
             computeChargeRun(entranceId, units, tariff)
         } catch (e: RuntimeException) {
