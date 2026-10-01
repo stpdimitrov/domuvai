@@ -1,6 +1,7 @@
 package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -24,7 +25,8 @@ import java.util.UUID
 
 /**
  * Arrears ageing against real PostgreSQL: issue a run, then read a unit's arrears as of a date and
- * see the outstanding land in the right band (PM-DEBT-001). Docker-gated — skips locally, runs in CI.
+ * see the outstanding land in the right band (PM-DEBT-001), each debt due by the payment term in force on
+ * its own date (PM-SYS-002). Docker-gated — skips locally, runs in CI.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -48,6 +50,7 @@ class ArrearsIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var postings: PostingRepository
 
     private fun createEntrance(): UUID {
         val response = mvc.perform(
@@ -69,13 +72,16 @@ class ArrearsIT {
         return json.readTree(response).get("unitIds").map { UUID.fromString(it.asText()) }
     }
 
-    /** May's run: 10_000 + 20_000 by ideal parts, raised at value date 2026-05-01 — ап. 1 (60%) owes 18_000, ап. 2 12_000. */
-    private fun issueMay(entranceId: UUID) {
+    /** May's run, raised at value date 2026-05-01. */
+    private fun issueMay(entranceId: UUID) = issue(entranceId, "2026-05")
+
+    /** A month's run: 10_000 + 20_000 by ideal parts, raised on the month's first day — ап. 1 (60%) owes 18_000, ап. 2 12_000. */
+    private fun issue(entranceId: UUID, period: String) {
         mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
                 json.writeValueAsString(
                     StoredChargeRunRequest(
-                        period = "2026-05", legalDate = "2026-05-01",
+                        period = period, legalDate = "$period-01",
                         lines = listOf(
                             TariffLineRequest("MANAGEMENT", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
                             TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 20_000),
@@ -83,6 +89,15 @@ class ArrearsIT {
                     ),
                 ),
             ),
+        ).andExpect(status().isCreated)
+    }
+
+    /** A cash payment — it settles the unit's oldest debt first. */
+    private fun pay(entranceId: UUID, unitId: UUID, amountMinor: Long, on: String) {
+        mvc.perform(
+            post("/api/money/entrances/$entranceId/payments").header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"unitId":"$unitId","amountMinor":$amountMinor,"receivedInto":"CASH","valueDate":"$on"}"""),
         ).andExpect(status().isCreated)
     }
 
@@ -106,12 +121,8 @@ class ArrearsIT {
         val entranceId = createEntrance()
         val units = registerUnits(entranceId)
         issueMay(entranceId)
-        mvc.perform(                                                     // ап. 2 pays its 12_000 in full
-            post("/api/money/entrances/$entranceId/payments").header("Idempotency-Key", UUID.randomUUID().toString())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"unitId":"${units[1]}","amountMinor":12000,"receivedInto":"CASH","valueDate":"2026-05-10"}"""),
-        ).andExpect(status().isCreated)
-        val dueOn = LocalDate.parse("2026-05-01").plusDays(numberOn("PAYMENT_TERM_DAYS", "2026-05-20").toLong())   // PM-DEBT-002
+        pay(entranceId, units[1], 12_000, "2026-05-10")                  // ап. 2 pays its 12_000 in full
+        val dueOn = LocalDate.parse("2026-05-01").plusDays(numberOn("PAYMENT_TERM_DAYS", "2026-05-01").toLong())   // PM-DEBT-002, the term on the debt's date
 
         mvc.perform(get("/api/money/entrances/$entranceId/arrears").param("asOf", "2026-05-20"))
             .andExpect(status().isOk)
@@ -121,5 +132,47 @@ class ArrearsIT {
             .andExpect(jsonPath("$.units[0].buckets[1].amountMinor").value(18_000))
             .andExpect(jsonPath("$.units[0].oldestDebt.dueOn").value(dueOn.toString()))
             .andExpect(jsonPath("$.units[0].oldestDebt.overdueDays").value(ChronoUnit.DAYS.between(dueOn, LocalDate.parse("2026-05-20"))))
+    }
+
+    @Test
+    fun `PM-SYS-002 each debt falls due by the payment term in force on its own date — a part-paid debt, read back from Postgres`() {
+        val entranceId = createEntrance()
+        val units = registerUnits(entranceId)
+        issue(entranceId, "2026-05")
+        issue(entranceId, "2026-06")
+        pay(entranceId, units[0], 8_000, "2026-06-10")                   // ап. 1: May's 18_000 is 10_000 now
+        // The law has one term, so the read is given a test's own two: 10 days for a debt dated before June, 40 from then on.
+        val twoTerms = ArrearsService(postings) { if (it.isBefore(LocalDate.parse("2026-06-01"))) 10 else 40 }
+
+        val report = twoTerms.forEntrance(entranceId, LocalDate.parse("2026-07-01"))
+
+        // May's debts fell due on 11.05, 51 days before the read; June's fall due on 11.07. The term on the read date
+        // is 40 days: it would have May's fall due on 10.06, 21 days before the read.
+        val mayDue = OldestDebt(LocalDate.parse("2026-05-11"), 51)
+        fun bands(current: Long, days31to60: Long) = listOf(
+            AgeingBucket("CURRENT", current), AgeingBucket("0-30", 0), AgeingBucket("31-60", days31to60),
+            AgeingBucket("61-90", 0), AgeingBucket("90+", 0),
+        )
+        assertThat(report.units).containsExactly(
+            UnitArrears(units[0], "2026-07-01", 28_000, bands(18_000, 10_000), mayDue),
+            UnitArrears(units[1], "2026-07-01", 24_000, bands(12_000, 12_000), mayDue),
+        )
+        assertThat(report.totalMinor).isEqualTo(52_000)
+    }
+
+    @Test
+    fun `PM-SYS-002 a read date before any payment term reads as nothing owed, not a bad request`() {
+        val entranceId = createEntrance()
+        val units = registerUnits(entranceId)
+        issueMay(entranceId)
+
+        mvc.perform(get("/api/money/entrances/$entranceId/arrears").param("asOf", "1990-01-01"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalMinor").value(0))
+            .andExpect(jsonPath("$.units.length()").value(0))
+        mvc.perform(get("/api/money/units/${units[0]}/arrears").param("asOf", "1990-01-01"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalMinor").value(0))
+            .andExpect(jsonPath("$.oldestDebt").doesNotExist())
     }
 }

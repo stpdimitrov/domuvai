@@ -165,8 +165,8 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-DEBT-001` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:90` | `app/src/main/kotlin/zues/app/money/Arrears.kt:11` |  |
-| `PM-DEBT-002` | `app/src/test/kotlin/zues/app/money/ArrearsServiceTest.kt:115` | `app/src/main/kotlin/zues/app/money/Arrears.kt:42` |  |
+| `PM-DEBT-001` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:105` | `app/src/main/kotlin/zues/app/money/Arrears.kt:12` |  |
+| `PM-DEBT-002` | `app/src/test/kotlin/zues/app/money/ArrearsServiceTest.kt:119` | `app/src/main/kotlin/zues/app/money/Arrears.kt:43` |  |
 | `PM-DEBT-003` | — | — |  |
 | `PM-DEBT-004` | — | — |  |
 | `PM-DEBT-005` | — | — |  |
@@ -275,7 +275,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
-| `PM-SYS-002` | `law/src/test/kotlin/zues/law/LawTest.kt:15` | `law/src/main/kotlin/zues/law/Constants.kt:85` |  |
+| `PM-SYS-002` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:138` | `app/src/main/kotlin/zues/app/money/Arrears.kt:64` |  |
 | `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
 | `PM-SYS-004` | `app/src/test/kotlin/zues/app/registry/BookWebTest.kt:66` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
 | `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |

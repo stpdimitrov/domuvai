@@ -1,5 +1,6 @@
 package zues.app.money
 
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
@@ -62,5 +63,16 @@ class ArrearsWebTest {
             .andExpect(jsonPath("$.units[0].oldestDebt.overdueDays").value(15))
         mvc.perform(get("/api/money/entrances/$entranceId/arrears").param("asOf", "30.09.2026"))
             .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `PM-SYS-002 a debt dated before any payment term is a server error naming the constant — not a 404, not a 400`() {
+        val missing = NoSuchElementException("no constant PAYMENT_TERM_DAYS in force on 1990-01-01")
+        whenever(arrears.forUnit(eq(unitId), any())).thenThrow(missing)
+        whenever(arrears.forEntrance(any(), any())).thenThrow(missing)
+        // No handler takes it, so it leaves the controller as it is — the servlet container answers that with a 500.
+        for (path in listOf("/api/money/units/$unitId/arrears", "/api/money/entrances/${UUID.randomUUID()}/arrears")) {
+            assertThatThrownBy { mvc.perform(get(path).param("asOf", "2026-06-01")) }.hasRootCause(missing)
+        }
     }
 }
