@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
-import { entranceAt, eur, reach, type EntranceAt } from "@/lib/console";
+import { entranceAt, eur, isPeriod, monthName, reach, shiftPeriod as shift, thisPeriod, type EntranceAt } from "@/lib/console";
 
 export const metadata: Metadata = { title: "Начисления — Етаж" };
 
@@ -24,17 +24,6 @@ const DEMO_BASIS = {
 const STREAM_LABEL: Record<string, string> = { MANAGEMENT: "управление", MAINTENANCE: "поддръжка на общи части", REPAIR_FUND: "фонд „Ремонт“" };
 const describe = (l: Schemas["TariffLineRequest"]) =>
   `${STREAM_LABEL[l.stream] ?? l.stream} ${l.rateMinor != null ? `${eur(l.rateMinor)}/${l.key === "PER_PERSON" ? "живущ" : "обект"}` : `${eur(l.totalMinor ?? 0)} по идеални части`}`;
-
-const MONTHS = ["януари", "февруари", "март", "април", "май", "юни", "юли", "август", "септември", "октомври", "ноември", "декември"];
-
-const thisPeriod = () =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
-const shift = (period: string, by: number) => {
-  const [y, m] = period.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + by, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-};
-const monthName = (period: string) => `${MONTHS[Number(period.slice(5)) - 1]} ${period.slice(0, 4)}`;
 
 const pct = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 4, maximumFractionDigits: 6 }) + "%";
 
@@ -128,7 +117,7 @@ function MultipleForm({ period, entrance, multiple }: { period: string; entrance
 
 export default async function ChargesPage({ searchParams }: { searchParams: Promise<{ entrance?: string; period?: string; multiple?: string }> }) {
   const query = await searchParams;
-  const period = /^\d{4}-\d{2}$/.test(query.period ?? "") ? query.period! : thisPeriod();
+  const period = isPeriod(query.period) ? query.period : thisPeriod();
   const multiple = multipleOf(query.multiple);
   const view = await load(query.entrance, period, `${period}-01`, multiple);
   const shown = view.kind === "ok" || view.kind === "refused" ? view.entrance : undefined;

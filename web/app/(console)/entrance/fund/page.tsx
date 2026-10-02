@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
-import { entranceAt, eur, reach, type EntranceAt } from "@/lib/console";
+import { entranceAt, eur, isPeriod, monthDays, monthName, reach, shiftPeriod, thisPeriod, type EntranceAt } from "@/lib/console";
 
 export const metadata: Metadata = { title: "Каса и фонд — Етаж" };
 
 type Entrance = Schemas["EntranceView"];
 type Disbursement = Schemas["DisbursementView"];
 type Handover = Schemas["HandoverStatementView"];
+type Journal = Schemas["JournalView"];
 
 type Loaded =
   | {
       kind: "ok";
       entrance: Entrance;
       fund: Schemas["FundView"];
-      operating: Schemas["FundAccountView"] | null | { failed: string };   // null: none registered
+      operating: Schemas["OperatingAccountView"] | null | { failed: string };   // null: none registered
       handovers: Handover[] | { failed: string };
+      journal: Journal | { failed: string };
     }
   | Exclude<EntranceAt, { kind: "ok" }>
   | { kind: "nofund"; entrance: Entrance }
@@ -26,20 +28,22 @@ const refusal = (r: { error?: { error?: string }; response: Response }) => r.err
 /**
  * One screen, one server-side aggregation (ADR-011): the entrance's repair fund — its account (PM-FUND-004),
  * balance, committed and available (PM-FUND-009), every disbursement signed off against it (PM-FUND-006…008) —
- * the handover statements issued for it (PM-FUND-010), and the operating account it must stay apart from.
- * Every figure is the API's; the page decides nothing. The accounts and the statements each fail alone — the fund
- * stays on screen; without the fund there is nothing to show.
+ * the handover statements issued for it (PM-FUND-010), the operating account it must stay apart from, and the
+ * entrance's journal for a month (PM-FUND-005, PM-PMC-008). Every figure is the API's; the page sums a journal's
+ * legs for display and decides nothing. The operating account, the statements and the journal each fail alone — the
+ * fund stays on screen; without the fund there is nothing to show.
  */
-async function load(entranceId: string | undefined): Promise<Loaded> {
+async function load(entranceId: string | undefined, period: string, account: string | undefined): Promise<Loaded> {
   const at = await entranceAt(entranceId);
   if (at.kind !== "ok") return at;
   const { entrance } = at;
 
   const path = { entranceId: entrance.id };
-  const [fund, accounts, handovers] = await Promise.all([
+  const [fund, operating, handovers, journal] = await Promise.all([
     reach(() => api.GET("/api/money/entrances/{entranceId}/fund", { params: { path } })),
-    reach(() => api.GET("/api/money/entrances/{entranceId}/fund-accounts", { params: { path } })),
+    reach(() => api.GET("/api/money/entrances/{entranceId}/operating-account", { params: { path } })),
     reach(() => api.GET("/api/money/entrances/{entranceId}/fund/handover-statements", { params: { path } })),
+    reach(() => api.GET("/api/money/entrances/{entranceId}/journal", { params: { path, query: { ...monthDays(period), ...(account && { account }) } } })),
   ]);
   if (!fund) return { kind: "down" };
   if (!fund.data) {
@@ -51,11 +55,14 @@ async function load(entranceId: string | undefined): Promise<Loaded> {
     kind: "ok",
     entrance,
     fund: fund.data,
-    operating: accounts?.data
-      ? accounts.data.find((a) => a.purpose === "OPERATING") ?? null
-      : { failed: accounts ? `API отказа сметките: ${refusal(accounts)}` : "Бекендът не подаде сметките." },
+    // The API's 404 says so when the entrance has no operating account; any other refusal is shown as it came.
+    operating: operating?.data
+      ?? (operating?.response.status === 404 && refusal(operating).includes("no operating account") ? null
+        : { failed: operating ? `API отказа оперативната сметка: ${refusal(operating)}` : "Бекендът не подаде оперативната сметка." }),
     handovers: handovers?.data
       ?? { failed: handovers ? `API отказа отчетите: ${refusal(handovers)}` : "Бекендът не подаде отчетите." },
+    journal: journal?.data
+      ?? { failed: journal ? `API отказа дневника: ${refusal(journal)}` : "Бекендът не подаде дневника." },
   };
 }
 
@@ -77,6 +84,45 @@ const FILTERS = [
   ...Object.entries(STATUS).map(([status, { many }]) => ({ key: status.toLowerCase(), label: many })),
 ];
 
+/** The journal narrowed to one account, through the API's own filter. The keys are the screen's; the accounts are the ledger's. */
+const ACCOUNTS = [
+  { key: "", label: "Всички сметки", account: undefined },
+  { key: "fund", label: "Сметка на фонда", account: "BANK:REPAIR_RENEWAL" },
+  { key: "operating", label: "Оперативна сметка", account: "BANK:OPERATING" },
+  { key: "cash", label: "Каса", account: "CASH" },
+];
+
+/** The ledger's accounts in words; one the screen does not know is shown as the ledger names it. */
+const ACCOUNT: Record<string, string> = {
+  RECEIVABLE: "Вземания от обекти",
+  ADVANCE: "Аванси от обекти",
+  CASH: "Каса",
+  "BANK:REPAIR_RENEWAL": "Банка · сметка на фонда",
+  "BANK:OPERATING": "Банка · оперативна сметка",
+  "INCOME:MANAGEMENT": "Приход · управление",
+  "INCOME:MAINTENANCE": "Приход · поддръжка на общи части",
+  "INCOME:REPAIR_FUND": "Приход · фонд „Ремонт“",
+  "EXPENSE:REPAIR_FUND": "Разход · фонд „Ремонт“",
+};
+
+/** What wrote a journal, as the API says it; one nothing claims has no name. */
+const SOURCE: Record<string, string> = { CHARGE_RUN: "Начисление", PAYMENT: "Плащане", FUND_PAYOUT: "Изплащане от фонда" };
+
+/**
+ * A journal's legs as lines: one per account and side, in the order the API gives them — its debits, then its
+ * credits. A credit is below zero, as the API has it; a leg of nothing stands with the debits, where the API puts it.
+ */
+const lines = (legs: Schemas["JournalLeg"][]) => {
+  const byLine = new Map<string, { account: string; debit: boolean; amountMinor: number; legs: number }>();
+  for (const leg of legs) {
+    const debit = leg.amountMinor >= 0;
+    const key = `${debit}:${leg.account}`;
+    const line = byLine.get(key) ?? { account: leg.account, debit, amountMinor: 0, legs: 0 };
+    byLine.set(key, { ...line, amountMinor: line.amountMinor + Math.abs(leg.amountMinor), legs: line.legs + 1 });
+  }
+  return [...byLine.values()];
+};
+
 const date = (iso?: string) => (iso ? iso.slice(0, 10).split("-").reverse().join(".") : "—");
 const iban = (value: string) => value.replace(/\s+/g, "").replace(/(.{4})(?=.)/g, "$1 ");
 const purpose = (d: { purpose: string }) => PURPOSE[d.purpose] ?? d.purpose;
@@ -97,10 +143,12 @@ const DIM = { color: "#6B6F6C" };
 const FAILED = { color: "#8E2318" };
 const NOTE = { font: "400 11.5px/1 'IBM Plex Mono', monospace", color: "#6B6F6C" };
 
-export default async function FundPage({ searchParams }: { searchParams: Promise<{ entrance?: string; status?: string }> }) {
+export default async function FundPage({ searchParams }: { searchParams: Promise<{ entrance?: string; status?: string; period?: string; account?: string }> }) {
   const query = await searchParams;
-  const view = await load(query.entrance);
   const status = FILTERS.some((f) => f.key === query.status) ? query.status! : "";
+  const period = isPeriod(query.period) ? query.period : thisPeriod();
+  const account = ACCOUNTS.find((a) => a.key === query.account) ?? ACCOUNTS[0];
+  const view = await load(query.entrance, period, account.account);
   const entrance = "entrance" in view ? view.entrance : undefined;
 
   return (
@@ -120,7 +168,7 @@ export default async function FundPage({ searchParams }: { searchParams: Promise
       </div>
 
       {view.kind === "ok" ? (
-        <Fund view={view} status={status} />
+        <Fund view={view} status={status} period={period} account={account.key} />
       ) : (
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
@@ -137,13 +185,18 @@ export default async function FundPage({ searchParams }: { searchParams: Promise
   );
 }
 
-function Fund({ view, status }: { view: Extract<Loaded, { kind: "ok" }>; status: string }) {
-  const { fund, entrance, operating, handovers } = view;
+function Fund({ view, status, period, account: shownAccount }: { view: Extract<Loaded, { kind: "ok" }>; status: string; period: string; account: string }) {
+  const { fund, entrance, operating, handovers, journal } = view;
   const account = operating && !("failed" in operating) ? operating : null;
   const committed = fund.disbursements.filter((d) => d.status === "COMMITTED");
   const shown = fund.disbursements.filter((d) => !status || d.status === status.toUpperCase());
   const count = (key: string) => fund.disbursements.filter((d) => !key || d.status === key.toUpperCase()).length;
-  const href = (key: string) => `?entrance=${entrance.id}${key ? `&status=${key}` : ""}`;
+  // every link keeps what the others chose: the register's filter, the journal's month and its account
+  const link = (to: { status?: string; period?: string; account?: string }) => {
+    const chosen = { status, period, account: shownAccount, ...to };
+    return `?entrance=${entrance.id}${chosen.status ? `&status=${chosen.status}` : ""}&period=${chosen.period}${chosen.account ? `&account=${chosen.account}` : ""}`;
+  };
+  const href = (key: string) => link({ status: key });
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflow: "auto", paddingBottom: 24 }}>
@@ -151,11 +204,16 @@ function Fund({ view, status }: { view: Extract<Loaded, { kind: "ok" }>; status:
         <div className="acct-card">
           <div className="acct-head">
             <span className="acct-title">Оперативна сметка</span>
-            <span className="badge calm">Без салдо от API</span>
+            <span className="badge calm">{!account ? "—" : account.outflowsRecorded ? "Салдо от дневника" : "Само постъпления"}</span>
           </div>
           <div className="acct-iban">{account ? `${iban(account.iban)} · титуляр ${account.holderName}` : "—"}</div>
           <div className="acct-stats">
-            {["Салдо", "Поети задължения", "Разполагаемо"].map((label) => (
+            <div>
+              {/* a balance only once the API says money leaving the account is recorded too */}
+              <div className="lbl">{account?.outflowsRecorded ? "Салдо" : "Постъпления по сметката"}</div>
+              <div className="big" style={account ? undefined : DIM}>{account ? eur(account.balanceMinor) : "—"}</div>
+            </div>
+            {["Поети задължения", "Разполагаемо"].map((label) => (
               <div key={label}>
                 <div className="lbl">{label}</div>
                 <div className="big" style={DIM}>—</div>
@@ -165,7 +223,8 @@ function Fund({ view, status }: { view: Extract<Loaded, { kind: "ok" }>; status:
           <div className="acct-note" style={operating && "failed" in operating ? FAILED : undefined}>
             {operating && "failed" in operating ? operating.failed
               : operating === null ? "Входът няма регистрирана оперативна сметка."
-                : "API още не подава салдото на оперативната сметка — показват се само сметката и титулярят."}
+                : operating.outflowsRecorded ? "Поети задължения и разполагаемо API не подава за оперативната сметка."
+                  : "Разходите от оперативната сметка още не се записват: сумата е постъпилото по нея досега, не салдото в банката. Поети задължения и разполагаемо API не подава."}
           </div>
         </div>
 
@@ -203,7 +262,7 @@ function Fund({ view, status }: { view: Extract<Loaded, { kind: "ok" }>; status:
             <Link key={f.key} href={href(f.key)} className={`chip${f.key === status ? " active" : ""}`}>{f.label} · {count(f.key)}</Link>
           ))}
         </div>
-        <span style={NOTE}>Разходи от фонда · двустранният дневник ще се покаже, когато API го подава</span>
+        <span style={NOTE}>Разходи от фонда</span>
       </div>
 
       <div className="pf-card" style={{ margin: "12px 24px 0", flex: "none" }}>
@@ -229,7 +288,78 @@ function Fund({ view, status }: { view: Extract<Loaded, { kind: "ok" }>; status:
       </div>
 
       <Handovers handovers={handovers} />
+
+      <JournalSection journal={journal} period={period} account={shownAccount} link={link} />
     </div>
+  );
+}
+
+/**
+ * The entrance's journal for a month (Rule: PM-FUND-005, PM-PMC-008), as the API reads it: each journal whole, its
+ * debits and credits by account. Legs of one journal on one side of one account are one line with their sum;
+ * nothing else is worked out here, and a journal that did not load shows no figure at all. The API serves no description or document number, so none is shown.
+ */
+function JournalSection({ journal, period, account, link }: {
+  journal: Journal | { failed: string };
+  period: string;
+  account: string;
+  link: (to: { period?: string; account?: string }) => string;
+}) {
+  const journals = "failed" in journal ? [] : journal.journals;
+  const total = (debit: boolean) =>
+    journals.reduce((sum, j) => sum + j.legs.filter((l) => l.amountMinor >= 0 === debit).reduce((s, l) => s + Math.abs(l.amountMinor), 0), 0);
+  return (
+    <>
+      <div style={{ margin: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="acct-title">Дневник · {monthName(period)}</span>
+          <Link href={link({ period: shiftPeriod(period, -1) })} className="chip">◀ {monthName(shiftPeriod(period, -1)).split(" ")[0]}</Link>
+          <Link href={link({ period: shiftPeriod(period, 1) })} className="chip">{monthName(shiftPeriod(period, 1)).split(" ")[0]} ▶</Link>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {ACCOUNTS.map((a) => (
+            <Link key={a.key} href={link({ account: a.key })} className={`chip${a.key === account ? " active" : ""}`}>{a.label}</Link>
+          ))}
+        </div>
+      </div>
+      <div className="pf-card" style={{ margin: "8px 24px 0", flex: "none" }}>
+        <div className="jr-grid pf-head">
+          <div>Дата</div><div>Вид</div><div>Сметка</div><div className="num">Дебит</div><div className="num">Кредит</div>
+        </div>
+        {"failed" in journal ? (
+          <div className="jr-grid pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{journal.failed}</div></div>
+        ) : journals.length === 0 ? (
+          <div className="jr-grid pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма статии в дневника за {monthName(period)}{account ? " по тази сметка" : ""}.</div></div>
+        ) : (
+          journals.map((j) => (
+            <div key={j.journalId} className="jr-block">
+              {lines(j.legs).map((line, i) => (
+                <div key={`${line.debit}:${line.account}`} className="jr-grid pf-row">
+                  <div style={{ fontVariantNumeric: "tabular-nums" }}>{i === 0 ? date(j.valueDate) : ""}</div>
+                  <div title={j.journalId}>{i === 0 ? (j.source ? SOURCE[j.source] ?? j.source : "—") : ""}</div>
+                  <div style={line.debit ? undefined : { paddingLeft: 16 }}>
+                    {ACCOUNT[line.account] ?? line.account}{line.legs > 1 && <span style={DIM}> · {line.legs} записвания</span>}
+                  </div>
+                  <div className="num">{line.debit ? eur(line.amountMinor) : ""}</div>
+                  <div className="num">{line.debit ? "" : eur(line.amountMinor)}</div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+        <div className="jr-grid pf-foot">
+          {"failed" in journal ? (
+            <div style={{ gridColumn: "1 / -1" }}>Дневникът не е зареден.</div>
+          ) : (
+            <>
+              <div style={{ gridColumn: "1 / 4" }}>{journals.length} {journals.length === 1 ? "статия" : "статии"} · всяка с равни дебит и кредит</div>
+              <div className="num">{eur(total(true))}</div>
+              <div className="num">{eur(total(false))}</div>
+            </>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 

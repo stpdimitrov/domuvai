@@ -51,7 +51,9 @@ CALLS = {
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}),
     ("GET", "/api/money/entrances/{entranceId}/fund"): lambda e: (f"/api/money/entrances/{e}/fund", None),
-    ("GET", "/api/money/entrances/{entranceId}/fund-accounts"): lambda e: (f"/api/money/entrances/{e}/fund-accounts", None),
+    ("GET", "/api/money/entrances/{entranceId}/operating-account"): lambda e: (f"/api/money/entrances/{e}/operating-account", None),
+    ("GET", "/api/money/entrances/{entranceId}/journal"): lambda e: (
+        f"/api/money/entrances/{e}/journal?from=2026-09-01&to=2026-09-30", None),
     ("GET", "/api/money/entrances/{entranceId}/fund/handover-statements"): lambda e: (
         f"/api/money/entrances/{e}/fund/handover-statements", None),
     ("GET", "/api/money/entrances/{entranceId}/arrears"): lambda e: (f"/api/money/entrances/{e}/arrears?asOf=2026-09-30", None),
@@ -66,14 +68,35 @@ SCREENS = {
         "Общо 6 обекта 10 100,0000% €60,00 €45,00 — €600,00 €705,00",                      # per-stream totals
         "Общо за начисляване €705,00",
     ],
-    "/entrance/fund?entrance={e}": [
+    "/entrance/fund?entrance={e}&period=2026-09": [
         "BG87 UNCR 7000 1512 9981 02 · титуляр Мария Иванова",                    # the fund's account
         "BG44 UNCR 7000 1512 3456 78 · титуляр Мария Иванова",                    # the operating one
+        # what was paid into the operating account — named so, never a balance, while outflows are not recorded (WEB-17)
+        "Само постъпления", "Постъпления по сметката €70,00 Поети задължения — Разполагаемо —", "не салдото в банката",
+        # September's journal (PM-FUND-005, PM-PMC-008): the run, then the payments — each journal's debits, then its credits
+        "Дневник · септември 2026",
+        "01.09.2026 Начисление Вземания от обекти · 18 записвания €705,00 Приход · поддръжка на общи части €45,00 "
+        "Приход · управление €60,00 Приход · фонд „Ремонт“ €600,00",
+        "10.09.2026 Плащане Банка · оперативна сметка €40,00 Вземания от обекти €40,00",
+        "10.09.2026 Плащане Банка · сметка на фонда €300,00 Аванси от обекти €168,00 Вземания от обекти €132,00",   # an overpayment
+        "7 статии · всяка с равни дебит и кредит €1.825,00 €1.825,00",
         "Салдо €570,00", "Поети, неплатени €425,00", "Разполагаемо €145,00",       # the fund card (PM-FUND-009)
         "аварийно, без решение: теч от покрива над ап. 6 след бурята €125,00 Поето чака плащане",
         "€99,00 Оттеглено оттеглено", "· изпълнителят се отказа",                  # the cancelled one, and why
         "€0,00 + €1.050,00 − €480,00 = €570,00 €570,00 €0,00 Съвпада с банката 2 · €425,00",   # the handover
     ],
+    "/entrance/fund?entrance={e}&period=2026-09&account=operating": [             # only the journals touching that account, whole
+        "10.09.2026 Плащане Банка · оперативна сметка €30,00 Вземания от обекти €30,00",
+        "2 статии · всяка с равни дебит и кредит €70,00 €70,00",
+    ],
+    "/entrance/fund?entrance={e}&period=2026-09&account=fund": [                  # the four payments into the fund's account
+        "10.09.2026 Плащане Банка · сметка на фонда €250,00 Аванси от обекти €131,50 Вземания от обекти €118,50",
+        "4 статии · всяка с равни дебит и кредит €1.050,00 €1.050,00",
+    ],
+    "/entrance/fund?entrance={e}&period=2026-09&account=cash": [                  # September has journals, none through the cash box
+        "Няма статии в дневника за септември 2026 по тази сметка.", "0 статии · всяка с равни дебит и кредит €0,00 €0,00",
+    ],
+    "/entrance/fund?entrance={e}&period=2026-08": ["Дневник · август 2026", "Няма статии в дневника за август 2026."],
     "/debts?asOf=2026-09-30": [                              # the firm sidebar still carries the design's sample names
         "2 обекта с неплатено, 2 в просрочие · 1 вход от 2 · към 30.09.2026",   # the second is the seed's business entrance: nothing issued, nothing owed
         "ул. Шипка 14, вх. Б · 2 обекта с неплатено €156,50",  # the entrance's total (PM-DEBT-001)
@@ -343,6 +366,29 @@ def main():
         print(f"{'ok ' if status == 200 and not missing and not shown else 'BAD'} {url}  {len(expected) - len(missing)}/{len(expected)} figures")
 
     failures += charges_multiple(api, web)
+
+    # WEB-17 — the fund screen's links keep what the others chose: the journal's month, its account, the register's filter
+    status, page = fetch(web, f"/entrance/fund?entrance={entrance}&period=2026-09&account=operating&status=paid")
+    wanted = [f"?entrance={entrance}&status=paid&period=2026-08&account=operating",      # the month before
+              f"?entrance={entrance}&status=paid&period=2026-09&account=fund",           # another account
+              f"?entrance={entrance}&status=committed&period=2026-09&account=operating"]  # another state of the register
+    dropped = [link for link in wanted if f'href="{link}"' not in page.replace("&amp;", "&")]
+    failures += [f"/entrance/fund: no link to {link} — a link drops the month, the account or the register's filter" for link in dropped]
+    print(f"{'ok ' if status == 200 and not dropped else 'BAD'} /entrance/fund  {len(wanted) - len(dropped)}/{len(wanted)} links keep the month, the account and the filter")
+    # … and a debit stands in the debit column, a credit in the credit column: the text alone cannot tell them apart
+    cells = re.sub(r"<!--.*?-->", "", page, flags=re.S)
+    sides = {"debit": 'Банка · оперативна сметка</div><div class="num">€40,00</div><div class="num"></div>',     # the money came in
+             "credit": 'Вземания от обекти</div><div class="num"></div><div class="num">€40,00</div>'}          # the debt went down
+    misplaced = [side for side, cell in sides.items() if cell not in cells]
+    failures += [f"/entrance/fund: the journal shows no {side} of €40,00 in the {side} column" for side in misplaced]
+    print(f"{'ok ' if not misplaced else 'BAD'} /entrance/fund  a debit in the debit column, a credit in the credit column")
+    # … and the fund's payout, dated the day the seed ran: the screen is asked for the month the API dates it in
+    status, raw = fetch(api, f"/api/money/entrances/{entrance}/journal?from=2026-01-01&to=2100-12-31&account=BANK:REPAIR_RENEWAL")
+    payouts = [j for j in json.loads(raw)["journals"] if j.get("source") == "FUND_PAYOUT"] if status == 200 else []
+    payout = "Изплащане от фонда Разход · фонд „Ремонт“ €480,00 Банка · сметка на фонда €480,00"
+    shown = payouts and payout in visible_text(fetch(web, f"/entrance/fund?entrance={entrance}&period={payouts[0]['valueDate'][:7]}")[1])
+    failures += [] if shown else [f"/entrance/fund: the month of the fund's payout does not show {payout!r}"]
+    print(f"{'ok ' if shown else 'BAD'} /entrance/fund  the fund's payout in the journal of its month")
 
     for failure in failures:
         print(f"  ✗ {failure}")

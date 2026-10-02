@@ -1948,3 +1948,25 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — #68, this entry, `app/src/main/kotlin/zues/app/money/Journal.kt`, `web/app/(console)/entrance/fund/page.tsx`.
 
 ---
+
+## WEB-17 · 2026-10-02 · the fund screen shows the journal and the operating account's figure
+
+**Did** — the screen's half of #68 (#108, `lane:web`; the API's was S-G1-02i, #107).
+- **The operating account's card** reads `GET …/operating-account`. While the API says outflows are not recorded, its figure is named "Постъпления по сметката" under the badge "Само постъпления", with a note that it is not the bank's balance; it is called "Салдо" only once the API says outflows are recorded. Committed and available stay `—`: the API serves neither. An entrance with none registered is told so; any other refusal is shown as it came.
+- **A journal section** reads `GET …/journal` for a month (`?period=YYYY-MM`, this month in Sofia by default): each journal's date, what wrote it (Начисление · Плащане · Изплащане от фонда), and its debits and credits by account in words. Legs of one journal on one side of one account are one line with their sum and how many postings it holds. Chips narrow it to the fund's account, the operating one or the cash box (`?account=fund|operating|cash`) through the API's own filter. The footer totals the debits and the credits; a journal that did not load shows no figure.
+- Every link keeps the register's filter, the month and the account. The month helpers moved to `web/lib/console.ts`, shared with the charges screen, which now refuses a month like `2026-13` instead of asking the API for it.
+- `…/fund-accounts` is no longer called by any screen.
+
+**Rules covered** — PM-FUND-004, PM-FUND-005, PM-PMC-008 (the web's part: the two accounts shown apart, the entrance's journal as the API reads it).
+
+**Tests added** — `tools/check_e2e.py`: both new calls validated against the contract; the fund screen for September shows the operating figure under its honest name with the note, and the journal — the run with its 18 postings, an overpayment, the totals; the journal narrowed to the operating account, to the fund's, and to the cash box (none); an empty month; the links keeping the month, the account and the filter; a debit in the debit column and a credit in the credit column; the fund's payout in the month the API dates it. Sixteen mutants, each caught: the figure called a balance, the month ignored, the account chip not passed, every leg its own line, the source not shown, a link dropping the month or the account, the figure missing, the totals wrong, the badge claiming a book balance, credits before debits, the columns swapped, the cash chip reading the fund's account, the fund chip reading the operating one, a payout not named, the note removed.
+
+**Verified** — the whole chain on this machine, 2026-10-02: the API from its jar on a scratch Postgres 16 database, the seed, the production web build started three times as CI does; `check_e2e.py` holds.
+
+**Decisions** — none (the contract's D1–D5 on #108; the operating figure's naming is the owner's choice of 2026-10-02). After the review: a journal that did not load shows no totals; only the API's own "no operating account" 404 reads as none registered; "статия" for a journal entry and "записване" for a leg; the column is "Вид", not "Документ".
+
+**Open** — one path no check reaches: an operating-account read that fails other than "none registered" (the mutant taking it for none survives — it needs a fault in the API) · the journal's legs carry no unit names, and the journal is not paged · recording operating expenses — until then the operating figure only grows · `/debts` still shows gross amounts (S-G1-02h) · the "Банково извлечение" and the sign-off buttons stay disabled until sign-in.
+
+**Read first next time** — `web/README.md` (Status, `/entrance/fund`), `web/app/(console)/entrance/fund/page.tsx`.
+
+---

@@ -179,9 +179,14 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   filtered by `?status=`; and the fund's handover statements as issued (`GET …/fund/handover-statements`)
   — never called signed: the parties' signatures are not recorded yet. `?entrance=<id>` as on the
   charges screen. Read-only: signing off, paying out, cancelling and issuing a handover need sign-in.
-  The operating account's balance and the double-entry journal have no API yet (#68): its card shows
-  the account and holder (`GET …/fund-accounts`) with `—` for every figure, and the register stands
-  in for the journal. The accounts and the statements each fail alone — the fund stays on screen.
+  The operating account's card (`GET …/operating-account`, WEB-17) shows what was paid into it —
+  named so, never a balance, while the API says outflows are not recorded — with `—` for committed
+  and available, which the API does not serve. Below, the entrance's **journal** for a month
+  (`GET …/journal`; `?period=YYYY-MM`, this month by default): each journal's date, what wrote it,
+  and its debits and credits by account — legs of one journal on one side of one account shown as one line —
+  narrowed to the fund's account, the operating one or the cash box by `?account=fund|operating|cash`.
+  The API serves no description or document number, so none is shown. The operating account, the
+  statements and the journal each fail alone — the fund stays on screen.
 - **`/assembly`** — the live general assembly (screen 04 Общо събрание): a full-bleed, no-sidebar
   view — session-quorum banner, agenda, the item being voted (quorum + tally with the majority
   threshold), and live attendance with proxies. Has its own stylesheet (`assembly.css`).

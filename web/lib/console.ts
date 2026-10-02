@@ -62,3 +62,21 @@ export const eur = (minor: number) => {
   const euros = ((abs - (abs % 100)) / 100).toLocaleString("de-DE");
   return `${minor < 0 ? "−" : ""}€${euros},${String(abs % 100).padStart(2, "0")}`;
 };
+
+const MONTHS = ["януари", "февруари", "март", "април", "май", "юни", "юли", "август", "септември", "октомври", "ноември", "декември"];
+
+/** A month as the screens address it: `YYYY-MM`. This one, in Sofia (PM-SYS-004). */
+export const thisPeriod = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+export const isPeriod = (value: string | undefined): value is string => /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(value ?? "");   // a four-digit year, a real month
+export const shiftPeriod = (period: string, by: number) => {
+  const [y, m] = period.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + by, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+export const monthName = (period: string) => `${MONTHS[Number(period.slice(5)) - 1]} ${period.slice(0, 4)}`;
+/** The month's first and last day, as ISO dates. */
+export const monthDays = (period: string) => {
+  const [y, m] = period.split("-").map(Number);
+  return { from: `${period}-01`, to: `${period}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}` };
+};
