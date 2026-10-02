@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
-Seed one demo entrance through the public API only, never SQL, so every write it makes is exercised as a client
+Seed the demo entrance through the public API only, never SQL, so every write it makes is exercised as a client
 makes it (E2E-01 D2). The end-to-end check (tools/check_e2e.py) expects exactly this entrance; a local run uses it
 to have something true on screen. Prints the entrance id.
 
-Seeding is once per database: when the demo entrance is already there, its id is printed and nothing is written
-(the accounts' IBANs are unique, so a second copy could not be made anyway). To seed again, recreate the database.
+A second, small entrance holds a business unit reached through the common parts (WEB-16, PM-FEE-010): the charges
+screen needs the assembly's multiple for it. No run is issued for it and no figure is seeded — the multiple is the
+assembly's, and the check finds one the API accepts.
+
+Seeding is once per database: an entrance already there is left as it is (the accounts' IBANs are unique, so a
+second copy could not be made anyway). To seed again, recreate the database.
 
 Usage: seed_demo.py [API_URL]   (default http://localhost:8080)
 """
@@ -39,10 +43,23 @@ def iban(bban):
 
 
 LABEL = "ул. Шипка 14, вх. Б"
-seeded = [e["id"] for e in call("GET", "/api/registry/entrances") if e["label"] == LABEL]
-if seeded:
-    print(f"seed: {LABEL} is already seeded — nothing written", file=sys.stderr)
-    print(seeded[0])
+BUSINESS_LABEL = "ул. Шипка 16, вх. А"          # tools/check_e2e.py finds it by this label
+existing = {e["label"]: e["id"] for e in call("GET", "/api/registry/entrances")}
+
+if BUSINESS_LABEL not in existing:
+    business = call("POST", "/api/registry/entrances",
+                    {"label": BUSINESS_LABEL, "managementForm": "GA", "address": "София, ул. Шипка 16"})["entranceId"]
+    shop, flat = call("POST", f"/api/registry/entrances/{business}/units", {"units": [
+        {"designation": "магазин", "idealParts": "40.000000", "unitType": "SHOP", "businessUse": True},   # no separate entrance
+        {"designation": "ап. 1", "idealParts": "60.000000", "unitType": "APARTMENT"},
+    ]})["unitIds"]
+    for unit, adults in ((shop, 1), (flat, 2)):
+        call("POST", f"/api/registry/entrances/{business}/units/{unit}/household",
+             {"members": [{"isChildUnder6": False, "validFrom": "2026-01-01"}] * adults})
+
+if LABEL in existing:
+    print(f"seed: {LABEL} is already seeded — left as it is", file=sys.stderr)
+    print(existing[LABEL])
     sys.exit(0)
 
 entrance = call("POST", "/api/registry/entrances",

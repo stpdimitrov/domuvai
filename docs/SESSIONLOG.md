@@ -1908,3 +1908,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 - Applying advances to new charges was not chosen.
 
 **Read first next time** — #73, this entry, `app/src/main/kotlin/zues/app/money/Arrears.kt`.
+
+## WEB-16 · 2026-10-02 · the charges screen takes the assembly's multiple
+
+**Did** — `/entrance/charges` can be given the business-use multiple (#104, `lane:web`; fixes #95). Since S-G1-02g the API refuses a run that would charge the multiple with none given, and the screen sent none and had no way to. Now a field on the screen takes it and it travels in the address (`?multiple=`), kept by the period links. **No figure lives in `web`**, and the demo basis has none: the screen passes the figure as typed and the API decides against the law whether it is in range. A run the API refuses over the multiple — none for a business unit, or one out of range — shows the API's refusal with the field, for the same entrance and period; a figure that is not a whole number is said to be so, never dropped. The basis card says which figure was passed, by hand, and that it applies only to a business unit reached through the common parts. `tools/seed_demo.py` seeds a second, small entrance with such a unit — no run issued, no figure seeded — so `/debts` now counts two entrances.
+
+**Rules covered** — PM-FEE-010 (the web's part: the figure is the assembly's, never the screen's).
+
+**Tests added** — `tools/check_e2e.py` "PM-FEE-010 the charges screen": it asks the API which of the multiples 1–9 it accepts and types none itself; for the business entrance the screen shows the API's own refusal (naming the unit) with the field, its entrance and its period — with no multiple, with the lowest and the highest refused figure, and with one that is not a whole number — and the API's own totals for the lowest and the highest accepted figure, with the period links keeping the entrance and the multiple. Twelve mutants, each caught: the field ignored, a figure of the screen's own, the demo basis supplying one, no field on a refusal, the links dropping the multiple, the field forgetting the entrance or the period, the card not saying the figure, a non-whole figure dropped silently, a refused run losing its entrance, the API's message hidden, a high figure capped.
+
+**Verified** — the whole chain on this machine, 2026-10-02: the API from its jar on a scratch Postgres 16 database, the seed, the production web build started three times as CI does; `check_e2e.py` holds. In a browser: the business entrance is refused with the field; given ×4 the shop pays 4× on management and maintenance and its plain share of the fund.
+
+**Decisions** — none (the contract's D1–D4 on #104, on the owner's "#95", 2026-10-02). After the review: a typed figure is never silently dropped; the hint and field appear only on a refusal about the multiple (the API names PM-FEE-010 in it).
+
+**Open** — the "Коеф." column still shows `—`: which unit paid the multiple is not a field of the run · for an entrance with no business unit a figure given is passed and shown but applied to nothing, and the API does not range-check it there (#100) · the API's refusals are in English on a Bulgarian screen · `/debts` still shows gross amounts (S-G1-02h's open point) · the multiple wants a protocol reference (#100).
+
+**Read first next time** — `web/README.md` (Status, `/entrance/charges`), `web/app/(console)/entrance/charges/page.tsx`, #100.
+
+---

@@ -20,7 +20,8 @@ Live screens call `api` from this Next.js server (never from the browser), at `A
 
 ### Against the real API and a database
 
-The whole chain on one machine — Postgres 16, the API (JDK 21), one demo entrance seeded through the API:
+The whole chain on one machine — Postgres 16, the API (JDK 21), the demo entrance seeded through the API (and a
+small second one with a business unit, for the charges screen's multiple — WEB-16):
 
 ```bash
 brew install postgresql@16
@@ -168,6 +169,9 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   registered). Hover an amount for its derivation. The basis is a visibly labelled **demo** — the
   assembly module does not serve GA decisions yet — so confirming is disabled. The design's
   exemptions, coefficient and elevator columns show `—`: the API has no field for them yet.
+  `?multiple=<n>` is the assembly's multiple for business use (WEB-16, PM-FEE-010): the screen holds
+  no figure and the demo basis has none — a field on the screen takes it, the API decides whether it
+  is in range, and a run refused for want of it is shown as refused, with the field.
 - **`/entrance/fund`** — cash & repair fund (screen 06 Каса и фонд) — **live** (WEB-12): the fund's
   account (IBAN and holder, чл. 50 ЗУЕС) with balance, committed and available side by side
   (`GET …/fund`); every disbursement signed off against it — purpose, basis (the GA decision, the

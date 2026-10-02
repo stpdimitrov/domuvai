@@ -48,7 +48,7 @@ jobs:
           nohup java -jar app/build/libs/app.jar > api.log 2>&1 &
           curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
 
-      - name: Seed one entrance through the public API
+      - name: Seed the demo entrance, and a small one with a business unit, through the public API
         run: |
           entrance=$(python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
           echo "ENTRANCE=$entrance" >> "$GITHUB_ENV"
