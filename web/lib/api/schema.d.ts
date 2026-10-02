@@ -295,6 +295,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/journal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The entrance's double-entry journal from one date to another, both included — each journal whole, its legs summing to zero, with what wrote it where money knows; optionally only the journals that touch one account */
+        get: operations["get_money_entrances_entranceId_journal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/money/entrances/{entranceId}/operating-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's account and the cash box; outflows are not recorded yet, and the response says so */
+        get: operations["get_money_entrances_entranceId_operating_account"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/entrances/{entranceId}/payments": {
         parameters: {
             query?: never;
@@ -948,6 +982,32 @@ export interface components {
             /** Format: uuid */
             outgoingPartyId: string;
         };
+        JournalEntry: {
+            /** Format: uuid */
+            journalId: string;
+            legs: components["schemas"]["JournalLeg"][];
+            /** @enum {string} */
+            source?: "CHARGE_RUN" | "PAYMENT" | "FUND_PAYOUT";
+            /** Format: date */
+            valueDate: string;
+        };
+        JournalLeg: {
+            account: string;
+            /** Format: int64 */
+            amountMinor: number;
+            /** Format: uuid */
+            unitId?: string;
+        };
+        JournalView: {
+            account?: string;
+            /** Format: uuid */
+            entranceId: string;
+            /** Format: date */
+            from: string;
+            journals: components["schemas"]["JournalEntry"][];
+            /** Format: date */
+            to: string;
+        };
         ManualEntry: {
             designation: string;
             /** @enum {string} */
@@ -985,6 +1045,15 @@ export interface components {
             dueOn: string;
             /** Format: int64 */
             overdueDays: number;
+        };
+        OperatingAccountView: {
+            /** Format: int64 */
+            balanceMinor: number;
+            /** Format: uuid */
+            entranceId: string;
+            holderName: string;
+            iban: string;
+            outflowsRecorded: boolean;
         };
         OverdueDeclaration: {
             /** Format: date */
@@ -2192,6 +2261,98 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_journal: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                account?: string;
+            };
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_operating_account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatingAccountView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

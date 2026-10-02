@@ -31,6 +31,9 @@ interface PostingRepository : ListCrudRepository<PostingRow, UUID> {
     fun findByJournalId(journalId: UUID): List<PostingRow>
     fun findByUnitIdAndAccount(unitId: UUID, account: String): List<PostingRow>
     fun findByEntranceIdAndAccount(entranceId: UUID, account: String): List<PostingRow>
+
+    /** The entrance's postings dated from [from] to [to], both included. */
+    fun findByEntranceIdAndValueDateBetween(entranceId: UUID, from: LocalDate, to: LocalDate): List<PostingRow>
 }
 
 /**

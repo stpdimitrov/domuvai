@@ -80,6 +80,13 @@ RUNNING = {
    ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("List the entrance's fund accounts", ['PM-FUND-001', 'PM-FUND-004']),
+ ('get', '/api/money/entrances/{entranceId}/journal'):
+   ("The entrance's double-entry journal from one date to another, both included — each journal whole, its legs "
+    "summing to zero, with what wrote it where money knows; optionally only the journals that touch one account",
+    ['PM-FUND-005', 'PM-PMC-008']),
+ ('get', '/api/money/entrances/{entranceId}/operating-account'):
+   ("The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's "
+    "account and the cash box; outflows are not recorded yet, and the response says so", ['PM-FUND-004', 'PM-FEE-019']),
  ('get', '/api/money/entrances/{entranceId}/fund'):
    ('The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements', ['PM-FUND-004', 'PM-FUND-009']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements'):

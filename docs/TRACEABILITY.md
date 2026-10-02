@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 48 | 21% |
-| **Proved by a test named after the rule** | **50** | **21%** |
-| No implementation and no test | 183 | 79% |
+| Referenced in code (`// Rule:`) | 50 | 21% |
+| **Proved by a test named after the rule** | **52** | **22%** |
+| No implementation and no test | 181 | 78% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -120,7 +120,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-015` | — | — |  |
 | `PM-VOTE-016` | — | — |  |
 
-## FEE — Charges & allocation  ·  18/20 covered
+## FEE — Charges & allocation  ·  19/20 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -142,8 +142,8 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FEE-016` | `kernel/src/test/kotlin/zues/kernel/KernelTest.kt:12` | `kernel/src/main/kotlin/zues/kernel/Money.kt:4` |  |
 | `PM-FEE-017` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:98` | `app/src/main/kotlin/zues/app/money/ChargeCalculator.kt:24` |  |
 | `PM-FEE-018` | `app/src/test/kotlin/zues/app/money/StatementIT.kt:71` | `app/src/main/kotlin/zues/app/money/Statement.kt:35` |  |
-| `PM-FEE-019` | — | — |  |
-| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:63` | `app/src/main/kotlin/zues/app/money/Postings.kt:40` |  |
+| `PM-FEE-019` | `app/src/test/kotlin/zues/app/money/LedgerReadsTest.kt:113` | `app/src/main/kotlin/zues/app/money/Journal.kt:29` |  |
+| `PM-FEE-020` | `app/src/test/kotlin/zues/app/money/PostingsTest.kt:63` | `app/src/main/kotlin/zues/app/money/Postings.kt:43` |  |
 
 ## FUND — Repair & renewal fund  ·  9/11 covered
 
@@ -216,7 +216,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-REG-011` | — | — |  |
 | `PM-REG-012` | — | — | ⚠ |
 
-## PMC — Professional management (commercial)  ·  0/18 covered
+## PMC — Professional management (commercial)  ·  1/18 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -227,7 +227,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-PMC-005` | — | — |  |
 | `PM-PMC-006` | — | — | ⚠ |
 | `PM-PMC-007` | — | — |  |
-| `PM-PMC-008` | — | — |  |
+| `PM-PMC-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:294` | `app/src/main/kotlin/zues/app/money/Journal.kt:25` |  |
 | `PM-PMC-009` | — | — |  |
 | `PM-PMC-010` | — | — |  |
 | `PM-PMC-011` | — | — |  |

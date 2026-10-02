@@ -289,4 +289,54 @@ class FundPersistenceIT {
         insert(mapOf("period_from" to "DATE '2026-09-15'"))                              // a one-day period
         insert(mapOf("received_minor" to "-10", "closing_minor" to "-50"))               // net receipts may be negative: a reversal
     }
+
+    @Test
+    fun `PM-PMC-008 PM-FUND-005 an entrance's journal is read whole and balanced from Postgres, with nothing of another entrance — and the operating account's balance apart from the fund's`() {
+        val (entranceId, unitId, chair) = entranceWithFund()
+        val other = entranceWithFund()
+        val iban = "BG80BNBG${"%014d".format(System.nanoTime() % 100_000_000_000_000)}"
+        postFor(
+            "/api/money/entrances/$entranceId/fund-accounts",
+            """{"iban":"$iban","purpose":"OPERATING","holderName":"Иван Петров","holderKind":"MANAGER","holderPartyId":"$chair"}""", "fundAccountId",
+        )
+        pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")                              // dated 2026-09-01
+        pay(entranceId, unitId, 12_000, "OPERATING")
+        pay(other.entranceId, other.unitId, 9_000, "REPAIR_RENEWAL")                   // another entrance's money
+        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
+        act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isOk)
+        mvc.perform(                                                                     // October's run, after the payments: a third kind of journal
+            post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
+                """{"period":"2026-10","legalDate":"2026-10-01","lines":[{"stream":"REPAIR_FUND","key":"BY_IDEAL_PARTS","decisionId":"GA-2026-7","totalMinor":7000}]}""",
+            ),
+        ).andExpect(status().isCreated)
+
+        fun journal(entrance: UUID, from: String, to: String, account: String? = null) = json.readTree(
+            mvc.perform(get("/api/money/entrances/$entrance/journal").param("from", from).param("to", to).apply { account?.let { param("account", it) } })
+                .andExpect(status().isOk).andReturn().response.contentAsString,
+        ).get("journals").toList()
+        fun legs(entry: com.fasterxml.jackson.databind.JsonNode) = entry.get("legs").associate { it.get("account").asText() to it.get("amountMinor").asLong() }
+
+        val all = journal(entranceId, "2026-09-01", signedOn)
+        assertThat(all.take(2).map { it.get("source").asText() }).containsExactly("PAYMENT", "PAYMENT")   // oldest first: 01.09
+        assertThat(all.drop(2).map { it.get("source").asText() }).containsExactlyInAnyOrder("CHARGE_RUN", "FUND_PAYOUT")
+        val payout = all.single { it.get("journalId").asText() == works.toString() }
+        assertThat(legs(all.single { it.get("source").asText() == "CHARGE_RUN" })).isEqualTo(mapOf("RECEIVABLE" to 7_000L, "INCOME:REPAIR_FUND" to -7_000L))
+        assertThat(all).allSatisfy { entry -> assertThat(entry.get("legs").sumOf { it.get("amountMinor").asLong() }).isZero() }
+        assertThat(legs(payout)).isEqualTo(mapOf("EXPENSE:REPAIR_FUND" to 20_000L, "BANK:REPAIR_RENEWAL" to -20_000L))
+        assertThat(all.flatMap { it.get("legs") }.map { kotlin.math.abs(it.get("amountMinor").asLong()) }).doesNotContain(9_000L)   // PM-PMC-008
+
+        val operating = journal(entranceId, "2026-09-01", signedOn, "BANK:OPERATING")
+        assertThat(operating.map(::legs)).containsExactly(mapOf("BANK:OPERATING" to 12_000L, "ADVANCE" to -12_000L))
+        assertThat(operating.single().get("legs").single { it.get("account").asText() == "ADVANCE" }.get("unitId").asText()).isEqualTo(unitId.toString())
+        assertThat(journal(entranceId, "2026-08-01", "2026-08-31")).isEmpty()
+        assertThat(journal(other.entranceId, "2026-09-01", signedOn).map(::legs))
+            .containsExactly(mapOf("BANK:REPAIR_RENEWAL" to 9_000L, "ADVANCE" to -9_000L))
+
+        mvc.perform(get("/api/money/entrances/$entranceId/operating-account"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.iban").value(iban))
+            .andExpect(jsonPath("$.balanceMinor").value(12_000))                         // not the fund's 30 000
+            .andExpect(jsonPath("$.outflowsRecorded").value(false))
+        mvc.perform(get("/api/money/entrances/${other.entranceId}/operating-account")).andExpect(status().isNotFound)
+    }
 }

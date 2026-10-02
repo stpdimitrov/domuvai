@@ -1926,3 +1926,25 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/README.md` (Status, `/entrance/charges`), `web/app/(console)/entrance/charges/page.tsx`, #100.
 
 ---
+
+## S-G1-02i · 2026-10-02 · the entrance's journal, and the operating account's balance (money)
+
+**Did** — the API half of #68 (#106, `lane:money`); the fund screen follows in `web`.
+- **`GET /api/money/entrances/{entranceId}/journal?from=&to=[&account=]`** — the entrance's journals dated from one day to another, both included, oldest first. Each is whole: every leg a signed amount against an account (a debit above zero, a credit below), summing to zero (ADR-006). Each says what wrote it — `CHARGE_RUN`, `PAYMENT` or `FUND_PAYOUT` — read from money's own tables, since a journal's id is that record's; nothing is stored for it. With `account`, only the journals that touch it, still whole. Legs and same-day journals come in the same order on every read.
+- **A journal the range or the entrance would cut stops the read** rather than be shown as if whole. Every writer dates a journal's legs alike today, so it cannot happen; the reversing journal the payment migration promises is the case it guards.
+- **`GET /api/money/entrances/{entranceId}/operating-account`** — the operating account's IBAN and holder, and what the ledger holds as paid into that bank account, apart from the fund's account and the cash box. **Nothing can record money leaving the operating account**, so the figure is what was paid in to date and the response says so: `outflowsRecorded: false` (the owner's choice, 2026-10-02). Committed and available are not served — nothing can be committed against it. No operating account registered is a 404.
+- The contract is regenerated (41 operations) and the web client with it. No schema change.
+
+**Rules covered** — PM-FUND-005, PM-PMC-008, PM-FUND-004, PM-FEE-019 (first tests named after PM-PMC-008 and PM-FEE-019).
+
+**Tests added** — `LedgerReadsTest` (8): the journal whole, oldest first, balanced, naming what wrote it; the account filter keeping whole journals; a journal nothing claims, and an empty entrance; a backwards range refused; same-day journals and like legs in a fixed order; a cut journal stopping the read; the operating account's balance apart from the fund's, saying outflows are not recorded; no operating account. `LedgerWebTest` (4): the wire shape, the account passed or blank, the 400s, the 404. `FundPersistenceIT` +1 (Docker — CI): `PM-PMC-008 PM-FUND-005 an entrance's journal is read whole and balanced from Postgres, with nothing of another entrance — and the operating account's balance apart from the fund's` — two payments, a payout and a charge run. Mutations, each failing its tests: the filter cutting a journal to the matching legs, no date order, credits before debits, a payment named a charge run, no source read, a backwards range read as empty, the operating balance taken from the fund's account, any account taken for the operating one, outflows claimed as recorded, the last day left out, a blank account passed as a filter, a bad date a server error, like legs unordered, a cut journal shown as whole, same-day journals unordered, a year no calendar holds reaching the database.
+
+**Verified** — the persistence test passed on local Postgres 16 from a scratch copy without Testcontainers, 2026-10-02; the copy is not committed. Gates green.
+
+**Decisions** — the owner's, 2026-10-02: serve the ledger's balance for the operating account and say plainly that outflows are not recorded. The contract's D1–D5 on #106.
+
+**Open** — the fund screen still shows `—` for the operating account and the disbursement register in the journal's place: `web`, next · **recording operating expenses** — until then the operating figure only grows · a payment into either account can settle any stream's charges (`RECEIVABLE` is not split by stream), so "two ledgers" (PM-FEE-019's acceptance) is two bank accounts, not two sets of books · `money.posting` has no index: the journal read and the arrears reads scan it · the journal carries no description or document number, and is not paged · `source` is found by loading the rows of the runs, payments and payouts in range.
+
+**Read first next time** — #68, this entry, `app/src/main/kotlin/zues/app/money/Journal.kt`, `web/app/(console)/entrance/fund/page.tsx`.
+
+---
