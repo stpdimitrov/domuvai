@@ -767,6 +767,23 @@
   padding: 0 16px;
   min-width: 960px;
 }
+/* the entrance's journal: each journal a block of lines, a debit or a credit against an account */
+.jr-grid {
+  display: grid;
+  grid-template-columns: 84px 160px minmax(0, 1fr) 112px 112px;
+  column-gap: 12px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 720px;
+}
+.jr-block {
+  border-bottom: 1px solid #eae9e5;
+}
+.jr-block .pf-row {
+  border-bottom: none;
+  height: auto;
+  min-height: 28px;
+}
 .fd-grid.pf-row {
   height: auto;
   min-height: 36px;
