@@ -15,6 +15,9 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 5. #79: the landing sends a demo request nowhere by itself, so it never says one arrived. The first server has an
    address to write to (web/lib/contact.ts) and offers the form with it; the second has none, a third has a value
    that is not an address, and they offer neither.
+6. WEB-16 (PM-FEE-010): for the seeded entrance with a business unit, the charges screen shows the API's refusal and a
+   field for the assembly's multiple; given one, it shows the API's own figures — for two different multiples. No
+   figure is typed here: the check takes the ones the API accepts.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
@@ -72,13 +75,13 @@ SCREENS = {
         "€0,00 + €1.050,00 − €480,00 = €570,00 €570,00 €0,00 Съвпада с банката 2 · €425,00",   # the handover
     ],
     "/debts?asOf=2026-09-30": [                              # the firm sidebar still carries the design's sample names
-        "2 обекта с неплатено, 2 в просрочие · 1 вход от 1 · към 30.09.2026",
+        "2 обекта с неплатено, 2 в просрочие · 1 вход от 2 · към 30.09.2026",   # the second is the seed's business entrance: nothing issued, nothing owed
         "ул. Шипка 14, вх. Б · 2 обекта с неплатено €156,50",  # the entrance's total (PM-DEBT-001)
         "ап. 5 Надя Тодорова €80,00 — 15 дни — —",            # owed, the oldest debt's days overdue (PM-DEBT-002)
         "ап. 6 Петър Георгиев €76,50 — 15 дни — —",
     ],
     "/debts?asOf=2026-09-05": [                              # before the due day: unpaid, but nothing overdue
-        "6 обекта с неплатено, 0 в просрочие · 1 вход от 1 · към 05.09.2026",
+        "6 обекта с неплатено, 0 в просрочие · 1 вход от 2 · към 05.09.2026",
         "ап. 1 Иван Петров €132,00 — в срок — —",
     ],
 }
@@ -162,6 +165,69 @@ def console_closed(web, closed_web, next_dir):
         failures.append("PM-DEBT-011: the switched-on landing links to no console path — a link missing from the other proves nothing")
     print(f"{'BAD' if failures else 'ok '} PM-DEBT-011 not switched on: {len(console)} console paths × {len(ASKS)} ways asked "
           f"answer the 404 a missing page gets, the landing links to none")
+    return failures
+
+
+BUSINESS_LABEL = "ул. Шипка 16, вх. А"                  # the entrance tools/seed_demo.py gives a business unit
+
+
+def eur(minor):
+    """An amount as the console writes it (web/lib/console.ts)."""
+    return f"€{minor // 100:,}".replace(",", ".") + f",{minor % 100:02d}"
+
+
+def charges_multiple(api, web):
+    """
+    Rule: PM-FEE-010 — the multiple a business unit pays is the assembly's, so the charges screen holds none: without
+    one it shows the API's own refusal, which names the unit, and offers a field for it; with one it shows what the API
+    computes with that figure. The check types no figure either — it asks the API which ones it accepts, and reads
+    the screen for the lowest and the highest, so a screen that ignores the field, or sends a figure of its own, shows
+    the wrong totals for at least one. A figure the API refuses, or one that is not a whole number, is shown as
+    refused, with the field still there for the same entrance and period.
+    """
+    status, raw = fetch(api, "/api/registry/entrances")
+    entrance = next((e["id"] for e in json.loads(raw) if e["label"] == BUSINESS_LABEL), None) if status == 200 else None
+    if not entrance:
+        return [f"PM-FEE-010: the seed's business entrance ({BUSINESS_LABEL}) is not registered — nothing was checked"]
+    body = {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}
+    preview = lambda extra: fetch(api, f"/api/money/entrances/{entrance}/charge-runs/preview", {**body, **extra})
+    previews = {m: preview({"businessMultiplier": m}) for m in range(1, 10)}
+    accepted = {m: json.loads(raw) for m, (status, raw) in previews.items() if status == 200}
+    refused = {m: json.loads(raw).get("error", "") for m, (status, raw) in previews.items() if status == 400}
+    none_status, none_raw = preview({})
+    if len(accepted) < 2 or not refused or none_status != 400:
+        return [f"PM-FEE-010: of the multiples 1–9 the API accepts {sorted(accepted)} and answers a run with none HTTP {none_status} — "
+                f"two accepted, one refused and a refusal for none are needed to tell the screens apart"]
+
+    failures = []
+    screen = f"/entrance/charges?period=2026-09&entrance={entrance}"
+    hidden = lambda page, name, value: re.search(rf'<input(?=[^>]*\bname="{name}")(?=[^>]*\bvalue="{re.escape(value)}")[^>]*>', page)
+    links = lambda page, m: all(f'href="?period={p}&entrance={entrance}{m}"' in page.replace("&amp;", "&") for p in ("2026-08", "2026-10"))
+    asks = [("no multiple", screen, json.loads(none_raw).get("error", ""), "")]
+    asks += [(f"the refused multiple {m}", f"{screen}&multiple={m}", refused[m], f"&multiple={m}") for m in (min(refused), max(refused))]
+    asks += [("a multiple that is not a whole number", f"{screen}&multiple=3.5", "3.5", "")]
+    for how, url, says, kept in asks:
+        status, page = fetch(web, url)
+        text = visible_text(page)
+        if status != 200 or "API отказа изчислението" not in text or not says or says not in text:
+            failures.append(f"PM-FEE-010: {url} ({how}) does not show the refusal {says!r}")
+        if 'name="multiple"' not in page or not hidden(page, "entrance", entrance) or not hidden(page, "period", "2026-09"):
+            failures.append(f"PM-FEE-010: {url} ({how}) does not offer the field for the multiple with its entrance and period")
+        if not links(page, kept):
+            failures.append(f"PM-FEE-010: {url} ({how}) — a period link drops the entrance or the multiple")
+    if "магазин" not in asks[0][2]:
+        failures.append(f"PM-FEE-010: the API's refusal for a run with no multiple does not name the unit: {asks[0][2]!r}")
+    for m in (min(accepted), max(accepted)):
+        status, page = fetch(web, f"{screen}&multiple={m}")
+        text, run = visible_text(page), accepted[m]
+        wanted = [f"Общо за начисляване {eur(run['totalMinor'])}", f"×{m} — посочена ръчно"] + [f"{eur(c['totalMinor'])}" for c in run["charges"]]
+        missing = [want for want in wanted if want not in text]
+        if status != 200 or missing or "API отказа" in text:
+            failures.append(f"PM-FEE-010: {screen}&multiple={m} does not show the API's figures for ×{m} — missing {missing}")
+        if not links(page, f"&multiple={m}") or not hidden(page, "entrance", entrance) or not hidden(page, "period", "2026-09"):
+            failures.append(f"PM-FEE-010: {screen}&multiple={m} — a period link or the field drops the entrance, the period or the multiple")
+    print(f"{'BAD' if failures else 'ok '} PM-FEE-010 the charges screen: the API's refusal with a field for the multiple, then the API's "
+          f"figures for ×{min(accepted)} and ×{max(accepted)}")
     return failures
 
 
@@ -275,6 +341,8 @@ def main():
         failures += [f"{url}: does not show {want!r}" for want in missing]
         failures += [f"{url}: shows an error state ({word!r})" for word in shown]
         print(f"{'ok ' if status == 200 and not missing and not shown else 'BAD'} {url}  {len(expected) - len(missing)}/{len(expected)} figures")
+
+    failures += charges_multiple(api, web)
 
     for failure in failures:
         print(f"  ✗ {failure}")
