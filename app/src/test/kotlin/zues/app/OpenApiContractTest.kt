@@ -23,6 +23,7 @@ import zues.app.money.ChargeRunStore
 import zues.app.money.FundAccountService
 import zues.app.money.FundHandoverService
 import zues.app.money.FundService
+import zues.app.money.LedgerReads
 import zues.app.money.PaymentService
 import zues.app.money.StatementService
 import zues.app.registry.BookRetentionService
@@ -63,6 +64,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var fund: FundAccountService
     @MockitoBean lateinit var fundView: FundService
     @MockitoBean lateinit var fundHandover: FundHandoverService
+    @MockitoBean lateinit var ledger: LedgerReads
     @MockitoBean lateinit var payments: PaymentService
     @MockitoBean lateinit var statements: StatementService
     @MockitoBean lateinit var book: BookService

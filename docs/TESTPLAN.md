@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **50** (21%) |
-| Remaining | **183** |
+| Proved by a test named after the rule | **52** (22%) |
+| Remaining | **181** |
 | Proposed slices at ~10 rules each | **20** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-23 rule(s) remaining across 3 slice(s).
+22 rule(s) remaining across 3 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -31,13 +31,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-SYS-008` | SHOULD | One number a manager can act on. |
 | `PM-SYS-011` | SHOULD | Tasks appear without anyone remembering to create them. |
 
-### S-G1-02 · `money` · FEE · FUND · 4 rule(s) · ⚠ 1 unconfirmed
+### S-G1-02 · `money` · FEE · FUND · 3 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-FUND-002` | MUST ⚠ | Minimum wage is a dated configuration value; a below-minimum tariff is rejected with the computed floor shown. |
 | `PM-FEE-013` | MUST | Budget vs actual report is a first-class screen. |
-| `PM-FEE-019` | SHOULD | Two accounts, two ledgers, no transfers without a decision. |
 | `PM-FUND-011` | SHOULD | Multi-year plan with a funding gap indicator. |
 
 ### S-G1-03 · `registry` · BOOK · ORG · 9 rule(s)
@@ -199,7 +198,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 4 — the risk board is credible
 
-70 rule(s) remaining across 8 slice(s).
+69 rule(s) remaining across 8 slice(s).
 
 ### S-G4-01 · `agent` · AI · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -253,15 +252,14 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-PMC-004` | MUST | Building onboarding is blocked without it. |
 | `PM-PMC-005` | MUST | Powers are a checklist that drives in-app permissions for that building. |
 | `PM-PMC-007` | MUST | A property officer assigned to Building A cannot read Building B. |
-| `PM-PMC-008` | MUST | Attempting a cross-building journal entry is rejected at the ledger layer. |
 | `PM-PMC-009` | MUST | Two ledgers, two document series. |
 | `PM-PMC-010` | MUST | One-click export; the audit trail records what was handed over and when. |
+| `PM-PMC-013` | MUST | Every posting carries `acting_user_id` and `on_behalf_of_entrance_id`. |
 
-### S-G4-05 · `identity-org` · PMC · 8 rule(s) · ⚠ 1 unconfirmed
+### S-G4-05 · `identity-org` · PMC · 7 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-PMC-013` | MUST | Every posting carries `acting_user_id` and `on_behalf_of_entrance_id`. |
 | `PM-PMC-014` | MUST | Feature flags by deployment mode; the volunteer manager never sees invoicing. |
 | `PM-PMC-016` | MUST | Controller retains read access to company-kept records for that building. |
 | `PM-PMC-006` | SHOULD ⚠ | Contract end date is mandatory; auto-renewal toggle is disabled by default with a legal note. |
