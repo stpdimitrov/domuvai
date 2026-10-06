@@ -82,8 +82,9 @@ const PLAIN = { color: "inherit", textDecoration: "none" };
 
 export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ asOf?: string; show?: string }> }) {
   const query = await searchParams;
-  const asOf = query.asOf && isDay(query.asOf) ? query.asOf : today();
-  const show = query.show && query.show in SHOWN ? query.show : "all";
+  const dated = typeof query.asOf === "string" && isDay(query.asOf) ? query.asOf : undefined;   // a repeated parameter is an array
+  const asOf = dated ?? today();
+  const show = typeof query.show === "string" && Object.hasOwn(SHOWN, query.show) ? query.show : "all";
   const view = await load(asOf);
 
   return (
@@ -98,6 +99,9 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
                 {count(view.rows.length, "вход", "входа")} ·{" "}
                 {count(new Set(view.rows.map((r) => r.entrance.condominiumId)).size, "сграда", "сгради")} ·{" "}
                 {count(view.rows.reduce((n, r) => n + (r.kind === "ok" ? r.units : 0), 0), "обект", "обекта")} ·{" "}
+                {view.rows.some((r) => r.kind === "failed") && (
+                  <span style={FAILED}>без {count(view.rows.filter((r) => r.kind === "failed").length, "незареден вход", "незаредени входа")} · </span>
+                )}
               </>
             )}
             към <span style={{ fontVariantNumeric: "tabular-nums" }}>{date(asOf)}</span>
@@ -114,7 +118,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
           </div>
         </div>
       ) : (
-        <Portfolio view={view} show={show} dated={query.asOf && isDay(query.asOf) ? query.asOf : undefined} />
+        <Portfolio view={view} show={show} dated={dated} />
       )}
     </>
   );
@@ -124,7 +128,10 @@ function Portfolio({ view, show, dated }: { view: Extract<Loaded, { kind: "ok" }
   // Largest owed first, then by name — `entrances()` lists them by name, and the sort is stable. A failed one stays on top.
   const sorted = [...view.rows].sort((a, b) => Number(b.kind === "failed") - Number(a.kind === "failed") || owed(b) - owed(a));
   const rows = sorted.filter((r) => r.kind === "failed" || SHOWN[show].keep(r));
-  const failed = view.rows.filter((r) => r.kind === "failed").length;
+  const loaded = view.rows.filter((r) => r.kind === "ok");
+  const kept = loaded.filter(SHOWN[show].keep).length;                   // a failed entrance is listed, and counted apart
+  const failed = view.rows.length - loaded.length;
+  const fundsFailed = loaded.filter((r) => r.fund.kind === "failed").length;
   const at = (params: Record<string, string | undefined>) => {
     const q = new URLSearchParams(Object.entries(params).filter((p): p is [string, string] => p[1] !== undefined));
     return q.size ? `?${q}` : "";
@@ -136,6 +143,7 @@ function Portfolio({ view, show, dated }: { view: Extract<Loaded, { kind: "ok" }
         <div style={{ font: "400 13px/1.5 'IBM Plex Sans'", color: "#3D413E" }}>
           <span style={{ fontWeight: 500 }}>{count(view.rows.filter(owing).length, "вход дължи", "входа дължат")}</span> към {date(view.asOf)} ·{" "}
           <span style={{ fontWeight: 500 }}>{count(view.rows.filter(fundBelowZero).length, "вход", "входа")}</span> с отрицателен фонд
+          {fundsFailed > 0 && <span style={FAILED}> · {count(fundsFailed, "фонд не се зареди", "фонда не се заредиха")}</span>}
           {failed > 0 && <span style={FAILED}> · {count(failed, "вход не се зареди", "входа не се заредиха")}</span>}
         </div>
 
@@ -171,7 +179,7 @@ function Portfolio({ view, show, dated }: { view: Extract<Loaded, { kind: "ok" }
           <div className="num">Риск</div>
         </div>
 
-        {rows.length === 0 && (
+        {kept === 0 && (
           <div className="pl-grid pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма вход за този филтър.</div></div>
         )}
 
@@ -211,11 +219,11 @@ function Portfolio({ view, show, dated }: { view: Extract<Loaded, { kind: "ok" }
         ))}
 
         <div className="pl-grid pf-foot">
-          <div>Общо {count(view.rows.length, "вход", "входа")}</div>
+          <div>Общо {count(loaded.length, "вход", "входа")}</div>
           <div />
           <div className="dim" style={{ fontWeight: 400 }}>
-            {rows.length === view.rows.length ? "показани всички" : `показани ${rows.length} от ${view.rows.length}`}
-            {failed > 0 && <span style={FAILED}> · без {count(failed, "незареден вход", "незаредени входа")}</span>}
+            {kept === loaded.length ? "показани всички" : `показани ${kept} от ${loaded.length}`}
+            {failed > 0 && <span style={FAILED}> · и {count(failed, "незареден вход", "незаредени входа")}</span>}
           </div>
           <div /><div /><div /><div /><div /><div />
         </div>
