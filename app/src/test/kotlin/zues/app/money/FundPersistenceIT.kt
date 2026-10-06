@@ -62,8 +62,12 @@ class FundPersistenceIT {
         return UUID.fromString((if (node.isArray) node.get(0) else node).asText())
     }
 
-    private fun disburse(entranceId: UUID, body: String) =
-        mvc.perform(post("/api/money/entrances/$entranceId/fund/disbursements").contentType(MediaType.APPLICATION_JSON).content(body))
+    private fun newKey() = UUID.randomUUID().toString()
+
+    private fun disburse(entranceId: UUID, body: String, key: String = newKey()) = mvc.perform(
+        post("/api/money/entrances/$entranceId/fund/disbursements").header("Idempotency-Key", key)
+            .contentType(MediaType.APPLICATION_JSON).content(body),
+    )
 
     private fun pay(entranceId: UUID, unitId: UUID, amountMinor: Long, into: String) =
         mvc.perform(
@@ -151,8 +155,9 @@ class FundPersistenceIT {
         return UUID.fromString(node.get("id").asText()) to node.get("committedOn").asText()
     }
 
-    private fun act(entranceId: UUID, disbursementId: UUID, verb: String, body: String) = mvc.perform(
-        post("/api/money/entrances/$entranceId/fund/disbursements/$disbursementId/$verb").contentType(MediaType.APPLICATION_JSON).content(body),
+    private fun act(entranceId: UUID, disbursementId: UUID, verb: String, body: String, key: String = newKey()) = mvc.perform(
+        post("/api/money/entrances/$entranceId/fund/disbursements/$disbursementId/$verb").header("Idempotency-Key", key)
+            .contentType(MediaType.APPLICATION_JSON).content(body),
     )
 
     @Test
@@ -210,6 +215,67 @@ class FundPersistenceIT {
     }
 
     @Test
+    fun `a fund write repeated with its Idempotency-Key returns the first record and writes nothing, and a reused key is refused`() {   // DEVBRIEF §8 (#58)
+        val (entranceId, unitId, chair) = entranceWithFund()
+        val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
+        pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
+        val works = """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}"""
+        fun count(table: String) = jdbc.queryForObject("SELECT count(*) FROM $table WHERE entrance_id = ?", Long::class.java, entranceId)
+
+        val first = json.readTree(disburse(entranceId, works, "k-commit").andExpect(status().isCreated).andReturn().response.contentAsString)
+        val id = UUID.fromString(first.get("id").asText())
+        val signedOn = first.get("committedOn").asText()
+        disburse(entranceId, works, "k-commit").andExpect(status().isCreated).andExpect(jsonPath("$.id").value(id.toString()))
+        assertThat(count("fund_disbursement")).isEqualTo(1)
+        disburse(entranceId, works.replace("20000", "20001"), "k-commit")
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.error").value("Idempotency-Key was already used for a different request"))
+        disburse(entranceId, works, " ").andExpect(status().isBadRequest)
+
+        val paying = """{"paidOn":"$signedOn","paidBy":"$chair"}"""
+        act(entranceId, id, "pay", paying, "k-pay").andExpect(status().isOk).andExpect(jsonPath("$.status").value("PAID"))
+        act(entranceId, id, "pay", paying, "k-pay").andExpect(status().isOk).andExpect(jsonPath("$.status").value("PAID"))   // the answer, not a 409
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM posting WHERE journal_id = ?", Long::class.java, id)).isEqualTo(2)   // one payout journal
+        act(entranceId, id, "cancel", """{"cancelledBy":"$chair","reason":"revoked"}""", "k-pay").andExpect(status().isConflict)   // a payout's key
+        act(entranceId, id, "pay", paying, "k-commit").andExpect(status().isConflict)                                             // a sign-off's key
+        mvc.perform(get("/api/money/entrances/$entranceId/fund")).andExpect(jsonPath("$.balanceMinor").value(30_000))
+
+        val roof = UUID.fromString(
+            json.readTree(disburse(entranceId, works, "k-roof").andReturn().response.contentAsString).get("id").asText(),
+        )
+        val cancelling = """{"cancelledBy":"$chair","reason":"the roofer found no leak"}"""
+        act(entranceId, roof, "cancel", cancelling, "k-cancel").andExpect(status().isOk).andExpect(jsonPath("$.status").value("CANCELLED"))
+        act(entranceId, roof, "cancel", cancelling, "k-cancel").andExpect(status().isOk).andExpect(jsonPath("$.status").value("CANCELLED"))
+        disburse(entranceId, works, "k-roof").andExpect(status().isCreated).andExpect(jsonPath("$.status").value("CANCELLED"))   // as it stands now
+        act(entranceId, roof, "pay", paying, "k-pay").andExpect(status().isConflict)                                             // another disbursement's key
+
+        val statements = "/api/money/entrances/$entranceId/fund/handover-statements"
+        fun issue(bank: Long, key: String) = mvc.perform(
+            post(statements).header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON)
+                .content("""{"handoverOn":"$signedOn","outgoingPartyId":"$chair","incomingPartyId":"$successor","bankBalanceMinor":$bank}"""),
+        )
+        val issued = issue(30_000, "k-handover").andExpect(status().isCreated).andReturn().response.contentAsString
+        assertThat(issue(30_000, "k-handover").andExpect(status().isCreated).andReturn().response.contentAsString).isEqualTo(issued)
+        assertThat(count("fund_handover_statement")).isEqualTo(1)
+        issue(29_000, "k-handover").andExpect(status().isConflict)
+        issue(30_000, "k-commit").andExpect(status().isConflict)
+
+        // Another entrance's key of the same text is its own: keys are kept per entrance.
+        val (otherEntrance, _, otherChair) = entranceWithFund()
+        val theirs = disburse(otherEntrance, works.replace(chair.toString(), otherChair.toString()), "k-commit")
+            .andExpect(status().isCreated).andReturn().response.contentAsString
+        assertThat(json.readTree(theirs).get("id").asText()).isNotEqualTo(id.toString())
+        act(otherEntrance, id, "pay", paying, "k-pay").andExpect(status().isNotFound)       // neither this entrance's key nor its disbursement
+
+        // The table keeps a key as it was first used.
+        assertThat(count("fund_request_key")).isEqualTo(5)
+        jdbc.update("UPDATE fund_request_key SET request_hash = 'x' WHERE entrance_id = ?", entranceId)   // ignored
+        jdbc.update("DELETE FROM fund_request_key WHERE entrance_id = ?", entranceId)                     // ignored
+        disburse(entranceId, works, "k-commit").andExpect(status().isCreated).andExpect(jsonPath("$.id").value(id.toString()))
+        assertThat(count("fund_disbursement")).isEqualTo(2)
+    }
+
+    @Test
     fun `PM-FUND-010 a handover statement is stored as issued, reconciled against the bank or not, and never changed`() {
         val (entranceId, unitId, chair) = entranceWithFund()
         val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
@@ -219,7 +285,7 @@ class FundPersistenceIT {
         signedOff(entranceId, """{"amountMinor":5000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-8"}""")   // unpaid: inherited
         val statements = "/api/money/entrances/$entranceId/fund/handover-statements"
         fun issue(incoming: UUID, bank: Long) = mvc.perform(
-            post(statements).contentType(MediaType.APPLICATION_JSON)
+            post(statements).header("Idempotency-Key", newKey()).contentType(MediaType.APPLICATION_JSON)
                 .content("""{"handoverOn":"$signedOn","outgoingPartyId":"$chair","incomingPartyId":"$incoming","bankBalanceMinor":$bank}"""),
         )
 

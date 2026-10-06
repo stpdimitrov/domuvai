@@ -2029,3 +2029,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`.
 
 ---
+
+## S-G1-02j · 2026-10-06 · money — the fund's write endpoints take an Idempotency-Key (#58)
+
+**Shipped** — `POST …/fund/disbursements`, `…/disbursements/{id}/pay`, `…/disbursements/{id}/cancel` and `POST …/fund/handover-statements` require an `Idempotency-Key` header, as payments do (DEVBRIEF §8); without one the answer is a 400. A repeat with the same key and the same request returns the record the first request made and writes nothing: no second disbursement, no second statement, and no 409 for a disbursement the first request already closed. The same key for a different request, disbursement or operation is a 409. Keys are kept per entrance in a new insert-only table, `money.fund_request_key` (the operation, a hash of the request as canonical JSON, the id of the record made), written in the write's own transaction; the disbursement and statement tables are unchanged. `FundRequestKeys` holds the lookup and the keeping for both services. `tools/seed_demo.py` sends a key on each fund write. The OpenAPI contract and the TS client are regenerated (the header on four operations).
+
+**Verified** — unit tests for each service (a repeat returns the first record; nothing written twice; a reused key refused; a blank key refused), web tests (400 without the header on all four; 409 for a reused key), and `FundPersistenceIT` run from a scratch copy on this machine's Postgres 16 — 8 of 8, including the new test and the table ignoring an update and a delete. Three mutants killed (the payout's key not kept; the request hash not compared; the handover's lookup removed). Gates green; `web` builds against the regenerated client.
+
+**Review** — fresh context, three findings, all taken: the request was hashed from the data class's rendering, so a missing reference and the text "null" hashed alike — now canonical JSON with named fields; the Postgres test now replays a payout's key against another disbursement and from another entrance; a key lost in a race is refused by `FundRequestKeys` itself, and the controllers no longer map every duplicate key to that message.
+
+**Decisions** — mine, stated on #113: the header is required, not optional · a repeated sign-off returns the disbursement as it stands now (it may have been paid or cancelled since), not a stored copy of the first response · a repeat answers with the same status code as the first (201 for a sign-off or a statement).
+
+**Open** — the comparison of `operation` in `FundRequestKeys.prior` is a defence no test can fail alone: the request hash already differs between operations · two identical handover requests racing each other: one stores the statement, the other gets a 409, not the statement · keys never expire · the other modules' write endpoints (registry, intake, charge runs) take no key — DEVBRIEF §8 says every write endpoint does; not filed as findings yet.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/money/FundRequestKeys.kt`, `FundService.kt` (the first lines of `commit`, `pay`, `cancel`).
+
+---

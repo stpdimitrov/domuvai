@@ -1926,7 +1926,9 @@ export interface operations {
     post_money_entrances_entranceId_fund_disbursements: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
             };
@@ -1985,7 +1987,9 @@ export interface operations {
     post_money_entrances_entranceId_fund_disbursements_disbursementId_cancel: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 disbursementId: string;
@@ -2045,7 +2049,9 @@ export interface operations {
     post_money_entrances_entranceId_fund_disbursements_disbursementId_pay: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 disbursementId: string;
@@ -2160,7 +2166,9 @@ export interface operations {
     post_money_entrances_entranceId_fund_handover_statements: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
             };
