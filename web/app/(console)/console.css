@@ -202,6 +202,15 @@
   padding: 0 16px;
   min-width: 1000px;
 }
+/* the live portfolio (WEB-19): the design's columns, and what is available beside the fund's balance (PM-FUND-009) */
+.pl-grid {
+  display: grid;
+  grid-template-columns: 240px 92px minmax(120px, 1fr) 100px 100px 116px 108px 88px 72px;
+  column-gap: 14px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 1080px;
+}
 .pf-head {
   position: sticky;
   top: 0;

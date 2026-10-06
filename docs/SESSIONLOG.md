@@ -2045,3 +2045,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/money/FundRequestKeys.kt`, `FundService.kt` (the first lines of `commit`, `pay`, `cancel`).
 
 ---
+
+## WEB-19 · 2026-10-06 · web — `/portfolio` live
+
+**Shipped** — `/portfolio` no longer shows the design's sample rows. It lists every registered entrance with its number of units, what it owes after the advances as of `?asOf=` (default: today in Sofia; the arrears read's `netMinor`, PM-DEBT-001) and its repair fund's balance beside what is available (the fund read, PM-FUND-009), or "няма сметка" when the entrance has no fund account. Largest owed first, then by name. Two filters work as links — owing, and a fund below zero; the design's three others are shown disabled. The columns no backend serves — overdue statutory tasks, the next deadline, the collection rate, the mandate's end, the risk — show a dash, with one line saying they are not kept yet. A name links to the entrance, what is owed to `/debts` (carrying the date), the fund's balance to the entrance's fund screen. An entrance whose reads fail is listed as failed. No new API read: the screen uses four calls the check already validates. `tools/check_e2e.py` gains the screen for two dates and both filters, that the owing filter leaves out an entrance owing nothing, and four links.
+
+**Verified** — the whole chain on this machine (the API's jar on a scratch Postgres 16 database, the seed, the production web build on three servers): the check holds. Three mutants of the page each fail it (the unpaid total for what is owed; the owing filter keeping everything; what is available in the balance column). Looked at the rendered screen at 1400 px.
+
+**Review** — fresh context, seven findings, six taken: `?show=toString` or a repeated `?asOf=` no longer throws; a failed entrance is counted apart, so the footer, the filter's empty line and the top bar's unit count no longer speak for it; a fund that failed to load is said in the summary, not counted as not below zero. Not taken: the check cannot assert the order, since in the seed the order by what is owed and the order by name coincide.
+
+**Decisions** — mine, stated on #115: no firm-wide money total, since adding the entrances' figures would be a figure of the web's own (as on `/debts`) · the fund's balance and what is available are both shown, as PM-FUND-009 asks, so the table has nine columns where the design has eight · "buildings" in the top bar counts distinct condominiums · the order is by what is owed, since nobody computes the design's risk.
+
+**Open** — the order (largest owed first) is not asserted by the check · `/debts` still throws on a repeated `?asOf=` (found in this review, not this slice's screen) · the fund's figures are today's while what is owed follows `?asOf=`; the column's tooltip says so, the header does not · a name links to `/entrance`, which is still sample data and ignores the entrance it is given · the search box and the CSV export of the design are gone until something backs them · the firm sidebar still carries the design's sample names.
+
+**Read first next time** — `web/app/(console)/(firm)/portfolio/page.tsx`, `web/README.md` (`/portfolio`).
+
+---

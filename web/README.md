@@ -121,7 +121,7 @@ app/
       layout.tsx       firm sidebar + main
       FirmSidebar.tsx  firm navigation (client; active from the path)
       portfolio/
-        page.tsx       /portfolio — the risk-sorted portfolio dashboard
+        page.tsx       /portfolio — every entrance with what it owes and its fund (live)
     entrance/          single-entrance context
       layout.tsx       entrance sidebar + main
       EntranceSidebar.tsx  entrance navigation (client)
@@ -149,8 +149,14 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   the platform showcase (mock console cards), roles, steps, trust, pricing, company, an FAQ
   accordion, and a validated "заявете демо" form. Client parts: `LandingNav`, `Faq`, `DemoForm`,
   `HeroVideo`.
-- **`/portfolio`** — the console's firm-wide portfolio dashboard (screen 01). A portfolio row
-  links through to the entrance detail.
+- **`/portfolio`** — the console's firm-wide portfolio (screen 01) — **live** (WEB-19): every registered
+  entrance with its number of units, what it owes after the advances as of `?asOf=` (default today in Sofia;
+  `GET …/arrears`, `netMinor`), and its repair fund's balance beside what is available (`GET …/fund`; "няма
+  сметка" when it has no fund account). The fund's figures are today's, whatever the date. Largest owed first.
+  `?show=owing` and `?show=fund` (a fund below zero) filter. The design's other columns — overdue statutory
+  tasks, the next deadline, the collection rate, the mandate's end, the risk — show a dash until a backend
+  serves them, and the screen adds no firm-wide total of its own. A name links to the entrance, what is owed
+  to `/debts`, the fund's balance to the entrance's fund screen.
 - **`/debts`** — firm-wide arrears (screen 05 Задължения) — **live** (WEB-13): every entrance's debtors
   from one arrears read per entrance (`GET …/arrears?asOf=`), joined to its units and to their owners on the
   read date — what each has unpaid, the advance it holds and what it owes after it (WEB-18), the entrance's
