@@ -30,7 +30,7 @@ PG="$(brew --prefix postgresql@16)/bin"
 "$PG/psql" -d postgres -c "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD 'postgres'"
 "$PG/createdb" -O postgres domuvai
 ./gradlew :app:bootRun                        # from the repo root; Flyway migrates the empty database
-python3 tools/seed_demo.py                    # prints the entrance id
+python3 tools/seed_demo.py                    # prints the entrance id; a database seeded before WEB-18 has no October run — recreate it to get one
 cd web && API_URL=http://localhost:8080 npm run dev
 ```
 
@@ -153,8 +153,11 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   links through to the entrance detail.
 - **`/debts`** — firm-wide arrears (screen 05 Задължения) — **live** (WEB-13): every entrance's debtors
   from one arrears read per entrance (`GET …/arrears?asOf=`), joined to its units and to their owners on the
-  read date — what each owes, the entrance's total and the oldest debt's days overdue, as `money` computes
-  them. `?asOf=YYYY-MM-DD` (default: today, Europe/Sofia). An entrance where nobody owes is left out. The
+  read date — what each has unpaid, the advance it holds and what it owes after it (WEB-18), the entrance's
+  total after the advances, and the oldest debt's days overdue, as `money` computes them; the screen subtracts
+  nothing itself. A unit whose advance covers all it has unpaid stays listed, marked as covered, and is not
+  counted as owing or overdue. `?asOf=YYYY-MM-DD` (default: today, Europe/Sofia). An entrance where nothing is
+  unpaid is left out. The
   design's interest, escalation ladder (Покана → Нотариална → Решение на ОС → Заповед) and next action are not
   built — those columns show `—`, and the two buttons stay disabled. **It names debtors and their debts, so it
   must never be reachable by the public** (PM-DEBT-011) — served only where the console is switched on (see

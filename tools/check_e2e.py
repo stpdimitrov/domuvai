@@ -98,14 +98,30 @@ SCREENS = {
     ],
     "/entrance/fund?entrance={e}&period=2026-08": ["Дневник · август 2026", "Няма статии в дневника за август 2026."],
     "/debts?asOf=2026-09-30": [                              # the firm sidebar still carries the design's sample names
-        "2 обекта с неплатено, 2 в просрочие · 1 вход от 2 · към 30.09.2026",   # the second is the seed's business entrance: nothing issued, nothing owed
+        "2 обекта дължат, 2 в просрочие · 1 вход от 2 · към 30.09.2026",   # the second is the seed's business entrance: nothing issued, nothing owed
         "ул. Шипка 14, вх. Б · 2 обекта с неплатено €156,50",  # the entrance's total (PM-DEBT-001)
-        "ап. 5 Надя Тодорова €80,00 — 15 дни — —",            # owed, the oldest debt's days overdue (PM-DEBT-002)
-        "ап. 6 Петър Георгиев €76,50 — 15 дни — —",
+        "ап. 5 Надя Тодорова €80,00 — €80,00 — 15 дни — —",            # owed, the oldest debt's days overdue (PM-DEBT-002)
+        "ап. 6 Петър Георгиев €76,50 — €76,50 — 15 дни — —",
     ],
     "/debts?asOf=2026-09-05": [                              # before the due day: unpaid, but nothing overdue
-        "6 обекта с неплатено, 0 в просрочие · 1 вход от 2 · към 05.09.2026",
-        "ап. 1 Иван Петров €132,00 — в срок — —",
+        "6 обекта дължат, 0 в просрочие · 1 вход от 2 · към 05.09.2026",
+        "ап. 1 Иван Петров €132,00 — €132,00 — в срок — —",
+    ],
+    # After October's run (WEB-18, PM-DEBT-001): the units that overpaid in September hold an advance against the new
+    # debt — unpaid, the advance, and what is owed after it, each the API's. One covered in full is listed and owes nothing.
+    "/debts?asOf=2026-10-20": [
+        "3 обекта дължат, 3 в просрочие · 1 вход от 2 · към 20.10.2026",
+        "ул. Шипка 14, вх. Б · 6 обекта с неплатено €861,50 − покрито с аванси €468,50 €393,00",   # the entrance, after the advances
+        "сортирано по неплатено ↓",                                           # the API's order: largest unpaid first —
+        "€183,00 — €183,00 — 35 дни — — ап. 1 Иван Петров €132,00",           # — not by what is owed after the advance
+        "Общо 6 обекта с неплатено · 3 дължат",
+        "ап. 5 Надя Тодорова €200,00 — €200,00 — 35 дни — —",                # no advance: all of it owed
+        "ап. 1 Иван Петров €132,00 €168,00 €0,00 — покрито с аванс — —",       # covered in full
+        "ап. 3 Мария Иванова €105,00 €95,00 €10,00 — 5 дни — —",              # covered in part
+    ],
+    "/debts?asOf=2026-10-10": [                              # October's debt not yet due: covered in part, and on time
+        "ап. 3 Мария Иванова €105,00 €95,00 €10,00 — в срок — —",
+        "3 обекта дължат, 2 в просрочие",                    # ап. 5 and ап. 6 still owe September
     ],
 }
 # The words of every error state the live screens have. None may appear for the seeded entrance.

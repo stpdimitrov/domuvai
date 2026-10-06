@@ -22,7 +22,8 @@ const refusal = (r: { error?: { error?: string }; response: Response }) => r.err
 /**
  * One screen, one server-side aggregation (ADR-011): every entrance's arrears as of a date (PM-DEBT-001, PM-DEBT-002 —
  * money ages them), joined to its units and to their owners on that date — a few entrances at a time. Every amount is
- * the API's; the page adds none of its own. An entrance where nothing is unpaid is left out; one that failed is shown.
+ * the API's — what is unpaid, the advance held and what is owed after it — and the page subtracts none of its own.
+ * An entrance where nothing is unpaid is left out; one that failed is shown.
  */
 async function load(asOf: string): Promise<Loaded> {
   const listed = await entrances();
@@ -62,7 +63,9 @@ async function load(asOf: string): Promise<Loaded> {
  * oldest. CURRENT means nothing is overdue yet.
  */
 const oldestBand = (u: Owing) => [...u.buckets].reverse().find((b) => b.amountMinor > 0)?.band ?? "CURRENT";
-const overdue = (u: Owing) => oldestBand(u) !== "CURRENT";
+/** Its advance covers all it has unpaid: the API's own figure after the advance is nothing. It stays listed, and owes nothing. */
+const covered = (u: Owing) => u.netMinor === 0;
+const overdue = (u: Owing) => !covered(u) && oldestBand(u) !== "CURRENT";
 const TONE: Record<string, string | undefined> = { "90+": "#8E2318", "61-90": "#8E2318", "31-60": "#7A5210" };
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -93,6 +96,7 @@ export default async function DebtsPage({ searchParams }: { searchParams: Promis
   const ok = view.kind === "ok" ? view.groups.filter((g) => g.kind === "ok") : [];
   const failed = view.kind === "ok" ? view.groups.length - ok.length : 0;
   const listed = ok.flatMap((g) => g.arrears.units);
+  const owing = listed.filter((u) => !covered(u)).length;
   const late = listed.filter(overdue).length;
 
   return (
@@ -104,7 +108,7 @@ export default async function DebtsPage({ searchParams }: { searchParams: Promis
           <span className="meta">
             {view.kind === "ok" && (
               <>
-                {count(listed.length, "обект", "обекта")} с неплатено, {late} в просрочие ·{" "}
+                {count(owing, "обект дължи", "обекта дължат")}, {late} в просрочие ·{" "}
                 {count(ok.length, "вход", "входа")} от {view.entranceCount} ·{" "}
                 {failed > 0 && <span style={FAILED}>{count(failed, "вход не се зареди", "входа не се заредиха")} · </span>}
               </>
@@ -127,13 +131,13 @@ export default async function DebtsPage({ searchParams }: { searchParams: Promis
           </div>
         </div>
       ) : (
-        <Debts view={view} listed={listed.length} failed={failed} />
+        <Debts view={view} listed={listed.length} owing={owing} failed={failed} />
       )}
     </>
   );
 }
 
-function Debts({ view, listed, failed }: { view: Extract<Loaded, { kind: "ok" }>; listed: number; failed: number }) {
+function Debts({ view, listed, owing, failed }: { view: Extract<Loaded, { kind: "ok" }>; listed: number; owing: number; failed: number }) {
   return (
     <>
       <div style={{ padding: "16px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
@@ -147,7 +151,7 @@ function Debts({ view, listed, failed }: { view: Extract<Loaded, { kind: "ok" }>
           ))}
         </div>
         <span style={{ font: "400 11.5px/1 'IBM Plex Mono', monospace", color: "#6B6F6C" }}>
-          стъпките по чл. 38 ЗУЕС и лихвата още не се водят · сортирано по дължимо ↓
+          стъпките по чл. 38 ЗУЕС и лихвата още не се водят · сортирано по неплатено ↓
         </span>
       </div>
 
@@ -155,7 +159,9 @@ function Debts({ view, listed, failed }: { view: Extract<Loaded, { kind: "ok" }>
         <div className="dt-grid pf-head">
           <div>Обект</div>
           <div>Собственик към {date(view.asOf)}</div>
-          <div className="num">Дължимо</div>
+          <div className="num">Неплатено</div>
+          <div className="num" title="надплатено от обекта, държано като аванс">Аванс</div>
+          <div className="num" title="неплатеното след аванса">Дължимо</div>
           <div className="num">Лихва</div>
           <div className="num">Просрочие</div>
           <div>Стъпка</div>
@@ -171,9 +177,13 @@ function Debts({ view, listed, failed }: { view: Extract<Loaded, { kind: "ok" }>
             <div className={`dt-group${gi > 0 ? " mid" : ""}`}>
               <span>
                 {g.entrance.label}{" "}
-                <span className="gnote">{g.kind === "ok" ? `· ${count(g.arrears.units.length, "обект", "обекта")} с неплатено` : ""}</span>
+                <span className="gnote">
+                  {g.kind === "ok" ? `· ${count(g.arrears.units.length, "обект", "обекта")} с неплатено` : ""}
+                  {/* the entrance's advance is only what covers each unit's own debt — less than the units' advances add up to */}
+                  {g.kind === "ok" && g.arrears.advanceMinor > 0 && ` ${eur(g.arrears.totalMinor)} − покрито с аванси ${eur(g.arrears.advanceMinor)}`}
+                </span>
               </span>
-              <span className="gtotal">{g.kind === "ok" ? eur(g.arrears.totalMinor) : "—"}</span>
+              <span className="gtotal">{g.kind === "ok" ? eur(g.arrears.netMinor) : "—"}</span>
             </div>
             {g.kind === "failed" && (
               <div className="dt-grid pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{g.message}</div></div>
@@ -185,14 +195,16 @@ function Debts({ view, listed, failed }: { view: Extract<Loaded, { kind: "ok" }>
               <div key={u.unitId} className="dt-grid pf-row">
                 <div style={{ fontWeight: 500 }}>{g.units.get(u.unitId) ?? "—"}</div>
                 <div className="ellipsis">{g.owners.get(u.unitId) ?? "—"}</div>
-                <div className="num" style={{ fontWeight: 500 }}>{eur(u.totalMinor)}</div>
+                <div className="num">{eur(u.totalMinor)}</div>
+                <div className="num" style={u.advanceMinor > 0 ? undefined : DIM}>{u.advanceMinor > 0 ? eur(u.advanceMinor) : "—"}</div>
+                <div className="num" style={covered(u) ? DIM : { fontWeight: 500 }}>{eur(u.netMinor)}</div>
                 <div className="num" style={DIM}>—</div>
                 <div
                   className="num"
                   style={overdue(u) ? { color: TONE[oldestBand(u)] } : DIM}
                   title={u.oldestDebt ? `падеж ${date(u.oldestDebt.dueOn)} — датата на начислението плюс срока за плащане` : undefined}
                 >
-                  {!u.oldestDebt ? "—" : overdue(u) ? count(u.oldestDebt.overdueDays, "ден", "дни") : "в срок"}
+                  {covered(u) ? "покрито с аванс" : !u.oldestDebt ? "—" : overdue(u) ? count(u.oldestDebt.overdueDays, "ден", "дни") : "в срок"}
                 </div>
                 <div style={DIM}>—</div>
                 <div className="action" style={DIM}>—</div>
@@ -204,10 +216,10 @@ function Debts({ view, listed, failed }: { view: Extract<Loaded, { kind: "ok" }>
         <div className="dt-grid pf-foot">
           <div>Общо</div>
           <div style={{ color: "#6B6F6C", fontWeight: 400 }}>
-            {count(listed, "обект", "обекта")}
+            {count(listed, "обект", "обекта")} с неплатено · {count(owing, "дължи", "дължат")}
             {failed > 0 && <span style={FAILED}> · без {count(failed, "незареден вход", "незаредени входа")}</span>}
           </div>
-          <div /><div /><div /><div /><div />
+          <div /><div /><div /><div /><div /><div /><div />
         </div>
       </div>
     </>

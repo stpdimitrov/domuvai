@@ -110,6 +110,15 @@ for unit, amount, into in zip(unit_ids, [30_000, 25_000, 20_000, 30_000, 4_000, 
          {"unitId": unit, "amountMinor": amount, "receivedInto": into, "valueDate": "2026-09-10"},
          {"Idempotency-Key": str(uuid.uuid4())})
 
+# October's run on the same decision. The units that overpaid in September now hold an advance against a new debt,
+# so the debts screen has something to net (WEB-18): a payment settles only debts raised by its own date, and an
+# advance is not applied to a later charge.
+call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-10", "legalDate": "2026-10-01", "lines": [
+    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 600},
+    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 450},
+    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": "GA-2026-03-12-4", "totalMinor": 60_000},
+]})
+
 # Disbursements from the fund: works on a GA decision, paid; an emergency; a measure, cancelled; one committed
 base = f"/api/money/entrances/{entrance}/fund/disbursements"
 roof = call("POST", base, {"amountMinor": 48_000, "purpose": "WORKS", "authorisedBy": manager, "decisionId": "GA-2026-03-12-3"})
