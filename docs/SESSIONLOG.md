@@ -1993,3 +1993,39 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/README.md` (Status, `/debts`), `web/app/(console)/(firm)/debts/page.tsx`.
 
 ---
+
+## H-09 · 2026-10-06 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at `980adda` (#111) or later. Nothing in flight: no open PR, every lane free. Next: the owner's choice among the proposals below.
+
+**Shipped since H-08** (squash-merged, each reviewed before it merged):
+- #80 WEB-14 — the console only where it is switched on. #84 WEB-15 — the demo form claims nothing it did not do; the contact address is the server's `DOMUVAI_CONTACT_EMAIL` (#88: `office@newcleardigital.com`).
+- #82 S-G1-02f-o — each debt's own payment term. #103 S-G1-02h — advances netted in the arrears read; a receivable must name its unit. #111 WEB-18 — `/debts` shows unpaid, advance and owed.
+- #87 S-G1-02a-i — the dry-run names a tariff line. #90 S-G1-02a-j — the dry-run counts the persons the firm charged, pinned (the sheet's occupants already leave out children and reflect absences and animals).
+- The business-use change plan (#91, closed): #93 S-G1-03d a unit's business use apart from its separate entrance · #96 S-G1-02g the multiple only for business through the common parts, refused when none is given · #99 S-G1-02a-k the dry-run and the commit take the sheet's business use · #105 WEB-16 the charges screen takes the multiple.
+- #101 S-G1-03e — derived ideal parts.
+- #107 S-G1-02i — the journal read and the operating account's figure. #109 WEB-17 — the fund screen shows both (#68, closed).
+
+**Numbers** — named-test coverage 52 of 233. Gate 1 left: S-G1-01 kernel 10, S-G1-03 registry 9, S-G1-02 money 3. The API runs 41 operations.
+
+**Frontend ↔ backend, as of today** — three screens are live and each gained since H-08: `/entrance/charges` (the multiple), `/entrance/fund` (the operating figure, the journal by month and account), `/debts` (unpaid · advance · owed). Still sample data: `/portfolio`, `/entrance`, `/assembly`, `/compliance`, the sidebars. No sign-in.
+
+**The owner's decisions since H-08** (each recorded on its issue):
+- #73: payment term by each debt's own date · advances netted in the read and shown · "oldest debt" stays two things (payments settle the first charged; arrears names the first due).
+- #86: the sheet's `OCCUPANTS` is the charged headcount; animals and absences are already in it.
+- #91: units flagged `separate_entrance` marked business use too · a run needing the multiple with none is refused · a commit adopts business use.
+- #68: the operating account's ledger figure is served and named as paid in, never a balance, while outflows are not recorded.
+
+**Findings open** — #100 what the business-use plan left for the owner and counsel (a shop with no chargeable person pays nothing per person; the catalogue and `law` disagree on PM-FEE-010's confirmation; PM-ORG-009 cites a PM-FEE-034 that does not exist; a multiple per unit with a protocol reference is not built) · #73 can close — its four items are delivered or decided · #58 idempotency keys on the fund's writes · #57 signing the handover statement.
+
+**Not built, and waiting on the owner** — recording operating expenses (who may pay, on what basis); until then the operating figure only grows · where a demo request goes for good · sign-in (the provider).
+
+**Next slices, proposed** — `/entrance` or `/portfolio` live · operating expenses, once the owner answers · #58 · back to Gate 1's backend (S-G1-01 kernel, S-G1-03 registry, S-G1-02 money).
+
+**The chain on one machine** — unchanged (`web/README.md`). New: the seed makes a second entrance with a business unit and issues October's run; **a database seeded before 2026-10-06 has neither October nor advances against it — recreate it to see `/debts` net anything**. Postgres does not start at login. The web dev server binds `127.0.0.1`, not `localhost`.
+
+**Operating procedure** — unchanged (`.claude/skills/zues-slice/SKILL.md`). Practised this stretch: a slice that depends on another waits for its merge with one wait on its checks, not a poll loop; persistence tests are run here from a scratch copy without Testcontainers against local Postgres, never committed; a review finding is checked against earlier owner decisions before it is built (#86 was filed against D1 on #31).
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`.
+
+---
