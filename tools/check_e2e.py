@@ -18,6 +18,8 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 6. WEB-16 (PM-FEE-010): for the seeded entrance with a business unit, the charges screen shows the API's refusal and a
    field for the assembly's multiple; given one, it shows the API's own figures — for two different multiples. No
    figure is typed here: the check takes the ones the API accepts.
+7. WEB-19: the portfolio lists every seeded entrance with the API's figures, its filter leaves out what it should, and
+   its links carry the entrance and the date.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
@@ -123,6 +125,19 @@ SCREENS = {
         "ап. 3 Мария Иванова €105,00 €95,00 €10,00 — в срок — —",
         "3 обекта дължат, 2 в просрочие",                    # ап. 5 and ап. 6 still owe September
     ],
+    # WEB-19 — the portfolio: each entrance with what it owes after the advances as of the date (PM-DEBT-001) and its
+    # fund's balance beside what is available (PM-FUND-009), the API's figures. What is not kept yet is a dash.
+    "/portfolio?asOf=2026-09-30": [
+        "2 входа · 2 сгради · 8 обекта · към 30.09.2026",
+        "1 вход дължи към 30.09.2026 · 0 входа с отрицателен фонд",
+        "Всички 2 С дължимо 1 Отрицателен фонд 0",
+        "ул. Шипка 14, вх. Б · 6 об. — — — €156,50 €570,00 €145,00 — —",
+        "ул. Шипка 16, вх. А · 2 об. — — — €0,00 няма сметка — —",          # nothing issued; no fund account — said, not an error
+        "Общо 2 входа показани всички",
+    ],
+    "/portfolio?asOf=2026-10-20": ["ул. Шипка 14, вх. Б · 6 об. — — — €393,00 €570,00 €145,00 — —"],   # owed moves with the date
+    "/portfolio?asOf=2026-09-30&show=owing": ["ул. Шипка 14, вх. Б · 6 об.", "Общо 2 входа показани 1 от 2"],
+    "/portfolio?asOf=2026-09-30&show=fund": ["Няма вход за този филтър.", "Общо 2 входа показани 0 от 2"],
 }
 # The words of every error state the live screens have. None may appear for the seeded entrance.
 ERRORS = [
@@ -382,6 +397,15 @@ def main():
         print(f"{'ok ' if status == 200 and not missing and not shown else 'BAD'} {url}  {len(expected) - len(missing)}/{len(expected)} figures")
 
     failures += charges_multiple(api, web)
+
+    # WEB-19 — the portfolio's filter leaves out what it should, and its links carry the entrance and the date
+    status, page = fetch(web, "/portfolio?asOf=2026-09-30&show=owing")
+    kept_out = "ул. Шипка 16" not in visible_text(page)
+    failures += [] if kept_out else ["/portfolio?show=owing: lists an entrance that owes nothing"]
+    wanted = [f"/entrance/fund?entrance={entrance}", "/debts?asOf=2026-09-30", "/portfolio?asOf=2026-09-30&show=fund", "/portfolio?asOf=2026-09-30"]
+    dropped = [link for link in wanted if f'href="{link}"' not in page.replace("&amp;", "&")]
+    failures += [f"/portfolio: no link to {link}" for link in dropped]
+    print(f"{'ok ' if status == 200 and kept_out and not dropped else 'BAD'} /portfolio  the filter and {len(wanted) - len(dropped)}/{len(wanted)} links")
 
     # WEB-17 — the fund screen's links keep what the others chose: the journal's month, its account, the register's filter
     status, page = fetch(web, f"/entrance/fund?entrance={entrance}&period=2026-09&account=operating&status=paid")
