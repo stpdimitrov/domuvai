@@ -85,12 +85,15 @@ class FundService(
     private val accounts: FundAccountRepository,
     private val disbursements: FundDisbursementRepository,
     private val postings: PostingRepository,
+    private val keys: FundRequestKeys,
     private val jdbc: JdbcTemplate,
     private val clock: Clock,
 ) {
+    /** A repeat with the same key and request returns the disbursement the first one signed off, as it stands now (DEVBRIEF §8). */
     @Transactional
-    fun commit(entranceId: UUID, command: CommitDisbursement): DisbursementView {
+    fun commit(entranceId: UUID, idempotencyKey: String, command: CommitDisbursement): DisbursementView {
         lock(entranceId)
+        keys.prior(entranceId, idempotencyKey, FundOperation.COMMIT, command.asRequest())?.let { return DisbursementView.of(disbursements.findById(it).orElseThrow()) }
         val fund = fundAccount(entranceId)
         require(command.amountMinor > 0) { "amountMinor must be positive" }
         val purpose = enumValueOf<DisbursementPurpose>(command.purpose)                 // Rule: PM-FUND-006
@@ -128,6 +131,7 @@ class FundService(
                 committedOn = today(),
             ),
         )
+        keys.keep(entranceId, idempotencyKey, FundOperation.COMMIT, command.asRequest(), row.id)
         return DisbursementView.of(row)
     }
 
@@ -136,11 +140,13 @@ class FundService(
      * signed off, once, on the bank's value date — not after today, not before the sign-off — naming who recorded it. Its journal credits
      * the fund's bank account, so the balance and what is committed fall alike and what is available does not
      * move (Rule: PM-FUND-009). The balance may go below zero: the bank is the truth, and a negative balance
-     * shows receipts not yet recorded.
+     * shows receipts not yet recorded. A repeat with the same key and request returns the paid disbursement, not a
+     * refusal that it is closed (DEVBRIEF §8).
      */
     @Transactional
-    fun pay(entranceId: UUID, disbursementId: UUID, command: PayDisbursement): DisbursementView {
+    fun pay(entranceId: UUID, disbursementId: UUID, idempotencyKey: String, command: PayDisbursement): DisbursementView {
         lock(entranceId)
+        keys.prior(entranceId, idempotencyKey, FundOperation.PAY, command.asRequest(disbursementId))?.let { return DisbursementView.of(disbursements.findById(it).orElseThrow()) }
         val row = open(entranceId, disbursementId)
         requireHolder(fundAccount(entranceId), command.paidBy, "pay out")
         val today = today()
@@ -148,17 +154,20 @@ class FundService(
         require(!command.paidOn.isBefore(row.committedOn)) { "a payout cannot be dated before the sign-off (${row.committedOn})" }
         val paid = aggregates.update(row.copy(status = DisbursementStatus.PAID.name, paidOn = command.paidOn, paidBy = command.paidBy))
         Ledger.forPayout(paid, command.paidOn).forEach { aggregates.insert(it) }
+        keys.keep(entranceId, idempotencyKey, FundOperation.PAY, command.asRequest(disbursementId), paid.id)
         return DisbursementView.of(paid)
     }
 
     /**
      * Withdraws a signed-off, unpaid disbursement (Rule: PM-FUND-007): the party holding the fund's account
      * cancels it with a written reason, and it is no longer committed, so what is available rises (Rule:
-     * PM-FUND-009). A paid disbursement is not cancelled.
+     * PM-FUND-009). A paid disbursement is not cancelled. A repeat with the same key and request returns the
+     * cancelled disbursement (DEVBRIEF §8).
      */
     @Transactional
-    fun cancel(entranceId: UUID, disbursementId: UUID, command: CancelDisbursement): DisbursementView {
+    fun cancel(entranceId: UUID, disbursementId: UUID, idempotencyKey: String, command: CancelDisbursement): DisbursementView {
         lock(entranceId)
+        keys.prior(entranceId, idempotencyKey, FundOperation.CANCEL, command.asRequest(disbursementId))?.let { return DisbursementView.of(disbursements.findById(it).orElseThrow()) }
         val row = open(entranceId, disbursementId)
         requireHolder(fundAccount(entranceId), command.cancelledBy, "cancel")
         require(command.reason.isNotBlank()) { "a cancellation gives its reason (PM-FUND-007)" }
@@ -168,6 +177,7 @@ class FundService(
                 cancelledBy = command.cancelledBy, cancelReason = command.reason,
             ),
         )
+        keys.keep(entranceId, idempotencyKey, FundOperation.CANCEL, command.asRequest(disbursementId), cancelled.id)
         return DisbursementView.of(cancelled)
     }
 
@@ -203,6 +213,18 @@ class FundService(
         }
         return row
     }
+
+    // What each request asked, field by field, for its Idempotency-Key's hash (DEVBRIEF §8).
+    private fun CommitDisbursement.asRequest() = mapOf(
+        "amountMinor" to amountMinor, "purpose" to purpose, "authorisedBy" to authorisedBy.toString(), "decisionId" to decisionId,
+        "emergencyJustification" to emergencyJustification, "passportMeasure" to passportMeasure,
+    )
+
+    private fun PayDisbursement.asRequest(disbursementId: UUID) =
+        mapOf("disbursementId" to disbursementId.toString(), "paidOn" to paidOn.toString(), "paidBy" to paidBy.toString())
+
+    private fun CancelDisbursement.asRequest(disbursementId: UUID) =
+        mapOf("disbursementId" to disbursementId.toString(), "cancelledBy" to cancelledBy.toString(), "reason" to reason)
 
     private fun today(): LocalDate = LocalDate.parse(toSofiaDate(clock.instant()))   // a Sofia calendar day (PM-SYS-004)
 

@@ -154,10 +154,10 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-FUND-003` | `charges/src/test/kotlin/zues/charges/ChargesTest.kt:47` | `kernel/src/main/kotlin/zues/kernel/Allocation.kt:6` |  |
 | `PM-FUND-004` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:92` | `app/src/main/kotlin/zues/app/money/FundAccount.kt:9` |  |
 | `PM-FUND-005` | `app/src/test/kotlin/zues/app/money/FundAccountPersistenceIT.kt:85` | `app/src/main/kotlin/zues/app/money/FundAccountService.kt:53` |  |
-| `PM-FUND-006` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:115` | `app/src/main/kotlin/zues/app/money/FundController.kt:35` |  |
-| `PM-FUND-007` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:94` | `app/src/main/kotlin/zues/app/money/FundController.kt:35` |  |
-| `PM-FUND-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:94` | `app/src/main/kotlin/zues/app/money/FundController.kt:35` |  |
-| `PM-FUND-009` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:94` | `app/src/main/kotlin/zues/app/money/FundController.kt:34` |  |
+| `PM-FUND-006` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:119` | `app/src/main/kotlin/zues/app/money/FundController.kt:36` |  |
+| `PM-FUND-007` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:98` | `app/src/main/kotlin/zues/app/money/FundController.kt:36` |  |
+| `PM-FUND-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:98` | `app/src/main/kotlin/zues/app/money/FundController.kt:36` |  |
+| `PM-FUND-009` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:98` | `app/src/main/kotlin/zues/app/money/FundController.kt:35` |  |
 | `PM-FUND-010` | `app/src/test/kotlin/zues/app/money/FundHandoverTest.kt:87` | `app/src/main/kotlin/zues/app/money/FundHandover.kt:21` |  |
 | `PM-FUND-011` | — | — |  |
 
@@ -227,7 +227,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-PMC-005` | — | — |  |
 | `PM-PMC-006` | — | — | ⚠ |
 | `PM-PMC-007` | — | — |  |
-| `PM-PMC-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:294` | `app/src/main/kotlin/zues/app/money/Journal.kt:25` |  |
+| `PM-PMC-008` | `app/src/test/kotlin/zues/app/money/FundPersistenceIT.kt:360` | `app/src/main/kotlin/zues/app/money/Journal.kt:25` |  |
 | `PM-PMC-009` | — | — |  |
 | `PM-PMC-010` | — | — |  |
 | `PM-PMC-011` | — | — |  |

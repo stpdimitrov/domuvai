@@ -29,7 +29,8 @@ class FundWebTest {
     private val chair = UUID.randomUUID()
 
     private fun postDisbursement(body: String = """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""") =
-        post("/api/money/entrances/$entranceId/fund/disbursements").contentType(MediaType.APPLICATION_JSON).content(body)
+        post("/api/money/entrances/$entranceId/fund/disbursements").header("Idempotency-Key", "k-1")
+            .contentType(MediaType.APPLICATION_JSON).content(body)
 
     @Test
     fun `GET the fund shows its balance, what is committed and what is available`() {
@@ -43,7 +44,7 @@ class FundWebTest {
 
     @Test
     fun `POST a disbursement hands each field to the service and returns 201 with it committed`() {
-        whenever(fund.commit(eq(entranceId), any())).thenReturn(
+        whenever(fund.commit(eq(entranceId), any(), any())).thenReturn(
             DisbursementView(UUID.randomUUID(), 20_000, "WORKS", "GA-2026-7", null, null, chair, "COMMITTED", LocalDate.parse("2026-09-29")),
         )
         mvc.perform(
@@ -55,7 +56,7 @@ class FundWebTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.status").value("COMMITTED"))
             .andExpect(jsonPath("$.decisionId").value("GA-2026-7"))
-        verify(fund).commit(entranceId, CommitDisbursement(20_000, "PASSPORT_MEASURE", chair, "D", "E", "M"))
+        verify(fund).commit(entranceId, "k-1", CommitDisbursement(20_000, "PASSPORT_MEASURE", chair, "D", "E", "M"))
     }
 
     @Test
@@ -64,10 +65,10 @@ class FundWebTest {
             FundShortfall("short") to 409, FundUnsignable("no registered holder") to 409, DataIntegrityViolationException("check") to 409,
             IllegalArgumentException("no decision") to 400, NoSuchElementException("no fund") to 404,
         )) {
-            whenever(fund.commit(eq(entranceId), any())).thenThrow(error)
+            whenever(fund.commit(eq(entranceId), any(), any())).thenThrow(error)
             mvc.perform(postDisbursement()).andExpect(status().`is`(expected))
         }
-        whenever(fund.commit(eq(entranceId), any())).thenThrow(DataIntegrityViolationException("violates check constraint \"fund_disbursement_x\""))
+        whenever(fund.commit(eq(entranceId), any(), any())).thenThrow(DataIntegrityViolationException("violates check constraint \"fund_disbursement_x\""))
         mvc.perform(postDisbursement())
             .andExpect(jsonPath("$.error").value("the disbursement conflicts with the fund's records"))   // the database's text stays inside
     }
@@ -75,27 +76,27 @@ class FundWebTest {
     private val disbursementId = UUID.randomUUID()
 
     private fun act(verb: String, body: String) = post("/api/money/entrances/$entranceId/fund/disbursements/$disbursementId/$verb")
-        .contentType(MediaType.APPLICATION_JSON).content(body)
+        .header("Idempotency-Key", "k-2").contentType(MediaType.APPLICATION_JSON).content(body)
 
     @Test
     fun `POST pay and cancel hand each field to the service and return the disbursement`() {
         val paid = DisbursementView(
             disbursementId, 20_000, "WORKS", "GA-2026-7", null, null, chair, "PAID", LocalDate.parse("2026-09-01"), paidOn = LocalDate.parse("2026-09-15"),
         )
-        whenever(fund.pay(eq(entranceId), eq(disbursementId), any())).thenReturn(paid)
-        whenever(fund.cancel(eq(entranceId), eq(disbursementId), any())).thenReturn(
+        whenever(fund.pay(eq(entranceId), eq(disbursementId), any(), any())).thenReturn(paid)
+        whenever(fund.cancel(eq(entranceId), eq(disbursementId), any(), any())).thenReturn(
             paid.copy(status = "CANCELLED", paidOn = null, cancelledOn = LocalDate.parse("2026-09-29"), cancelledBy = chair, cancelReason = "revoked"),
         )
         mvc.perform(act("pay", """{"paidOn":"2026-09-15","paidBy":"$chair"}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("PAID"))
             .andExpect(jsonPath("$.paidOn").value("2026-09-15"))
-        verify(fund).pay(entranceId, disbursementId, PayDisbursement(LocalDate.parse("2026-09-15"), chair))
+        verify(fund).pay(entranceId, disbursementId, "k-2", PayDisbursement(LocalDate.parse("2026-09-15"), chair))
         mvc.perform(act("cancel", """{"cancelledBy":"$chair","reason":"the GA revoked decision GA-2026-7"}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("CANCELLED"))
             .andExpect(jsonPath("$.cancelReason").value("revoked"))
-        verify(fund).cancel(entranceId, disbursementId, CancelDisbursement(chair, "the GA revoked decision GA-2026-7"))
+        verify(fund).cancel(entranceId, disbursementId, "k-2", CancelDisbursement(chair, "the GA revoked decision GA-2026-7"))
     }
 
     @Test
@@ -104,14 +105,37 @@ class FundWebTest {
             DisbursementClosed("already paid") to 409, NoSuchElementException("no such disbursement") to 404,
             IllegalArgumentException("after today") to 400,
         )) {
-            whenever(fund.pay(eq(entranceId), eq(disbursementId), any())).thenThrow(error)
+            whenever(fund.pay(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(error)
             mvc.perform(act("pay", """{"paidOn":"2026-09-15","paidBy":"$chair"}""")).andExpect(status().`is`(expected))
-            whenever(fund.cancel(eq(entranceId), eq(disbursementId), any())).thenThrow(error)
+            whenever(fund.cancel(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(error)
             mvc.perform(act("cancel", """{"cancelledBy":"$chair","reason":"revoked"}""")).andExpect(status().`is`(expected))
         }
         mvc.perform(act("pay", """{"paidOn":"15.09.2026","paidBy":"$chair"}"""))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error").value("paidOn must be an ISO date (YYYY-MM-DD)"))
+    }
+
+    @Test
+    fun `a fund write without an Idempotency-Key is a 400, and a key reused for a different request a 409`() {     // DEVBRIEF §8 (#58)
+        val base = "/api/money/entrances/$entranceId/fund/disbursements"
+        val bodies = mapOf(
+            base to """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""",
+            "$base/$disbursementId/pay" to """{"paidOn":"2026-09-15","paidBy":"$chair"}""",
+            "$base/$disbursementId/cancel" to """{"cancelledBy":"$chair","reason":"revoked"}""",
+        )
+        for ((path, body) in bodies) {
+            mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest)
+        }
+        org.mockito.Mockito.verifyNoInteractions(fund)
+        val error = IdempotencyKeyReused("reused")
+        whenever(fund.commit(eq(entranceId), any(), any())).thenThrow(error)
+        whenever(fund.pay(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(error)
+        whenever(fund.cancel(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(error)
+        for ((path, body) in bodies) {
+            mvc.perform(post(path).header("Idempotency-Key", "k-1").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict)
+                .andExpect(jsonPath("$.error").value("Idempotency-Key was already used for a different request"))
+        }
     }
 
     @Test

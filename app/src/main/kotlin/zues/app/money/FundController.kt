@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -33,7 +34,8 @@ data class CancelDisbursementRequest(val cancelledBy: UUID, val reason: String)
 /**
  * The repair and renewal fund (Rule: PM-FUND-009): its balance, what is committed and what is
  * available, and the disbursements signed off against it (Rule: PM-FUND-006, PM-FUND-007, PM-FUND-008),
- * each paid out or cancelled once.
+ * each paid out or cancelled once. Every write takes an `Idempotency-Key` (DEVBRIEF §8): the same key with the
+ * same request returns the disbursement the first one made or closed, and a key reused for anything else is a 409.
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/fund")
@@ -44,9 +46,13 @@ class FundController(private val fund: FundService) {
 
     @PostMapping("/disbursements")
     @ResponseStatus(HttpStatus.CREATED)
-    fun commit(@PathVariable entranceId: UUID, @RequestBody request: CommitDisbursementRequest): DisbursementView =
+    fun commit(
+        @PathVariable entranceId: UUID,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String,
+        @RequestBody request: CommitDisbursementRequest,
+    ): DisbursementView =
         fund.commit(
-            entranceId,
+            entranceId, idempotencyKey,
             CommitDisbursement(
                 request.amountMinor, request.purpose, request.authorisedBy,
                 request.decisionId, request.emergencyJustification, request.passportMeasure,
@@ -54,12 +60,20 @@ class FundController(private val fund: FundService) {
         )
 
     @PostMapping("/disbursements/{disbursementId}/pay")
-    fun pay(@PathVariable entranceId: UUID, @PathVariable disbursementId: UUID, @RequestBody request: PayDisbursementRequest): DisbursementView =
-        fund.pay(entranceId, disbursementId, PayDisbursement(LocalDate.parse(request.paidOn), request.paidBy))
+    fun pay(
+        @PathVariable entranceId: UUID, @PathVariable disbursementId: UUID,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String,
+        @RequestBody request: PayDisbursementRequest,
+    ): DisbursementView =
+        fund.pay(entranceId, disbursementId, idempotencyKey, PayDisbursement(LocalDate.parse(request.paidOn), request.paidBy))
 
     @PostMapping("/disbursements/{disbursementId}/cancel")
-    fun cancel(@PathVariable entranceId: UUID, @PathVariable disbursementId: UUID, @RequestBody request: CancelDisbursementRequest): DisbursementView =
-        fund.cancel(entranceId, disbursementId, CancelDisbursement(request.cancelledBy, request.reason))
+    fun cancel(
+        @PathVariable entranceId: UUID, @PathVariable disbursementId: UUID,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String,
+        @RequestBody request: CancelDisbursementRequest,
+    ): DisbursementView =
+        fund.cancel(entranceId, disbursementId, idempotencyKey, CancelDisbursement(request.cancelledBy, request.reason))
 
     /** An unknown purpose, a missing basis, measure or reason, a date out of bounds, or a party who does not hold the account → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
@@ -79,6 +93,12 @@ class FundController(private val fund: FundService) {
     @ExceptionHandler(FundShortfall::class, FundUnsignable::class, DisbursementClosed::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: RuntimeException): Map<String, String> = mapOf("error" to (e.message ?: "conflicts with the fund's state"))
+
+    /** A key already used for a different request, or taken by one racing this → 409. */
+    @ExceptionHandler(IdempotencyKeyReused::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun onKeyReused(e: RuntimeException): Map<String, String> =
+        mapOf("error" to "Idempotency-Key was already used for a different request")
 
     /** Backstop for the table's own checks. */
     @ExceptionHandler(DataIntegrityViolationException::class)
