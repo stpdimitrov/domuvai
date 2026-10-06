@@ -179,12 +179,17 @@ class FundHandoverService(
     private val disbursements: FundDisbursementRepository,
     private val postings: PostingRepository,
     private val statements: FundHandoverRepository,
+    private val keys: FundRequestKeys,
     private val json: ObjectMapper,
     private val clock: Clock,
 ) {
-    /** Rule: PM-FUND-010 — one snapshot, so a payout cannot fall between the ledger and the disbursements it reads. */
+    /**
+     * Rule: PM-FUND-010 — one snapshot, so a payout cannot fall between the ledger and the disbursements it reads.
+     * A repeat with the same key and request returns the statement as first issued, and stores no second one (DEVBRIEF §8).
+     */
     @Transactional(isolation = Isolation.REPEATABLE_READ)
-    fun issue(entranceId: UUID, command: IssueHandover): HandoverStatementView {
+    fun issue(entranceId: UUID, idempotencyKey: String, command: IssueHandover): HandoverStatementView {
+        keys.prior(entranceId, idempotencyKey, FundOperation.HANDOVER, command.asRequest())?.let { return asIssued(statements.findById(it).orElseThrow()) }
         val issuedAt = clock.instant().truncatedTo(ChronoUnit.MICROS)                  // as the database keeps it
         val today = LocalDate.parse(toSofiaDate(issuedAt))                             // a Sofia calendar day (PM-SYS-004)
         require(!command.handoverOn.isAfter(today)) { "a handover statement cannot be dated after today ($today)" }
@@ -203,6 +208,7 @@ class FundHandoverService(
                 JsonbValue(basis), BasisJson.hash(basis), CATALOGUE_VERSION, ENGINE_VERSION, statement.issuedOn, issuedAt,
             ),
         )
+        keys.keep(entranceId, idempotencyKey, FundOperation.HANDOVER, command.asRequest(), row.id)
         return HandoverStatementView(row.id, statement, basis, row.basisHash, row.lawVersion, row.engineVersion)
     }
 
@@ -216,6 +222,12 @@ class FundHandoverService(
     @Transactional(readOnly = true)
     fun list(entranceId: UUID): List<HandoverStatementView> =
         statements.findByEntranceIdOrderByIssuedAtDesc(entranceId).map(::asIssued)
+
+    /** What the request asked, field by field, for its Idempotency-Key's hash (DEVBRIEF §8). */
+    private fun IssueHandover.asRequest() = mapOf(
+        "handoverOn" to handoverOn.toString(), "from" to from?.toString(), "outgoingPartyId" to outgoingPartyId.toString(),
+        "incomingPartyId" to incomingPartyId.toString(), "bankBalanceMinor" to bankBalanceMinor,
+    )
 
     private fun asIssued(row: FundHandoverRow): HandoverStatementView {
         val statement = runCatching { json.readValue(row.basis.json, HandoverStatement::class.java) }

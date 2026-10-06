@@ -134,8 +134,9 @@ class FundHandoverTest {
     private val disbursements: FundDisbursementRepository = mock()
     private val postings: PostingRepository = mock()
     private val statements: FundHandoverRepository = mock()
+    private val keyRows: FundRequestKeyRepository = mock()
     private val json = jacksonObjectMapper().registerModule(JavaTimeModule())
-    private val service = FundHandoverService(aggregates, accounts, disbursements, postings, statements, json, Clock.fixed(lateNight, ZoneOffset.UTC))
+    private val service = FundHandoverService(aggregates, accounts, disbursements, postings, statements, FundRequestKeys(keyRows, aggregates), json, Clock.fixed(lateNight, ZoneOffset.UTC))
     private val stored = mutableListOf<FundHandoverRow>()
 
     @BeforeEach
@@ -148,7 +149,7 @@ class FundHandoverTest {
 
     @Test
     fun `PM-FUND-010 a statement is stored as issued, with the hash of its basis, and read back from what was stored`() {
-        val issued = service.issue(entranceId, handover(bankBalance = 33_000))
+        val issued = service.issue(entranceId, UUID.randomUUID().toString(), handover(bankBalance = 33_000))
         val row = stored.single()
         assertThat(row.basis.json).isEqualTo(issued.basis).isEqualTo(issued.statement.basisJson())
         assertThat(row.basisHash).isEqualTo(BasisJson.hash(issued.basis)).isEqualTo(issued.basisHash)
@@ -170,8 +171,26 @@ class FundHandoverTest {
     }
 
     @Test
+    fun `a handover repeated with its key returns the statement first issued, and stores no second one`() {      // DEVBRIEF §8 (#58)
+        whenever(aggregates.insert(any<FundHandoverRow>())).thenAnswer {
+            (it.arguments[0] as FundHandoverRow).also { row -> stored += row; whenever(statements.findById(row.id)).thenReturn(Optional.of(row)) }
+        }
+        whenever(aggregates.insert(any<FundRequestKeyRow>())).thenAnswer {
+            (it.arguments[0] as FundRequestKeyRow).also { row -> whenever(keyRows.findByEntranceIdAndIdempotencyKey(row.entranceId, row.idempotencyKey)).thenReturn(row) }
+        }
+        val first = service.issue(entranceId, "k-1", handover())
+        whenever(postings.findByEntranceIdAndAccount(entranceId, "BANK:REPAIR_RENEWAL")).thenReturn(ledger + leg(-40_000, "2026-09-02"))
+        assertThat(service.issue(entranceId, "k-1", handover())).isEqualTo(first)               // as issued, not recomputed
+        assertThat(stored).hasSize(1)
+        assertThatThrownBy { service.issue(entranceId, "k-1", handover(bankBalance = 1)) }.isInstanceOf(IdempotencyKeyReused::class.java)
+        assertThatThrownBy { service.issue(entranceId, " ", handover()) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(service.issue(entranceId, "k-2", handover()).id).isNotEqualTo(first.id)      // a correction is a new statement (D5)
+        assertThat(stored).hasSize(2)
+    }
+
+    @Test
     fun `PM-FUND-010 a stored statement that no longer matches its hash is refused, not served`() {
-        service.issue(entranceId, handover())
+        service.issue(entranceId, UUID.randomUUID().toString(), handover())
         val row = stored.single()
         val altered = row.copy(basis = JsonbValue(row.basis.json.replace("\"closingMinor\":33200", "\"closingMinor\":99999")))
         whenever(statements.findById(row.id)).thenReturn(Optional.of(altered))
@@ -183,20 +202,20 @@ class FundHandoverTest {
 
     @Test
     fun `PM-FUND-010 a handover is dated no later than today, its period starts by then, and two different parties hand over`() {
-        assertThat(service.issue(entranceId, handover(on = "2026-09-29")).statement.handoverOn)
+        assertThat(service.issue(entranceId, UUID.randomUUID().toString(), handover(on = "2026-09-29")).statement.handoverOn)
             .isEqualTo(LocalDate.parse("2026-09-29"))                                          // today in Sofia, still the 28th in UTC
-        assertThatThrownBy { service.issue(entranceId, handover(on = "2026-09-30")) }.isInstanceOf(IllegalArgumentException::class.java)
-        assertThat(service.issue(entranceId, handover(from = "2026-09-15")).statement.from).isEqualTo(LocalDate.parse("2026-09-15"))
-        assertThatThrownBy { service.issue(entranceId, handover(from = "2026-09-16")) }.isInstanceOf(IllegalArgumentException::class.java)
-        assertThatThrownBy { service.issue(entranceId, handover().copy(incomingPartyId = chair)) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { service.issue(entranceId, UUID.randomUUID().toString(), handover(on = "2026-09-30")) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(service.issue(entranceId, UUID.randomUUID().toString(), handover(from = "2026-09-15")).statement.from).isEqualTo(LocalDate.parse("2026-09-15"))
+        assertThatThrownBy { service.issue(entranceId, UUID.randomUUID().toString(), handover(from = "2026-09-16")) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { service.issue(entranceId, UUID.randomUUID().toString(), handover().copy(incomingPartyId = chair)) }.isInstanceOf(IllegalArgumentException::class.java)
         assertThat(stored).hasSize(2)                                                          // a refused statement is not stored
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(operating))
-        assertThatThrownBy { service.issue(entranceId, handover()) }.isInstanceOf(NoSuchElementException::class.java)
+        assertThatThrownBy { service.issue(entranceId, UUID.randomUUID().toString(), handover()) }.isInstanceOf(NoSuchElementException::class.java)
     }
 
     @Test
     fun `PM-FUND-010 a statement reads the fund from one snapshot, so a payout cannot fall between its reads`() {
-        val issue = FundHandoverService::class.java.getMethod("issue", UUID::class.java, IssueHandover::class.java)
+        val issue = FundHandoverService::class.java.getMethod("issue", UUID::class.java, String::class.java, IssueHandover::class.java)
         assertThat(issue.getAnnotation(Transactional::class.java).isolation).isEqualTo(Isolation.REPEATABLE_READ)
     }
 }

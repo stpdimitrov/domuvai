@@ -41,13 +41,13 @@ class FundHandoverWebTest {
     )
 
     private fun issue(body: String) = post("/api/money/entrances/$entranceId/fund/handover-statements")
-        .contentType(MediaType.APPLICATION_JSON).content(body)
+        .header("Idempotency-Key", "k-1").contentType(MediaType.APPLICATION_JSON).content(body)
 
     private val body = """{"handoverOn":"2026-09-15","from":"2026-09-01","outgoingPartyId":"$chair","incomingPartyId":"$successor","bankBalanceMinor":33000}"""
 
     @Test
     fun `POST a handover hands each field to the service and returns 201 with the statement, its basis and hash`() {
-        whenever(handovers.issue(eq(entranceId), any())).thenReturn(view)
+        whenever(handovers.issue(eq(entranceId), any(), any())).thenReturn(view)
         mvc.perform(issue(body))
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.statement.closingMinor").value(33_200))
@@ -55,9 +55,9 @@ class FundHandoverWebTest {
             .andExpect(jsonPath("$.statement.issuedAt").value("2026-09-28T21:30:00Z"))
             .andExpect(jsonPath("$.basis").value("{\"availableMinor\":22400}"))
             .andExpect(jsonPath("$.basisHash").value("ab12"))
-        verify(handovers).issue(entranceId, IssueHandover(LocalDate.parse("2026-09-15"), LocalDate.parse("2026-09-01"), chair, successor, 33_000))
+        verify(handovers).issue(entranceId, "k-1", IssueHandover(LocalDate.parse("2026-09-15"), LocalDate.parse("2026-09-01"), chair, successor, 33_000))
         mvc.perform(issue(body.replace(""""from":"2026-09-01",""", ""))).andExpect(status().isCreated)
-        verify(handovers).issue(entranceId, IssueHandover(LocalDate.parse("2026-09-15"), null, chair, successor, 33_000))   // from the fund's first record
+        verify(handovers).issue(entranceId, "k-1", IssueHandover(LocalDate.parse("2026-09-15"), null, chair, successor, 33_000))   // from the fund's first record
     }
 
     @Test
@@ -66,6 +66,17 @@ class FundHandoverWebTest {
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error").value("bankBalanceMinor is the balance on the bank's own statement for the handover date — required"))
         verifyNoInteractions(handovers)
+    }
+
+    @Test
+    fun `a handover without an Idempotency-Key is a 400, and a key reused for a different request a 409`() {       // DEVBRIEF §8 (#58)
+        mvc.perform(post("/api/money/entrances/$entranceId/fund/handover-statements").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isBadRequest)
+        org.mockito.Mockito.verifyNoInteractions(handovers)
+        whenever(handovers.issue(eq(entranceId), any(), any())).thenThrow(IdempotencyKeyReused("reused"))
+        mvc.perform(issue(body))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.error").value("Idempotency-Key was already used for a different request"))
     }
 
     @Test
@@ -86,10 +97,10 @@ class FundHandoverWebTest {
         for ((error, expected) in listOf(
             IllegalArgumentException("after today") to 400, NoSuchElementException("no fund") to 404, DataIntegrityViolationException("check") to 409,
         )) {
-            whenever(handovers.issue(eq(entranceId), any())).thenThrow(error)
+            whenever(handovers.issue(eq(entranceId), any(), any())).thenThrow(error)
             mvc.perform(issue(body)).andExpect(status().`is`(expected))
         }
-        whenever(handovers.issue(eq(entranceId), any())).thenThrow(DataIntegrityViolationException("violates foreign key constraint \"fund_handover_statement_incoming_party_fkey\""))
+        whenever(handovers.issue(eq(entranceId), any(), any())).thenThrow(DataIntegrityViolationException("violates foreign key constraint \"fund_handover_statement_incoming_party_fkey\""))
         mvc.perform(issue(body))
             .andExpect(jsonPath("$.error").value("the statement conflicts with the fund's records, or a party named on it is not registered"))
         mvc.perform(issue(body.replace("2026-09-15", "15.09.2026")))

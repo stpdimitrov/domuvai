@@ -33,8 +33,9 @@ class FundServiceTest {
     private val disbursements: FundDisbursementRepository = mock()
     private val postings: PostingRepository = mock()
     private val jdbc: JdbcTemplate = mock()
+    private val keyRows: FundRequestKeyRepository = mock()
     private val lateNight = Clock.fixed(Instant.parse("2026-09-28T21:30:00Z"), ZoneOffset.UTC)   // 00:30 on 29 September in Sofia
-    private val service = FundService(aggregates, accounts, disbursements, postings, jdbc, lateNight)
+    private val service = FundService(aggregates, accounts, disbursements, postings, FundRequestKeys(keyRows, aggregates), jdbc, lateNight)
 
     private val entranceId = UUID.randomUUID()
     private val chair = UUID.randomUUID()
@@ -61,16 +62,18 @@ class FundServiceTest {
     private fun signedOff(amount: Long = 20_000, status: String = "COMMITTED") =
         disbursement(amount, status).also { whenever(disbursements.findById(it.id)).thenReturn(Optional.of(it)) }
 
-    private fun pay(row: FundDisbursementRow, on: String = "2026-09-29", by: UUID = chair) =
-        service.pay(entranceId, row.id, PayDisbursement(LocalDate.parse(on), by))
+    private fun newKey() = UUID.randomUUID().toString()
 
-    private fun cancel(row: FundDisbursementRow, reason: String = "the GA revoked decision GA-2026-7", by: UUID = chair) =
-        service.cancel(entranceId, row.id, CancelDisbursement(by, reason))
+    private fun pay(row: FundDisbursementRow, on: String = "2026-09-29", by: UUID = chair, key: String = newKey()) =
+        service.pay(entranceId, row.id, key, PayDisbursement(LocalDate.parse(on), by))
+
+    private fun cancel(row: FundDisbursementRow, reason: String = "the GA revoked decision GA-2026-7", by: UUID = chair, key: String = newKey()) =
+        service.cancel(entranceId, row.id, key, CancelDisbursement(by, reason))
 
     private fun commit(
         amount: Long = 20_000, purpose: String = "WORKS", by: UUID = chair,
-        decision: String? = "GA-2026-7", emergency: String? = null, measure: String? = null,
-    ) = service.commit(entranceId, CommitDisbursement(amount, purpose, by, decision, emergency, measure))
+        decision: String? = "GA-2026-7", emergency: String? = null, measure: String? = null, key: String = newKey(),
+    ) = service.commit(entranceId, key, CommitDisbursement(amount, purpose, by, decision, emergency, measure))
 
     @BeforeEach
     fun fundWithMoney() {
@@ -264,5 +267,77 @@ class FundServiceTest {
         assertThatThrownBy { service.view(UUID.randomUUID()) }.isInstanceOf(NoSuchElementException::class.java)
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(operating))
         assertThatThrownBy { service.view(entranceId) }.isInstanceOf(NoSuchElementException::class.java)
+    }
+
+    // DEVBRIEF §8 — every write takes an Idempotency-Key (#58).
+
+    /** What is written is found again, as in the tables: a kept key, and the disbursement it names. */
+    private fun remembering() {
+        whenever(aggregates.insert(any<FundRequestKeyRow>())).thenAnswer {
+            (it.arguments[0] as FundRequestKeyRow).also { row -> whenever(keyRows.findByEntranceIdAndIdempotencyKey(row.entranceId, row.idempotencyKey)).thenReturn(row) }
+        }
+        whenever(aggregates.insert(any<FundDisbursementRow>())).thenAnswer {
+            (it.arguments[0] as FundDisbursementRow).also { row -> inserted += row; whenever(disbursements.findById(row.id)).thenReturn(Optional.of(row)) }
+        }
+        whenever(aggregates.update(any<FundDisbursementRow>())).thenAnswer {
+            (it.arguments[0] as FundDisbursementRow).also { row -> updated += row; whenever(disbursements.findById(row.id)).thenReturn(Optional.of(row)) }
+        }
+    }
+
+    @Test
+    fun `a sign-off repeated with its key returns the disbursement first signed off, and signs off no second one`() {
+        remembering()
+        val first = commit(key = "k-1")
+        assertThat(commit(key = "k-1")).isEqualTo(first)
+        assertThat(inserted).hasSize(1)
+        assertThat(commit(key = "k-2").id).isNotEqualTo(first.id)                               // another key is another disbursement
+        assertThat(inserted).hasSize(2)
+    }
+
+    @Test
+    fun `a payout or a cancellation repeated with its key returns the closed disbursement, not a refusal, and posts nothing twice`() {
+        remembering()
+        val works = signedOff()
+        val paid = pay(works, key = "k-pay")
+        assertThat(pay(works, key = "k-pay")).isEqualTo(paid)
+        assertThat(paid.status).isEqualTo("PAID")
+        assertThat(journal).hasSize(2)                                                          // one payout journal, two legs
+        assertThat(updated).hasSize(1)
+        assertThatThrownBy { pay(works, key = "k-other") }.isInstanceOf(DisbursementClosed::class.java)   // a new request is still refused
+
+        val roof = signedOff()
+        val cancelled = cancel(roof, key = "k-cancel")
+        assertThat(cancel(roof, key = "k-cancel")).isEqualTo(cancelled)
+        assertThat(cancelled.status).isEqualTo("CANCELLED")
+        assertThat(updated).hasSize(2)
+    }
+
+    @Test
+    fun `a key reused for a different request, disbursement or operation is refused, and a blank key is no key`() {
+        remembering()
+        commit(key = "k-1")
+        assertThatThrownBy { commit(amount = 20_001, key = "k-1") }.isInstanceOf(IdempotencyKeyReused::class.java)
+        val works = signedOff()
+        val other = signedOff()
+        assertThatThrownBy { pay(works, key = "k-1") }.isInstanceOf(IdempotencyKeyReused::class.java)        // a sign-off's key
+        pay(works, key = "k-pay")
+        assertThatThrownBy { pay(works, on = "2026-09-28", key = "k-pay") }.isInstanceOf(IdempotencyKeyReused::class.java)
+        assertThatThrownBy { pay(other, key = "k-pay") }.isInstanceOf(IdempotencyKeyReused::class.java)
+        assertThatThrownBy { cancel(other, key = "k-pay") }.isInstanceOf(IdempotencyKeyReused::class.java)
+        assertThat(inserted).hasSize(1)
+        assertThat(updated).hasSize(1)
+        // Text is compared as text: a missing reference is not the word "null", and one field's text cannot pass for two.
+        commit(decision = null, emergency = "roof leak", key = "k-text")
+        assertThatThrownBy { commit(decision = "null", emergency = "roof leak", key = "k-text") }.isInstanceOf(IdempotencyKeyReused::class.java)
+        commit(decision = "X, emergencyJustification=Y", key = "k-split")
+        assertThatThrownBy { commit(decision = "X", emergency = "Y, emergencyJustification=null", key = "k-split") }
+            .isInstanceOf(IdempotencyKeyReused::class.java)
+        assertThat(inserted).hasSize(3)
+        // A key taken by a request racing this one is refused like any reused key.
+        whenever(aggregates.insert(any<FundRequestKeyRow>())).thenThrow(org.springframework.dao.DuplicateKeyException("uq"))
+        assertThatThrownBy { commit(key = "k-race") }.isInstanceOf(IdempotencyKeyReused::class.java)
+        assertThatThrownBy { commit(key = " ") }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { pay(other, key = "") }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { cancel(other, key = "\t") }.isInstanceOf(IllegalArgumentException::class.java)
     }
 }
