@@ -1970,3 +1970,26 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/README.md` (Status, `/entrance/fund`), `web/app/(console)/entrance/fund/page.tsx`.
 
 ---
+
+## WEB-18 · 2026-10-06 · the debts screen shows what is owed after the advance
+
+**Did** — the screen's half of #73 item 2 (#110, `lane:web`; the API's was S-G1-02h, #103).
+- **Three figures per unit, each the API's:** Неплатено (`totalMinor`), Аванс (`advanceMinor`), Дължимо (`netMinor`). The screen subtracts nothing.
+- **A unit whose advance covers all it has unpaid** stays listed, reads "покрито с аванс", and is not counted as owing or overdue. The header counts the units that owe; the footer says how many have something unpaid and how many of them owe.
+- **An entrance's line** shows what is owed after the advances, with the unpaid and the part the advances cover beside it when there is any — worded "покрито с аванси", since it is less than the units' advances add up to.
+- The rows stay in the API's order, largest unpaid first, and the screen says so.
+- **`tools/seed_demo.py` issues October's run**, so units that overpaid in September hold an advance against a new debt. September's figures are unchanged. A database seeded earlier has no October run until it is recreated.
+
+**Rules covered** — PM-DEBT-001 (the web's part).
+
+**Tests added** — `tools/check_e2e.py`: `/debts?asOf=2026-10-20` — three units owe and three are overdue of six with something unpaid; the entrance after the advances; a unit with no advance, one covered in full, one covered in part; the API's row order; the footer. `/debts?asOf=2026-10-10` — covered in part and not yet due. September's two dates now read all three columns. Ten mutants, each caught: "owed" showing the unpaid, a covered unit counted as owing or as overdue, the entrance's total unpaid, the advance not shown, any advance taken for full cover, the entrance not saying what the advances cover, the screen subtracting the whole advance itself, the rows re-sorted by what is owed, the footer counting covered units as owing.
+
+**Verified** — the whole chain on this machine, 2026-10-06: the API from its jar on a scratch Postgres 16 database, the seed, the production web build started three times as CI does; `check_e2e.py` holds.
+
+**Decisions** — none (the contract's D1–D5 on #110; netting in the read and showing it is the owner's answer on #73, 2026-10-01).
+
+**Open** — #73 can close: items 1–3 are delivered and item 4 was decided · the unit statement still shows gross · interest and the escalation ladder have no backend · recording operating expenses · #100, #58, #57.
+
+**Read first next time** — `web/README.md` (Status, `/debts`), `web/app/(console)/(firm)/debts/page.tsx`.
+
+---

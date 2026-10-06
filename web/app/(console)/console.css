@@ -656,11 +656,11 @@
 
 .dt-grid {
   display: grid;
-  grid-template-columns: 64px 148px 96px 84px 96px 224px 1fr;
+  grid-template-columns: 64px 148px 92px 84px 92px 64px 112px 150px 1fr;
   column-gap: 14px;
   align-items: center;
   padding: 0 16px;
-  min-width: 1000px;
+  min-width: 1080px;
 }
 .dt-group {
   display: flex;
