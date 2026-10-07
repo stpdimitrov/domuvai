@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
-import { entrances, eur, inTurn, reach } from "@/lib/console";
+import { entrances, eur, inTurn, isDay, reach } from "@/lib/console";
 
 export const metadata: Metadata = { title: "Задължения — Етаж" };
 
@@ -71,12 +71,6 @@ const TONE: Record<string, string | undefined> = { "90+": "#8E2318", "61-90": "#
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
 const date = (iso: string) => iso.split("-").reverse().join(".");
-/** A real calendar day, YYYY-MM-DD — 2026-02-31 is not one. */
-const isDay = (value: string) => {
-  const [y, m, d] = value.split("-").map(Number);
-  const day = new Date(Date.UTC(y, m - 1, d));
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d;
-};
 
 // The чл. 38 ЗУЕС → чл. 410 ГПК ladder, as the design draws it — no step is recorded yet (PM-DEBT-009).
 const LEGEND = [
@@ -88,9 +82,9 @@ const LEGEND = [
 const DIM = { color: "#6B6F6C" };
 const FAILED = { color: "#8E2318" };
 
-export default async function DebtsPage({ searchParams }: { searchParams: Promise<{ asOf?: string }> }) {
+export default async function DebtsPage({ searchParams }: { searchParams: Promise<{ asOf?: string | string[] }> }) {
   const query = await searchParams;
-  const asOf = query.asOf && isDay(query.asOf) ? query.asOf : today();
+  const asOf = isDay(query.asOf) ? query.asOf : today();   // a repeated parameter is a list, and no date
   const view = await load(asOf);
 
   const ok = view.kind === "ok" ? view.groups.filter((g) => g.kind === "ok") : [];

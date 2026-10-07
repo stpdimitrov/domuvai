@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
-import { entrances, eur, inTurn, reach } from "@/lib/console";
+import { entrances, eur, inTurn, isDay, reach } from "@/lib/console";
 
 export const metadata: Metadata = { title: "Портфейл — Етаж" };
 
@@ -69,20 +69,14 @@ const NOT_KEPT = ["С просрочени задачи", "Мандат < 60 д�
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
 const date = (iso: string) => iso.split("-").reverse().join(".");
-/** A real calendar day, YYYY-MM-DD — 2026-02-31 is not one. */
-const isDay = (value: string) => {
-  const [y, m, d] = value.split("-").map(Number);
-  const day = new Date(Date.UTC(y, m - 1, d));
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d;
-};
 
 const DIM = { color: "#6B6F6C" };
 const FAILED = { color: "#8E2318" };
 const PLAIN = { color: "inherit", textDecoration: "none" };
 
-export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ asOf?: string; show?: string }> }) {
+export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ asOf?: string | string[]; show?: string | string[] }> }) {
   const query = await searchParams;
-  const dated = typeof query.asOf === "string" && isDay(query.asOf) ? query.asOf : undefined;   // a repeated parameter is an array
+  const dated = isDay(query.asOf) ? query.asOf : undefined;   // a repeated parameter is an array
   const asOf = dated ?? today();
   const show = typeof query.show === "string" && Object.hasOwn(SHOWN, query.show) ? query.show : "all";
   const view = await load(asOf);
