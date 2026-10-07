@@ -74,7 +74,7 @@ const DIM = { color: "#6B6F6C" };
 const FAILED = { color: "#8E2318" };
 const PLAIN = { color: "inherit", textDecoration: "none" };
 
-export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ asOf?: string; show?: string }> }) {
+export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ asOf?: string | string[]; show?: string | string[] }> }) {
   const query = await searchParams;
   const dated = isDay(query.asOf) ? query.asOf : undefined;   // a repeated parameter is an array
   const asOf = dated ?? today();

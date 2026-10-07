@@ -456,8 +456,9 @@ def main():
     failures += entrance_screen(api, web, entrance)
 
     # WEB-21 — a parameter given twice arrives as a list: every live screen answers it, none fails on it
-    twice = [f"/debts?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?show=owing&show=fund",
-             f"/entrance?entrance={entrance}&entrance={entrance}", f"/entrance/fund?entrance={entrance}&period=2026-09&period=2026-08",
+    twice = ["/debts?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?show=owing&show=fund",
+             f"/entrance?entrance={entrance}&entrance={entrance}", f"/entrance/fund?entrance={entrance}&entrance={entrance}",
+             f"/entrance/charges?entrance={entrance}&entrance={entrance}", f"/entrance/fund?entrance={entrance}&period=2026-09&period=2026-08",
              f"/entrance/fund?entrance={entrance}&account=fund&account=cash", f"/entrance/fund?entrance={entrance}&status=paid&status=committed",
              f"/entrance/charges?entrance={entrance}&period=2026-09&period=2026-08", f"/entrance/charges?entrance={entrance}&multiple=3&multiple=4"]
     broken = [(url, status) for url in twice if (status := fetch(web, url)[0]) != 200]

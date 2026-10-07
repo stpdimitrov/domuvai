@@ -2080,9 +2080,11 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 
 ## WEB-21 · 2026-10-07 · web — `/debts` answers a repeated `?asOf=`
 
-**Shipped** — `/debts?asOf=a&asOf=b` answered HTTP 500: a parameter given twice arrives as a list, and the screen split it as text. It now reads that as no date given and shows today's, as `/portfolio` does. The test for a real calendar day moved to `web/lib/console.ts`, takes any value, and is the one both screens use. `tools/check_e2e.py` asks every live screen with each of its parameters given twice — nine requests — and requires an answer.
+**Shipped** — `/debts?asOf=a&asOf=b` answered HTTP 500: a parameter given twice arrives as a list, and the screen split it as text. It now reads that as no date given and shows today's, as `/portfolio` does. The test for a real calendar day moved to `web/lib/console.ts`, takes any value, and is the one both screens use. `tools/check_e2e.py` asks every live screen with each of its parameters given twice — eleven requests — and requires an answer.
 
-**Verified** — on this machine's running servers: the request that failed answers 200, and so do the other eight; before the change the first answered 500, so the new check fails without the fix. Type-check and gates green. The whole chain was not rerun locally: the new check is nine status codes, and CI's e2e job runs it.
+**Verified** — on this machine's running servers: the request that failed answers 200, and so do the other ten; before the change the first answered 500, so the new check fails without the fix. Type-check and gates green. The whole chain was not rerun locally: the new check is eleven status codes, and CI's e2e job runs it.
+
+**Review** — fresh context, no defect; three small points taken: the fund and charges screens are also asked with `?entrance=` twice, an f-string without a placeholder, and the portfolio's parameter types now say a list may arrive.
 
 **Decisions** — none.
 
