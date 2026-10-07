@@ -125,7 +125,7 @@ app/
     entrance/          single-entrance context
       layout.tsx       entrance sidebar + main
       EntranceSidebar.tsx  entrance navigation (client)
-      page.tsx         /entrance — the entrance detail (statutory calendar)
+      page.tsx         /entrance — the entrance: overdue book declarations, its accounts (live)
 lib/
   api/schema.d.ts  GENERATED from docs/api/openapi.json — never edit
   api/client.ts    the typed, server-only client for `api`
@@ -170,8 +170,14 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   [The console switch](#the-console-switch)), and see TODO before launch.
 - **`/compliance`** — the firm's regulatory standing (screen 07 Съответствие): register / insurance /
   management-contract status cards, and a filings-and-declarations table.
-- **`/entrance`** — a single entrance's detail (screen 02): the statutory-deadline calendar plus
-  the entrance's file, accounts and next assembly. Uses the **entrance** sidebar.
+- **`/entrance`** — a single entrance (screen 02) — **live** (WEB-20): `?entrance=<id>` (default: the first
+  by name), its units by kind and its management form; in the calendar panel, who is past the deadline to
+  declare for the book, with the registry's own due date (`GET …/book/declarations/overdue`, names only) —
+  the only statutory deadline a backend serves yet, and the panel says so; the operating account (what was
+  paid in, never a balance) and the repair fund (balance, available, committed), or that the entrance has
+  none. Manager, mandate, last and next assembly show a dash until a backend keeps them. The screen counts no
+  days overdue and adds up no ideal parts. Uses the **entrance** sidebar, whose entrance links — like the
+  screen's tabs — carry `?entrance=` on.
 - **`/entrance/charges`** — the monthly charge run (screen 03 Начисления) — **live** (WEB-11): the
   engine's preview (`POST …/charge-runs/preview`) joined server-side to the entrance's units and
   owners. `?period=YYYY-MM` (default: this month) and `?entrance=<id>` (default: the first

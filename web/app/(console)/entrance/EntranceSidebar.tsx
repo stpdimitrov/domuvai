@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
-// Firm-level shortcuts sit above the entrance's own sections. Only Портфейл and Статутен
-// календар are real routes today; the rest activate as each entrance screen lands.
+// Firm-level shortcuts sit above the entrance's own sections. A "#" has no screen behind it yet.
+// The entrance's own screens carry `?entrance=` on, so the sidebar stays on the entrance being looked at.
 const FIRM: { label: string; href: string; due?: string }[] = [
   { label: "Портфейл", href: "/portfolio" },
   { label: "Задължения", href: "/debts" },
@@ -34,6 +34,8 @@ function Item({ label, href, due, active }: { label: string; href: string; due?:
 
 export default function EntranceSidebar() {
   const pathname = usePathname();
+  const entrance = useSearchParams().get("entrance");
+  const own = (href: string) => (entrance && href.startsWith("/entrance") ? `${href}?entrance=${encodeURIComponent(entrance)}` : href);
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -50,9 +52,9 @@ export default function EntranceSidebar() {
         <Item key={i.label} {...i} active={i.href !== "#" && pathname === i.href} />
       ))}
 
-      <div className="sidebar-section">Вход · Шипка 14 Б</div>
+      <div className="sidebar-section">Вход</div>
       {ENTRANCE.map((i) => (
-        <Item key={i.label} {...i} active={i.href !== "#" && pathname === i.href} />
+        <Item key={i.label} {...i} href={own(i.href)} active={i.href !== "#" && pathname === i.href} />
       ))}
 
       <div className="sidebar-user">
