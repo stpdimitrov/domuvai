@@ -22,6 +22,7 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
    its links carry the entrance and the date.
 8. WEB-20: the entrance screen shows the entrance asked for — who is past the deadline to declare for the book, and its
    accounts — nothing of the design's sample, and refuses an entrance that is not registered.
+9. WEB-21: every live screen answers a request that gives one of its parameters twice.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
@@ -453,6 +454,15 @@ def main():
 
     failures += charges_multiple(api, web)
     failures += entrance_screen(api, web, entrance)
+
+    # WEB-21 — a parameter given twice arrives as a list: every live screen answers it, none fails on it
+    twice = [f"/debts?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?show=owing&show=fund",
+             f"/entrance?entrance={entrance}&entrance={entrance}", f"/entrance/fund?entrance={entrance}&period=2026-09&period=2026-08",
+             f"/entrance/fund?entrance={entrance}&account=fund&account=cash", f"/entrance/fund?entrance={entrance}&status=paid&status=committed",
+             f"/entrance/charges?entrance={entrance}&period=2026-09&period=2026-08", f"/entrance/charges?entrance={entrance}&multiple=3&multiple=4"]
+    broken = [(url, status) for url in twice if (status := fetch(web, url)[0]) != 200]
+    failures += [f"{url}: HTTP {status} for a parameter given twice" for url, status in broken]
+    print(f"{'ok ' if not broken else 'BAD'} a parameter given twice  {len(twice) - len(broken)}/{len(twice)} screens answer")
 
     # WEB-19 — the portfolio's filter leaves out what it should, and its links carry the entrance and the date
     status, page = fetch(web, "/portfolio?asOf=2026-09-30&show=owing")
