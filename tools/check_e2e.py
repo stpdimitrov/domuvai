@@ -20,6 +20,8 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
    figure is typed here: the check takes the ones the API accepts.
 7. WEB-19: the portfolio lists every seeded entrance with the API's figures, its filter leaves out what it should, and
    its links carry the entrance and the date.
+8. WEB-20: the entrance screen shows the entrance asked for — who is past the deadline to declare for the book, and its
+   accounts — nothing of the design's sample, and refuses an entrance that is not registered.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
@@ -49,6 +51,8 @@ DEMO_BASIS = [
 CALLS = {
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
     ("GET", "/api/registry/entrances/{entranceId}/units"): lambda e: (f"/api/registry/entrances/{e}/units", None),
+    ("GET", "/api/registry/entrances/{entranceId}/book/declarations/overdue"): lambda e: (
+        f"/api/registry/entrances/{e}/book/declarations/overdue", None),
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}),
@@ -64,6 +68,19 @@ CALLS = {
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
 # each with its label or its whole row (the visible text, tags and empty cells collapsed to single spaces).
 SCREENS = {
+    # WEB-20 — the entrance: its units, who is past the deadline to declare for the book with the registry's own due
+    # date (PM-BOOK-003; the seed files no declaration, so every owner since 2020 is), and its two accounts (PM-FUND-009).
+    "/entrance?entrance={e}": [
+        "Портфейл / ул. Шипка 14, вх. Б 6 обекта 7 просрочени декларации",
+        "Просрочени декларации · 7",
+        "16.01.2020 Декларация за вписване в книгата — ап. 1 чл. 7, ал. 3 ЗУЕС · собственик от 01.01.2020 Просрочена Иван Петров",
+        "Декларация за вписване в книгата — ап. 2 чл. 7, ал. 3 ЗУЕС · собственик от 01.01.2020 Просрочена Георги Колев",   # a co-owner owes his own
+        "Останалите срокове по ЗУЕС — отчети, покани, мандати, проверки — още не се водят в системата.",
+        "Обекти 6 · 6 жил. Форма на управление общо събрание Управител — Мандат до — Последно ОС — Книга на собствениците 7 просрочени декларации",
+        "Оперативна сметка BG44 UNCR 7000 1512 3456 78 €70,00 Постъпления по сметката — не салдото в банката",
+        "Фонд „Ремонт и обновяване“ BG87 UNCR 7000 1512 9981 02 €570,00 Разполагаемо €145,00 — €425,00 поети, неплатени",
+        "Общите събрания още не се водят в системата.",
+    ],
     "/entrance/charges?period=2026-09&entrance={e}": [
         "ул. Шипка 14, вх. Б",
         "ап. 2 Георги Колев, Елена Колева 2 — — 16,2500% €12,00 €9,00 — €97,50 €118,50",   # co-owners; a child not counted
@@ -290,6 +307,44 @@ SENDS_NOTHING = "Тази страница не изпраща нищо сама
 NOT_YET = "Още не приемаме заявки през сайта"
 
 
+def entrance_screen(api, web, entrance):
+    """
+    WEB-20 — `/entrance` shows the entrance it is asked for and nothing of the design's sample: no sample figure or
+    name is left, its tabs and the sidebar carry the entrance on, an entrance with no accounts and nobody overdue says
+    so, and an id that is not registered is refused rather than answered with the first entrance.
+    """
+    failures = []
+    status, page = fetch(web, f"/entrance?entrance={entrance}")
+    text, hrefs = visible_text(page), page.replace("&amp;", "&")
+    sample = ["€3.812,40", "€1.240,50", "Покрив 2026", "57 живущи", "24 обекта", "Шипка 14 Б", "Мандат до 31.10", "отг. М. Петрова", "Лифт Сервиз"]
+    failures += [f"/entrance: still shows the design's sample ({word!r})" for word in sample if word in text]
+    failures += [] if status == 200 else [f"/entrance: HTTP {status}"]
+    # the tab and the sidebar each carry the entrance — and, to the fund, the accounts card's button too
+    wanted = {f"/entrance/charges?entrance={entrance}": 2, f"/entrance/fund?entrance={entrance}": 3, f"/entrance?entrance={entrance}": 2}
+    failures += [f"/entrance: {n} link(s) to {link}, where {least} should carry the entrance"
+                 for link, least in wanted.items() if (n := hrefs.count(f'href="{link}"')) < least]
+
+    status, raw = fetch(api, "/api/registry/entrances")
+    other = next((e["id"] for e in json.loads(raw) if e["label"] == BUSINESS_LABEL), None) if status == 200 else None
+    if not other:
+        return failures + [f"/entrance: the seed's second entrance ({BUSINESS_LABEL}) is not registered — it was not checked"]
+    status, page = fetch(web, f"/entrance?entrance={other}")
+    failures += [] if status == 200 else [f"/entrance for {BUSINESS_LABEL}: HTTP {status}"]
+    bare = visible_text(page)
+    expected = [f"Портфейл / {BUSINESS_LABEL} 2 обекта", "Просрочени декларации · 0", "Няма просрочена декларация за книгата на собствениците.",
+                "Обекти 2 · 1 жил. / 1 търг.", "Книга на собствениците без просрочени декларации",
+                "Входът няма оперативна сметка в регистъра.", "Входът няма сметка на фонда в регистъра."]
+    failures += [f"/entrance for {BUSINESS_LABEL}: does not show {want!r}" for want in expected if want not in bare]
+    failures += [f"/entrance for {BUSINESS_LABEL}: shows the other entrance's {word!r}" for word in ("ул. Шипка 14", "€570,00", "Иван Петров") if word in bare]
+
+    unknown = "00000000-0000-0000-0000-000000000000"
+    refused = visible_text(fetch(web, f"/entrance?entrance={unknown}")[1])
+    if f"Вход {unknown} не е регистриран." not in refused or "Сметки на входа" in refused:
+        failures.append("/entrance: an entrance that is not registered is not refused")
+    print(f"{'ok ' if not failures else 'BAD'} /entrance  no sample left, links carry the entrance, an entrance with nothing says so, an unknown one is refused")
+    return failures
+
+
 def demo_request(web, without_address, contact, next_dir):
     """
     #79 — the landing sends a demo request nowhere by itself: with an address to write to (DOMUVAI_CONTACT_EMAIL) it
@@ -397,6 +452,7 @@ def main():
         print(f"{'ok ' if status == 200 and not missing and not shown else 'BAD'} {url}  {len(expected) - len(missing)}/{len(expected)} figures")
 
     failures += charges_multiple(api, web)
+    failures += entrance_screen(api, web, entrance)
 
     # WEB-19 — the portfolio's filter leaves out what it should, and its links carry the entrance and the date
     status, page = fetch(web, "/portfolio?asOf=2026-09-30&show=owing")

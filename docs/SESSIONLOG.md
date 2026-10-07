@@ -2061,3 +2061,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/app/(console)/(firm)/portfolio/page.tsx`, `web/README.md` (`/portfolio`).
 
 ---
+
+## WEB-20 · 2026-10-07 · web — `/entrance` live
+
+**Shipped** — `/entrance` no longer shows the design's sample calendar, record and accounts. For `?entrance=<id>` (default: the first by name) it shows the entrance's name, its units by kind and its management form; in the calendar panel, who is past the deadline to declare for the book of owners, each with the registry's own due date and the date of acquiring (PM-BOOK-003, the names-only read, PM-BOOK-011) and one line saying the other statutory deadlines are not kept yet; the operating account (what was paid in, named so) and the repair fund (balance, available, committed — PM-FUND-009), or that the entrance has none. Manager, mandate and last assembly show a dash; the next-assembly card says assemblies are not kept yet. The tabs with a screen behind them are links, the others are shown disabled. The entrance sidebar no longer names a sample entrance, and its entrance links carry `?entrance=` on (it reads the query string, so the layout wraps it in `Suspense`). One API read is new to the web: `GET …/book/declarations/overdue`, now validated against the contract by the check. `tools/check_e2e.py` gains the screen for the seeded entrance, that none of nine sample figures and names is left, that the tabs and the sidebar carry the entrance, that the second entrance (no accounts, nobody overdue) says so and shows nothing of the first, and that an id that is not registered is refused.
+
+**Verified** — the whole chain on this machine (the API's jar on a scratch Postgres 16 database, the seed, the production web build on three servers): the check holds. Three mutants each fail it (the screen ignoring the entrance asked for; the sidebar dropping it; what is available shown as the fund's balance). Looked at the rendered screen at 1400 px.
+
+**Review** — fresh context, ten findings, all taken: a user's title is `USR`, not `USE`; the check's sample list held a date that the top bar itself would print on 31.10.2026; a 404 counts as "no account" only when the API's message says so, as on the fund screen; the operating account's note follows `outflowsRecorded`; the list's key cannot collide; the fund link is required three times and each page's status is asserted; the sidebar reads a repeated `?entrance=` as the screens do; the record card says "overdue", as the rest of the screen does; unit kinds are counted by the word shown, and only the two kinds the registry is given get a word; the README's sentence on the next assembly.
+
+**Decisions** — mine, stated on #117: no "N days overdue" — counting days against a statutory deadline is the backend's (PM-SYS-005), so the screen shows the due date and the word · no sum of ideal parts and no resident count, since neither is served without reading the whole book and the web adds nothing up · the design's calendar keeps its panel and title though only one kind of deadline is in it.
+
+**Open** — the seed files no declaration, so every seeded owner is listed as overdue since 2020; that is the registry's answer, not a display fault · the overdue list is as of today only (the read takes `?on=`, the screen does not pass one) · reading the book itself (PM-BOOK-006, PM-BOOK-007: limited and logged access) is untouched — the screen uses the names-only read · the sidebar's sample person and firm remain · `/debts` still throws on a repeated `?asOf=`.
+
+**Read first next time** — `web/app/(console)/entrance/page.tsx`, `web/README.md` (`/entrance`).
+
+---
