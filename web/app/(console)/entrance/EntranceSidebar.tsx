@@ -34,7 +34,8 @@ function Item({ label, href, due, active }: { label: string; href: string; due?:
 
 export default function EntranceSidebar() {
   const pathname = usePathname();
-  const entrance = useSearchParams().get("entrance");
+  const asked = useSearchParams().getAll("entrance");
+  const entrance = asked.length === 1 ? asked[0] : null;      // a repeated one names no entrance, as the screens read it
   const own = (href: string) => (entrance && href.startsWith("/entrance") ? `${href}?entrance=${encodeURIComponent(entrance)}` : href);
   return (
     <aside className="sidebar">

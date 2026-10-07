@@ -175,7 +175,7 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   declare for the book, with the registry's own due date (`GET …/book/declarations/overdue`, names only) —
   the only statutory deadline a backend serves yet, and the panel says so; the operating account (what was
   paid in, never a balance) and the repair fund (balance, available, committed), or that the entrance has
-  none. Manager, mandate, last and next assembly show a dash until a backend keeps them. The screen counts no
+  none. Manager, mandate and last assembly show a dash, and the next-assembly card says assemblies are not kept yet. The screen counts no
   days overdue and adds up no ideal parts. Uses the **entrance** sidebar, whose entrance links — like the
   screen's tabs — carry `?entrance=` on.
 - **`/entrance/charges`** — the monthly charge run (screen 03 Начисления) — **live** (WEB-11): the

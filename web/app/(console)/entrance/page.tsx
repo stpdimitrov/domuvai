@@ -49,29 +49,35 @@ async function load(entranceId: string | undefined): Promise<Loaded> {
     units: units.data,
     overdue: overdue?.data
       ?? { failed: overdue ? `API отказа просрочените декларации: ${refusal(overdue)}` : "Бекендът не подаде просрочените декларации." },
-    // A 404 is the entrance having no such account — a fact about it, said as one; any other refusal is shown as it came.
+    // The API's 404 says which account the entrance does not have — a fact about it, said as one. Any other refusal,
+    // another 404 among them, is shown as it came.
     fund: fund?.data
-      ?? (fund?.response.status === 404 ? null : { failed: fund ? `API отказа фонда: ${refusal(fund)}` : "Бекендът не подаде фонда." }),
+      ?? (fund?.response.status === 404 && refusal(fund).includes("PM-FUND-001") ? null
+        : { failed: fund ? `API отказа фонда: ${refusal(fund)}` : "Бекендът не подаде фонда." }),
     operating: operating?.data
-      ?? (operating?.response.status === 404 ? null
+      ?? (operating?.response.status === 404 && refusal(operating).includes("no operating account") ? null
         : { failed: operating ? `API отказа оперативната сметка: ${refusal(operating)}` : "Бекендът не подаде оперативната сметка." }),
   };
 }
 
-const KIND: Record<string, string> = { APARTMENT: "жил.", FLAT: "жил.", SHOP: "магазин", OFFICE: "офис", GARAGE: "гараж", STUDIO: "ателие" };
+// The registry keeps a unit's kind as text. The two the seed and the import write get a short word; any other is shown as it is.
+const KIND: Record<string, string> = { APARTMENT: "жил.", SHOP: "търг." };
 const FORM: Record<string, string> = { GA: "общо събрание", ASSOCIATION: "сдружение на собствениците", CLOSED_COMPLEX: "затворен комплекс" };
-const ROLE: Record<string, string> = { OWN: "собственик", USE: "ползвател" };
+const ROLE: Record<string, string> = { OWN: "собственик", USR: "ползвател" };   // the registry's TitleRole
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
 const date = (iso: string) => iso.split("-").reverse().join(".");
 const iban = (value: string) => value.replace(/\s+/g, "").replace(/(.{4})(?=.)/g, "$1 ");
 
-/** The units by kind, in the API's codes put into words — a count, most numerous first. */
+/** The units by kind, counted by the word shown — most numerous first. */
 const kinds = (units: Schemas["UnitView"][]) => {
   const by = new Map<string, number>();
-  for (const u of units) by.set(u.unitType, (by.get(u.unitType) ?? 0) + 1);
-  return [...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([kind, n]) => `${n} ${KIND[kind] ?? kind.toLowerCase()}`).join(" / ");
+  for (const u of units) {
+    const word = KIND[u.unitType] ?? u.unitType.toLowerCase();
+    by.set(word, (by.get(word) ?? 0) + 1);
+  }
+  return [...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "bg")).map(([word, n]) => `${n} ${word}`).join(" / ");
 };
 
 const DIM = { color: "#6B6F6C" };
@@ -159,7 +165,7 @@ function Body({ view, q }: { view: Extract<Loaded, { kind: "ok" }>; q: string })
                 <div style={{ ...DIM, font: "400 13px/1.5 'IBM Plex Sans'", paddingBottom: 10 }}>Няма просрочена декларация за книгата на собствениците.</div>
               )}
               {overdue.map((d, i) => (
-                <div className="cal-item" key={`${d.unitId}-${d.partyName}-${d.titleRole}-${d.acquiredOn}`}>
+                <div className="cal-item" key={`${d.unitId}-${d.partyName}-${d.titleRole}-${d.acquiredOn}-${i}`}>
                   <div className="cal-date" style={{ color: "#8E2318" }} title="срокът за подаване, както го води регистърът">{date(d.dueOn)}</div>
                   <div className="cal-rail">
                     <span className="cal-dot" style={{ background: "#A32B23" }} />
@@ -196,7 +202,7 @@ function Body({ view, q }: { view: Extract<Loaded, { kind: "ok" }>; q: string })
             <div className="kv-row">
               <span>Книга на собствениците</span>
               {failed(overdue) ? <span style={FAILED}>не се зареди</span>
-                : overdue.length > 0 ? <span style={{ color: "#8E2318", fontWeight: 500 }}>{count(overdue.length, "чакаща декларация", "чакащи декларации")}</span>
+                : overdue.length > 0 ? <span style={{ color: "#8E2318", fontWeight: 500 }}>{count(overdue.length, "просрочена декларация", "просрочени декларации")}</span>
                   : <span>без просрочени декларации</span>}
             </div>
           </div>
@@ -212,7 +218,11 @@ function Body({ view, q }: { view: Extract<Loaded, { kind: "ok" }>; q: string })
                   <>
                     <div className="iban">{iban(operating.iban)}</div>
                     <div className="acct-amt">{eur(operating.balanceMinor)}</div>
-                    <div style={NOTE}>Постъпления по сметката — не салдото в банката: разходите от нея още не се водят.</div>
+                    <div style={NOTE}>
+                      {operating.outflowsRecorded
+                        ? "Салдо по сметката."
+                        : "Постъпления по сметката — не салдото в банката: разходите от нея още не се водят."}
+                    </div>
                   </>
                 )}
             <div className="rule" style={{ margin: "10px 0" }} />

@@ -76,7 +76,7 @@ SCREENS = {
         "16.01.2020 Декларация за вписване в книгата — ап. 1 чл. 7, ал. 3 ЗУЕС · собственик от 01.01.2020 Просрочена Иван Петров",
         "Декларация за вписване в книгата — ап. 2 чл. 7, ал. 3 ЗУЕС · собственик от 01.01.2020 Просрочена Георги Колев",   # a co-owner owes his own
         "Останалите срокове по ЗУЕС — отчети, покани, мандати, проверки — още не се водят в системата.",
-        "Обекти 6 · 6 жил. Форма на управление общо събрание Управител — Мандат до — Последно ОС — Книга на собствениците 7 чакащи декларации",
+        "Обекти 6 · 6 жил. Форма на управление общо събрание Управител — Мандат до — Последно ОС — Книга на собствениците 7 просрочени декларации",
         "Оперативна сметка BG44 UNCR 7000 1512 3456 78 €70,00 Постъпления по сметката — не салдото в банката",
         "Фонд „Ремонт и обновяване“ BG87 UNCR 7000 1512 9981 02 €570,00 Разполагаемо €145,00 — €425,00 поети, неплатени",
         "Общите събрания още не се водят в системата.",
@@ -316,19 +316,23 @@ def entrance_screen(api, web, entrance):
     failures = []
     status, page = fetch(web, f"/entrance?entrance={entrance}")
     text, hrefs = visible_text(page), page.replace("&amp;", "&")
-    sample = ["€3.812,40", "€1.240,50", "Покрив 2026", "57 живущи", "24 обекта", "Шипка 14 Б", "31.10.2026", "отг. М. Петрова", "Лифт Сервиз"]
+    sample = ["€3.812,40", "€1.240,50", "Покрив 2026", "57 живущи", "24 обекта", "Шипка 14 Б", "Мандат до 31.10", "отг. М. Петрова", "Лифт Сервиз"]
     failures += [f"/entrance: still shows the design's sample ({word!r})" for word in sample if word in text]
-    wanted = [f"/entrance/charges?entrance={entrance}", f"/entrance/fund?entrance={entrance}", f"/entrance?entrance={entrance}"]
-    failures += [f"/entrance: {n} link(s) to {link}, where the tab and the sidebar should each carry the entrance"
-                 for link in wanted if (n := hrefs.count(f'href="{link}"')) < 2]
+    failures += [] if status == 200 else [f"/entrance: HTTP {status}"]
+    # the tab and the sidebar each carry the entrance — and, to the fund, the accounts card's button too
+    wanted = {f"/entrance/charges?entrance={entrance}": 2, f"/entrance/fund?entrance={entrance}": 3, f"/entrance?entrance={entrance}": 2}
+    failures += [f"/entrance: {n} link(s) to {link}, where {least} should carry the entrance"
+                 for link, least in wanted.items() if (n := hrefs.count(f'href="{link}"')) < least]
 
     status, raw = fetch(api, "/api/registry/entrances")
     other = next((e["id"] for e in json.loads(raw) if e["label"] == BUSINESS_LABEL), None) if status == 200 else None
     if not other:
         return failures + [f"/entrance: the seed's second entrance ({BUSINESS_LABEL}) is not registered — it was not checked"]
-    bare = visible_text(fetch(web, f"/entrance?entrance={other}")[1])
+    status, page = fetch(web, f"/entrance?entrance={other}")
+    failures += [] if status == 200 else [f"/entrance for {BUSINESS_LABEL}: HTTP {status}"]
+    bare = visible_text(page)
     expected = [f"Портфейл / {BUSINESS_LABEL} 2 обекта", "Просрочени декларации · 0", "Няма просрочена декларация за книгата на собствениците.",
-                "Обекти 2 · 1 жил. / 1 магазин", "Книга на собствениците без просрочени декларации",
+                "Обекти 2 · 1 жил. / 1 търг.", "Книга на собствениците без просрочени декларации",
                 "Входът няма оперативна сметка в регистъра.", "Входът няма сметка на фонда в регистъра."]
     failures += [f"/entrance for {BUSINESS_LABEL}: does not show {want!r}" for want in expected if want not in bare]
     failures += [f"/entrance for {BUSINESS_LABEL}: shows the other entrance's {word!r}" for word in ("ул. Шипка 14", "€570,00", "Иван Петров") if word in bare]
