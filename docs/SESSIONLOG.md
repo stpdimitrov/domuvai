@@ -2110,19 +2110,6 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 
 ---
 
-## WEB-22 · 2026-10-08 · web — the console's footer shows the rule catalogue's version (PM-SYS-010)
-
-**Shipped** — every screen under the console's layout (portfolio, debts, compliance, the entrance and its charges and fund) ends in a footer line: the rule catalogue's version and the engine's, read from `GET /api/law/version` on each request (`CatalogueFooter`, a server component in the console's layout). The web keeps no copy: when the API does not answer, the footer says the version is not available. The layout's shell became a column — the sidebar and the screen in a row, the footer under both. Reading the version at request time makes `/compliance`, which was prerendered, a page rendered on demand like the others. `tools/check_e2e.py` validates the new call against the contract and requires, on each of the six screens, one footer with the API's own two values.
-
-**Verified** — the whole chain on this machine (the API's jar on a scratch Postgres 16 database, the seed, the production web build on three servers): the check holds. Two mutants each fail it on all six screens (no footer; the engine's version shown as the catalogue's). A server pointed at an address nothing listens on shows "версията не е достъпна". Looked at the rendered portfolio.
-
-**Review** — fresh context, three findings, all taken: the footer was awaited with the layout, so a hung version call held every screen for the client's ten seconds — it now waits inside its own `Suspense`, with an empty strip in its place; a screen taller than the window (`/entrance` on a short one) painted through the footer — the screen's column now scrolls above it; the footer's text is one step darker, for contrast.
-
-**Decisions** — mine, stated on #124: "the footer" is the console's; the landing page states no rule and shows no version.
-
-**Open** — with this, both halves of PM-SYS-010's acceptance are built (S-G1-01a stores and serves, this shows) · `/assembly` is outside the console's layout and has no footer · a value typed into the web instead of the API's would pass the check while the two agree; the scan of the web's calls only proves the call is made · which version is right, 1.0 or 1.3, is still #122.
-
-**Read first next time** — `web/app/(console)/CatalogueFooter.tsx`, `web/app/(console)/layout.tsx`.
 ## S-G1-01b · 2026-10-08 · law — the catalogue's version has one source, and a gate fails when a copy disagrees (#122)
 
 **Shipped** — the catalogue is v1.3, and RULES.md's header is the one place that says so. `tools/build_rules.py` reads the version from that header instead of holding a literal "1.0", so `docs/rules.json` — and FUNCTIONAL.md and TRACEABILITY.md, generated from it — now say 1.3. A new gate, 11 of 11 (`tools/check_catalogue_version.py`), fails the build and names the file when `rules.json`, `law`'s `CATALOGUE_VERSION`, INDEX, CLAUDE.md, STAGE1, FUNCTIONAL, the events generator or any published event example says another version, and when `rules.json` is not what the generator makes from RULES.md today. STAGE1's line still said 228 rules and version 1.2; it now says today's.
@@ -2138,5 +2125,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Open** — the legal baseline date is also written in several places and is not checked · nothing yet says what must happen when the version is raised (PM-LAW-006's sign-off, PM-LAW-007's reproduction of past figures): the gate only keeps the copies together.
 
 **Read first next time** — `tools/check_catalogue_version.py`.
+
+---
+
+## WEB-22 · 2026-10-08 · web — the console's footer shows the rule catalogue's version (PM-SYS-010)
+
+**Shipped** — every screen under the console's layout (portfolio, debts, compliance, the entrance and its charges and fund) ends in a footer line: the rule catalogue's version and the engine's, read from `GET /api/law/version` on each request (`CatalogueFooter`, a server component in the console's layout). The web keeps no copy: when the API does not answer, the footer says the version is not available. The layout's shell became a column — the sidebar and the screen in a row, the footer under both. Reading the version at request time makes `/compliance`, which was prerendered, a page rendered on demand like the others. `tools/check_e2e.py` validates the new call against the contract and requires, on each of the six screens, one footer with the API's own two values.
+
+**Verified** — the whole chain on this machine (the API's jar on a scratch Postgres 16 database, the seed, the production web build on three servers): the check holds. Two mutants each fail it on all six screens (no footer; the engine's version shown as the catalogue's). A server pointed at an address nothing listens on shows "версията не е достъпна". Looked at the rendered portfolio.
+
+**Review** — fresh context, three findings, all taken: the footer was awaited with the layout, so a hung version call held every screen for the client's ten seconds — it now waits inside its own `Suspense`, with an empty strip in its place; a screen taller than the window (`/entrance` on a short one) painted through the footer — the screen's column now scrolls above it; the footer's text is one step darker, for contrast.
+
+**Decisions** — mine, stated on #124: "the footer" is the console's; the landing page states no rule and shows no version.
+
+**Open** — with this, both halves of PM-SYS-010's acceptance are built (S-G1-01a stores and serves, this shows) · `/assembly` is outside the console's layout and has no footer · a value typed into the web instead of the API's would pass the check while the two agree; the scan of the web's calls only proves the call is made · which version is right, 1.0 or 1.3, is still #122.
+
+**Read first next time** — `web/app/(console)/CatalogueFooter.tsx`, `web/app/(console)/layout.tsx`.
 
 ---
