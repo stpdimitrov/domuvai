@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 52 | 22% |
-| **Proved by a test named after the rule** | **54** | **23%** |
-| No implementation and no test | 179 | 77% |
+| Referenced in code (`// Rule:`) | 53 | 23% |
+| **Proved by a test named after the rule** | **55** | **24%** |
+| No implementation and no test | 178 | 76% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -28,7 +28,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:72` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
 | `PM-ORG-012` | — | — |  |
 
-## BOOK — Owners' book & residents  ·  9/12 covered
+## BOOK — Owners' book & residents  ·  10/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -43,7 +43,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-009` | — | — |  |
 | `PM-BOOK-010` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/BookRetention.kt:10` |  |
 | `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:83` |  |
-| `PM-BOOK-012` | — | — |  |
+| `PM-BOOK-012` | `app/src/test/kotlin/zues/app/money/HeadcountCheckTest.kt:53` | `app/src/main/kotlin/zues/app/money/HeadcountCheck.kt:17` |  |
 
 ## GOV — Governance & mandates  ·  0/18 covered
 

@@ -9,6 +9,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -85,5 +86,44 @@ class PerPersonChargeIT {
         post("/api/money/entrances/$entranceId/charge-runs/preview", request)
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.totalMinor").value(1500))   // 500 × 3 occupants
+    }
+
+    @Test
+    fun `PM-BOOK-012 a person declared, after a period was issued, for a date it had already billed turns up in that period's headcount report`() {
+        val entranceId = createEntrance()
+        val unitId = registerSingleUnit(entranceId)
+        val household = "/api/registry/entrances/$entranceId/units/$unitId/household"
+        post(household, """{"members":[{"isChildUnder6":false,"validFrom":"2026-01-01"},{"isChildUnder6":false,"validFrom":"2026-01-01"}]}""")
+            .andExpect(status().isCreated)
+        val run = json.writeValueAsString(
+            StoredChargeRunRequest(
+                period = "2026-05", legalDate = "2026-05-01",
+                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+            ),
+        )
+        val report = "/api/money/entrances/$entranceId/charge-runs/2026-05/headcount"
+        mvc.perform(get(report)).andExpect(status().isNotFound)                          // nothing issued yet
+        post("/api/money/entrances/$entranceId/charge-runs", run).andExpect(status().isCreated)
+
+        mvc.perform(get(report))                                                         // the book says what was billed
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.unitsCompared").value(1))
+            .andExpect(jsonPath("$.mismatches.length()").value(0))
+
+        // A child declared late, as living there since March; and a person who moves in after the run's date — who is none of May's.
+        post(household, """{"members":[{"isChildUnder6":true,"validFrom":"2026-03-01"},{"isChildUnder6":false,"validFrom":"2026-05-02"}]}""")
+            .andExpect(status().isCreated)
+        mvc.perform(get(report))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.legalDate").value("2026-05-01"))
+            .andExpect(jsonPath("$.mismatches.length()").value(1))
+            .andExpect(jsonPath("$.mismatches[0].unitId").value(unitId.toString()))
+            .andExpect(jsonPath("$.mismatches[0].designation").value("ап. 1"))
+            .andExpect(jsonPath("$.mismatches[0].difference").value("COUNT_DIFFERS"))
+            .andExpect(jsonPath("$.mismatches[0].billedOccupants").value(2))
+            .andExpect(jsonPath("$.mismatches[0].billedChildrenUnder6").value(0))
+            .andExpect(jsonPath("$.mismatches[0].declaredOccupants").value(3))
+            .andExpect(jsonPath("$.mismatches[0].declaredChildrenUnder6").value(1))
+        mvc.perform(get("/api/money/entrances/$entranceId/charge-runs/2026-06/headcount")).andExpect(status().isNotFound)
     }
 }
