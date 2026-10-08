@@ -32,12 +32,13 @@ class ImportSavepoint(private val registry: RegistryService, private val jdbc: J
     @Transactional(propagation = Propagation.NESTED)
     fun remove(importId: UUID) {
         oneAtATime(importId)
-        registry.revertImport(importId)
-        // the mark, once: the table takes inserts only, so "on conflict" is not available to it
+        // The mark first, once — the table takes inserts only, so "on conflict" is not available to it. A removal that is
+        // then refused takes the mark back with it: the savepoint undoes both.
         jdbc.update(
             "INSERT INTO registry.reverted_import (import_id) SELECT ? WHERE NOT EXISTS (SELECT 1 FROM registry.reverted_import WHERE import_id = ?)",
             importId, importId,
         )
+        registry.revertImport(importId)
         jdbc.execute("SET CONSTRAINTS ALL IMMEDIATE")
     }
 

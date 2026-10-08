@@ -138,6 +138,7 @@ class ImportCommitPersistenceIT {
         savepoint.remove(UUID.fromString(importId))                                     // a revert delivered again: nothing to do, one mark
         assertThat(jdbc.queryForObject("SELECT count(*) FROM reverted_import WHERE import_id = ?::uuid", Long::class.java, importId)).isEqualTo(1)
         jdbc.update("DELETE FROM reverted_import WHERE import_id = ?::uuid", importId)  // ignored: the mark stays
+        assertThatThrownBy { jdbc.execute("TRUNCATE reverted_import") }.isInstanceOf(org.springframework.dao.DataIntegrityViolationException::class.java)
         assertThatThrownBy { savepoint.adopt(entranceId, UUID.fromString(importId), ON, again) }.isInstanceOf(IllegalStateException::class.java)
         mvc.perform(get("/api/intake/imports/$importId")).andExpect(jsonPath("$.status").value("REVERTED"))
         mvc.perform(                                                                    // done once: not reverted again
@@ -218,7 +219,7 @@ class ImportCommitPersistenceIT {
         mvc.perform(revert).andExpect(status().isOk).andExpect(jsonPath("$.status").value("REVERTING"))
         val blocked = eventually(importId, "REVERT_BLOCKED")
         assertThat(jdbc.queryForObject("SELECT count(*) FROM reverted_import WHERE import_id = ?::uuid", Long::class.java, importId))
-            .isEqualTo(0)                                                               // a revert that was refused leaves no mark
+            .isEqualTo(0)                                                               // the mark was written, then undone with the refused removal
         assertThat(blocked.get("revertBlockedBy").asText()).startsWith("title (")       // the table that still points at the unit
         assertThat(units.findByImportId(id)).hasSize(2)                                  // nothing was removed —
         assertThat(household.findByImportId(id)).hasSize(3)                              // — not even what went first
