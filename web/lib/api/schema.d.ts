@@ -62,7 +62,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read an import record — its verdict and content hash */
+        /** Read an import record — its verdict, content hash and, when a revert was blocked, what blocks it */
         get: operations["get_intake_imports_id"];
         put?: never;
         post?: never;
@@ -98,7 +98,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revert a committed import wholesale, with its reason */
+        /** Ask for a committed import to be reverted wholesale, with its reason — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED */
         post: operations["post_intake_imports_id_revert"];
         delete?: never;
         options?: never;
@@ -970,6 +970,7 @@ export interface components {
             differing: number;
             /** Format: uuid */
             id: string;
+            revertBlockedBy?: string;
             /** Format: int32 */
             rowsParsed: number;
             sourceSha: string;

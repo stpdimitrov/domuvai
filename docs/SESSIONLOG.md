@@ -2143,3 +2143,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/app/(console)/CatalogueFooter.tsx`, `web/app/(console)/layout.tsx`.
 
 ---
+
+## S-41c · 2026-10-08 · intake — a revert the registry cannot carry out is said so, not reported as done (#129)
+
+**Shipped** — a revert has two steps. `POST …/imports/{id}/revert` answers `REVERTING`; the registry, which hears of it after the request has answered, removes the import's rows inside a savepoint and reports back with one of two new in-process events defined by intake (`ImportRevertApplied`, `ImportRevertBlocked`); the import then reads `REVERTED`, or `REVERT_BLOCKED` with `revertBlockedBy` — the table and constraint that still point at an imported row, from the database's own refusal. A blocked revert removes nothing and can be asked for again once the blocker is gone; a revert under way cannot be asked for twice. Before this the import read `REVERTED` at once, whatever the registry then managed: a payment against an imported unit, a title added later, or an entry in the book's access log naming an imported owner left every row in place and nothing said so. Two statuses and one column added to `intake.fee_import`. The OpenAPI contract and the TS client are regenerated.
+
+**Verified** — unit tests on both sides of the seam (the states and which may be reverted; an answer settling only a waiting import; applied, blocked with its name, and any other failure thrown so it is delivered again), and `ImportCommitPersistenceIT` from a scratch copy on this machine's Postgres 16 — 6 of 6: a clean revert ends `REVERTED` with the rows gone; one blocked by a later title ends `REVERT_BLOCKED` naming `title`, with every imported row still there, the household rows that are removed first among them; after the title is withdrawn the same revert ends `REVERTED`. Three mutants killed (no savepoint; an answer settling any status; a revert under way asked again). Gates green.
+
+**Found on the way** — a batched delete's refusal reaches the caller wrapped in Spring Data's `DbActionExecutionException`, which is not a `DataAccessException`; the first version caught the wrong type and the import stayed `REVERTING` — the Postgres test found it, the mocked one had not.
+
+**Decisions** — the owner's, 2026-10-08 (asked in session, recorded on #131): two steps, not a single answer and not intake asking the registry first. Mine: the two report-back events are intake's types published by the registry, so the dependency still runs registry → intake only, and they stay out of the published event catalogue · only a foreign-key refusal is an answer; any other failure is thrown and retried.
+
+**Open** — a revert whose reaction keeps failing for another reason stays `REVERTING` with no time limit and no alarm · committing has the same shape: the answer says `COMMITTED` before the registry has adopted anything, and a failed adoption says nothing — not built here · what blocks is named by table and constraint, not by row, and in the database's words · a blocker in another module (a payment) is named the same way but can only be removed there.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportAdoption.kt`, `app/src/main/kotlin/zues/app/intake/ImportRevertOutcome.kt`, `ImportService.kt` (`revert`, `settle`).
+
+---

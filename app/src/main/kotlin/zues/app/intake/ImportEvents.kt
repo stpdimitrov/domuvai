@@ -55,5 +55,17 @@ data class ImportReverted(
     val reason: String,
 )
 
+/**
+ * The registry's answer to [ImportReverted]: every row that carried the import's id is gone. Defined here and
+ * published by the registry, so the dependency still runs registry → intake only. In-process; not externalized.
+ */
+data class ImportRevertApplied(val entranceId: UUID, val importId: UUID)
+
+/**
+ * The registry's other answer: it could not remove the import's rows, and nothing was removed. [blockedBy] names
+ * what still points at them, as the database refused it — a record added after the commit is not the import's to drop.
+ */
+data class ImportRevertBlocked(val entranceId: UUID, val importId: UUID, val blockedBy: String)
+
 /** A commit or revert asked for on an import whose status does not allow it — a 409, not a 400. */
 class ImportStateException(message: String) : RuntimeException(message)

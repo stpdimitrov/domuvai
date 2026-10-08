@@ -19,6 +19,8 @@ data class ImportView(
     val rowsParsed: Int,
     val differing: Int,
     val violations: Int,
+    /** while the status is REVERT_BLOCKED: what still points at the import's rows, so the registry removed none */
+    val revertBlockedBy: String? = null,
 )
 
 /**
@@ -27,7 +29,11 @@ data class ImportView(
  */
 data class CommitRequest(val committedBy: UUID, val sheet: FeeSheetDryRunRequest)
 
-/** Revert a committed import. A reason is required — a reverted legal record says why. */
+/**
+ * Ask for a committed import to be reverted. A reason is required — a reverted legal record says why. The answer is
+ * REVERTING: the registry removes the rows afterwards, and the import then reads REVERTED, or REVERT_BLOCKED with
+ * what blocks it.
+ */
 data class RevertRequest(val revertedBy: UUID, val reason: String)
 
 /** Durable imports: record a fee sheet with its Gate-1 verdict, and read it back. */
@@ -45,7 +51,7 @@ class ImportController(private val imports: ImportService) {
 
     @GetMapping("/imports/{id}")
     fun get(@PathVariable id: UUID): ImportView =
-        imports.find(id).let { ImportView(it.id, it.status, it.sourceSha, it.rowsParsed, it.differing, it.violations) }
+        imports.find(id).let(::view)
 
     @PostMapping("/imports/{id}/commit")
     fun commit(@PathVariable id: UUID, @RequestBody request: CommitRequest): CommitResult =
@@ -53,8 +59,10 @@ class ImportController(private val imports: ImportService) {
 
     @PostMapping("/imports/{id}/revert")
     fun revert(@PathVariable id: UUID, @RequestBody request: RevertRequest): ImportView =
-        imports.revert(id, request.revertedBy, request.reason)
-            .let { ImportView(it.id, it.status, it.sourceSha, it.rowsParsed, it.differing, it.violations) }
+        imports.revert(id, request.revertedBy, request.reason).let(::view)
+
+    private fun view(row: ImportRow) =
+        ImportView(row.id, row.status, row.sourceSha, row.rowsParsed, row.differing, row.violations, row.revertBlockedBy)
 
     /** A malformed tariff — an unknown cost stream, allocation key or named cost — is the caller's error. */
     @ExceptionHandler(IllegalArgumentException::class, IllegalStateException::class)

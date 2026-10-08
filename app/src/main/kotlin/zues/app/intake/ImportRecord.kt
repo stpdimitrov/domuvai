@@ -17,11 +17,13 @@ import java.util.UUID
 data class ImportRow(
     @Id val id: UUID,
     val entranceId: UUID,
-    val status: String,        // REPRODUCED | NEEDS_REVIEW
+    val status: String,        // REPRODUCED | NEEDS_REVIEW | COMMITTED | REVERTING | REVERTED | REVERT_BLOCKED
     val sourceSha: String,
     val rowsParsed: Int,
     val differing: Int,
     val violations: Int,
+    /** what still points at the import's rows, when the registry could not remove them; set exactly while REVERT_BLOCKED */
+    val revertBlockedBy: String? = null,
 )
 
 interface ImportRepository : ListCrudRepository<ImportRow, UUID> {

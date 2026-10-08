@@ -1,14 +1,20 @@
 package zues.app.registry
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import zues.app.intake.AdoptedUnit
 import zues.app.intake.ImportCommitted
+import zues.app.intake.ImportRevertApplied
+import zues.app.intake.ImportRevertBlocked
+import zues.app.intake.ImportReverted
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.LocalDate
@@ -118,7 +124,7 @@ class ImportAdoptionTest {
         val written = argumentCaptor<Any>()
         whenever(aggregates.insert(written.capture())).thenAnswer { it.arguments[0] }
 
-        ImportAdoption(service).on(
+        ImportAdoption(service, mock()).on(
             ImportCommitted(
                 entranceId, importId, importId, UUID.randomUUID(), 2, 0,
                 listOf(
@@ -160,5 +166,48 @@ class ImportAdoptionTest {
             verify(parties).deleteAll(listOf(party))
             verify(units).deleteAll(listOf(adopted))
         }
+    }
+
+    // S-41c — the reaction to a revert reports back what became of it.
+
+    private fun reverted() = ImportReverted(entranceId, importId, UUID.randomUUID(), java.time.Instant.parse("2026-05-02T08:00:00Z"), "wrong entrance")
+
+    @Test
+    fun `a revert the registry carried out is answered with ImportRevertApplied`() {
+        val registry: RegistryService = mock()
+        val events: org.springframework.context.ApplicationEventPublisher = mock()
+        ImportAdoption(registry, events).on(reverted())
+        verify(registry).revertImport(importId)
+        verify(events).publishEvent(ImportRevertApplied(entranceId, importId))
+    }
+
+    @Test
+    fun `a revert refused because a later record still points at an imported row is answered with what blocks it`() {
+        val registry: RegistryService = mock()
+        val events: org.springframework.context.ApplicationEventPublisher = mock()
+        val refusal = org.postgresql.util.PSQLException(
+            """ERROR: update or delete on table "unit" violates foreign key constraint "title_unit_id_fkey" on table "title"""",
+            org.postgresql.util.PSQLState.FOREIGN_KEY_VIOLATION,
+        )
+        // as a batched delete delivers it: wrapped twice, the database's own refusal at the root
+        whenever(registry.revertImport(importId))
+            .thenThrow(RuntimeException("Failed to execute BatchWithValue", org.springframework.dao.DataIntegrityViolationException("refused", refusal)))
+        ImportAdoption(registry, events).on(reverted())
+        verify(events).publishEvent(ImportRevertBlocked(entranceId, importId, "title (title_unit_id_fkey)"))
+    }
+
+    @Test
+    fun `a revert that fails for any other reason is not an answer — it is thrown, to be delivered again`() {
+        val registry: RegistryService = mock()
+        val events: org.springframework.context.ApplicationEventPublisher = mock()
+        val checked = org.postgresql.util.PSQLException("ERROR: violates check constraint", org.postgresql.util.PSQLState.CHECK_VIOLATION)
+        for (failure in listOf(
+            org.springframework.dao.DataIntegrityViolationException("check", checked),
+            org.springframework.dao.QueryTimeoutException("the database did not answer"), IllegalStateException("not the database at all"),
+        )) {
+            org.mockito.kotlin.doThrow(failure).whenever(registry).revertImport(importId)   // doThrow: the stub before it already throws
+            assertThatThrownBy { ImportAdoption(registry, events).on(reverted()) }.isSameAs(failure)
+        }
+        verifyNoInteractions(events)
     }
 }
