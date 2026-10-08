@@ -42,9 +42,11 @@ class LawVersionIT {
     private fun required(vararg names: String): Map<String, Set<String>> =
         jdbc.queryForList(
             """
-            SELECT table_schema || '.' || table_name AS t, column_name AS c FROM information_schema.columns
-            WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND is_nullable = 'NO'
-              AND column_name IN (${names.joinToString { "'$it'" }})
+            SELECT c.table_schema || '.' || c.table_name AS t, c.column_name AS c
+            FROM information_schema.columns c JOIN information_schema.tables t USING (table_schema, table_name)
+            WHERE t.table_type = 'BASE TABLE'                                -- a view's columns always read as nullable
+              AND c.table_schema NOT IN ('pg_catalog', 'information_schema') AND c.is_nullable = 'NO'
+              AND c.column_name IN (${names.joinToString { "'$it'" }})
             """.trimIndent(),
         ).groupBy({ it["t"] as String }, { it["c"] as String }).mapValues { it.value.toSet() }
 
@@ -59,8 +61,10 @@ class LawVersionIT {
         // … and a nullable basis_hash, or a nullable version, is not one that is kept: count them however they are declared
         val declared = jdbc.queryForList(
             """
-            SELECT table_schema || '.' || table_name AS t, count(*) AS n FROM information_schema.columns
-            WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND column_name IN ('basis_hash', 'law_version', 'engine_version')
+            SELECT c.table_schema || '.' || c.table_name AS t, count(*) AS n
+            FROM information_schema.columns c JOIN information_schema.tables t USING (table_schema, table_name)
+            WHERE t.table_type = 'BASE TABLE' AND c.table_schema NOT IN ('pg_catalog', 'information_schema')
+              AND c.column_name IN ('basis_hash', 'law_version', 'engine_version')
             GROUP BY 1
             """.trimIndent(),
         ).associate { it["t"] as String to (it["n"] as Number).toInt() }

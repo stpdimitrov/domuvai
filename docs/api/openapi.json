@@ -5436,7 +5436,7 @@
       "name": "intake"
     },
     {
-      "description": "",
+      "description": "The rule catalogue and engine versions in force. Dated constants live in the pure `law` module.",
       "name": "law"
     },
     {

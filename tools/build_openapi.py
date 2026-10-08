@@ -172,6 +172,7 @@ PLANNED = [
 
 TAGS = {
  'registry': 'Entrances, units, households, ownership, the Book of the Condominium. Owns ORG and BOOK.',
+ 'law': 'The rule catalogue and engine versions in force. Dated constants live in the pure `law` module.',
  'money': 'Charges, the fund, arrears. Owns FEE, FUND and DEBT.',
  'intake': "Importing a firm's existing records. Owns no rules — it enforces ORG and BOOK on the way in.",
 }

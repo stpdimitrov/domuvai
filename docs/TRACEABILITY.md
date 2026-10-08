@@ -283,7 +283,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SYS-007` | — | — |  |
 | `PM-SYS-008` | — | — |  |
 | `PM-SYS-009` | — | — | ⚠ |
-| `PM-SYS-010` | `app/src/test/kotlin/zues/app/law/LawVersionIT.kt:52` | `app/src/main/kotlin/zues/app/law/LawController.kt:13` |  |
+| `PM-SYS-010` | `app/src/test/kotlin/zues/app/law/LawVersionIT.kt:54` | `app/src/main/kotlin/zues/app/law/LawController.kt:13` |  |
 | `PM-SYS-011` | — | — |  |
 | `PM-SYS-012` | — | — |  |
 | `PM-SYS-013` | — | — |  |
