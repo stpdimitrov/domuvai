@@ -149,6 +149,10 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   the platform showcase (mock console cards), roles, steps, trust, pricing, company, an FAQ
   accordion, and a validated "заявете демо" form. Client parts: `LandingNav`, `Faq`, `DemoForm`,
   `HeroVideo`.
+- **The console's footer** (WEB-22, PM-SYS-010) — every screen under the console's layout ends in the rule
+  catalogue's version and the engine's, read from `GET /api/law/version` on each request
+  (`app/(console)/CatalogueFooter.tsx`); the web keeps no copy, and says so when the API does not answer.
+  `/assembly` sits outside that layout and has no footer.
 - **`/portfolio`** — the console's firm-wide portfolio (screen 01) — **live** (WEB-19): every registered
   entrance with its number of units, what it owes after the advances as of `?asOf=` (default today in Sofia;
   `GET …/arrears`, `netMinor`), and its repair fund's balance beside what is available (`GET …/fund`; "няма
