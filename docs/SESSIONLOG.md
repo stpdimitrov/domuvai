@@ -2093,3 +2093,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/lib/console.ts` (`isDay`).
 
 ---
+
+## S-G1-01a · 2026-10-08 · law — the rule catalogue's version is served, and every computed record keeps it (PM-SYS-010)
+
+**Shipped** — `GET /api/law/version` answers the catalogue version and the engine version in force, from the same two constants every computed record is stamped with (`zues.app.law.LawController`, a new package: the HTTP face of the pure `law` module). `LawVersionIT` reads the schema after every migration: a table that keeps a computed basis, or either version, requires both `law_version` and `engine_version`, and each of the three columns a table declares is NOT NULL — today `money.charge_run`, `money.payment`, `money.fund_handover_statement` and `assembly.decision`. The OpenAPI contract (42 operations, a fourth module) and the TS client are regenerated.
+
+**Verified** — the web test for the endpoint; `LawVersionIT` from a scratch copy on this machine's Postgres 16: it passes on the real migrations and fails for each of three mutant migrations (a basis with no versions; a nullable engine version; a nullable basis). Modularity and contract tests pass; gates green; the web type-checks against the regenerated client.
+
+**Review** — fresh context, no defect; three points taken: the log said more than the schema test checks (a table with none of the three columns is not seen); the test now reads base tables only, since a view's columns always read as nullable; the API's `law` tag has its description.
+
+**Decisions** — mine, stated on #121: "every decision" is checked as every table that keeps a computed basis or a version: one added later with a basis or one version but not both, or with any of the three nullable, fails the build. A computed table added with none of the three is not seen · the footer is the web's half of the rule's acceptance and comes next (WEB-22).
+
+**Open** — the test plan counts a rule covered from its first named test, so PM-SYS-010 leaves the remaining list here though the footer is not built yet · the catalogue's version is written in three places that do not agree (`docs/rules.json` 1.0; INDEX and `law` 1.3) and nothing ties them — filed: https://github.com/stpdimitrov/domuvai/issues/122 · the first version of this slice's schema test also demanded a basis hash wherever a version is kept; `assembly.decision` keeps both versions and no basis, rightly, and the test now says so · the other nine SYS rules of S-G1-01 wait on modules that do not exist (assembly, compliance, offline queue, reports) or on the owner (PM-SYS-015's payload budget, PM-SYS-009's fine ranges).
+
+**Read first next time** — `app/src/main/kotlin/zues/app/law/LawController.kt`, `app/src/test/kotlin/zues/app/law/LawVersionIT.kt`.
+
+---

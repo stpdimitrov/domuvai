@@ -60,6 +60,9 @@ RUNNING = {
    ('Record a title to a unit — effective-dated, with its share', ['PM-ORG-005', 'PM-ORG-011']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
    ("The owners and users of an entrance's units as of a date — names only", ['PM-ORG-011', 'PM-BOOK-011']),
+ # ---- law
+ ('get', '/api/law/version'):
+   ('The rule catalogue and engine versions in force — the pair every computed record is stamped with', ['PM-SYS-010']),
  # ---- money
  ('post', '/api/money/charge-runs/preview'):
    ('Compute a charge run from a stated basis, metered consumption included — nothing is stored',
@@ -169,6 +172,7 @@ PLANNED = [
 
 TAGS = {
  'registry': 'Entrances, units, households, ownership, the Book of the Condominium. Owns ORG and BOOK.',
+ 'law': 'The rule catalogue and engine versions in force. Dated constants live in the pure `law` module.',
  'money': 'Charges, the fund, arrears. Owns FEE, FUND and DEBT.',
  'intake': "Importing a firm's existing records. Owns no rules — it enforces ORG and BOOK on the way in.",
 }

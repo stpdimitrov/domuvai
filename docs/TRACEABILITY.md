@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 50 | 21% |
-| **Proved by a test named after the rule** | **52** | **22%** |
-| No implementation and no test | 181 | 78% |
+| Referenced in code (`// Rule:`) | 51 | 22% |
+| **Proved by a test named after the rule** | **53** | **23%** |
+| No implementation and no test | 180 | 77% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -270,7 +270,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SEC-011` | — | — |  |
 | `PM-SEC-012` | — | — |  |
 
-## SYS — Cross-cutting system rules  ·  5/15 covered
+## SYS — Cross-cutting system rules  ·  6/15 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -283,7 +283,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SYS-007` | — | — |  |
 | `PM-SYS-008` | — | — |  |
 | `PM-SYS-009` | — | — | ⚠ |
-| `PM-SYS-010` | — | — |  |
+| `PM-SYS-010` | `app/src/test/kotlin/zues/app/law/LawVersionIT.kt:54` | `app/src/main/kotlin/zues/app/law/LawController.kt:13` |  |
 | `PM-SYS-011` | — | — |  |
 | `PM-SYS-012` | — | — |  |
 | `PM-SYS-013` | — | — |  |
