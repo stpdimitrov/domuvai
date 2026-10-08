@@ -1,6 +1,8 @@
 import json, re, pathlib
 
 md = pathlib.Path("RULES.md").read_text(encoding="utf-8")
+# The catalogue's version is RULES.md's own header — read, never typed here (PM-SYS-010; tools/check_catalogue_version.py).
+VERSION = re.search(r"^\*\*Version:\*\* (\d+\.\d+) ", md, re.M).group(1)
 
 DOMAIN_TITLES = {
  "ORG":"Structure & ideal parts","BOOK":"Owners' book & residents","GOV":"Governance & mandates",
@@ -33,7 +35,7 @@ for line in md.splitlines():
 out={
  "meta":{
    "title":"Bulgarian condominium property management — business rules",
-   "version":"1.0",
+   "version":VERSION,
    "legal_baseline":"2026-09-03",
    "jurisdiction":"BG",
    "primary_act":"Закон за управление на етажната собственост (ЗУЕС), ДВ 6/2009, am. ДВ 82/2023",

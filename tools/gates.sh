@@ -8,16 +8,17 @@ cd "$(dirname "$0")/.."
 fail=0
 run() { printf '\n\033[1m▸ %s\033[0m\n' "$1"; shift; "$@" || { fail=1; printf '\033[31m  ✗ failed\033[0m\n'; }; }
 
-run "1/10  tests"               ./gradlew test --console=plain
-run "2/10  event contracts"     bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
-run "3/10  functional spec"     bash -c 'cd tools && python3 build_functional.py'
-run "4/10  traceability"        python3 tools/traceability.py
-run "5/10  test plan"           python3 tools/testplan.py
-run "6/10  openapi"             python3 tools/build_openapi.py
-run "7/10  banned words"        python3 tools/check_banned_words.py
-run "8/10  legal thresholds"    python3 tools/check_legal_literals.py
-run "9/10  schema columns"      python3 tools/check_schema_columns.py
-run "10/10 legal today"         python3 tools/check_legal_today.py
+run "1/11  tests"               ./gradlew test --console=plain
+run "2/11  event contracts"     bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
+run "3/11  functional spec"     bash -c 'cd tools && python3 build_functional.py'
+run "4/11  traceability"        python3 tools/traceability.py
+run "5/11  test plan"           python3 tools/testplan.py
+run "6/11  openapi"             python3 tools/build_openapi.py
+run "7/11  banned words"        python3 tools/check_banned_words.py
+run "8/11  legal thresholds"    python3 tools/check_legal_literals.py
+run "9/11  schema columns"      python3 tools/check_schema_columns.py
+run "10/11 legal today"         python3 tools/check_legal_today.py
+run "11/11 catalogue version"   python3 tools/check_catalogue_version.py
 
 # Only GENERATED paths belong here. A hand-written document changing is normal;
 # flagging it would make this gate noise, and noise gets switched off.

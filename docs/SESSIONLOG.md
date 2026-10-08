@@ -2109,3 +2109,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/law/LawController.kt`, `app/src/test/kotlin/zues/app/law/LawVersionIT.kt`.
 
 ---
+
+## S-G1-01b · 2026-10-08 · law — the catalogue's version has one source, and a gate fails when a copy disagrees (#122)
+
+**Shipped** — the catalogue is v1.3, and RULES.md's header is the one place that says so. `tools/build_rules.py` reads the version from that header instead of holding a literal "1.0", so `docs/rules.json` — and FUNCTIONAL.md and TRACEABILITY.md, generated from it — now say 1.3. A new gate, 11 of 11 (`tools/check_catalogue_version.py`), fails the build and names the file when `rules.json`, `law`'s `CATALOGUE_VERSION`, INDEX's header, CLAUDE.md, STAGE1, FUNCTIONAL or the event examples say another version, and when `rules.json` is not what the generator makes from RULES.md today. STAGE1's line still said 228 rules and version 1.2; it now says today's.
+
+**Why 1.3 and not 1.0** (the owner asked for the analysis and the decision) — RULES.md is the catalogue and says 1.3; `rules.json` is only its mirror, and its "1.0" was a literal typed into the generator in the first commit, which never read the catalogue's version at all. STAGE1 recorded an earlier state, 228 rules at version 1.2: a 233-rule catalogue was never 1.0. And every computed record has been stamped 1.3 since 2026-09-14, so calling the catalogue 1.0 now would date new records before the old ones.
+
+**Verified** — the gate is red on the tree as it was (rules.json and FUNCTIONAL at 1.0) and green after; changed one at a time, each of the seven copies, RULES.md's own header, and one field in the mirror's body turns it red, naming the file. Regenerating `rules.json` before the change reproduced it byte for byte, so the generator is faithful and only the version moved. Gates green.
+
+**Decisions** — the owner's, delegated on 2026-10-08: 1.3. Mine: RULES.md's header is the source, since the catalogue is the thing versioned; the constant in `law` stays a typed literal that the gate checks, not a value read from a document at build time.
+
+**Open** — the legal baseline date is also written in several places and is not checked · nothing yet says what must happen when the version is raised (PM-LAW-006's sign-off, PM-LAW-007's reproduction of past figures): the gate only keeps the copies together.
+
+**Read first next time** — `tools/check_catalogue_version.py`.
+
+---
