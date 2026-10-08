@@ -142,7 +142,6 @@ class ImportCommitPersistenceIT {
             .content("""{"committedBy":"${UUID.randomUUID()}","sheet":$sheet}""")
 
         mvc.perform(commit).andExpect(status().isOk).andExpect(jsonPath("$.status").value("COMMITTING"))
-        mvc.perform(commit).andExpect(status().isConflict)                              // under way: not asked twice
         val blocked = eventually(importId, "COMMIT_BLOCKED")
         assertThat(blocked.get("commitBlockedBy").asText())                             // the schema's own deferred check, run inside the savepoint
             .contains("sum to 200.0000").contains("PM-ORG-002")

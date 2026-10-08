@@ -248,6 +248,11 @@ class ImportAdoptionTest {
             .isEqualTo(ImportCommitBlocked(entranceId, importId, "no entrance $entranceId"))
         assertThat(commitAnswerTo(IllegalStateException()))
             .isEqualTo(ImportCommitBlocked(entranceId, importId, "the registry could not carry it out (IllegalStateException)"))
+        // a framework's failure can quote the row it was writing — it is named by its kind, never by its message (PM-BOOK-011)
+        assertThat(commitAnswerTo(org.springframework.dao.OptimisticLockingFailureException("Failed to update Party(fullName=Иван Петров)")))
+            .isEqualTo(ImportCommitBlocked(entranceId, importId, "the registry could not carry it out (OptimisticLockingFailureException)"))
+        assertThat(commitAnswerTo(RuntimeException("Failed to execute InsertRoot(entity=Party(fullName=Иван Петров))", IllegalStateException("no converter"))))
+            .isEqualTo(ImportCommitBlocked(entranceId, importId, "the registry could not carry it out (RuntimeException)"))
         // a foreign key refusing an insert is not "a later record": only a revert names what still points at a row
         val fk = """ERROR: insert or update on table "unit" violates foreign key constraint "unit_entrance_id_fkey""""
         assertThat(commitAnswerTo(refusal(fk, org.postgresql.util.PSQLState.FOREIGN_KEY_VIOLATION)))

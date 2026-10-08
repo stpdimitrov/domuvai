@@ -77,12 +77,15 @@ class ImportAdoption(
 
     /**
      * Why it did not happen: the database's own first line — an entrance's ideal parts no longer adding up — or, for a
-     * failure that is not the database's, what it said, or its kind. Asking again is always possible.
+     * failure that is not the database's, what the registry itself said. Any other failure is named by its kind only:
+     * a framework's message can quote the row it was writing, an owner's name with it (PM-BOOK-011). Asking again is
+     * always possible.
      */
     private fun why(refused: RuntimeException): String {
         val cause = database(refused)
-            ?: return firstLine(refused.message).ifBlank { "the registry could not carry it out (${refused.javaClass.simpleName})" }
-        return firstLine(cause.message).ifBlank { "the database refused it (${cause.sqlState})" }
+        if (cause != null) return firstLine(cause.message).ifBlank { "the database refused it (${cause.sqlState})" }
+        val ours = refused is NoSuchElementException || refused is IllegalArgumentException || refused is IllegalStateException
+        return firstLine(refused.message.takeIf { ours }).ifBlank { "the registry could not carry it out (${refused.javaClass.simpleName})" }
     }
 
     /** For a revert: the table and constraint of a row that still points at an imported one — or null when that is not what refused it. */

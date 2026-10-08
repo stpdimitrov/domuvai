@@ -237,7 +237,7 @@ class ImportServiceTest {
         assertThat(updated.lastValue.status).isEqualTo("COMMITTED")
 
         val settled = updated.allValues.size                                                     // at least once: an answer nobody waits for changes nothing
-        for (status in listOf("REPRODUCED", "COMMITTED", "REVERTING", "REVERTED")) {
+        for (status in listOf("REPRODUCED", "NEEDS_REVIEW", "COMMITTED", "REVERTING", "REVERTED", "REVERT_BLOCKED")) {
             whenever(imports.readById(importId)).thenReturn(row(status, null))
             service.commitApplied(importId)
             service.commitBlocked(importId, "x")
