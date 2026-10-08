@@ -7,7 +7,8 @@ import org.springframework.stereotype.Component
  * The second step of a revert (STAGE1-ADDENDUM §1). A revert is carried out by the registry after the request has
  * answered, so the import waits as REVERTING until the registry reports back — with one of intake's own two events,
  * so the dependency still runs registry → intake only. Delivery is at least once: an outcome for an import that is
- * no longer REVERTING changes nothing.
+ * no longer waiting for it changes nothing. [ImportCommitOutcome] is the same for a commit; the two stay apart so
+ * that a reaction keeps the name an undelivered publication was stored under.
  */
 @Component
 class ImportRevertOutcome(private val imports: ImportService) {

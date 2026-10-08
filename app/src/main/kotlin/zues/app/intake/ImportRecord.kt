@@ -19,17 +19,19 @@ import java.util.UUID
 data class ImportRow(
     @Id val id: UUID,
     val entranceId: UUID,
-    val status: String,        // REPRODUCED | NEEDS_REVIEW | COMMITTED | REVERTING | REVERTED | REVERT_BLOCKED
+    val status: String,        // REPRODUCED | NEEDS_REVIEW | COMMITTING | COMMITTED | COMMIT_BLOCKED | REVERTING | REVERTED | REVERT_BLOCKED
     val sourceSha: String,
     val rowsParsed: Int,
     val differing: Int,
     val violations: Int,
     /** what still points at the import's rows, when the registry could not remove them; set exactly while REVERT_BLOCKED */
     val revertBlockedBy: String? = null,
+    /** why the registry could not adopt the import's rows; set exactly while COMMIT_BLOCKED */
+    val commitBlockedBy: String? = null,
 )
 
 interface ImportRepository : ListCrudRepository<ImportRow, UUID> {
-    /** The record, locked until the transaction ends: a revert and the registry's answer to it change its status one at a time. */
+    /** The record, locked until the transaction ends: a commit, a revert and the registry's answers to them change its status one at a time. */
     @Lock(LockMode.PESSIMISTIC_WRITE)
     fun readById(id: UUID): ImportRow?
 

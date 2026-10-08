@@ -21,6 +21,8 @@ data class ImportView(
     val violations: Int,
     /** while the status is REVERT_BLOCKED: what still points at the import's rows, so the registry removed none */
     val revertBlockedBy: String? = null,
+    /** while the status is COMMIT_BLOCKED: why the registry adopted none of the import's rows */
+    val commitBlockedBy: String? = null,
 )
 
 /**
@@ -62,7 +64,7 @@ class ImportController(private val imports: ImportService) {
         imports.revert(id, request.revertedBy, request.reason).let(::view)
 
     private fun view(row: ImportRow) =
-        ImportView(row.id, row.status, row.sourceSha, row.rowsParsed, row.differing, row.violations, row.revertBlockedBy)
+        ImportView(row.id, row.status, row.sourceSha, row.rowsParsed, row.differing, row.violations, row.revertBlockedBy, row.commitBlockedBy)
 
     /** A malformed tariff — an unknown cost stream, allocation key or named cost — is the caller's error. */
     @ExceptionHandler(IllegalArgumentException::class, IllegalStateException::class)
