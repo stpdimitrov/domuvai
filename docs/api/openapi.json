@@ -89,6 +89,44 @@
         ],
         "type": "object"
       },
+      "BookAccessView": {
+        "properties": {
+          "actor": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "bookDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "actor",
+          "actorName",
+          "at",
+          "id",
+          "kind",
+          "purpose"
+        ],
+        "type": "object"
+      },
       "BookNonUse": {
         "properties": {
           "from": {
@@ -4270,6 +4308,23 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "purpose",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4310,13 +4365,95 @@
             "description": "Not Found"
           }
         },
-        "summary": "Read the Book of the Condominium as of a date",
+        "summary": "Read the Book of the Condominium as of a date — the read names who and why, and is logged",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-BOOK-001",
-          "PM-BOOK-002"
+          "PM-BOOK-002",
+          "PM-BOOK-007"
+        ]
+      }
+    },
+    "/api/registry/entrances/{entranceId}/book/access-log": {
+      "get": {
+        "operationId": "get_registry_entrances_entranceId_book_access_log",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "purpose",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BookAccessView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Export who read the entrance's book, why and when — oldest first; the export is logged too",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-BOOK-007"
         ]
       }
     },

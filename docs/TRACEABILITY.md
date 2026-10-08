@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 51 | 22% |
-| **Proved by a test named after the rule** | **53** | **23%** |
-| No implementation and no test | 180 | 77% |
+| Referenced in code (`// Rule:`) | 52 | 22% |
+| **Proved by a test named after the rule** | **54** | **23%** |
+| No implementation and no test | 179 | 77% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -28,17 +28,17 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:64` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
 | `PM-ORG-012` | — | — |  |
 
-## BOOK — Owners' book & residents  ·  8/12 covered
+## BOOK — Owners' book & residents  ·  9/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-BOOK-001` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:69` | — |  |
+| `PM-BOOK-001` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:74` | — |  |
 | `PM-BOOK-002` | `app/src/test/kotlin/zues/app/intake/ImportCommitPersistenceIT.kt:148` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:12` |  |
-| `PM-BOOK-003` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:54` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:10` |  |
-| `PM-BOOK-004` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:54` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:11` |  |
+| `PM-BOOK-003` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:59` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:10` |  |
+| `PM-BOOK-004` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:59` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:11` |  |
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:183` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
 | `PM-BOOK-006` | — | — |  |
-| `PM-BOOK-007` | — | — |  |
+| `PM-BOOK-007` | `app/src/test/kotlin/zues/app/registry/BookAccessServiceTest.kt:50` | `app/src/main/kotlin/zues/app/registry/BookAccess.kt:15` |  |
 | `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:333` |  |
 | `PM-BOOK-009` | — | — |  |
 | `PM-BOOK-010` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/BookRetention.kt:10` |  |
@@ -277,7 +277,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
 | `PM-SYS-002` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:138` | `app/src/main/kotlin/zues/app/money/Arrears.kt:73` |  |
 | `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
-| `PM-SYS-004` | `app/src/test/kotlin/zues/app/registry/BookWebTest.kt:66` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
+| `PM-SYS-004` | `app/src/test/kotlin/zues/app/registry/BookWebTest.kt:70` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
 | `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |
 | `PM-SYS-006` | — | — |  |
 | `PM-SYS-007` | — | — |  |

@@ -2127,3 +2127,17 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `tools/check_catalogue_version.py`.
 
 ---
+
+## S-G1-03f · 2026-10-08 · registry — every read of the book is logged, with who and why (PM-BOOK-007)
+
+**Shipped** — `GET …/book` now requires `actor` (a registered party) and `purpose`; without either, with a blank purpose or with an actor who is not registered, the book is not served (400). Each read writes one entry to a new insert-only table, `registry.book_access` — entrance, actor, purpose, the date the book was read as of, the moment — in the read's own transaction and before the book is assembled: no entry, no book (`BookAccessService`). `GET …/book/access-log` exports the entrance's entries, oldest first, each with the actor's name, takes `actor` and `purpose` too, and is itself an entry (`LOG_EXPORT`). The OpenAPI contract (43 operations) and the TS client are regenerated; no screen reads the book, so the web is otherwise untouched.
+
+**Verified** — unit tests (the entry before the book; nothing served or written without a purpose, a registered actor and a registered entrance; the export an entry of its own), web tests (each missing parameter a 400, the service never reached), and `BookPersistenceIT` from a scratch copy on this machine's Postgres 16 — 3 of 3, including the table ignoring an update and a delete and refusing four malformed rows. Five mutants killed (a read not logged; the book assembled before its entry; the actor not checked; the table allowing an update; allowing a delete). Gates green.
+
+**Decisions** — the owner's, 2026-10-08 (asked in session, recorded on #128): until sign-in exists the caller names the actor, as the fund's signatory is named · only the full book is logged in this slice; the names-only lists the console uses (owners, overdue declarations) are not. Mine: the purpose is free text, required, trimmed · the log's export is logged as its own kind.
+
+**Open** — the names-only reads of owners and of overdue declarations are personal data from the book and are not logged: every console screen would have to name an actor, which waits on sign-in · who may read at all (PM-BOOK-006) is not decided here: any registered party who states a purpose is served, and is on record · an actor named by the caller is a claim, not proof, until sign-in · "export of book data" in the ministry's layout has no endpoint yet; it will need an entry of its own kind · the log has no retention rule of its own, and it holds names by reference to the party · the wider audit trail (PM-SEC-004) belongs to the evidence module, which does not exist; this table is the registry's until then.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/registry/BookAccess.kt`, `BookController.kt`.
+
+---
