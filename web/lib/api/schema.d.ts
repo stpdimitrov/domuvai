@@ -106,6 +106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/law/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The rule catalogue and engine versions in force — the pair every computed record is stamped with */
+        get: operations["get_law_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/charge-runs/preview": {
         parameters: {
             query?: never;
@@ -1008,6 +1025,10 @@ export interface components {
             /** Format: date */
             to: string;
         };
+        LawVersionView: {
+            catalogueVersion: string;
+            engineVersion: string;
+        };
         ManualEntry: {
             designation: string;
             /** @enum {string} */
@@ -1595,6 +1616,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    get_law_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawVersionView"];
                 };
             };
         };

@@ -1200,6 +1200,21 @@
         ],
         "type": "object"
       },
+      "LawVersionView": {
+        "properties": {
+          "catalogueVersion": {
+            "type": "string"
+          },
+          "engineVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalogueVersion",
+          "engineVersion"
+        ],
+        "type": "object"
+      },
       "ManualEntry": {
         "properties": {
           "designation": {
@@ -2627,6 +2642,30 @@
         ],
         "x-rules": [
           "PM-DOC-001"
+        ]
+      }
+    },
+    "/api/law/version": {
+      "get": {
+        "operationId": "get_law_version",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawVersionView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "The rule catalogue and engine versions in force — the pair every computed record is stamped with",
+        "tags": [
+          "law"
+        ],
+        "x-rules": [
+          "PM-SYS-010"
         ]
       }
     },
@@ -5395,6 +5434,10 @@
     {
       "description": "Importing a firm's existing records. Owns no rules — it enforces ORG and BOOK on the way in.",
       "name": "intake"
+    },
+    {
+      "description": "",
+      "name": "law"
     },
     {
       "description": "Charges, the fund, arrears. Owns FEE, FUND and DEBT.",
