@@ -26,6 +26,7 @@ import zues.app.money.FundService
 import zues.app.money.LedgerReads
 import zues.app.money.PaymentService
 import zues.app.money.StatementService
+import zues.app.registry.BookAccessService
 import zues.app.registry.BookRetentionService
 import zues.app.registry.BookService
 import zues.app.registry.DeclarationService
@@ -58,6 +59,7 @@ class OpenApiContractTest {
     @Autowired lateinit var mvc: MockMvc
 
     @MockitoBean lateinit var imports: ImportService
+    @MockitoBean lateinit var bookAccess: BookAccessService
     @MockitoBean lateinit var arrears: ArrearsService
     @MockitoBean lateinit var chargeRuns: ChargeRunService
     @MockitoBean lateinit var chargeRunStore: ChargeRunStore

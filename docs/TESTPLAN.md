@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **53** (23%) |
-| Remaining | **180** |
+| Proved by a test named after the rule | **54** (23%) |
+| Remaining | **179** |
 | Proposed slices at ~10 rules each | **20** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-21 rule(s) remaining across 3 slice(s).
+20 rule(s) remaining across 3 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 9 rule(s) · ⚠ 1 unconfirmed
 
@@ -38,12 +38,11 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-FEE-013` | MUST | Budget vs actual report is a first-class screen. |
 | `PM-FUND-011` | SHOULD | Multi-year plan with a funding gap indicator. |
 
-### S-G1-03 · `registry` · BOOK · ORG · 9 rule(s)
+### S-G1-03 · `registry` · BOOK · ORG · 8 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-BOOK-006` | MUST | Owner A querying owner B's household returns 403 and an audit entry. |
-| `PM-BOOK-007` | MUST | Audit log is immutable and exportable for a supervisory authority. |
 | `PM-ORG-006` | MUST | Marking an entrance `CLOSED_COMPLEX` swaps GA-driven fee rules for contract-driven ones and requires an uploaded registered contract. |
 | `PM-ORG-007` | MUST | Missing entry reference raises a compliance flag on ownership change. |
 | `PM-ORG-012` | MUST | New owner onboarding shows all in-force decisions and outstanding plans. |

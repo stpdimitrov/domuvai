@@ -1,10 +1,19 @@
 package zues.app.registry
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.jdbc.core.JdbcTemplate
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.reset
+import org.mockito.kotlin.whenever
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -17,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import zues.law.constantOn
 import java.time.LocalDate
+import java.util.UUID
 
 /**
  * The Book of the Condominium against real PostgreSQL: assemble it from a unit with an owner,
@@ -47,8 +57,9 @@ class BookPersistenceIT {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var registry: RegistryService
     @Autowired lateinit var ownership: OwnershipService
-    @Autowired lateinit var book: BookService
+    @MockitoSpyBean lateinit var book: BookService          // the real one; one test makes it fail after the entry is written
     @Autowired lateinit var declarations: DeclarationService
+    @Autowired lateinit var jdbc: JdbcTemplate
 
     @Test
     fun `PM-BOOK-003 PM-BOOK-004 a filed declaration persists with its template version and clears what was owed`() {
@@ -97,9 +108,63 @@ class BookPersistenceIT {
         assertThat(e2.complete).isFalse()                      // no owner named
         assertThat(theBook.complete).isFalse()                 // not every unit is complete
 
-        // PM-BOOK-001 — the electronic book reads back over HTTP
-        mvc.perform(get("/api/registry/entrances/$entrance/book").param("on", "2026-06-01"))
+        // PM-BOOK-001 — the electronic book reads back over HTTP, to a reader on the record
+        mvc.perform(get("/api/registry/entrances/$entrance/book").param("on", "2026-06-01").param("actor", party.toString()).param("purpose", "проверка"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.units.length()").value(2))
+    }
+
+    @Test
+    fun `PM-BOOK-007 a read of the book writes its entry, a refused read writes none, and an entry is never changed or removed`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 7", "А", "GA")).entranceId
+        registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
+        val manager = ownership.registerParty(RegisterParty("Мария Иванова"))
+        val url = "/api/registry/entrances/$entrance/book"
+        fun entries() = jdbc.queryForObject("SELECT count(*) FROM book_access WHERE entrance_id = ?", Long::class.java, entrance)
+
+        mvc.perform(get(url)).andExpect(status().isBadRequest)                                                    // nobody named
+        mvc.perform(get(url).param("actor", manager.toString()).param("purpose", " ")).andExpect(status().isBadRequest)
+        mvc.perform(get(url).param("actor", UUID.randomUUID().toString()).param("purpose", "проверка")).andExpect(status().isBadRequest)   // not registered
+        mvc.perform(get("/api/registry/entrances/${UUID.randomUUID()}/book").param("actor", manager.toString()).param("purpose", "проверка"))
+            .andExpect(status().isNotFound)
+        assertThat(entries()).isEqualTo(0)
+
+        mvc.perform(get(url).param("on", "2026-06-01").param("actor", manager.toString()).param("purpose", "годишен отчет"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.units.length()").value(1))
+        mvc.perform(get(url).param("actor", manager.toString()).param("purpose", "справка за собственик")).andExpect(status().isOk)
+        assertThat(entries()).isEqualTo(2)
+
+        // The entry and the book stand or fall together: a read that fails after its entry was written leaves none.
+        doThrow(IllegalStateException("the book could not be assembled")).whenever(book).forEntrance(eq(entrance), any())
+        assertThatThrownBy { mvc.perform(get(url).param("actor", manager.toString()).param("purpose", "неуспешно четене")) }
+            .hasRootCauseInstanceOf(IllegalStateException::class.java)
+        reset(book)
+        assertThat(entries()).isEqualTo(2)
+
+        jdbc.update("UPDATE book_access SET purpose = 'друго' WHERE entrance_id = ?", entrance)                  // ignored
+        jdbc.update("DELETE FROM book_access WHERE entrance_id = ?", entrance)                                    // ignored
+        assertThatThrownBy { jdbc.execute("TRUNCATE book_access") }.isInstanceOf(DataIntegrityViolationException::class.java)   // refused
+        mvc.perform(get("$url/access-log").param("actor", manager.toString()).param("purpose", "проверка на КЗЛД"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(3))                                                           // the export is an entry too
+            .andExpect(jsonPath("$[0].kind").value("BOOK_READ"))
+            .andExpect(jsonPath("$[0].purpose").value("годишен отчет"))
+            .andExpect(jsonPath("$[0].bookDate").value("2026-06-01"))
+            .andExpect(jsonPath("$[0].actorName").value("Мария Иванова"))
+            .andExpect(jsonPath("$[1].purpose").value("справка за собственик"))
+            .andExpect(jsonPath("$[2].kind").value("LOG_EXPORT"))
+            .andExpect(jsonPath("$[2].bookDate").doesNotExist())
+
+        // The table's own refusals, one at a time: a read with no date, an export with one, a blank purpose, one too long, an unknown kind.
+        val row = "INSERT INTO book_access (id, entrance_id, actor, purpose, kind, book_date, at) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?::date, now())"
+        for ((purpose, kind, date) in listOf(
+            Triple("проверка", "BOOK_READ", null), Triple("проверка", "LOG_EXPORT", "2026-06-01"), Triple(" ", "BOOK_READ", "2026-06-01"),
+            Triple("проверка", "PEEK", "2026-06-01"), Triple("о".repeat(501), "BOOK_READ", "2026-06-01"),
+        )) {
+            assertThatThrownBy { jdbc.update(row, entrance, manager, purpose, kind, date) }.isInstanceOf(DataIntegrityViolationException::class.java)
+        }
+        jdbc.update(row, entrance, manager, "проверка", "BOOK_READ", "2026-06-01")                                // and a sound one is taken
+        assertThat(entries()).isEqualTo(4)
     }
 }

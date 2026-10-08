@@ -22,8 +22,9 @@ import java.util.UUID
 
 /**
  * The book endpoints with the services mocked — no database. Proves the route binds and returns the
- * book, that with no date it is read as of today in Sofia, that the retention pass runs as of that
- * day, and that a malformed `on` date is a 400 (parsed before the service is ever called).
+ * book, that with no date it is read as of today in Sofia, that a read names who and why or is not
+ * served (PM-BOOK-007), that the retention pass runs as of that day, and that a malformed `on` date
+ * is a 400 (parsed before the service is ever called).
  */
 @WebMvcTest(BookController::class)
 class BookWebTest {
@@ -36,14 +37,17 @@ class BookWebTest {
 
     @Autowired lateinit var mvc: MockMvc
 
-    @MockitoBean lateinit var book: BookService
+    @MockitoBean lateinit var access: BookAccessService
     @MockitoBean lateinit var retention: BookRetentionService
 
     private val entranceId = UUID.randomUUID()
+    private val manager = UUID.randomUUID()
+
+    private fun readBook() = get("/api/registry/entrances/$entranceId/book").param("actor", manager.toString()).param("purpose", "годишен отчет")
 
     @Test
     fun `PM-BOOK-001 the book is read back as the electronic record`() {
-        whenever(book.forEntrance(eq(entranceId), any())).thenReturn(
+        whenever(access.read(eq(entranceId), any(), eq(manager), eq("годишен отчет"))).thenReturn(
             CondominiumBook(
                 entranceId, LocalDate.parse("2026-06-01"),
                 listOf(
@@ -55,7 +59,7 @@ class BookWebTest {
                 complete = true,
             ),
         )
-        mvc.perform(get("/api/registry/entrances/$entranceId/book"))
+        mvc.perform(readBook())
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.complete").value(true))
             .andExpect(jsonPath("$.units[0].designation").value("ап. 1"))
@@ -64,10 +68,10 @@ class BookWebTest {
 
     @Test
     fun `PM-SYS-004 with no date given the book is read as of today in Sofia`() {
-        whenever(book.forEntrance(eq(entranceId), any())).thenAnswer {
+        whenever(access.read(eq(entranceId), any(), any(), any())).thenAnswer {
             CondominiumBook(entranceId, it.getArgument(1), emptyList(), complete = true)
         }
-        mvc.perform(get("/api/registry/entrances/$entranceId/book"))
+        mvc.perform(readBook())
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.asOf").value("2026-06-01"))
     }
@@ -86,7 +90,42 @@ class BookWebTest {
 
     @Test
     fun `a malformed on date is a 400`() {
-        mvc.perform(get("/api/registry/entrances/$entranceId/book").param("on", "nonsense"))
+        mvc.perform(readBook().param("on", "nonsense")).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `PM-BOOK-007 the book is not served to a reader who does not say who reads and why`() {
+        val url = "/api/registry/entrances/$entranceId/book"
+        mvc.perform(get(url)).andExpect(status().isBadRequest)
+        mvc.perform(get(url).param("actor", manager.toString())).andExpect(status().isBadRequest)
+        mvc.perform(get(url).param("purpose", "годишен отчет")).andExpect(status().isBadRequest)
+        mvc.perform(get(url).param("actor", "not-an-id").param("purpose", "годишен отчет")).andExpect(status().isBadRequest)
+        mvc.perform(get("$url/access-log")).andExpect(status().isBadRequest)
+        org.mockito.Mockito.verifyNoInteractions(access)
+        // … and what the service refuses — a blank purpose, an actor who is not registered — is a 400 with its reason
+        whenever(access.read(eq(entranceId), any(), eq(manager), eq(" "))).thenThrow(BookAccessRefused("a purpose is required"))
+        mvc.perform(get(url).param("actor", manager.toString()).param("purpose", " "))
             .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("a purpose is required"))
+        whenever(access.read(eq(entranceId), any(), eq(manager), eq("x"))).thenThrow(NoSuchElementException("no entrance"))
+        mvc.perform(get(url).param("actor", manager.toString()).param("purpose", "x")).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `PM-BOOK-007 the access log is exported with who read, why and when`() {
+        whenever(access.export(entranceId, manager, "проверка на КЗЛД")).thenReturn(
+            listOf(
+                BookAccessView(UUID.randomUUID(), manager, "Мария Иванова", "годишен отчет", "BOOK_READ", LocalDate.parse("2026-06-01"), Instant.parse("2026-05-31T21:30:00Z")),
+                BookAccessView(UUID.randomUUID(), manager, "Мария Иванова", "проверка на КЗЛД", "LOG_EXPORT", null, Instant.parse("2026-05-31T21:31:00Z")),
+            ),
+        )
+        mvc.perform(get("/api/registry/entrances/$entranceId/book/access-log").param("actor", manager.toString()).param("purpose", "проверка на КЗЛД"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].actorName").value("Мария Иванова"))
+            .andExpect(jsonPath("$[0].kind").value("BOOK_READ"))
+            .andExpect(jsonPath("$[0].bookDate").value("2026-06-01"))
+            .andExpect(jsonPath("$[0].at").value("2026-05-31T21:30:00Z"))
+            .andExpect(jsonPath("$[1].purpose").value("проверка на КЗЛД"))
     }
 }
