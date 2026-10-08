@@ -233,8 +233,10 @@ class RegistryService(
     /**
      * Undo an import: drop every row that carried its [importId] (STAGE1-ADDENDUM §1) — the rows
      * that point at a unit first, then the units. A record added later and pointing at an imported
-     * unit is not the import's to drop: the unit's delete then fails and nothing is removed.
-     * The reaction to a revert calls this through [ImportRemoval], in a savepoint.
+     * unit is not the import's to drop: the unit's delete then fails and nothing is removed. The same
+     * holds for an imported party since named as the reader in the book's access log (PM-BOOK-007):
+     * the log keeps its entries, so that party — and with it the import — stays.
+     * The reaction to a revert calls this through [ImportRemoval], in a savepoint, and reports a refusal.
      */
     @Transactional
     fun revertImport(importId: UUID) {

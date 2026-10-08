@@ -439,8 +439,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the Book of the Condominium as of a date */
+        /** Read the Book of the Condominium as of a date — the read names who and why, and is logged */
         get: operations["get_registry_entrances_entranceId_book"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/registry/entrances/{entranceId}/book/access-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export who read the entrance's book, why and when — oldest first; the export is logged too */
+        get: operations["get_registry_entrances_entranceId_book_access_log"];
         put?: never;
         post?: never;
         delete?: never;
@@ -681,6 +698,19 @@ export interface components {
             titleRole: string;
             validFrom?: string;
             validTo?: string;
+        };
+        BookAccessView: {
+            /** Format: uuid */
+            actor: string;
+            actorName: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: date */
+            bookDate?: string;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            purpose: string;
         };
         BookNonUse: {
             /** Format: date */
@@ -2700,8 +2730,10 @@ export interface operations {
     };
     get_registry_entrances_entranceId_book: {
         parameters: {
-            query?: {
+            query: {
                 on?: string;
+                actor: string;
+                purpose: string;
             };
             header?: never;
             path: {
@@ -2718,6 +2750,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CondominiumBook"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_registry_entrances_entranceId_book_access_log: {
+        parameters: {
+            query: {
+                actor: string;
+                purpose: string;
+            };
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookAccessView"][];
                 };
             };
             /** @description Bad Request */

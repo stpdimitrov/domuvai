@@ -18,18 +18,29 @@ import java.util.UUID
 /**
  * Reads the Book of the Condominium for an entrance (PM-BOOK-001 — the electronic book is the
  * system of record). The book resolves as of a date; omit it and it is today in Sofia (PM-SYS-004).
+ * Every read names who reads and why, and is logged (PM-BOOK-007); the log is exported the same way.
  */
 @RestController
 @RequestMapping("/api/registry/entrances/{entranceId}/book")
 class BookController(
-    private val book: BookService,
+    private val access: BookAccessService,
     private val retention: BookRetentionService,
     private val clock: Clock,
 ) {
 
     @GetMapping
-    fun book(@PathVariable entranceId: UUID, @RequestParam(required = false) on: String?): CondominiumBook =
-        book.forEntrance(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())))
+    fun book(
+        @PathVariable entranceId: UUID,
+        @RequestParam(required = false) on: String?,
+        @RequestParam actor: UUID,
+        @RequestParam purpose: String,
+    ): CondominiumBook =
+        access.read(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())), actor, purpose)
+
+    /** Who read the book, why and when (PM-BOOK-007) — the entrance's entries, oldest first. This export is an entry too. */
+    @GetMapping("/access-log")
+    fun accessLog(@PathVariable entranceId: UUID, @RequestParam actor: UUID, @RequestParam purpose: String): List<BookAccessView> =
+        access.export(entranceId, actor, purpose)
 
     /**
      * Anonymise the field groups past their retention window — a resident's link to a named person,
@@ -45,6 +56,11 @@ class BookController(
     @ExceptionHandler(NoSuchElementException::class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
+
+    /** No purpose, one too long, or an actor who is not a registered party → 400: the book is not served off the record. */
+    @ExceptionHandler(BookAccessRefused::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    fun onRefused(e: BookAccessRefused): Map<String, String> = mapOf("error" to (e.message ?: "the book is read on the record"))
 
     /** A malformed `on` date is the caller's error. */
     @ExceptionHandler(DateTimeParseException::class)
