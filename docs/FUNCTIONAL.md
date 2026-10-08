@@ -1,7 +1,7 @@
 # What the application does
 
 **ЗУЕС condominium platform · functional specification · business level**
-Rule catalogue v1.0 · legal baseline 2026-09-03 · 233 rules · 13 modules + 3 platform guarantees
+Rule catalogue v1.3 · legal baseline 2026-09-03 · 233 rules · 13 modules + 3 platform guarantees
 
 This document is for people who do not read code: the pilot firm, a домоуправител, a lawyer, an investor, a new joiner. It says what the product does, who does it, and what it refuses to do. It does not say how it is built — that is the Developer Brief and the Architecture Detail.
 

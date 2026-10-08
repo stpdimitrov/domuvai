@@ -54,7 +54,7 @@ Then take one slice from [docs/TESTPLAN.md](docs/TESTPLAN.md), claim it with a G
 
 ```bash
 pip install -r tools/requirements.txt   # once
-./tools/gates.sh                        # all nine checks, the same ones CI runs
+./tools/gates.sh                        # every gate, the same ones CI runs
 
 python3 tools/build_functional.py   # regenerate docs/FUNCTIONAL.md from rules.json — fails if a rule has no module
 python3 tools/md2pdf.py <in.md> <out.html> "<title>"
