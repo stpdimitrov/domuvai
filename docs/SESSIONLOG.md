@@ -2193,3 +2193,17 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportAdoption.kt`, `ImportSavepoint.kt`, `app/src/main/kotlin/zues/app/intake/ImportCommitOutcome.kt`, `ImportService.kt` (`commit`, `settle`).
 
 ---
+
+## S-41e · 2026-10-08 · registry — a reverted import is never adopted again
+
+**Shipped** — the registry remembers each import it has reverted in a new insert-only table, `registry.reverted_import`, written inside the revert's own savepoint; an adoption for an import that bears the mark is refused and adopts nothing (`ImportSavepoint`). An adoption and a removal of one import now take one advisory lock on its id, so neither slips between the other's check and its writes. This closes what S-41d recorded as open: the adoption's guard looked only for rows carrying the import's id, so a commit delivered again after its import was reverted found none and adopted them all anew, under a record that said `REVERTED`.
+
+**Verified** — `ImportCommitPersistenceIT` from a scratch copy on this machine's Postgres 16, 7 of 7: after a commit and its revert, the same adoption asked again is refused with "was reverted", no unit and no household row appears, and the import still reads `REVERTED`; a revert delivered twice leaves one mark; the mark ignores a delete; a revert that was blocked leaves none, and that import is reverted later as before. Two mutants killed (the mark not checked; the mark not written). The registry-side unit tests pass unchanged — an adoption refused this way is answered as blocked with what the registry said, which the already-reverted import ignores. Gates green.
+
+**Decisions** — the owner's, 2026-10-08: "whatever you recommend" among three next slices; this one was recommended as a correctness gap in what had just shipped. Mine: the mark lives in the registry, not in a read of intake's status, so the registry decides from its own record · the mark is permanent, since a reverted import cannot be committed again.
+
+**Open** — the two operations lock on the import's id only inside `ImportSavepoint`; `RegistryService.adoptImport` and `revertImport` called directly (as two tests do) take no such lock and check no mark · an import still waits as `COMMITTING` or `REVERTING` if the process stops before the registry answers, until the application next starts.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportSavepoint.kt`.
+
+---

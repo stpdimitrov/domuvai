@@ -71,6 +71,7 @@ class ImportCommitPersistenceIT {
     @Autowired lateinit var household: HouseholdMemberRepository
     @Autowired lateinit var titles: TitleRepository
     @Autowired lateinit var parties: PartyRepository
+    @Autowired lateinit var savepoint: zues.app.registry.ImportSavepoint
     @Autowired lateinit var jdbc: org.springframework.jdbc.core.JdbcTemplate
 
     private val ON = LocalDate.parse("2026-05-01")
@@ -123,6 +124,22 @@ class ImportCommitPersistenceIT {
 
         assertThat(eventually(importId, "REVERTED").has("revertBlockedBy")).isFalse()
         assertThat(units.findByImportId(UUID.fromString(importId))).isEmpty()
+
+        // S-41e — a commit is delivered at least once. Delivered again now, it finds no row of the import; the revert's
+        // mark refuses it all the same, and nothing is adopted under a record that says REVERTED.
+        val again = listOf(
+            ImportedUnit(RegisterUnit(designation = "ап. 1", unitType = "UNSPECIFIED", idealParts = "60.0000"), occupants = 2),
+            ImportedUnit(RegisterUnit(designation = "ап. 2", unitType = "UNSPECIFIED", idealParts = "40.0000"), occupants = 1),
+        )
+        assertThatThrownBy { savepoint.adopt(entranceId, UUID.fromString(importId), ON, again) }
+            .isInstanceOf(IllegalStateException::class.java).hasMessageContaining("was reverted")
+        assertThat(units.findByEntranceId(entranceId)).isEmpty()
+        assertThat(household.findByImportId(UUID.fromString(importId))).isEmpty()
+        savepoint.remove(UUID.fromString(importId))                                     // a revert delivered again: nothing to do, one mark
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM reverted_import WHERE import_id = ?::uuid", Long::class.java, importId)).isEqualTo(1)
+        jdbc.update("DELETE FROM reverted_import WHERE import_id = ?::uuid", importId)  // ignored: the mark stays
+        assertThatThrownBy { savepoint.adopt(entranceId, UUID.fromString(importId), ON, again) }.isInstanceOf(IllegalStateException::class.java)
+        mvc.perform(get("/api/intake/imports/$importId")).andExpect(jsonPath("$.status").value("REVERTED"))
         mvc.perform(                                                                    // done once: not reverted again
             post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"again"}"""),
@@ -200,6 +217,8 @@ class ImportCommitPersistenceIT {
             .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"wrong entrance"}""")
         mvc.perform(revert).andExpect(status().isOk).andExpect(jsonPath("$.status").value("REVERTING"))
         val blocked = eventually(importId, "REVERT_BLOCKED")
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM reverted_import WHERE import_id = ?::uuid", Long::class.java, importId))
+            .isEqualTo(0)                                                               // a revert that was refused leaves no mark
         assertThat(blocked.get("revertBlockedBy").asText()).startsWith("title (")       // the table that still points at the unit
         assertThat(units.findByImportId(id)).hasSize(2)                                  // nothing was removed —
         assertThat(household.findByImportId(id)).hasSize(3)                              // — not even what went first
