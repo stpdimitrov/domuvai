@@ -2193,3 +2193,38 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportAdoption.kt`, `ImportSavepoint.kt`, `app/src/main/kotlin/zues/app/intake/ImportCommitOutcome.kt`, `ImportService.kt` (`commit`, `settle`).
 
 ---
+
+## H-10 · 2026-10-08 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at S-41e (#136) or later. Nothing in flight: no open PR, every lane free. Next: the owner's choice among the proposals below.
+
+**Shipped since H-09** (squash-merged, each reviewed in a fresh context before it merged):
+- Money — #114 S-G1-02j: the fund's four write endpoints require an `Idempotency-Key` (#58, closed).
+- Console, live screens — #116 WEB-19 `/portfolio` · #118 WEB-20 `/entrance` (overdue book declarations, the entrance's accounts; tabs and sidebar carry `?entrance=`) · #120 WEB-21 a repeated query parameter no longer fails `/debts` · #125 WEB-22 the footer shows the rule catalogue's version.
+- The catalogue's version (PM-SYS-010) — #123 S-G1-01a: `GET /api/law/version`, and a schema test that a table keeping a computed basis keeps both versions · #127 S-G1-01b: RULES.md's header is the one source, gate 11 fails when a copy disagrees (#122, closed).
+- Registry — #130 S-G1-03f: every read of the book names who and why and is logged; the log is exported.
+- The commit seam — #132 S-41c: a revert is two steps (`REVERTING` → `REVERTED` | `REVERT_BLOCKED`) · #134 S-41d: a commit likewise (`COMMITTING` → `COMMITTED` | `COMMIT_BLOCKED`) · #136 S-41e: a reverted import is never adopted again (#129, closed).
+
+**Numbers** — named-test coverage 54 of 233. Gate 1 left: 20 rules across S-G1-01 kernel (9), S-G1-02 money (3), S-G1-03 registry (8). The API runs 43 operations in four modules. Eleven gates.
+
+**Frontend ↔ backend, as of today** — five console screens are live: `/portfolio`, `/entrance`, `/entrance/charges`, `/entrance/fund`, `/debts`; each shows a dash, and says so, where no backend serves a figure. `/compliance` and `/assembly` are still the design's sample. No screen calls intake or reads the book.
+
+**The owner's decisions since H-09** (each recorded on its issue or in its slice's entry):
+- #73 closed. The catalogue is v1.3 (delegated: "you decide", with the analysis in S-G1-01b).
+- The book's access log: until sign-in exists the caller names the actor; only the full book is logged, not the names-only lists.
+- A blocked revert and a blocked commit: two steps, not a single answer and not intake asking the registry first.
+- "Whatever you recommend" for the slice after S-41d: taken as S-41e.
+
+**Findings and gaps open** — #100 what the business-use plan left for the owner and counsel · #57 signing the fund's handover statement · an import waits as `COMMITTING` or `REVERTING` with no time limit if the process stops before the registry answers (redelivered at the next start) · the names-only reads of owners and overdue declarations are personal data and are not logged; any registered party who states a purpose can read the book (PM-BOOK-006 needs roles) · the book-access table and the revert marks are guarded against the application, not against the database's owner: no separate role exists · registry, intake and charge-run writes take no `Idempotency-Key` (DEVBRIEF §8); only payments and the fund do · the legal baseline date is written in several places and no gate ties them.
+
+**Not built, and waiting on the owner** — recording operating expenses (who may pay, on what basis) · sign-in, which the access log, PM-BOOK-006 and the console's switch all wait on · PM-SYS-015's payload budget and PM-SYS-009's fine ranges (numbers the owner or counsel must give).
+
+**Next slices, proposed** — registry: units where declared residents differ from billed ones (PM-BOOK-012) · `/compliance` live as far as the registry's overdue declarations go · operating expenses, once the owner answers · the remaining Gate 1 rules, most of which wait on modules that do not exist yet (assembly, compliance, evidence).
+
+**The chain on one machine** — unchanged (`web/README.md`). Practised this stretch: `next build` and `next dev` share `web/.next`, so stop the dev server before a production build and start it again after; the local harness runs on ports 8081 and 3010–3012 beside the owner's 8080 and 3000; a persistence IT runs locally from an uncommitted scratch copy with the Testcontainers parts removed.
+
+**Operating procedure** — unchanged (`.claude/skills/zues-slice/SKILL.md`). Lessons of this stretch: check a gate's exit status, never the last line of a pipe — a `tail` hid one failure and a stale generated file was pushed, then fixed · two PRs in flight both append here, and git places the second entry before main's last: after merging `main`, move the slice's own entry to the end · a mocked refusal and the database's real one differ (Spring Data wraps a batched delete's refusal in an exception that is not a `DataAccessException`): the Postgres run found what the unit test had not · a review finding is checked against the code before it is taken; one count in a review was wrong.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`.
+
+---
