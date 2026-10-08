@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import CatalogueFooter from "./CatalogueFooter";
 import "./console.css";
 
@@ -12,7 +12,10 @@ export default function ConsoleLayout({ children }: { children: ReactNode }) {
   return (
     <div className="console">
       <div className="console-row">{children}</div>
-      <CatalogueFooter />
+      {/* the footer waits on the API by itself: a slow answer holds an empty strip, never the screen */}
+      <Suspense fallback={<div className="console-foot" />}>
+        <CatalogueFooter />
+      </Suspense>
     </div>
   );
 }

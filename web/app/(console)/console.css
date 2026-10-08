@@ -26,12 +26,14 @@
   background: #edece8;
   border-top: 1px solid #deddd9;
   font: 400 11px/1 "IBM Plex Mono", monospace;
-  color: #6b6f6c;
+  color: #5c605e;
 }
 
 .console-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: auto; /* a screen taller than the window scrolls above the footer, not through it */
   display: flex;
   flex-direction: column;
 }

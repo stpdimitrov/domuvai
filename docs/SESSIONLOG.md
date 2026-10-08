@@ -2116,6 +2116,8 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 
 **Verified** — the whole chain on this machine (the API's jar on a scratch Postgres 16 database, the seed, the production web build on three servers): the check holds. Two mutants each fail it on all six screens (no footer; the engine's version shown as the catalogue's). A server pointed at an address nothing listens on shows "версията не е достъпна". Looked at the rendered portfolio.
 
+**Review** — fresh context, three findings, all taken: the footer was awaited with the layout, so a hung version call held every screen for the client's ten seconds — it now waits inside its own `Suspense`, with an empty strip in its place; a screen taller than the window (`/entrance` on a short one) painted through the footer — the screen's column now scrolls above it; the footer's text is one step darker, for contrast.
+
 **Decisions** — mine, stated on #124: "the footer" is the console's; the landing page states no rule and shows no version.
 
 **Open** — with this, both halves of PM-SYS-010's acceptance are built (S-G1-01a stores and serves, this shows) · `/assembly` is outside the console's layout and has no footer · a value typed into the web instead of the API's would pass the check while the two agree; the scan of the web's calls only proves the call is made · which version is right, 1.0 or 1.3, is still #122.
