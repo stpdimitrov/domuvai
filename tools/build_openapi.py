@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """A9, rebuilt by ADR-013 — the HTTP contract for the `api` deployable.
 
-The spec is generated from the running code: `OpenApiContractTest` (gate 1/9) asks springdoc
-for it and writes app/build/openapi/api-docs.json. This script (gate 6/9) publishes it as
+The spec is generated from the running code: `OpenApiContractTest` (the tests gate) asks springdoc
+for it and writes app/build/openapi/api-docs.json. This script (the openapi gate) publishes it as
 docs/api/openapi.json and adds the one thing the code cannot say — which rules each operation
 serves. The build fails when:
 

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import zues.kernel.IdealParts
 import zues.law.AllocationKey
+import zues.law.CATALOGUE_VERSION
 import zues.law.CostItem
 import zues.law.CostStream
 import zues.law.defaultKey
@@ -87,7 +88,7 @@ class ChargesTest {
     @Test
     fun `PM-FEE-014 the run carries the basis, law version and engine version`() {
         val run = computeChargeRun("e1", listOf(unit("A", "100")), tariff())
-        assertEquals("1.3", run.lawVersion)
+        assertEquals(CATALOGUE_VERSION, run.lawVersion)     // the catalogue's, whatever it is (tools/check_catalogue_version.py)
         assertTrue(run.engineVersion.isNotBlank())
         assertEquals(on, run.basis.legalDate)
         assertEquals(30.0, run.basis.constants["ABSENCE_EXEMPTION_DAYS"]!!)

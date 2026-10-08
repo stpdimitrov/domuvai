@@ -1,8 +1,11 @@
-import json, re, pathlib
+import json, re, pathlib, sys
 
 md = pathlib.Path("RULES.md").read_text(encoding="utf-8")
 # The catalogue's version is RULES.md's own header — read, never typed here (PM-SYS-010; tools/check_catalogue_version.py).
-VERSION = re.search(r"^\*\*Version:\*\* (\d+\.\d+) ", md, re.M).group(1)
+_header = re.search(r"^\*\*Version:\*\* (\d+(?:\.\d+)+) ", md, re.M)
+if not _header:
+    sys.exit("RULES.md states no version in its header — a line starting '**Version:** N.N ' is needed")
+VERSION = _header.group(1)
 
 DOMAIN_TITLES = {
  "ORG":"Structure & ideal parts","BOOK":"Owners' book & residents","GOV":"Governance & mandates",
