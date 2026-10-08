@@ -57,10 +57,10 @@ class BookController(
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
-    /** A blank purpose, or an actor who is not a registered party → 400: the book is not served off the record. */
-    @ExceptionHandler(IllegalArgumentException::class)
+    /** No purpose, one too long, or an actor who is not a registered party → 400: the book is not served off the record. */
+    @ExceptionHandler(BookAccessRefused::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid request"))
+    fun onRefused(e: BookAccessRefused): Map<String, String> = mapOf("error" to (e.message ?: "the book is read on the record"))
 
     /** A malformed `on` date is the caller's error. */
     @ExceptionHandler(DateTimeParseException::class)

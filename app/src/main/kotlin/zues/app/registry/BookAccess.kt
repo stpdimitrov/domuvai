@@ -36,6 +36,12 @@ interface BookAccessRepository : Repository<BookAccessRow, UUID> {
     fun findByEntranceIdOrderByAtAscIdAsc(entranceId: UUID): List<BookAccessRow>
 }
 
+/** A read off the record — no purpose, one too long to be a purpose, or an actor who is not a registered party: a 400, and no book. */
+class BookAccessRefused(message: String) : RuntimeException(message)
+
+/** A purpose is a line, not a document: the table refuses a longer one too. */
+const val PURPOSE_MAX = 500
+
 /** An entry as exported: the actor by name beside the id, so the log reads without a second lookup. */
 data class BookAccessView(
     val id: UUID,
@@ -79,10 +85,12 @@ class BookAccessService(
 
     private fun record(entranceId: UUID, actor: UUID, purpose: String, kind: BookAccessKind, bookDate: LocalDate?) {
         if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
-        require(purpose.isNotBlank()) { "a purpose is required to read the book (PM-BOOK-007)" }
-        require(parties.existsById(actor)) { "actor $actor is not a registered party (PM-BOOK-007)" }
+        val why = purpose.trim()
+        if (why.isEmpty()) throw BookAccessRefused("a purpose is required to read the book (PM-BOOK-007)")
+        if (why.length > PURPOSE_MAX) throw BookAccessRefused("a purpose is at most $PURPOSE_MAX characters (PM-BOOK-007)")
+        if (!parties.existsById(actor)) throw BookAccessRefused("actor $actor is not a registered party (PM-BOOK-007)")
         aggregates.insert(
-            BookAccessRow(UUID.randomUUID(), entranceId, actor, purpose.trim(), kind.name, bookDate, clock.instant().truncatedTo(ChronoUnit.MICROS)),
+            BookAccessRow(UUID.randomUUID(), entranceId, actor, why, kind.name, bookDate, clock.instant().truncatedTo(ChronoUnit.MICROS)),
         )
     }
 }

@@ -8,6 +8,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.reset
+import org.mockito.kotlin.whenever
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -51,7 +57,7 @@ class BookPersistenceIT {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var registry: RegistryService
     @Autowired lateinit var ownership: OwnershipService
-    @Autowired lateinit var book: BookService
+    @MockitoSpyBean lateinit var book: BookService          // the real one; one test makes it fail after the entry is written
     @Autowired lateinit var declarations: DeclarationService
     @Autowired lateinit var jdbc: JdbcTemplate
 
@@ -129,8 +135,16 @@ class BookPersistenceIT {
         mvc.perform(get(url).param("actor", manager.toString()).param("purpose", "справка за собственик")).andExpect(status().isOk)
         assertThat(entries()).isEqualTo(2)
 
+        // The entry and the book stand or fall together: a read that fails after its entry was written leaves none.
+        doThrow(IllegalStateException("the book could not be assembled")).whenever(book).forEntrance(eq(entrance), any())
+        assertThatThrownBy { mvc.perform(get(url).param("actor", manager.toString()).param("purpose", "неуспешно четене")) }
+            .hasRootCauseInstanceOf(IllegalStateException::class.java)
+        reset(book)
+        assertThat(entries()).isEqualTo(2)
+
         jdbc.update("UPDATE book_access SET purpose = 'друго' WHERE entrance_id = ?", entrance)                  // ignored
         jdbc.update("DELETE FROM book_access WHERE entrance_id = ?", entrance)                                    // ignored
+        assertThatThrownBy { jdbc.execute("TRUNCATE book_access") }.isInstanceOf(DataIntegrityViolationException::class.java)   // refused
         mvc.perform(get("$url/access-log").param("actor", manager.toString()).param("purpose", "проверка на КЗЛД"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(3))                                                           // the export is an entry too
@@ -142,11 +156,11 @@ class BookPersistenceIT {
             .andExpect(jsonPath("$[2].kind").value("LOG_EXPORT"))
             .andExpect(jsonPath("$[2].bookDate").doesNotExist())
 
-        // The table's own refusals, one at a time: a read with no date, an export with one, a blank purpose, an unknown kind.
+        // The table's own refusals, one at a time: a read with no date, an export with one, a blank purpose, one too long, an unknown kind.
         val row = "INSERT INTO book_access (id, entrance_id, actor, purpose, kind, book_date, at) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?::date, now())"
         for ((purpose, kind, date) in listOf(
             Triple("проверка", "BOOK_READ", null), Triple("проверка", "LOG_EXPORT", "2026-06-01"), Triple(" ", "BOOK_READ", "2026-06-01"),
-            Triple("проверка", "PEEK", "2026-06-01"),
+            Triple("проверка", "PEEK", "2026-06-01"), Triple("о".repeat(501), "BOOK_READ", "2026-06-01"),
         )) {
             assertThatThrownBy { jdbc.update(row, entrance, manager, purpose, kind, date) }.isInstanceOf(DataIntegrityViolationException::class.java)
         }

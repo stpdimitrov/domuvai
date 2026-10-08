@@ -1,11 +1,13 @@
 -- Rule: PM-BOOK-007 — every access to the Book of the Condominium, with who read it, why, and when. One row per
 -- read of the book (BOOK_READ, with the date the book was read as of) and per export of this log (LOG_EXPORT).
--- Insert-only: an entry is never changed and never removed.
+-- Insert-only for the application: an UPDATE or a DELETE changes nothing, and a TRUNCATE is refused. The database's
+-- owner can still drop these guards — the application connects as one role, and a role of its own is not set up yet.
 CREATE TABLE registry.book_access (
   id           uuid PRIMARY KEY,
   entrance_id  uuid NOT NULL REFERENCES registry.entrance(id),
   actor        uuid NOT NULL REFERENCES registry.party(id),
-  purpose      text NOT NULL CONSTRAINT book_access_purpose_not_blank CHECK (purpose ~ '\S'),
+  purpose      text NOT NULL CONSTRAINT book_access_purpose_not_blank CHECK (purpose ~ '\S')
+                             CONSTRAINT book_access_purpose_length CHECK (char_length(purpose) <= 500),
   kind         text NOT NULL CHECK (kind IN ('BOOK_READ','LOG_EXPORT')),
   book_date    date,
   at           timestamptz NOT NULL,
@@ -14,3 +16,10 @@ CREATE TABLE registry.book_access (
 CREATE INDEX book_access_entrance ON registry.book_access (entrance_id, at);
 CREATE RULE book_access_no_update AS ON UPDATE TO registry.book_access DO INSTEAD NOTHING;
 CREATE RULE book_access_no_delete AS ON DELETE TO registry.book_access DO INSTEAD NOTHING;
+CREATE FUNCTION registry.book_access_keeps_its_entries() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'registry.book_access is the record of who read the book, and is not emptied' USING ERRCODE = 'check_violation';
+END $$;
+CREATE TRIGGER book_access_no_truncate BEFORE TRUNCATE ON registry.book_access
+  FOR EACH STATEMENT EXECUTE FUNCTION registry.book_access_keeps_its_entries();

@@ -61,11 +61,16 @@ class BookAccessServiceTest {
 
     @Test
     fun `PM-BOOK-007 nothing is served and nothing written without a purpose, a registered actor and a registered entrance`() {
-        assertThatThrownBy { service.read(entranceId, on, manager, " ") }.isInstanceOf(IllegalArgumentException::class.java)
-        assertThatThrownBy { service.read(entranceId, on, UUID.randomUUID(), "годишен отчет") }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { service.read(entranceId, on, manager, " ") }.isInstanceOf(BookAccessRefused::class.java)
+        assertThatThrownBy { service.read(entranceId, on, manager, "о".repeat(PURPOSE_MAX + 1)) }.isInstanceOf(BookAccessRefused::class.java)
+        assertThatThrownBy { service.read(entranceId, on, UUID.randomUUID(), "годишен отчет") }.isInstanceOf(BookAccessRefused::class.java)
         assertThatThrownBy { service.read(UUID.randomUUID(), on, manager, "годишен отчет") }.isInstanceOf(NoSuchElementException::class.java)
-        assertThatThrownBy { service.export(entranceId, manager, "") }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { service.export(entranceId, manager, "") }.isInstanceOf(BookAccessRefused::class.java)
         assertThat(written).isEmpty()
+        service.read(entranceId, on, manager, " " + "о".repeat(PURPOSE_MAX) + " ")                 // the longest purpose, once trimmed
+        assertThat(written.single().purpose).hasSize(PURPOSE_MAX)
+        written.clear()
+        org.mockito.Mockito.clearInvocations(book)
         verify(book, never()).forEntrance(any(), any())
         verify(log, never()).findByEntranceIdOrderByAtAscIdAsc(any())
     }

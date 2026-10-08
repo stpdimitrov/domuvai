@@ -103,7 +103,7 @@ class BookWebTest {
         mvc.perform(get("$url/access-log")).andExpect(status().isBadRequest)
         org.mockito.Mockito.verifyNoInteractions(access)
         // … and what the service refuses — a blank purpose, an actor who is not registered — is a 400 with its reason
-        whenever(access.read(eq(entranceId), any(), eq(manager), eq(" "))).thenThrow(IllegalArgumentException("a purpose is required"))
+        whenever(access.read(eq(entranceId), any(), eq(manager), eq(" "))).thenThrow(BookAccessRefused("a purpose is required"))
         mvc.perform(get(url).param("actor", manager.toString()).param("purpose", " "))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error").value("a purpose is required"))
