@@ -73,7 +73,7 @@ A lint rule fails the build on the banned words.
 
 ## 3. Requirements source
 
-`docs/rules.json` — 228 rules, 16 domains, catalogue version 1.2, legal baseline 3 Sep 2026.
+`docs/rules.json` — 233 rules, 16 domains, catalogue version 1.3, legal baseline 3 Sep 2026.
 
 | Binding | Meaning |
 |---|---|
