@@ -34,8 +34,8 @@ import java.util.UUID
  * The commit seam against real PostgreSQL, proved in two halves so no test depends on the async
  * hop between them:
  *  - the intake HTTP lifecycle: a reviewed import commits (its file's hash must match) and reverts,
- *    and its status transitions REPRODUCED → COMMITTED → REVERTING → REVERTED — or REVERT_BLOCKED,
- *    with what blocks it, when the registry cannot remove the rows (S-41c; these two tests do wait
+ *    and its status transitions REPRODUCED → COMMITTING → COMMITTED → REVERTING → REVERTED — or COMMIT_BLOCKED /
+ *    REVERT_BLOCKED, with why, when the registry cannot carry it out (S-41c, S-41d; these tests do wait
  *    on the async hop, by reading the import until it settles);
  *  - the registry's adoption (RegistryService.adoptImport, which the listener calls): units are
  *    created stamped with the import id, typed UNSPECIFIED until the pilot sheet, summing to 100%
@@ -105,8 +105,10 @@ class ImportCommitPersistenceIT {
             post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"committedBy":"${UUID.randomUUID()}","sheet":$sheet}"""),
         ).andExpect(status().isOk).andExpect(jsonPath("$.rowsCreated").value(2))
+            .andExpect(jsonPath("$.status").value("COMMITTING"))                        // asked for; the registry has yet to adopt
 
-        mvc.perform(get("/api/intake/imports/$importId")).andExpect(jsonPath("$.status").value("COMMITTED"))
+        assertThat(eventually(importId, "COMMITTED").has("commitBlockedBy")).isFalse()
+        assertThat(units.findByImportId(UUID.fromString(importId))).hasSize(2)
 
         // Committing again is refused — a committed import is not re-committed (409).
         mvc.perform(
@@ -125,6 +127,38 @@ class ImportCommitPersistenceIT {
             post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"again"}"""),
         ).andExpect(status().isConflict)
+    }
+
+    @Test
+    fun `a commit the registry cannot adopt ends COMMIT_BLOCKED saying why, adopts nothing, and succeeds once what refused it is gone`() {
+        val entranceId = createEntrance()
+        mvc.perform(                                                                    // the entrance already holds its units: 100%
+            post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"units":[{"designation":"ап. 9","unitType":"APARTMENT","idealParts":"100.0000"}]}"""),
+        ).andExpect(status().isCreated)
+        val importId = recordImport(entranceId)
+        val id = UUID.fromString(importId)
+        val commit = post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON)
+            .content("""{"committedBy":"${UUID.randomUUID()}","sheet":$sheet}""")
+
+        mvc.perform(commit).andExpect(status().isOk).andExpect(jsonPath("$.status").value("COMMITTING"))
+        mvc.perform(commit).andExpect(status().isConflict)                              // under way: not asked twice
+        val blocked = eventually(importId, "COMMIT_BLOCKED")
+        assertThat(blocked.get("commitBlockedBy").asText())                             // the schema's own deferred check, run inside the savepoint
+            .contains("sum to 200.0000").contains("PM-ORG-002")
+        assertThat(units.findByImportId(id)).isEmpty()                                  // nothing was adopted —
+        assertThat(household.findByImportId(id)).isEmpty()                              // — not even what was written before the refusal
+        assertThat(units.findByEntranceId(entranceId)).hasSize(1)
+        mvc.perform(                                                                    // never committed: nothing to revert
+            post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"x"}"""),
+        ).andExpect(status().isConflict)
+
+        jdbc.update("DELETE FROM unit WHERE entrance_id = ? AND import_id IS NULL", entranceId)
+        mvc.perform(commit).andExpect(status().isOk).andExpect(jsonPath("$.status").value("COMMITTING"))
+        assertThat(eventually(importId, "COMMITTED").has("commitBlockedBy")).isFalse()
+        assertThat(units.findByImportId(id)).hasSize(2)
+        assertThat(household.findByImportId(id)).hasSize(3)
     }
 
     /** The import as `GET` shows it, once its status is [status] — the registry reacts after the request has answered. */
@@ -148,7 +182,7 @@ class ImportCommitPersistenceIT {
             post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"committedBy":"${UUID.randomUUID()}","sheet":$sheet}"""),
         ).andExpect(status().isOk)
-        repeat(100) { if (units.findByImportId(id).size < 2) Thread.sleep(100) }       // the adoption, too, follows the answer
+        eventually(importId, "COMMITTED")                                               // the adoption, too, follows the answer
         val adopted = units.findByImportId(id)
         assertThat(adopted).hasSize(2)
         assertThat(household.findByImportId(id)).hasSize(3)

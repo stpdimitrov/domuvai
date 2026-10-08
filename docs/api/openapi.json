@@ -447,13 +447,17 @@
           "rowsCreated": {
             "format": "int32",
             "type": "integer"
+          },
+          "status": {
+            "type": "string"
           }
         },
         "required": [
           "importId",
           "manualEntries",
           "rowsChanged",
-          "rowsCreated"
+          "rowsCreated",
+          "status"
         ],
         "type": "object"
       },
@@ -1058,6 +1062,9 @@
       },
       "ImportView": {
         "properties": {
+          "commitBlockedBy": {
+            "type": "string"
+          },
           "differing": {
             "format": "int32",
             "type": "integer"
@@ -2500,7 +2507,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Read an import record — its verdict, content hash and, when a revert was blocked, what blocks it",
+        "summary": "Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why",
         "tags": [
           "intake"
         ],
@@ -2584,7 +2591,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Commit a reviewed import into the registry — units, households and owners; what needs a declaration is returned for a person to record, never adopted",
+        "summary": "Ask for a reviewed import to be committed into the registry — units, households and owners; answers COMMITTING, and the record then reads COMMITTED or COMMIT_BLOCKED; what needs a declaration is returned for a person to record, never adopted",
         "tags": [
           "intake"
         ],

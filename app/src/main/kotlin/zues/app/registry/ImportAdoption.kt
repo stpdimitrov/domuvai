@@ -3,6 +3,8 @@ package zues.app.registry
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
+import zues.app.intake.ImportCommitApplied
+import zues.app.intake.ImportCommitBlocked
 import zues.app.intake.ImportCommitted
 import zues.app.intake.ImportRevertApplied
 import zues.app.intake.ImportRevertBlocked
@@ -20,59 +22,73 @@ import java.sql.SQLException
  * Delivery is at least once, so both reactions are idempotent on the import id (see
  * [RegistryService.adoptImport] and [RegistryService.revertImport]).
  *
- * A revert reports back. The registry hears of it after intake's request has answered, so it says what
- * became of it with one of intake's own two events: the rows are gone, or they could not be removed —
- * and why — and none was. It always answers: a failure it cannot name is still a revert that did not
- * happen, and the import must not wait on it.
+ * Both reactions report back. The registry hears of a commit or a revert after intake's request has
+ * answered, so it says what became of it with one of intake's own events: done, or not — and why — with
+ * nothing written. It always answers: a failure it cannot name is still a commit or a revert that did
+ * not happen, and the import must not wait on it.
  */
 @Component
 class ImportAdoption(
     private val registry: RegistryService,
-    private val removal: ImportRemoval,
+    private val savepoint: ImportSavepoint,
     private val events: ApplicationEventPublisher,
 ) {
 
     @ApplicationModuleListener
     fun on(event: ImportCommitted) {
-        registry.adoptImport(
-            event.entranceId,
-            event.importId,
-            event.effectiveFrom,
-            event.units.map {
-                ImportedUnit(
-                    RegisterUnit(
-                        designation = it.designation, unitType = IMPORTED_UNIT_TYPE,
-                        areaM2 = it.builtArea?.let(::BigDecimal), idealParts = it.idealParts,
-                        businessUse = it.businessUse,   // Rule: PM-FEE-010 — a sheet has no separate-entrance column, so none is set
-                    ),
-                    occupants = it.occupants, childrenUnder6 = it.childrenUnder6, ownerName = it.ownerName,
-                )
-            },
-        )
+        val outcome = try {
+            savepoint.adopt(                                           // in a savepoint: a refusal undoes the adoption, not this reaction
+                event.entranceId,
+                event.importId,
+                event.effectiveFrom,
+                event.units.map {
+                    ImportedUnit(
+                        RegisterUnit(
+                            designation = it.designation, unitType = IMPORTED_UNIT_TYPE,
+                            areaM2 = it.builtArea?.let(::BigDecimal), idealParts = it.idealParts,
+                            businessUse = it.businessUse,   // Rule: PM-FEE-010 — a sheet has no separate-entrance column, so none is set
+                        ),
+                        occupants = it.occupants, childrenUnder6 = it.childrenUnder6, ownerName = it.ownerName,
+                    )
+                },
+            )
+            ImportCommitApplied(event.entranceId, event.importId)
+        } catch (refused: RuntimeException) {
+            ImportCommitBlocked(event.entranceId, event.importId, why(refused))
+        }
+        events.publishEvent(outcome)
     }
 
     @ApplicationModuleListener
     fun on(event: ImportReverted) {
         val outcome = try {
-            removal.remove(event.importId)                             // in a savepoint: a refusal undoes the removal, not this reaction
+            savepoint.remove(event.importId)                           // in a savepoint: a refusal undoes the removal, not this reaction
             ImportRevertApplied(event.entranceId, event.importId)
         } catch (refused: RuntimeException) {   // a batched delete's refusal arrives wrapped (DbActionExecutionException), not as a DataAccessException
-            ImportRevertBlocked(event.entranceId, event.importId, blockedBy(refused))
+            ImportRevertBlocked(event.entranceId, event.importId, stillReferenced(refused) ?: why(refused))
         }
         events.publishEvent(outcome)
     }
 
+    private fun database(refused: RuntimeException): SQLException? =
+        generateSequence<Throwable>(refused) { it.cause }.filterIsInstance<SQLException>().firstOrNull()
+
+    private fun firstLine(text: String?) = text.orEmpty().lineSequence().firstOrNull().orEmpty().removePrefix("ERROR: ").trim().take(300)
+
     /**
-     * Why the revert did not happen. A row that still points at an imported one is named by its table and constraint;
-     * any other refusal of the database's — the entrance's ideal parts no longer adding up — in its own first line;
-     * a failure that is not the database's by its kind. Asking again is always possible.
+     * Why it did not happen: the database's own first line — an entrance's ideal parts no longer adding up — or, for a
+     * failure that is not the database's, what it said, or its kind. Asking again is always possible.
      */
-    private fun blockedBy(refused: RuntimeException): String {
-        val cause = generateSequence<Throwable>(refused) { it.cause }.filterIsInstance<SQLException>().firstOrNull()
-            ?: return "the registry could not carry it out (${refused.javaClass.simpleName})"
-        val said = cause.message.orEmpty().lineSequence().firstOrNull().orEmpty().removePrefix("ERROR: ").trim().take(300)
-        if (cause.sqlState != FOREIGN_KEY_VIOLATION) return said.ifBlank { "the database refused it (${cause.sqlState})" }
-        val named = STILL_REFERENCED.find(said) ?: return "a record added after the import was committed"
+    private fun why(refused: RuntimeException): String {
+        val cause = database(refused)
+            ?: return firstLine(refused.message).ifBlank { "the registry could not carry it out (${refused.javaClass.simpleName})" }
+        return firstLine(cause.message).ifBlank { "the database refused it (${cause.sqlState})" }
+    }
+
+    /** For a revert: the table and constraint of a row that still points at an imported one — or null when that is not what refused it. */
+    private fun stillReferenced(refused: RuntimeException): String? {
+        val cause = database(refused)?.takeIf { it.sqlState == FOREIGN_KEY_VIOLATION } ?: return null
+        val named = STILL_REFERENCED.find(firstLine(cause.message)) ?: return "a record added after the import was committed"
         return "${named.groupValues[2]} (${named.groupValues[1]})"
     }
 

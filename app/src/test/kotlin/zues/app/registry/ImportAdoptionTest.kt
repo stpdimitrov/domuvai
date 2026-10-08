@@ -11,6 +11,8 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import zues.app.intake.AdoptedUnit
+import zues.app.intake.ImportCommitApplied
+import zues.app.intake.ImportCommitBlocked
 import zues.app.intake.ImportCommitted
 import zues.app.intake.ImportRevertApplied
 import zues.app.intake.ImportRevertBlocked
@@ -124,7 +126,7 @@ class ImportAdoptionTest {
         val written = argumentCaptor<Any>()
         whenever(aggregates.insert(written.capture())).thenAnswer { it.arguments[0] }
 
-        ImportAdoption(service, mock(), mock()).on(
+        ImportAdoption(service, ImportSavepoint(service, mock()), mock()).on(     // the real savepoint step, its SQL mocked
             ImportCommitted(
                 entranceId, importId, importId, UUID.randomUUID(), 2, 0,
                 listOf(
@@ -170,7 +172,7 @@ class ImportAdoptionTest {
 
     // S-41c — the reaction to a revert reports back what became of it, always.
 
-    private val removal: ImportRemoval = mock()
+    private val removal: ImportSavepoint = mock()
     private val published: org.springframework.context.ApplicationEventPublisher = mock()
 
     private fun reverted() = ImportReverted(entranceId, importId, UUID.randomUUID(), java.time.Instant.parse("2026-05-02T08:00:00Z"), "wrong entrance")
@@ -208,7 +210,47 @@ class ImportAdoptionTest {
         assertThat(answerTo(refusal(parts, org.postgresql.util.PSQLState.UNKNOWN_STATE)))
             .isEqualTo(ImportRevertBlocked(entranceId, importId, "ideal parts for entrance 7f sum to 40.0000, must be 100.0000 or empty (PM-ORG-002)"))
         assertThat(answerTo(IllegalStateException("not the database at all")))
+            .isEqualTo(ImportRevertBlocked(entranceId, importId, "not the database at all"))
+        assertThat(answerTo(IllegalStateException()))
             .isEqualTo(ImportRevertBlocked(entranceId, importId, "the registry could not carry it out (IllegalStateException)"))
         assertThat((answerTo(refusal("ERROR: " + "x".repeat(400), org.postgresql.util.PSQLState.UNKNOWN_STATE)) as ImportRevertBlocked).blockedBy).hasSize(300)
+    }
+
+    // S-41d — and so does the reaction to a commit.
+
+    private fun committed() = ImportCommitted(entranceId, importId, importId, UUID.randomUUID(), 1, 0, listOf(AdoptedUnit("ап. 1", "100.0000", "72.50", 2, 1, "Иван Петров")), on)
+
+    private fun commitAnswerTo(failure: RuntimeException?): Any {
+        org.mockito.Mockito.reset(removal, published)
+        if (failure != null) org.mockito.kotlin.doThrow(failure).whenever(removal).adopt(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        ImportAdoption(service, removal, published).on(committed())
+        val answer = argumentCaptor<Any>()
+        verify(published).publishEvent(answer.capture())
+        return answer.firstValue
+    }
+
+    @Test
+    fun `a commit the registry adopted is answered with ImportCommitApplied, and each field of the sheet reaches the adoption`() {
+        assertThat(commitAnswerTo(null)).isEqualTo(ImportCommitApplied(entranceId, importId))
+        val adopted = argumentCaptor<List<ImportedUnit>>()
+        verify(removal).adopt(org.mockito.kotlin.eq(entranceId), org.mockito.kotlin.eq(importId), org.mockito.kotlin.eq(on), adopted.capture())
+        val row = adopted.firstValue.single()
+        assertThat(listOf(row.unit.designation, row.unit.unitType, row.unit.idealParts, row.unit.areaM2, row.occupants, row.childrenUnder6, row.ownerName))
+            .containsExactly("ап. 1", "UNSPECIFIED", "100.0000", BigDecimal("72.50"), 2, 1, "Иван Петров")
+    }
+
+    @Test
+    fun `a commit the registry could not adopt is answered with why — the database's own line, what the failure said, or its kind`() {
+        val parts = "ERROR: ideal parts for entrance 7f sum to 200.0000, must be 100.0000 or empty (PM-ORG-002)\n  Where: PL/pgSQL function"
+        assertThat(commitAnswerTo(refusal(parts, org.postgresql.util.PSQLState.UNKNOWN_STATE)))
+            .isEqualTo(ImportCommitBlocked(entranceId, importId, "ideal parts for entrance 7f sum to 200.0000, must be 100.0000 or empty (PM-ORG-002)"))
+        assertThat(commitAnswerTo(NoSuchElementException("no entrance $entranceId")))
+            .isEqualTo(ImportCommitBlocked(entranceId, importId, "no entrance $entranceId"))
+        assertThat(commitAnswerTo(IllegalStateException()))
+            .isEqualTo(ImportCommitBlocked(entranceId, importId, "the registry could not carry it out (IllegalStateException)"))
+        // a foreign key refusing an insert is not "a later record": only a revert names what still points at a row
+        val fk = """ERROR: insert or update on table "unit" violates foreign key constraint "unit_entrance_id_fkey""""
+        assertThat(commitAnswerTo(refusal(fk, org.postgresql.util.PSQLState.FOREIGN_KEY_VIOLATION)))
+            .isEqualTo(ImportCommitBlocked(entranceId, importId, """insert or update on table "unit" violates foreign key constraint "unit_entrance_id_fkey""""))
     }
 }

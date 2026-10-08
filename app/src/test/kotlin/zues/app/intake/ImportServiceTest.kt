@@ -114,8 +114,7 @@ class ImportServiceTest {
             it.copy(lines = it.lines + TariffInput("MAINTENANCE", "PER_UNIT", "GA-2026-2", rateMinor = 500, item = "CONCIERGE"))
         }
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0)))
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0))
 
         assertThatThrownBy { service.commit(importId, committedBy, req) }
             .isInstanceOf(ImportStateException::class.java).hasMessageContaining("PM-FEE-011")
@@ -126,8 +125,7 @@ class ImportServiceTest {
     fun `committing a reproduced import adopts its units and publishes ImportCommitted`() {
         val req = request(6000, 4000)
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0)))
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0))
         whenever(aggregates.update(any<ImportRow>())).thenAnswer { it.getArgument<ImportRow>(0) }
 
         val result = service.commit(importId, committedBy, req)
@@ -135,7 +133,8 @@ class ImportServiceTest {
         assertThat(result.rowsCreated).isEqualTo(2)
         val updated = argumentCaptor<ImportRow>()
         verify(aggregates).update(updated.capture())
-        assertThat(updated.firstValue.status).isEqualTo("COMMITTED")
+        assertThat(updated.firstValue.status).isEqualTo("COMMITTING")           // the registry has not adopted anything yet
+        assertThat(result.status).isEqualTo("COMMITTING")
         val event = argumentCaptor<ImportCommitted>()
         verify(events).publishEvent(event.capture())
         assertThat(event.firstValue.units.map { it.designation }).containsExactly("ап. 1", "ап. 2")
@@ -156,8 +155,7 @@ class ImportServiceTest {
                 "ап. 2,40.0000,1,${1_000 * multiple},,,,,,да",
         )
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0)))
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0))
         whenever(aggregates.update(any<ImportRow>())).thenAnswer { it.getArgument<ImportRow>(0) }
         val result = service.commit(importId, committedBy, req)
         val event = argumentCaptor<ImportCommitted>()
@@ -203,8 +201,7 @@ class ImportServiceTest {
             csv = "designation,ideal_parts,occupants,fee_minor,business\nап. 1,60.0000,2,1000,\nап. 2,40.0000,1,${1_000 * multiple},да",
         )
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0)))
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REPRODUCED", sha256(req.csv), 2, 0, 0))
 
         assertThatThrownBy { service.commit(importId, committedBy, req) }
             .isInstanceOf(ImportStateException::class.java).hasMessageContaining("PM-FEE-010")
@@ -212,10 +209,48 @@ class ImportServiceTest {
     }
 
     @Test
+    fun `only a reproduced import, or one whose commit was blocked, can be committed — and the registry's answer settles it`() {
+        val req = request(6000, 4000)
+        val importId = UUID.randomUUID()
+        val row = { status: String, why: String? -> ImportRow(importId, entranceId, status, sha256(req.csv), 2, 0, 0, commitBlockedBy = why) }
+        for (status in listOf("COMMITTING", "COMMITTED", "REVERTING", "REVERTED", "REVERT_BLOCKED")) {   // not twice, and not while one is under way
+            whenever(imports.readById(importId)).thenReturn(row(status, null))
+            assertThatThrownBy { service.commit(importId, committedBy, req) }.isInstanceOf(ImportStateException::class.java)
+        }
+        verifyNoInteractions(events)
+        whenever(imports.readById(importId)).thenReturn(row("COMMITTING", null))                 // … and a commit under way is not reverted
+        assertThatThrownBy { service.revert(importId, revertedBy, "x") }.isInstanceOf(ImportStateException::class.java)
+
+        val updated = argumentCaptor<ImportRow>()
+        whenever(aggregates.update(updated.capture())).thenAnswer { it.getArgument<ImportRow>(0) }
+        whenever(imports.readById(importId)).thenReturn(row("COMMIT_BLOCKED", "ideal parts sum to 200.0000"))
+        service.commit(importId, committedBy, req)                                               // asked again: the old answer is gone
+        assertThat(updated.lastValue.status to updated.lastValue.commitBlockedBy).isEqualTo("COMMITTING" to null)
+
+        whenever(imports.readById(importId)).thenReturn(row("COMMITTING", null))
+        service.commitBlocked(importId, "ideal parts sum to 200.0000")
+        assertThat(updated.lastValue.status to updated.lastValue.commitBlockedBy).isEqualTo("COMMIT_BLOCKED" to "ideal parts sum to 200.0000")
+        service.commitApplied(importId)
+        assertThat(updated.lastValue.status to updated.lastValue.commitBlockedBy).isEqualTo("COMMITTED" to null)
+        whenever(imports.readById(importId)).thenReturn(row("COMMIT_BLOCKED", "an earlier answer"))   // adopted is a fact: it settles a blocked one too
+        service.commitApplied(importId)
+        assertThat(updated.lastValue.status).isEqualTo("COMMITTED")
+
+        val settled = updated.allValues.size                                                     // at least once: an answer nobody waits for changes nothing
+        for (status in listOf("REPRODUCED", "COMMITTED", "REVERTING", "REVERTED")) {
+            whenever(imports.readById(importId)).thenReturn(row(status, null))
+            service.commitApplied(importId)
+            service.commitBlocked(importId, "x")
+        }
+        whenever(imports.readById(importId)).thenReturn(row("COMMIT_BLOCKED", "an earlier answer"))
+        service.commitBlocked(importId, "another")
+        assertThat(updated.allValues).hasSize(settled)
+    }
+
+    @Test
     fun `an import that is not REPRODUCED cannot be committed`() {
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "NEEDS_REVIEW", "sha", 2, 1, 0)))
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "NEEDS_REVIEW", "sha", 2, 1, 0))
         assertThatThrownBy { service.commit(importId, committedBy, request(6001, 4000)) }
             .isInstanceOf(ImportStateException::class.java)
         verifyNoInteractions(events)
@@ -224,8 +259,7 @@ class ImportServiceTest {
     @Test
     fun `committing a sheet whose hash differs from the reviewed import is refused`() {
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", "a-different-hash", 2, 0, 0)))
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REPRODUCED", "a-different-hash", 2, 0, 0))
         assertThatThrownBy { service.commit(importId, committedBy, request(6000, 4000)) }
             .isInstanceOf(ImportStateException::class.java)
         verifyNoInteractions(events)

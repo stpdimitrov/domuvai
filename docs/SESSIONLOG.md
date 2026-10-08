@@ -2177,3 +2177,17 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportAdoption.kt`, `app/src/main/kotlin/zues/app/intake/ImportRevertOutcome.kt`, `ImportService.kt` (`revert`, `settle`).
 
 ---
+
+## S-41d · 2026-10-08 · intake — a commit the registry cannot carry out is said so, not reported as done
+
+**Shipped** — a commit has the same two steps as a revert (S-41c). `POST …/imports/{id}/commit` answers with status `COMMITTING`; the registry adopts the import's rows inside a savepoint — with the checks the schema defers to commit run there — and always reports back (`ImportCommitApplied`, `ImportCommitBlocked`); the import then reads `COMMITTED`, or `COMMIT_BLOCKED` with `commitBlockedBy`. A blocked commit adopts nothing and can be asked for again with the same reviewed sheet; a commit under way can be neither committed twice nor reverted. Before this the import read `COMMITTED` at once: a commit into an entrance that already held units adopted nothing — the ideal parts would have summed to 200 — and said so nowhere. `ImportRemoval` became `ImportSavepoint` (adopt and remove), `ImportRevertOutcome` became `ImportOutcome` (four answers). Two statuses and one column added to `intake.fee_import`. The OpenAPI contract and the TS client are regenerated.
+
+**Verified** — unit tests on both sides of the seam (which statuses may be committed; an answer settling only a waiting import, "adopted" also one a stale answer left blocked; each field of the sheet reaching the adoption; a refusal answered with the database's line, what the failure said, or its kind), and `ImportCommitPersistenceIT` from a scratch copy on this machine's Postgres 16 — 7 of 7: a clean commit ends `COMMITTED` with the units adopted; one into an entrance already at 100% ends `COMMIT_BLOCKED` quoting the schema's own check (PM-ORG-002), with no unit and no household row adopted; once the earlier unit is gone the same commit ends `COMMITTED`. Three mutants killed (the deferred check left to the outer commit; a commit under way asked again; a stale "blocked" unsettling a committed import). Gates green.
+
+**Decisions** — the owner's, 2026-10-08: the same two steps as the revert. Mine: the commit's answer keeps its row count, as what it asks the registry to adopt, and gains the status · for a commit, a foreign-key refusal is reported in the database's words; only a revert names "what still points at a row".
+
+**Open** — an import still waits as `COMMITTING` if the reaction's own commit fails or the process stops before it answers, until the application next starts; no time limit, no alarm · the deferred ideal-parts check inside the savepoint is now exercised for real on the commit path; on the revert path still only with a mocked refusal · what refuses is said in the database's words, in English.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportAdoption.kt`, `ImportSavepoint.kt`, `app/src/main/kotlin/zues/app/intake/ImportOutcome.kt`, `ImportService.kt` (`commit`, `settle`).
+
+---

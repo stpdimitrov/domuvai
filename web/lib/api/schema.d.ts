@@ -62,7 +62,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read an import record — its verdict, content hash and, when a revert was blocked, what blocks it */
+        /** Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why */
         get: operations["get_intake_imports_id"];
         put?: never;
         post?: never;
@@ -81,7 +81,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Commit a reviewed import into the registry — units, households and owners; what needs a declaration is returned for a person to record, never adopted */
+        /** Ask for a reviewed import to be committed into the registry — units, households and owners; answers COMMITTING, and the record then reads COMMITTED or COMMIT_BLOCKED; what needs a declaration is returned for a person to record, never adopted */
         post: operations["post_intake_imports_id_commit"];
         delete?: never;
         options?: never;
@@ -805,6 +805,7 @@ export interface components {
             rowsChanged: number;
             /** Format: int32 */
             rowsCreated: number;
+            status: string;
         };
         CondominiumBook: {
             /** Format: date */
@@ -996,6 +997,7 @@ export interface components {
             report: components["schemas"]["DryRunReport"];
         };
         ImportView: {
+            commitBlockedBy?: string;
             /** Format: int32 */
             differing: number;
             /** Format: uuid */

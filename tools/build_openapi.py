@@ -124,9 +124,10 @@ RUNNING = {
  ('post', '/api/intake/entrances/{entranceId}/imports'):
    ('Record a source-file import: run the dry-run and store its verdict and content hash', ['PM-DOC-001']),
  ('get', '/api/intake/imports/{id}'):
-   ('Read an import record — its verdict, content hash and, when a revert was blocked, what blocks it', ['PM-DOC-001']),
+   ('Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why', ['PM-DOC-001']),
  ('post', '/api/intake/imports/{id}/commit'):
-   ('Commit a reviewed import into the registry — units, households and owners; '
+   ('Ask for a reviewed import to be committed into the registry — units, households and owners; answers COMMITTING, '
+    'and the record then reads COMMITTED or COMMIT_BLOCKED; '
     'what needs a declaration is returned for a person to record, never adopted',
     ['PM-ORG-001', 'PM-ORG-002', 'PM-DOC-001', 'PM-BOOK-002', 'PM-FEE-005', 'PM-FEE-008',
      'PM-ORG-011', 'PM-BOOK-011', 'PM-FEE-007', 'PM-BOOK-005']),

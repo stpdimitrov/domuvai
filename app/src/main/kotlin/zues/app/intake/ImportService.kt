@@ -19,10 +19,17 @@ data class ImportResult(val importId: UUID, val report: DryRunReport)
 data class ManualEntry(val designation: String, val field: IntakeField, val value: String, val rule: String)
 
 /**
- * What committing an import returns: the id, how many unit rows the commit adopts, and what the
+ * What committing an import returns: the id, how many unit rows the commit asks the registry to adopt, and what the
  * sheet carried that must be recorded by hand — surfaced, never dropped, never fabricated.
  */
-data class CommitResult(val importId: UUID, val rowsCreated: Int, val rowsChanged: Int, val manualEntries: List<ManualEntry>)
+data class CommitResult(
+    val importId: UUID,
+    val rowsCreated: Int,
+    val rowsChanged: Int,
+    val manualEntries: List<ManualEntry>,
+    /** COMMITTING: the registry adopts the rows after this answer; the import then reads COMMITTED or COMMIT_BLOCKED */
+    val status: String = "COMMITTING",
+)
 
 /**
  * Records a fee-sheet import durably. The dry-run runs exactly as in the stateless path (S-31),
@@ -66,16 +73,17 @@ class ImportService(
      * Commit a reviewed import (STAGE1-ADDENDUM §1, step 6). The sheet is re-presented and its
      * content hash checked against the reviewed import, so a commit adopts exactly the file a human
      * released — nothing is stored between review and commit that could drift, and the row schema
-     * stays unmodelled until the pilot spreadsheet defines it. Only a REPRODUCED import commits.
-     * This transaction writes intake's own record and the outbox event; the registry adopts the
-     * units in its own transaction (MODULE-TEMPLATE laws 1 and 3), so `registry.unit` is never
-     * written from here.
+     * stays unmodelled until the pilot spreadsheet defines it. Only a REPRODUCED import commits —
+     * or one whose commit was blocked, asked again. This transaction writes intake's own record and
+     * the outbox event; the registry adopts the units in its own transaction, after this answer
+     * (MODULE-TEMPLATE laws 1 and 3), so `registry.unit` is never written from here and the import
+     * is COMMITTING until the registry reports back ([commitApplied], [commitBlocked]).
      */
     @Transactional
     fun commit(importId: UUID, committedBy: UUID, request: FeeSheetDryRunRequest): CommitResult {
-        val record = imports.findById(importId).orElseThrow { NoSuchElementException("no import $importId") }
-        if (record.status != "REPRODUCED") {
-            throw ImportStateException("import $importId is ${record.status}; only a REPRODUCED import can be committed")
+        val record = imports.readById(importId) ?: throw NoSuchElementException("no import $importId")   // locked: two commits at once are one
+        if (record.status != "REPRODUCED" && record.status != "COMMIT_BLOCKED") {
+            throw ImportStateException("import $importId is ${record.status}; only a REPRODUCED import, or one whose commit was blocked, can be committed")
         }
         if (sha256(request.csv) != record.sourceSha) {
             throw ImportStateException("the submitted sheet does not match the reviewed import (source hash differs)")
@@ -91,7 +99,7 @@ class ImportService(
             val why = report.violations.ifEmpty { listOf("${report.differing} unit(s) differ") }.joinToString("; ")
             throw ImportStateException("import $importId no longer reproduces the firm's figures ($why); refusing to commit")
         }
-        aggregates.update(record.copy(status = "COMMITTED"))
+        aggregates.update(record.copy(status = "COMMITTING", commitBlockedBy = null))
         val units = sheet.rows.map {
             AdoptedUnit(
                 designation = it.designation,
@@ -133,20 +141,28 @@ class ImportService(
         return reverting
     }
 
+    /** The registry adopted the import's rows — a fact that stays true, so it also settles an import a stale answer left blocked. */
+    @Transactional
+    fun commitApplied(importId: UUID) = settle(importId, setOf("COMMITTING", "COMMIT_BLOCKED")) { it.copy(status = "COMMITTED", commitBlockedBy = null) }
+
+    /** The registry could not, and adopted nothing: COMMITTING becomes COMMIT_BLOCKED, with why. Any other status is left as it is. */
+    @Transactional
+    fun commitBlocked(importId: UUID, blockedBy: String) = settle(importId, setOf("COMMITTING")) { it.copy(status = "COMMIT_BLOCKED", commitBlockedBy = blockedBy) }
+
     /**
      * The registry removed the import's rows — a fact that stays true, so it settles an import that waits for it and
      * also one an earlier answer left REVERT_BLOCKED (delivery is at least once, and answers may arrive out of turn).
      */
     @Transactional
-    fun revertApplied(importId: UUID) = settle(importId, setOf("REVERTING", "REVERT_BLOCKED"), "REVERTED", null)
+    fun revertApplied(importId: UUID) = settle(importId, setOf("REVERTING", "REVERT_BLOCKED")) { it.copy(status = "REVERTED", revertBlockedBy = null) }
 
     /** The registry could not: REVERTING becomes REVERT_BLOCKED, with why. Any other status is left as it is. */
     @Transactional
-    fun revertBlocked(importId: UUID, blockedBy: String) = settle(importId, setOf("REVERTING"), "REVERT_BLOCKED", blockedBy)
+    fun revertBlocked(importId: UUID, blockedBy: String) = settle(importId, setOf("REVERTING")) { it.copy(status = "REVERT_BLOCKED", revertBlockedBy = blockedBy) }
 
-    private fun settle(importId: UUID, from: Set<String>, status: String, blockedBy: String?) {
+    private fun settle(importId: UUID, from: Set<String>, settled: (ImportRow) -> ImportRow) {
         val record = imports.readById(importId) ?: return
-        if (record.status in from) aggregates.update(record.copy(status = status, revertBlockedBy = blockedBy))
+        if (record.status in from) aggregates.update(settled(record))
     }
 
     private companion object {

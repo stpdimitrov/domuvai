@@ -35,10 +35,17 @@ class ImportCommitWebTest {
     """.trimIndent()
 
     @Test
-    fun `POST commit adopts the import and returns the row count`() {
+    fun `POST commit answers that the commit is under way, with the row count, and GET shows why one was blocked`() {
+        whenever(imports.find(importId))
+            .thenReturn(ImportRow(importId, UUID.randomUUID(), "COMMIT_BLOCKED", "sha", 2, 0, 0, commitBlockedBy = "ideal parts sum to 200.0000"))
+        mvc.perform(get("/api/intake/imports/$importId"))
+            .andExpect(jsonPath("$.status").value("COMMIT_BLOCKED"))
+            .andExpect(jsonPath("$.commitBlockedBy").value("ideal parts sum to 200.0000"))
+            .andExpect(jsonPath("$.revertBlockedBy").doesNotExist())
         whenever(imports.commit(eq(importId), any(), any())).thenReturn(CommitResult(importId, 2, 0, emptyList()))
         mvc.perform(post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON).content(commitBody))
             .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("COMMITTING"))
             .andExpect(jsonPath("$.rowsCreated").value(2))
             .andExpect(jsonPath("$.rowsChanged").value(0))
     }

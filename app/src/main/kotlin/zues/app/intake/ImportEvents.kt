@@ -56,6 +56,15 @@ data class ImportReverted(
 )
 
 /**
+ * The registry's answer to [ImportCommitted]: the import's rows are adopted. Defined here and published by the
+ * registry, so the dependency still runs registry → intake only. In-process; not externalized.
+ */
+data class ImportCommitApplied(val entranceId: UUID, val importId: UUID)
+
+/** The registry's other answer: it could not adopt the import's rows, and adopted none. [blockedBy] says why. */
+data class ImportCommitBlocked(val entranceId: UUID, val importId: UUID, val blockedBy: String)
+
+/**
  * The registry's answer to [ImportReverted]: every row that carried the import's id is gone. Defined here and
  * published by the registry, so the dependency still runs registry → intake only. In-process; not externalized.
  */
