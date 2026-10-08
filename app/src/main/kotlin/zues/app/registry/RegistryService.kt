@@ -3,7 +3,6 @@ package zues.app.registry
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import zues.kernel.IdealParts
 import zues.kernel.toSofiaDate
@@ -235,11 +234,9 @@ class RegistryService(
      * Undo an import: drop every row that carried its [importId] (STAGE1-ADDENDUM §1) — the rows
      * that point at a unit first, then the units. A record added later and pointing at an imported
      * unit is not the import's to drop: the unit's delete then fails and nothing is removed.
-     *
-     * Nested: called from the reaction to [zues.app.intake.ImportReverted] it runs in a savepoint, so a
-     * refusal undoes every removal and leaves the reaction's own transaction able to report it.
+     * The reaction to a revert calls this through [ImportRemoval], in a savepoint.
      */
-    @Transactional(propagation = Propagation.NESTED)
+    @Transactional
     fun revertImport(importId: UUID) {
         household.deleteAll(household.findByImportId(importId))
         titles.deleteAll(titles.findByImportId(importId))

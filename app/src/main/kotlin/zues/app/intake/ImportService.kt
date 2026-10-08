@@ -123,7 +123,7 @@ class ImportService(
     @Transactional
     fun revert(importId: UUID, revertedBy: UUID, reason: String): ImportRow {
         require(reason.isNotBlank()) { "a revert reason is required" }
-        val record = imports.findById(importId).orElseThrow { NoSuchElementException("no import $importId") }
+        val record = imports.readById(importId) ?: throw NoSuchElementException("no import $importId")   // locked: two reverts at once are one
         if (record.status != "COMMITTED" && record.status != "REVERT_BLOCKED") {
             throw ImportStateException("import $importId is ${record.status}; only a COMMITTED import, or one whose revert was blocked, can be reverted")
         }
@@ -133,17 +133,20 @@ class ImportService(
         return reverting
     }
 
-    /** The registry removed the import's rows: REVERTING becomes REVERTED. Any other status is left as it is. */
+    /**
+     * The registry removed the import's rows — a fact that stays true, so it settles an import that waits for it and
+     * also one an earlier answer left REVERT_BLOCKED (delivery is at least once, and answers may arrive out of turn).
+     */
     @Transactional
-    fun revertApplied(importId: UUID) = settle(importId, "REVERTED", null)
+    fun revertApplied(importId: UUID) = settle(importId, setOf("REVERTING", "REVERT_BLOCKED"), "REVERTED", null)
 
-    /** The registry could not: REVERTING becomes REVERT_BLOCKED, with what blocks it. Any other status is left as it is. */
+    /** The registry could not: REVERTING becomes REVERT_BLOCKED, with why. Any other status is left as it is. */
     @Transactional
-    fun revertBlocked(importId: UUID, blockedBy: String) = settle(importId, "REVERT_BLOCKED", blockedBy)
+    fun revertBlocked(importId: UUID, blockedBy: String) = settle(importId, setOf("REVERTING"), "REVERT_BLOCKED", blockedBy)
 
-    private fun settle(importId: UUID, status: String, blockedBy: String?) {
-        val record = imports.findById(importId).orElse(null) ?: return
-        if (record.status == "REVERTING") aggregates.update(record.copy(status = status, revertBlockedBy = blockedBy))
+    private fun settle(importId: UUID, from: Set<String>, status: String, blockedBy: String?) {
+        val record = imports.readById(importId) ?: return
+        if (record.status in from) aggregates.update(record.copy(status = status, revertBlockedBy = blockedBy))
     }
 
     private companion object {

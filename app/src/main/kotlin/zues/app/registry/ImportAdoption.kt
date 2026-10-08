@@ -21,11 +21,16 @@ import java.sql.SQLException
  * [RegistryService.adoptImport] and [RegistryService.revertImport]).
  *
  * A revert reports back. The registry hears of it after intake's request has answered, so it says what
- * became of it with one of intake's own two events: the rows are gone, or something added since still
- * points at them and none was removed.
+ * became of it with one of intake's own two events: the rows are gone, or they could not be removed —
+ * and why — and none was. It always answers: a failure it cannot name is still a revert that did not
+ * happen, and the import must not wait on it.
  */
 @Component
-class ImportAdoption(private val registry: RegistryService, private val events: ApplicationEventPublisher) {
+class ImportAdoption(
+    private val registry: RegistryService,
+    private val removal: ImportRemoval,
+    private val events: ApplicationEventPublisher,
+) {
 
     @ApplicationModuleListener
     fun on(event: ImportCommitted) {
@@ -49,20 +54,25 @@ class ImportAdoption(private val registry: RegistryService, private val events: 
     @ApplicationModuleListener
     fun on(event: ImportReverted) {
         val outcome = try {
-            registry.revertImport(event.importId)                      // in a savepoint: a refusal undoes the removal, not this reaction
+            removal.remove(event.importId)                             // in a savepoint: a refusal undoes the removal, not this reaction
             ImportRevertApplied(event.entranceId, event.importId)
         } catch (refused: RuntimeException) {   // a batched delete's refusal arrives wrapped (DbActionExecutionException), not as a DataAccessException
-            // Only a row that still points at the import's rows is an answer. Anything else is a failure, and is retried.
-            ImportRevertBlocked(event.entranceId, event.importId, blockedBy(refused) ?: throw refused)
+            ImportRevertBlocked(event.entranceId, event.importId, blockedBy(refused))
         }
         events.publishEvent(outcome)
     }
 
-    /** What still points at a row the revert tried to remove, from the database's own refusal — or null when it refused for another reason. */
-    private fun blockedBy(refused: RuntimeException): String? {
-        val cause = generateSequence<Throwable>(refused) { it.cause }.filterIsInstance<SQLException>().firstOrNull() ?: return null
-        if (cause.sqlState != FOREIGN_KEY_VIOLATION) return null
-        val named = STILL_REFERENCED.find(cause.message.orEmpty()) ?: return "a record added after the import was committed"
+    /**
+     * Why the revert did not happen. A row that still points at an imported one is named by its table and constraint;
+     * any other refusal of the database's — the entrance's ideal parts no longer adding up — in its own first line;
+     * a failure that is not the database's by its kind. Asking again is always possible.
+     */
+    private fun blockedBy(refused: RuntimeException): String {
+        val cause = generateSequence<Throwable>(refused) { it.cause }.filterIsInstance<SQLException>().firstOrNull()
+            ?: return "the registry could not carry it out (${refused.javaClass.simpleName})"
+        val said = cause.message.orEmpty().lineSequence().firstOrNull().orEmpty().removePrefix("ERROR: ").trim().take(300)
+        if (cause.sqlState != FOREIGN_KEY_VIOLATION) return said.ifBlank { "the database refused it (${cause.sqlState})" }
+        val named = STILL_REFERENCED.find(said) ?: return "a record added after the import was committed"
         return "${named.groupValues[2]} (${named.groupValues[1]})"
     }
 

@@ -9,6 +9,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -50,14 +51,20 @@ class ImportCommitWebTest {
     }
 
     @Test
-    fun `POST revert returns the reverted import`() {
+    fun `POST revert answers that the revert is under way, and GET shows what blocked one`() {
+        whenever(imports.find(importId))
+            .thenReturn(ImportRow(importId, UUID.randomUUID(), "REVERT_BLOCKED", "sha", 2, 0, 0, "title (title_unit_id_fkey)"))
+        mvc.perform(get("/api/intake/imports/$importId"))
+            .andExpect(jsonPath("$.status").value("REVERT_BLOCKED"))
+            .andExpect(jsonPath("$.revertBlockedBy").value("title (title_unit_id_fkey)"))
         whenever(imports.revert(eq(importId), any(), any()))
-            .thenReturn(ImportRow(importId, UUID.randomUUID(), "REVERTED", "sha", 2, 0, 0))
+            .thenReturn(ImportRow(importId, UUID.randomUUID(), "REVERTING", "sha", 2, 0, 0))
         mvc.perform(
             post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"wrong entrance"}"""),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.status").value("REVERTED"))
+            .andExpect(jsonPath("$.status").value("REVERTING"))
+            .andExpect(jsonPath("$.revertBlockedBy").doesNotExist())
     }
 }

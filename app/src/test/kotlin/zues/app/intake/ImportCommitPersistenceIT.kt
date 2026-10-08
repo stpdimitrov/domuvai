@@ -34,7 +34,9 @@ import java.util.UUID
  * The commit seam against real PostgreSQL, proved in two halves so no test depends on the async
  * hop between them:
  *  - the intake HTTP lifecycle: a reviewed import commits (its file's hash must match) and reverts,
- *    and its status transitions REPRODUCED → COMMITTED → REVERTED;
+ *    and its status transitions REPRODUCED → COMMITTED → REVERTING → REVERTED — or REVERT_BLOCKED,
+ *    with what blocks it, when the registry cannot remove the rows (S-41c; these two tests do wait
+ *    on the async hop, by reading the import until it settles);
  *  - the registry's adoption (RegistryService.adoptImport, which the listener calls): units are
  *    created stamped with the import id, typed UNSPECIFIED until the pilot sheet, summing to 100%
  *    (PM-ORG-002) under their entrance (PM-ORG-001), idempotent on redelivery, dropped on revert.

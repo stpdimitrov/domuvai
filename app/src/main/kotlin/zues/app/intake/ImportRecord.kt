@@ -2,6 +2,8 @@ package zues.app.intake
 
 import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Table
+import org.springframework.data.relational.core.sql.LockMode
+import org.springframework.data.relational.repository.Lock
 import org.springframework.data.repository.ListCrudRepository
 import java.util.UUID
 
@@ -27,5 +29,9 @@ data class ImportRow(
 )
 
 interface ImportRepository : ListCrudRepository<ImportRow, UUID> {
+    /** The record, locked until the transaction ends: a revert and the registry's answer to it change its status one at a time. */
+    @Lock(LockMode.PESSIMISTIC_WRITE)
+    fun readById(id: UUID): ImportRow?
+
     fun findByEntranceId(entranceId: UUID): List<ImportRow>
 }

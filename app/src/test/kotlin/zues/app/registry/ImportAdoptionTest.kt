@@ -124,7 +124,7 @@ class ImportAdoptionTest {
         val written = argumentCaptor<Any>()
         whenever(aggregates.insert(written.capture())).thenAnswer { it.arguments[0] }
 
-        ImportAdoption(service, mock()).on(
+        ImportAdoption(service, mock(), mock()).on(
             ImportCommitted(
                 entranceId, importId, importId, UUID.randomUUID(), 2, 0,
                 listOf(
@@ -168,46 +168,47 @@ class ImportAdoptionTest {
         }
     }
 
-    // S-41c — the reaction to a revert reports back what became of it.
+    // S-41c — the reaction to a revert reports back what became of it, always.
+
+    private val removal: ImportRemoval = mock()
+    private val published: org.springframework.context.ApplicationEventPublisher = mock()
 
     private fun reverted() = ImportReverted(entranceId, importId, UUID.randomUUID(), java.time.Instant.parse("2026-05-02T08:00:00Z"), "wrong entrance")
 
+    /** A batched delete's refusal as it arrives: wrapped twice, the database's own at the root. */
+    private fun refusal(message: String, state: org.postgresql.util.PSQLState) =
+        RuntimeException("Failed to execute BatchWithValue", org.springframework.dao.DataIntegrityViolationException("refused", org.postgresql.util.PSQLException(message, state)))
+
+    private fun answerTo(failure: RuntimeException?): Any {
+        org.mockito.Mockito.reset(removal, published)
+        if (failure != null) org.mockito.kotlin.doThrow(failure).whenever(removal).remove(importId)
+        ImportAdoption(service, removal, published).on(reverted())
+        val answer = argumentCaptor<Any>()
+        verify(published).publishEvent(answer.capture())
+        return answer.firstValue
+    }
+
     @Test
     fun `a revert the registry carried out is answered with ImportRevertApplied`() {
-        val registry: RegistryService = mock()
-        val events: org.springframework.context.ApplicationEventPublisher = mock()
-        ImportAdoption(registry, events).on(reverted())
-        verify(registry).revertImport(importId)
-        verify(events).publishEvent(ImportRevertApplied(entranceId, importId))
+        assertThat(answerTo(null)).isEqualTo(ImportRevertApplied(entranceId, importId))
+        verify(removal).remove(importId)
     }
 
     @Test
     fun `a revert refused because a later record still points at an imported row is answered with what blocks it`() {
-        val registry: RegistryService = mock()
-        val events: org.springframework.context.ApplicationEventPublisher = mock()
-        val refusal = org.postgresql.util.PSQLException(
-            """ERROR: update or delete on table "unit" violates foreign key constraint "title_unit_id_fkey" on table "title"""",
-            org.postgresql.util.PSQLState.FOREIGN_KEY_VIOLATION,
-        )
-        // as a batched delete delivers it: wrapped twice, the database's own refusal at the root
-        whenever(registry.revertImport(importId))
-            .thenThrow(RuntimeException("Failed to execute BatchWithValue", org.springframework.dao.DataIntegrityViolationException("refused", refusal)))
-        ImportAdoption(registry, events).on(reverted())
-        verify(events).publishEvent(ImportRevertBlocked(entranceId, importId, "title (title_unit_id_fkey)"))
+        val fk = """ERROR: update or delete on table "unit" violates foreign key constraint "title_unit_id_fkey" on table "title"
+  Detail: Key (id)=(20e8955b) is still referenced from table "title"."""
+        assertThat(answerTo(refusal(fk, org.postgresql.util.PSQLState.FOREIGN_KEY_VIOLATION)))
+            .isEqualTo(ImportRevertBlocked(entranceId, importId, "title (title_unit_id_fkey)"))
     }
 
     @Test
-    fun `a revert that fails for any other reason is not an answer — it is thrown, to be delivered again`() {
-        val registry: RegistryService = mock()
-        val events: org.springframework.context.ApplicationEventPublisher = mock()
-        val checked = org.postgresql.util.PSQLException("ERROR: violates check constraint", org.postgresql.util.PSQLState.CHECK_VIOLATION)
-        for (failure in listOf(
-            org.springframework.dao.DataIntegrityViolationException("check", checked),
-            org.springframework.dao.QueryTimeoutException("the database did not answer"), IllegalStateException("not the database at all"),
-        )) {
-            org.mockito.kotlin.doThrow(failure).whenever(registry).revertImport(importId)   // doThrow: the stub before it already throws
-            assertThatThrownBy { ImportAdoption(registry, events).on(reverted()) }.isSameAs(failure)
-        }
-        verifyNoInteractions(events)
+    fun `a revert that fails for any other reason is answered too — with the database's own line, or the failure's kind — never left waiting`() {
+        val parts = "ERROR: ideal parts for entrance 7f sum to 40.0000, must be 100.0000 or empty (PM-ORG-002)\n  Where: PL/pgSQL function"
+        assertThat(answerTo(refusal(parts, org.postgresql.util.PSQLState.UNKNOWN_STATE)))
+            .isEqualTo(ImportRevertBlocked(entranceId, importId, "ideal parts for entrance 7f sum to 40.0000, must be 100.0000 or empty (PM-ORG-002)"))
+        assertThat(answerTo(IllegalStateException("not the database at all")))
+            .isEqualTo(ImportRevertBlocked(entranceId, importId, "the registry could not carry it out (IllegalStateException)"))
+        assertThat((answerTo(refusal("ERROR: " + "x".repeat(400), org.postgresql.util.PSQLState.UNKNOWN_STATE)) as ImportRevertBlocked).blockedBy).hasSize(300)
     }
 }
