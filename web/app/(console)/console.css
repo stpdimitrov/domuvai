@@ -3,15 +3,37 @@
 
 .console {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   background: #f2f1ee;
   color: #17191a;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
 }
 
+/* the sidebar beside the screen; the footer under both */
+.console-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.console-foot {
+  flex: none;
+  height: 24px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: #edece8;
+  border-top: 1px solid #deddd9;
+  font: 400 11px/1 "IBM Plex Mono", monospace;
+  color: #5c605e;
+}
+
 .console-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: auto; /* a screen taller than the window scrolls above the footer, not through it */
   display: flex;
   flex-direction: column;
 }

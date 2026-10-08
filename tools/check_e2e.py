@@ -23,6 +23,8 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 8. WEB-20: the entrance screen shows the entrance asked for — who is past the deadline to declare for the book, and its
    accounts — nothing of the design's sample, and refuses an entrance that is not registered.
 9. WEB-21: every live screen answers a request that gives one of its parameters twice.
+10. WEB-22 (PM-SYS-010): every screen under the console's layout has one footer, with the catalogue and engine
+    versions the API serves.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
@@ -50,6 +52,7 @@ DEMO_BASIS = [
 
 # (method, contract path) → how the live screens call it for the seeded entrance: the URL and the body.
 CALLS = {
+    ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
     ("GET", "/api/registry/entrances/{entranceId}/units"): lambda e: (f"/api/registry/entrances/{e}/units", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/declarations/overdue"): lambda e: (
@@ -161,7 +164,7 @@ SCREENS = {
 ERRORS = [
     "Бекендът не отговаря", "Бекендът не подаде", "API отказа", "не е регистриран", "Няма регистриран вход",
     "няма регистрирана сметка на фонд", "няма регистрирана оперативна сметка", "не се заредиха", "не се зареди ",
-    "незаредени", "незареден",
+    "незаредени", "незареден", "версията не е достъпна",
 ]
 
 METHODS = "GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE"
@@ -454,6 +457,18 @@ def main():
 
     failures += charges_multiple(api, web)
     failures += entrance_screen(api, web, entrance)
+
+    # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
+    status, raw = fetch(api, "/api/law/version")
+    served = json.loads(raw) if status == 200 else {}
+    footer = f"Каталог на правилата v{served.get('catalogueVersion')} · изчислител {served.get('engineVersion')}"
+    under = ["/portfolio", "/debts", "/compliance", f"/entrance?entrance={entrance}", f"/entrance/charges?entrance={entrance}&period=2026-09",
+             f"/entrance/fund?entrance={entrance}"]
+    # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
+    in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
+    bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
+    failures += [f"{url}: no single footer saying {footer!r}" for url in bare] if served else ["/api/law/version: no version served"]
+    print(f"{'ok ' if served and not bare else 'BAD'} PM-SYS-010 the footer  {len(under) - len(bare)}/{len(under)} screens show {footer!r}")
 
     # WEB-21 — a parameter given twice arrives as a list: every live screen answers it, none fails on it
     twice = ["/debts?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?show=owing&show=fund",
