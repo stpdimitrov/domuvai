@@ -2194,6 +2194,22 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 
 ---
 
+## S-41e · 2026-10-08 · registry — a reverted import is never adopted again
+
+**Shipped** — the registry remembers each import it has reverted in a new table the application can only add to, `registry.reverted_import`, written first inside the revert's own savepoint; an adoption for an import that bears the mark is refused and adopts nothing (`ImportSavepoint`). An adoption and a removal of one import now take one advisory lock on its id, so neither slips between the other's check and its writes. This closes what S-41d recorded as open: the adoption's guard looked only for rows carrying the import's id, so a commit delivered again after its import was reverted found none and adopted them all anew, under a record that said `REVERTED`.
+
+**Verified** — `ImportCommitPersistenceIT` from a scratch copy on this machine's Postgres 16, 7 of 7: after a commit and its revert, the same adoption asked again is refused with "was reverted", no unit and no household row appears, and the import still reads `REVERTED`; a revert delivered twice leaves one mark; the mark ignores a delete and refuses a TRUNCATE; a revert blocked by a later title writes its mark and loses it with the refused removal, and that import is reverted later as before. Three mutants killed (the mark not checked; the mark not written; the removal outside a savepoint). The registry-side unit tests pass unchanged — an adoption refused this way is answered as blocked with what the registry said, which the already-reverted import ignores. Gates green.
+
+**Review** — fresh context, no blocking defect, three points taken: the test that a blocked revert leaves no mark could not fail — the refusal came before the mark was written — so the mark is now written first and really undone; a TRUNCATE is refused by a trigger, as on the book's access log; the migration carries the minute it was written, not a round hour.
+
+**Decisions** — the owner's, 2026-10-08: "whatever you recommend" among three next slices; this one was recommended as a correctness gap in what had just shipped. Mine: the mark lives in the registry, not in a read of intake's status, so the registry decides from its own record · the mark is permanent, since a reverted import cannot be committed again.
+
+**Open** — the two operations lock on the import's id only inside `ImportSavepoint`; `RegistryService.adoptImport` and `revertImport` called directly (as two tests do) take no such lock and check no mark · an import still waits as `COMMITTING` or `REVERTING` if the process stops before the registry answers, until the application next starts.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportSavepoint.kt`.
+
+---
+
 ## H-10 · 2026-10-08 · Handover — resume point before /compact
 
 **RESUME HERE.** `main` is at S-41e (#136) or later. Nothing in flight: no open PR, every lane free. Next: the owner's choice among the proposals below.
@@ -2226,18 +2242,5 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Operating procedure** — unchanged (`.claude/skills/zues-slice/SKILL.md`). Lessons of this stretch: check a gate's exit status, never the last line of a pipe — a `tail` hid one failure and a stale generated file was pushed, then fixed · two PRs in flight both append here, and git places the second entry before main's last: after merging `main`, move the slice's own entry to the end · a mocked refusal and the database's real one differ (Spring Data wraps a batched delete's refusal in an exception that is not a `DataAccessException`): the Postgres run found what the unit test had not · a review finding is checked against the code before it is taken; one count in a review was wrong.
 
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry; then `python3 tools/lanes.py` and `gh pr list`.
-## S-41e · 2026-10-08 · registry — a reverted import is never adopted again
-
-**Shipped** — the registry remembers each import it has reverted in a new table the application can only add to, `registry.reverted_import`, written first inside the revert's own savepoint; an adoption for an import that bears the mark is refused and adopts nothing (`ImportSavepoint`). An adoption and a removal of one import now take one advisory lock on its id, so neither slips between the other's check and its writes. This closes what S-41d recorded as open: the adoption's guard looked only for rows carrying the import's id, so a commit delivered again after its import was reverted found none and adopted them all anew, under a record that said `REVERTED`.
-
-**Verified** — `ImportCommitPersistenceIT` from a scratch copy on this machine's Postgres 16, 7 of 7: after a commit and its revert, the same adoption asked again is refused with "was reverted", no unit and no household row appears, and the import still reads `REVERTED`; a revert delivered twice leaves one mark; the mark ignores a delete and refuses a TRUNCATE; a revert blocked by a later title writes its mark and loses it with the refused removal, and that import is reverted later as before. Three mutants killed (the mark not checked; the mark not written; the removal outside a savepoint). The registry-side unit tests pass unchanged — an adoption refused this way is answered as blocked with what the registry said, which the already-reverted import ignores. Gates green.
-
-**Review** — fresh context, no blocking defect, three points taken: the test that a blocked revert leaves no mark could not fail — the refusal came before the mark was written — so the mark is now written first and really undone; a TRUNCATE is refused by a trigger, as on the book's access log; the migration carries the minute it was written, not a round hour.
-
-**Decisions** — the owner's, 2026-10-08: "whatever you recommend" among three next slices; this one was recommended as a correctness gap in what had just shipped. Mine: the mark lives in the registry, not in a read of intake's status, so the registry decides from its own record · the mark is permanent, since a reverted import cannot be committed again.
-
-**Open** — the two operations lock on the import's id only inside `ImportSavepoint`; `RegistryService.adoptImport` and `revertImport` called directly (as two tests do) take no such lock and check no mark · an import still waits as `COMMITTING` or `REVERTING` if the process stops before the registry answers, until the application next starts.
-
-**Read first next time** — `app/src/main/kotlin/zues/app/registry/ImportSavepoint.kt`.
 
 ---
