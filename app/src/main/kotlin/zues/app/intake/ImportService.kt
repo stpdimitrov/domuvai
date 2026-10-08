@@ -114,21 +114,39 @@ class ImportService(
     }
 
     /**
-     * Revert a committed import (STAGE1-ADDENDUM §1): the registry drops every unit stamped with
-     * the import id. Only a COMMITTED import can be reverted, and a reason is required — a reverted
+     * Ask for a committed import to be reverted (STAGE1-ADDENDUM §1). The registry drops every row
+     * stamped with the import id after this request has answered, so the import is REVERTING until
+     * the registry reports back ([revertApplied], [revertBlocked]). Only a COMMITTED import can be
+     * reverted — or one whose revert was blocked, asked again — and a reason is required: a reverted
      * legal record says why.
      */
     @Transactional
     fun revert(importId: UUID, revertedBy: UUID, reason: String): ImportRow {
         require(reason.isNotBlank()) { "a revert reason is required" }
-        val record = imports.findById(importId).orElseThrow { NoSuchElementException("no import $importId") }
-        if (record.status != "COMMITTED") {
-            throw ImportStateException("import $importId is ${record.status}; only a COMMITTED import can be reverted")
+        val record = imports.readById(importId) ?: throw NoSuchElementException("no import $importId")   // locked: two reverts at once are one
+        if (record.status != "COMMITTED" && record.status != "REVERT_BLOCKED") {
+            throw ImportStateException("import $importId is ${record.status}; only a COMMITTED import, or one whose revert was blocked, can be reverted")
         }
-        val reverted = record.copy(status = "REVERTED")
-        aggregates.update(reverted)
+        val reverting = record.copy(status = "REVERTING", revertBlockedBy = null)
+        aggregates.update(reverting)
         events.publishEvent(ImportReverted(record.entranceId, importId, revertedBy, clock.instant(), reason))
-        return reverted
+        return reverting
+    }
+
+    /**
+     * The registry removed the import's rows — a fact that stays true, so it settles an import that waits for it and
+     * also one an earlier answer left REVERT_BLOCKED (delivery is at least once, and answers may arrive out of turn).
+     */
+    @Transactional
+    fun revertApplied(importId: UUID) = settle(importId, setOf("REVERTING", "REVERT_BLOCKED"), "REVERTED", null)
+
+    /** The registry could not: REVERTING becomes REVERT_BLOCKED, with why. Any other status is left as it is. */
+    @Transactional
+    fun revertBlocked(importId: UUID, blockedBy: String) = settle(importId, setOf("REVERTING"), "REVERT_BLOCKED", blockedBy)
+
+    private fun settle(importId: UUID, from: Set<String>, status: String, blockedBy: String?) {
+        val record = imports.readById(importId) ?: return
+        if (record.status in from) aggregates.update(record.copy(status = status, revertBlockedBy = blockedBy))
     }
 
     private companion object {

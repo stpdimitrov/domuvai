@@ -1,10 +1,14 @@
 package zues.app.registry
 
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
 import zues.app.intake.ImportCommitted
+import zues.app.intake.ImportRevertApplied
+import zues.app.intake.ImportRevertBlocked
 import zues.app.intake.ImportReverted
 import java.math.BigDecimal
+import java.sql.SQLException
 
 /**
  * The consuming half of intake's commit seam. `intake` writes its own record and announces a
@@ -15,9 +19,18 @@ import java.math.BigDecimal
  *
  * Delivery is at least once, so both reactions are idempotent on the import id (see
  * [RegistryService.adoptImport] and [RegistryService.revertImport]).
+ *
+ * A revert reports back. The registry hears of it after intake's request has answered, so it says what
+ * became of it with one of intake's own two events: the rows are gone, or they could not be removed —
+ * and why — and none was. It always answers: a failure it cannot name is still a revert that did not
+ * happen, and the import must not wait on it.
  */
 @Component
-class ImportAdoption(private val registry: RegistryService) {
+class ImportAdoption(
+    private val registry: RegistryService,
+    private val removal: ImportRemoval,
+    private val events: ApplicationEventPublisher,
+) {
 
     @ApplicationModuleListener
     fun on(event: ImportCommitted) {
@@ -40,10 +53,33 @@ class ImportAdoption(private val registry: RegistryService) {
 
     @ApplicationModuleListener
     fun on(event: ImportReverted) {
-        registry.revertImport(event.importId)
+        val outcome = try {
+            removal.remove(event.importId)                             // in a savepoint: a refusal undoes the removal, not this reaction
+            ImportRevertApplied(event.entranceId, event.importId)
+        } catch (refused: RuntimeException) {   // a batched delete's refusal arrives wrapped (DbActionExecutionException), not as a DataAccessException
+            ImportRevertBlocked(event.entranceId, event.importId, blockedBy(refused))
+        }
+        events.publishEvent(outcome)
+    }
+
+    /**
+     * Why the revert did not happen. A row that still points at an imported one is named by its table and constraint;
+     * any other refusal of the database's — the entrance's ideal parts no longer adding up — in its own first line;
+     * a failure that is not the database's by its kind. Asking again is always possible.
+     */
+    private fun blockedBy(refused: RuntimeException): String {
+        val cause = generateSequence<Throwable>(refused) { it.cause }.filterIsInstance<SQLException>().firstOrNull()
+            ?: return "the registry could not carry it out (${refused.javaClass.simpleName})"
+        val said = cause.message.orEmpty().lineSequence().firstOrNull().orEmpty().removePrefix("ERROR: ").trim().take(300)
+        if (cause.sqlState != FOREIGN_KEY_VIOLATION) return said.ifBlank { "the database refused it (${cause.sqlState})" }
+        val named = STILL_REFERENCED.find(said) ?: return "a record added after the import was committed"
+        return "${named.groupValues[2]} (${named.groupValues[1]})"
     }
 
     companion object {
+        private const val FOREIGN_KEY_VIOLATION = "23503"
+        private val STILL_REFERENCED = Regex("""violates foreign key constraint "([^"]+)" on table "([^"]+)"""")
+
         // TODO(pilot-sheet): a fee sheet carries no unit type; the real pilot spreadsheet does.
         // Until it arrives an adopted unit is typed UNSPECIFIED rather than guessed at.
         const val IMPORTED_UNIT_TYPE = "UNSPECIFIED"

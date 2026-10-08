@@ -2,6 +2,8 @@ package zues.app.intake
 
 import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Table
+import org.springframework.data.relational.core.sql.LockMode
+import org.springframework.data.relational.repository.Lock
 import org.springframework.data.repository.ListCrudRepository
 import java.util.UUID
 
@@ -17,13 +19,19 @@ import java.util.UUID
 data class ImportRow(
     @Id val id: UUID,
     val entranceId: UUID,
-    val status: String,        // REPRODUCED | NEEDS_REVIEW
+    val status: String,        // REPRODUCED | NEEDS_REVIEW | COMMITTED | REVERTING | REVERTED | REVERT_BLOCKED
     val sourceSha: String,
     val rowsParsed: Int,
     val differing: Int,
     val violations: Int,
+    /** what still points at the import's rows, when the registry could not remove them; set exactly while REVERT_BLOCKED */
+    val revertBlockedBy: String? = null,
 )
 
 interface ImportRepository : ListCrudRepository<ImportRow, UUID> {
+    /** The record, locked until the transaction ends: a revert and the registry's answer to it change its status one at a time. */
+    @Lock(LockMode.PESSIMISTIC_WRITE)
+    fun readById(id: UUID): ImportRow?
+
     fun findByEntranceId(entranceId: UUID): List<ImportRow>
 }

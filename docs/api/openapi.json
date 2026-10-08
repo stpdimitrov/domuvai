@@ -1066,6 +1066,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "revertBlockedBy": {
+            "type": "string"
+          },
           "rowsParsed": {
             "format": "int32",
             "type": "integer"
@@ -2497,7 +2500,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Read an import record — its verdict and content hash",
+        "summary": "Read an import record — its verdict, content hash and, when a revert was blocked, what blocks it",
         "tags": [
           "intake"
         ],
@@ -2674,7 +2677,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Revert a committed import wholesale, with its reason",
+        "summary": "Ask for a committed import to be reverted wholesale, with its reason — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED",
         "tags": [
           "intake"
         ],

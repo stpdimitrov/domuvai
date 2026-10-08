@@ -232,15 +232,14 @@ class ImportServiceTest {
     }
 
     @Test
-    fun `reverting a committed import publishes ImportReverted with its reason`() {
+    fun `reverting a committed import publishes ImportReverted with its reason, and waits as REVERTING`() {
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "COMMITTED", "sha", 2, 0, 0)))
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "COMMITTED", "sha", 2, 0, 0))
         whenever(aggregates.update(any<ImportRow>())).thenAnswer { it.getArgument<ImportRow>(0) }
 
         val result = service.revert(importId, revertedBy, "wrong entrance")
 
-        assertThat(result.status).isEqualTo("REVERTED")
+        assertThat(result.status).isEqualTo("REVERTING")                 // the registry has not removed anything yet
         val event = argumentCaptor<ImportReverted>()
         verify(events).publishEvent(event.capture())
         assertThat(event.firstValue.reason).isEqualTo("wrong entrance")
@@ -248,11 +247,49 @@ class ImportServiceTest {
     }
 
     @Test
-    fun `only a committed import can be reverted`() {
+    fun `only a committed import, or one whose revert was blocked, can be reverted`() {
         val importId = UUID.randomUUID()
-        whenever(imports.findById(importId))
-            .thenReturn(Optional.of(ImportRow(importId, entranceId, "REPRODUCED", "sha", 2, 0, 0)))
-        assertThatThrownBy { service.revert(importId, revertedBy, "x") }.isInstanceOf(ImportStateException::class.java)
+        for (status in listOf("REPRODUCED", "NEEDS_REVIEW", "REVERTING", "REVERTED")) {       // not twice, and not while one is under way
+            whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, status, "sha", 2, 0, 0))
+            assertThatThrownBy { service.revert(importId, revertedBy, "x") }.isInstanceOf(ImportStateException::class.java)
+        }
         verifyNoInteractions(events)
+
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REVERT_BLOCKED", "sha", 2, 0, 0, "title (title_unit_id_fkey)"))
+        whenever(aggregates.update(any<ImportRow>())).thenAnswer { it.getArgument<ImportRow>(0) }
+        val again = service.revert(importId, revertedBy, "the later title was withdrawn")
+        assertThat(again.status).isEqualTo("REVERTING")
+        assertThat(again.revertBlockedBy).isNull()                                           // asked again: the old answer is gone
+        verify(events).publishEvent(any<ImportReverted>())
+    }
+
+    @Test
+    fun `the registry's answer settles a REVERTING import — reverted, or blocked and by what — and no other`() {
+        val importId = UUID.randomUUID()
+        val updated = argumentCaptor<ImportRow>()
+        whenever(aggregates.update(updated.capture())).thenAnswer { it.getArgument<ImportRow>(0) }
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REVERTING", "sha", 2, 0, 0))
+
+        service.revertApplied(importId)
+        service.revertBlocked(importId, "title (title_unit_id_fkey)")
+        assertThat(updated.allValues.map { it.status to it.revertBlockedBy })
+            .containsExactly("REVERTED" to null, "REVERT_BLOCKED" to "title (title_unit_id_fkey)")
+
+        // Delivery is at least once: an answer for an import that is not waiting for one changes nothing.
+        for (status in listOf("COMMITTED", "REVERTED", "REPRODUCED")) {
+            whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, status, "sha", 2, 0, 0))
+            service.revertApplied(importId)
+            service.revertBlocked(importId, "x")
+        }
+        whenever(imports.readById(importId)).thenReturn(null)
+        service.revertApplied(importId)
+        assertThat(updated.allValues).hasSize(2)
+
+        // … except that the rows being gone is a fact: it settles an import a stale answer had left blocked, and "blocked" never unsettles one.
+        whenever(imports.readById(importId)).thenReturn(ImportRow(importId, entranceId, "REVERT_BLOCKED", "sha", 2, 0, 0, "an earlier answer"))
+        service.revertBlocked(importId, "another")
+        assertThat(updated.allValues).hasSize(2)
+        service.revertApplied(importId)
+        assertThat(updated.lastValue.status to updated.lastValue.revertBlockedBy).isEqualTo("REVERTED" to null)
     }
 }

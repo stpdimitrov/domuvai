@@ -34,7 +34,9 @@ import java.util.UUID
  * The commit seam against real PostgreSQL, proved in two halves so no test depends on the async
  * hop between them:
  *  - the intake HTTP lifecycle: a reviewed import commits (its file's hash must match) and reverts,
- *    and its status transitions REPRODUCED → COMMITTED → REVERTED;
+ *    and its status transitions REPRODUCED → COMMITTED → REVERTING → REVERTED — or REVERT_BLOCKED,
+ *    with what blocks it, when the registry cannot remove the rows (S-41c; these two tests do wait
+ *    on the async hop, by reading the import until it settles);
  *  - the registry's adoption (RegistryService.adoptImport, which the listener calls): units are
  *    created stamped with the import id, typed UNSPECIFIED until the pilot sheet, summing to 100%
  *    (PM-ORG-002) under their entrance (PM-ORG-001), idempotent on redelivery, dropped on revert.
@@ -69,6 +71,7 @@ class ImportCommitPersistenceIT {
     @Autowired lateinit var household: HouseholdMemberRepository
     @Autowired lateinit var titles: TitleRepository
     @Autowired lateinit var parties: PartyRepository
+    @Autowired lateinit var jdbc: org.springframework.jdbc.core.JdbcTemplate
 
     private val ON = LocalDate.parse("2026-05-01")
 
@@ -114,7 +117,65 @@ class ImportCommitPersistenceIT {
         mvc.perform(
             post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"pilot re-import"}"""),
-        ).andExpect(status().isOk).andExpect(jsonPath("$.status").value("REVERTED"))
+        ).andExpect(status().isOk).andExpect(jsonPath("$.status").value("REVERTING"))   // asked for; the registry has yet to act
+
+        assertThat(eventually(importId, "REVERTED").has("revertBlockedBy")).isFalse()
+        assertThat(units.findByImportId(UUID.fromString(importId))).isEmpty()
+        mvc.perform(                                                                    // done once: not reverted again
+            post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"again"}"""),
+        ).andExpect(status().isConflict)
+    }
+
+    /** The import as `GET` shows it, once its status is [status] — the registry reacts after the request has answered. */
+    private fun eventually(importId: String, status: String): com.fasterxml.jackson.databind.JsonNode {
+        var seen = ""
+        repeat(100) {
+            val view = json.readTree(mvc.perform(get("/api/intake/imports/$importId")).andReturn().response.contentAsString)
+            seen = view.get("status").asText()
+            if (seen == status) return view
+            Thread.sleep(100)
+        }
+        throw AssertionError("import $importId is $seen after 10 s, not $status")
+    }
+
+    @Test
+    fun `a revert the registry cannot carry out ends REVERT_BLOCKED naming what blocks it, removes nothing, and succeeds once the blocker is gone`() {
+        val entranceId = createEntrance()
+        val importId = recordImport(entranceId)
+        val id = UUID.fromString(importId)
+        mvc.perform(
+            post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"committedBy":"${UUID.randomUUID()}","sheet":$sheet}"""),
+        ).andExpect(status().isOk)
+        repeat(100) { if (units.findByImportId(id).size < 2) Thread.sleep(100) }       // the adoption, too, follows the answer
+        val adopted = units.findByImportId(id)
+        assertThat(adopted).hasSize(2)
+        assertThat(household.findByImportId(id)).hasSize(3)
+
+        // A title recorded after the commit points at an imported unit, and is not the import's to drop.
+        val later = json.readTree(
+            mvc.perform(post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON).content("""{"fullName":"Нов Собственик"}"""))
+                .andExpect(status().isCreated).andReturn().response.contentAsString,
+        ).get("partyId").asText()
+        mvc.perform(
+            post("/api/registry/entrances/$entranceId/units/${adopted.first().id}/titles").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"partyId":"$later","share":"1","titleRole":"OWN","validFrom":"2026-06-01"}"""),
+        ).andExpect(status().isCreated)
+
+        val revert = post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON)
+            .content("""{"revertedBy":"${UUID.randomUUID()}","reason":"wrong entrance"}""")
+        mvc.perform(revert).andExpect(status().isOk).andExpect(jsonPath("$.status").value("REVERTING"))
+        val blocked = eventually(importId, "REVERT_BLOCKED")
+        assertThat(blocked.get("revertBlockedBy").asText()).startsWith("title (")       // the table that still points at the unit
+        assertThat(units.findByImportId(id)).hasSize(2)                                  // nothing was removed —
+        assertThat(household.findByImportId(id)).hasSize(3)                              // — not even what went first
+
+        jdbc.update("DELETE FROM title WHERE party_id = ?::uuid", later)                 // the blocker is withdrawn
+        mvc.perform(revert).andExpect(status().isOk).andExpect(jsonPath("$.status").value("REVERTING"))
+        assertThat(eventually(importId, "REVERTED").has("revertBlockedBy")).isFalse()
+        assertThat(units.findByImportId(id)).isEmpty()
+        assertThat(household.findByImportId(id)).isEmpty()
     }
 
     @Test

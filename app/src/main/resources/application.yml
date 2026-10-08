@@ -20,6 +20,9 @@ spring:
   # transaction as the change that raised it, then delivered to module listeners.
   modulith:
     events:
+      # A reaction that did not finish — the process stopped, or its commit failed — is delivered again when the
+      # application next starts. Every reaction is idempotent for that reason (delivery is at least once).
+      republish-outstanding-events-on-restart: true
       jdbc:
         schema-initialization:
           enabled: true
