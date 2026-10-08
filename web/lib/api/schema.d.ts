@@ -191,6 +191,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/charge-runs/{period}/headcount": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed */
+        get: operations["get_money_entrances_entranceId_charge_runs_period_headcount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/entrances/{entranceId}/fund": {
         parameters: {
             query?: never;
@@ -987,6 +1004,33 @@ export interface components {
             id: string;
             lawVersion: string;
             statement: components["schemas"]["HandoverStatement"];
+        };
+        HeadcountCheck: {
+            /** Format: uuid */
+            chargeRunId: string;
+            /** Format: uuid */
+            entranceId: string;
+            /** Format: date */
+            legalDate: string;
+            mismatches: components["schemas"]["HeadcountMismatch"][];
+            period: string;
+            /** Format: int32 */
+            unitsCompared: number;
+        };
+        HeadcountMismatch: {
+            /** Format: int32 */
+            billedChildrenUnder6?: number;
+            /** Format: int32 */
+            billedOccupants?: number;
+            /** Format: int32 */
+            declaredChildrenUnder6?: number;
+            /** Format: int32 */
+            declaredOccupants?: number;
+            designation: string;
+            /** @enum {string} */
+            difference: "COUNT_DIFFERS" | "NOT_IN_BOOK" | "NOT_BILLED";
+            /** Format: uuid */
+            unitId: string;
         };
         HouseholdRegisteredResponse: {
             memberIds: string[];
@@ -1835,6 +1879,40 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_charge_runs_period_headcount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeadcountCheck"];
                 };
             };
             /** @description Not Found */

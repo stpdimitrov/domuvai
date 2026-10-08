@@ -74,6 +74,8 @@ RUNNING = {
  ('post', '/api/money/entrances/{entranceId}/charge-runs'):
    ('Issue a charge run — stored with its basis, meter readings included, never altered afterwards',
     ['PM-FEE-012', 'PM-FEE-014', 'PM-FEE-015', 'PM-FEE-016', 'PM-FEE-017']),
+ ('get', '/api/money/entrances/{entranceId}/charge-runs/{period}/headcount'):
+   ("The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed", ['PM-BOOK-012']),
  ('get', '/api/money/units/{unitId}/statement'):
    ("The unit's itemised statement, showing how each number was derived — a metered line with its reading and item", ['PM-FEE-017', 'PM-FEE-018']),
  ('get', '/api/money/units/{unitId}/arrears'):

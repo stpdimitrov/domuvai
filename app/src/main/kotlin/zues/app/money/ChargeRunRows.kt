@@ -49,6 +49,7 @@ data class ChargeLineRow(
 
 interface ChargeRunRepository : ListCrudRepository<ChargeRunRow, UUID> {
     fun existsByEntranceIdAndPeriod(entranceId: UUID, period: String): Boolean
+    fun findByEntranceIdAndPeriod(entranceId: UUID, period: String): ChargeRunRow?
 }
 
 interface ChargeLineRepository : ListCrudRepository<ChargeLineRow, UUID> {

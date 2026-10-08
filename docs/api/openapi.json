@@ -1029,6 +1029,85 @@
         ],
         "type": "object"
       },
+      "HeadcountCheck": {
+        "properties": {
+          "chargeRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legalDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "mismatches": {
+            "items": {
+              "$ref": "#/components/schemas/HeadcountMismatch"
+            },
+            "type": "array"
+          },
+          "period": {
+            "type": "string"
+          },
+          "unitsCompared": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chargeRunId",
+          "entranceId",
+          "legalDate",
+          "mismatches",
+          "period",
+          "unitsCompared"
+        ],
+        "type": "object"
+      },
+      "HeadcountMismatch": {
+        "properties": {
+          "billedChildrenUnder6": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "billedOccupants": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "declaredChildrenUnder6": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "declaredOccupants": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "difference": {
+            "enum": [
+              "COUNT_DIFFERS",
+              "NOT_IN_BOOK",
+              "NOT_BILLED"
+            ],
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "designation",
+          "difference",
+          "unitId"
+        ],
+        "type": "object"
+      },
       "HouseholdRegisteredResponse": {
         "properties": {
           "memberIds": {
@@ -2983,6 +3062,62 @@
           "PM-FEE-001",
           "PM-FEE-014",
           "PM-FEE-017"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/charge-runs/{period}/headcount": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_charge_runs_period_headcount",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeadcountCheck"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-BOOK-012"
         ]
       }
     },
