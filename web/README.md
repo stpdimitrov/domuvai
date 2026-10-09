@@ -37,44 +37,54 @@ cd web && API_URL=http://localhost:8080 npm run dev
 ```
 
 The role and password are the local defaults in `app/src/main/resources/application.yml`, nothing more.
-`npm run dev` always serves the console (see [The console switch](#the-console-switch)). The CI check needs a
-production build started twice — switched on, and not. Stop `npm run dev` first: the build and the dev server
+`npm run dev` always serves the console (see [Who the console is served to](#who-the-console-is-served-to)). The CI
+check needs a production build started twice — told to run without sign-in, and not. Stop `npm run dev` first: the build and the dev server
 share `.next`.
 
 ```bash
 cd web && npm run build
-DOMUVAI_CONSOLE=on DOMUVAI_CONTACT_EMAIL=demo@example.test API_URL=http://localhost:8080 npx next start -p 3001 &
+DOMUVAI_AUTH=off DOMUVAI_CONTACT_EMAIL=demo@example.test API_URL=http://localhost:8080 npx next start -p 3001 &
 DOMUVAI_CONTACT_EMAIL= npx next start -p 3002 &
 DOMUVAI_CONTACT_EMAIL='mailto:nobody@example.test' npx next start -p 3003 &
-for port in 3001 3002 3003; do curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"; done
+DOMUVAI_AUTH_ISSUER=http://localhost:9/realms/domuvai DOMUVAI_AUTH_CLIENT_ID=domuvai-web DOMUVAI_AUTH_CLIENT_SECRET="$(openssl rand -hex 24)" \
+  DOMUVAI_SESSION_SECRET="$(openssl rand -hex 32)" DOMUVAI_WEB_URL=http://localhost:3004 npx next start -p 3004 &   # sign-in configured, nobody signed in
+for port in 3001 3002 3003 3004; do curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"; done
 cd .. && python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3001 \
-  --closed-web http://localhost:3002 --bad-contact-web http://localhost:3003 --contact demo@example.test \
+  --closed-web http://localhost:3002 --bad-contact-web http://localhost:3003 --signin-web http://localhost:3004 \
+  --contact demo@example.test \
   --entrance <id>
 ```
 
-### The console switch
+### Who the console is served to
 
-The console names debtors and what they owe, and there is no sign-in yet (ADR-011), so a server serves it only
-where it is switched on (WEB-14, PM-DEBT-011): **`DOMUVAI_CONSOLE=on`** in the server's environment, or
-`next dev` — which `npm run dev` binds to `127.0.0.1`, this machine alone. Anywhere else — a production server
-without the switch — `web/middleware.ts` answers every path but the landing with a 404 before any route is matched:
-the same response for a console page and for a path that does not exist, however it is asked (a load, a client
-navigation, a prefetch, a HEAD). Only the build's static files (`/_next/static/`) pass — code and the design's
-sample text, never what the API returns. The landing shows no link into a closed console: no `Вход`, and its two
-`Започнете безплатно` buttons go to the demo section. Closed is the default, so a screen added later is closed with
-the rest. The switch is read from the running server's environment, never baked into the build: one build serves
-either way.
+The console names debtors and what they owe (PM-DEBT-011), so a server serves it to a person who is signed in and to
+nobody else (AUTH-03, ADR-011). `web/middleware.ts` decides, before any route is matched, from the running server's
+environment — never baked into the build, so one build serves any of these ways:
 
-Set it in the server's environment, never in a `web/.env*` file: `next start` reads those too, so a file shipped
-beside the build would switch the console on. Switch it on only where everyone who can reach the server may see
+- **Sign-in configured** — all five settings of [Sign-in](#sign-in). Every path but the landing and the three
+  sign-in routes needs a session: a page asked for without one sends the person to sign in and back to it; anything
+  else asked without one (a client navigation, a prefetch, a HEAD) is a 401.
+- **Not configured** — closed. Every path but the landing answers with a 404: the same response for a console page
+  and for a path that does not exist, however it is asked. The landing shows no link into a closed console: no
+  `Вход`, and its two `Започнете безплатно` buttons go to the demo section. A setting missing or malformed is not
+  configured; a deployment that loses its settings stays shut.
+- **`DOMUVAI_AUTH=off`** — the console served with no sign-in, because the server is told so in so many words: the
+  api's word and the api's rule. `next dev` — which `npm run dev` binds to `127.0.0.1`, this machine alone — runs
+  this way with nothing set. `off` beside any sign-in setting is closed: one or the other.
+
+Only the build's static files (`/_next/static/`) pass unasked — code and the design's sample text, never what the
+API returns. A screen added later is behind the same rule; there is no list of console paths to keep.
+
+Set these in the server's environment, never in a `web/.env*` file: `next start` reads those too, so a file shipped
+beside the build would open the console. `DOMUVAI_AUTH=off` only where everyone who can reach the server may see
 every name and amount in its database — a developer's machine, CI, a demo seeded with made-up people. Never for
-real data before sign-in.
+real data. (`DOMUVAI_CONSOLE`, the switch before sign-in, is gone and opens nothing.)
 
 ### The demo request
 
 The landing sends a demo request nowhere by itself and stores none, so it never says one arrived (WEB-15, #79).
 Where to write is the server's setting: **`DOMUVAI_CONTACT_EMAIL`** in the server's environment, read per request
-like the console switch (`lib/contact.ts`); the repository holds no address. With it, the form writes the request
+like the sign-in settings (`lib/contact.ts`); the repository holds no address. With it, the form writes the request
 out as a letter the visitor opens in their own mail, or copies — it reaches us when they send it — and the landing
 shows the address. Without it, or with a value that is not a plain address, the landing offers no form and says
 requests are not taken through the site yet — its "Заявете демо" buttons still lead to that section, so set the
@@ -86,18 +96,37 @@ does. On a developer's machine put the same line in `web/.env.local`, which git 
 
 ## Sign-in
 
-`lib/auth/` is the web's side of sign-in (ADR-011, AUTH-03), written by hand on Web Crypto and `fetch` — no package:
-the authorization-code flow with PKCE (S256) against the realm in `infra/keycloak/`. It is the checks themselves and
-nothing is wired to a route yet (AUTH-03b does that): the console is still served by [the switch](#the-console-switch).
+The web signs a person in at the realm in `infra/keycloak/` by the authorization-code flow with PKCE (S256) —
+written by hand on Web Crypto and `fetch`, no package (ADR-011, AUTH-03).
 
-- `settings.ts` — the five settings, all or nothing: `DOMUVAI_AUTH_ISSUER` (the api's value), `DOMUVAI_AUTH_CLIENT_ID`,
-  `DOMUVAI_AUTH_CLIENT_SECRET`, `DOMUVAI_SESSION_SECRET` (32 characters or more) and `DOMUVAI_WEB_URL` (this site's own
-  address — the return address is built from it, never from a request). https, http for this machine only.
-- `oidc.ts` — a sign-in begun (fresh state, nonce and verifier, sealed for the browser to keep), finished (the state
-  compared before the issuer is asked anything, the verifier sent with the code, the ID token checked) and renewed.
-- `idToken.ts` — signature (RS256 by the issuer's published keys, nothing else), issuer, audience, expiry, nonce.
-- `seal.ts` — AES-256-GCM under a key derived from the session secret.
-- `auth.test.ts` runs them against `fakeIssuer.ts`, which signs real tokens and checks the verifier as an issuer does.
+Five settings, all or nothing, in the server's environment:
+
+| Setting | What |
+|---|---|
+| `DOMUVAI_AUTH_ISSUER` | the realm's issuer URL — the value the api is given |
+| `DOMUVAI_AUTH_CLIENT_ID` | the web's client in the realm: `domuvai-web` |
+| `DOMUVAI_AUTH_CLIENT_SECRET` | that client's secret, read from Keycloak's admin console — never committed |
+| `DOMUVAI_SESSION_SECRET` | what the session cookie is sealed under: 32 characters or more, random (`openssl rand -hex 32`). Changing it signs everyone out |
+| `DOMUVAI_WEB_URL` | this site's own address, with no path. Every address a person is sent to is built from it, never from a request |
+
+The issuer and the web's address are https; http is accepted for this machine only.
+
+- `/auth/login?return=<path>` begins a sign-in: the browser goes to the issuer, keeping — sealed, httpOnly, for ten
+  minutes and one answer — the state, nonce and PKCE verifier the answer will be held to.
+- `/auth/callback` finishes it: the state compared before the issuer is asked anything, the verifier sent with the
+  code, the ID token checked (signature, issuer, audience, expiry, nonce). Then the person goes to the path they
+  asked for, if it is a path on this site, else to `/portfolio`. A refusal is logged with its reason — which names
+  no token — and the browser is told only that sign-in failed.
+- **The session** is a sealed cookie (AES-256-GCM): httpOnly, SameSite=Lax, and `Secure` with the `__Host-` prefix
+  wherever the web is https. It holds the access and refresh tokens; no page's script can read it. `lib/api/client.ts`
+  passes the access token to the api as a bearer, on the server. Middleware renews a session whose access token is
+  about to run out; refused by the issuer is signed out.
+- **Sign-out** is the `Изход` button in the console's footer: a POST to `/auth/logout` from this site's own pages.
+  The cookie is taken back and the issuer is told, from this server, to end its own session.
+
+`lib/auth/`: `settings.ts` (the settings, the return path) · `oidc.ts` (begin, finish, renew, end) · `idToken.ts` ·
+`seal.ts` · `gate.ts` (who is served what; the cookies) · `party.ts`, `server.ts` (the wiring). `*.test.ts` run them
+against `fakeIssuer.ts`, which signs real tokens and checks the verifier as an issuer does.
 
 ## The API client
 
@@ -119,9 +148,12 @@ check that never runs blocks the merge.
 (Flyway on an empty database) → `tools/seed_demo.py` through the public API → `next start` →
 `tools/check_e2e.py`. The check validates every response the live screens use against the contract, reads the
 seeded figures off the screens, and fails when a screen calls an operation it does not cover. A second server
-from the same build, not switched on, must answer every path in the build's route manifest but the landing — a load,
+from the same build, with nothing set, must answer every path in the build's route manifest but the landing — a load,
 a client navigation, a prefetch, a HEAD — with the 404 a missing page gets, and its landing must link to none of
-them (PM-DEBT-011). It runs on every PR and is a required check on `main`.
+them (PM-DEBT-011). A third, with sign-in configured and nobody signed in, must send every load of those paths to
+sign in and answer any other way of asking with a 401 — a forged session cookie counting for nothing — refuse a
+sign-out that does not come from its own pages, and the build must hold no prerendered page. It runs on every PR and
+is a required check on `main`.
 
 ## Layout
 
@@ -148,8 +180,8 @@ lib/
   api/client.ts    the typed, server-only client for `api`
   console.ts       what the live entrance screens share: the entrance from `?entrance=` (else the
                    first by name), a call that may find the backend down, euros from minor units
-  consoleSwitch.ts is the console switched on here? (PM-DEBT-011)
-middleware.ts      where it is not, every path but the landing answers 404
+  auth/            sign-in, and who the console is served to (PM-DEBT-011) — see Sign-in
+middleware.ts      the console to a signed-in person only; closed where sign-in is not configured
 ```
 
 ## Status
@@ -187,8 +219,8 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   unpaid is left out. The
   design's interest, escalation ladder (Покана → Нотариална → Решение на ОС → Заповед) and next action are not
   built — those columns show `—`, and the two buttons stay disabled. **It names debtors and their debts, so it
-  must never be reachable by the public** (PM-DEBT-011) — served only where the console is switched on (see
-  [The console switch](#the-console-switch)), and see TODO before launch.
+  must never be reachable by the public** (PM-DEBT-011) — served only to a person who is signed in (see
+  [Who the console is served to](#who-the-console-is-served-to)), and see TODO before launch.
 - **`/compliance`** — the firm's regulatory standing (screen 07 Съответствие): register / insurance /
   management-contract status cards, and a filings-and-declarations table.
 - **`/entrance`** — a single entrance (screen 02) — **live** (WEB-20): `?entrance=<id>` (default: the first
@@ -232,17 +264,18 @@ sidebar (`entrance/`) — as sibling nested layouts under one flex shell. A hand
 (Обекти, Календар на сроковете, Доставчици, Документи, Екип, …) remain placeholders — screens not
 in the imported design.
 
-Every other screen is still static (typed mock data). No auth yet.
+Every other screen is still typed mock data. None is prerendered: a console page is rendered for the signed-in
+person who asked (see [Sign-in](#sign-in)), and CI fails on a prerendered one.
 
 **Auth (ADR-011):** OIDC · the `api` validates JWT and issues nothing · the session is an
-httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the default).
+httpOnly cookie in this Next.js BFF. The provider is Keycloak.
 
 ## TODO before launch
 
-- **Sign-in before anyone else can reach the console** (ADR-011). `/debts` shows debtors' names and what they
-  owe, which PM-DEBT-011 forbids in any publicly accessible place. The charges and fund screens show owners,
-  amounts and bank accounts. Until then the console is served only where it is switched on (WEB-14), and the
-  API — no sign-in either — must not be reachable from the internet: the web calls it from the server only.
+- **Permissions before real residents' data** (ADR-011, AUTH-04). The console is served to a signed-in person only
+  (AUTH-03), and `/debts` shows debtors' names and what they owe (PM-DEBT-011) — but until AUTH-04 anyone who can
+  sign in sees every entrance. Run the api closed (`DOMUVAI_AUTH_ISSUER`, `DOMUVAI_AUTH_AUDIENCE`) wherever the
+  web signs in, and never `DOMUVAI_AUTH=off` on either beside real data.
 - Set `DOMUVAI_CONTACT_EMAIL=office@newcleardigital.com` where the landing is served (see "The demo request"), and
   decide where a demo request goes — a stored lead, a CRM, a mail provider (#79). Until then the visitor sends it
   from their own mail (WEB-15).
