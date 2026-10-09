@@ -86,11 +86,11 @@ class AssemblyPersistenceIT {
         assertThat(read.get("agenda").map { it.get("text").asText() }).containsExactly("Отчет на управителя", "Избор на управител")
         assertThat(read.get("agenda")[0].get("majorityRuleId").asText()).isEqualTo(first.get("majority").get("id").asText())
 
-        // another entrance does not see it; an unregistered entrance or convenor is a 404, not a 500
+        // another entrance does not see it; an unregistered entrance is a 404 and an unregistered convenor a 400, not a 500
         mvc.perform(get("/api/assembly/entrances/${entrance()}/assemblies/$id")).andExpect(status().isNotFound)
         mvc.perform(post("/api/assembly/entrances/${UUID.randomUUID()}/assemblies").contentType(MediaType.APPLICATION_JSON).content(convening(convenor)))
             .andExpect(status().isNotFound)
-        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(convening(UUID.randomUUID()))).andExpect(status().isNotFound)
+        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(convening(UUID.randomUUID()))).andExpect(status().isBadRequest)
     }
 
     @Test
@@ -104,13 +104,18 @@ class AssemblyPersistenceIT {
 
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(convening(convenor, """"urgent":true"""))).andExpect(status().isBadRequest)
 
-        val insert = "INSERT INTO assembly.assembly(id, entrance_id, scheduled_at, mode, status, urgent, urgency_reason) VALUES (gen_random_uuid(), ?, now(), 'IN_PERSON', 'DRAFT', ?, ?)"
-        assertThatThrownBy { jdbc.update(insert, entranceId, true, null) }.isInstanceOf(DataIntegrityViolationException::class.java)
-        assertThatThrownBy { jdbc.update(insert, entranceId, true, "   ") }.isInstanceOf(DataIntegrityViolationException::class.java)
-        assertThatThrownBy { jdbc.update(insert, entranceId, false, "бързаме") }.isInstanceOf(DataIntegrityViolationException::class.java)
-        // PM-GA-002 — and a capacity outside the three
-        assertThatThrownBy { jdbc.update("UPDATE assembly.assembly SET convened_as = 'CSH' WHERE id = ?::uuid", id) }
-            .isInstanceOf(DataIntegrityViolationException::class.java)
+        val insert = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, urgent, urgency_reason) " +
+            "VALUES (gen_random_uuid(), ?, ?, ?, 'фоайето', now(), 'IN_PERSON', 'DRAFT', ?, ?)"
+        assertThat(jdbc.update(insert, entranceId, convenor, "BM", true, "теч")).isEqualTo(1)          // the control: this insert is a good one
+        for ((urgent, reason) in listOf(true to null, true to "   ", true to "\t\n", false to "бързаме", false to "")) {
+            assertThatThrownBy { jdbc.update(insert, entranceId, convenor, "BM", urgent, reason) }
+                .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("assembly_urgency_recorded")
+        }
+        // PM-GA-002 — a capacity outside the three, or none at all
+        assertThatThrownBy { jdbc.update(insert, entranceId, convenor, "CSH", false, null) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("convened_as")
+        assertThatThrownBy { jdbc.update(insert, entranceId, convenor, null, false, null) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("assembly_convening_stated")
     }
 
     @Test

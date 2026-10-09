@@ -1,6 +1,5 @@
 package zues.app.assembly
 
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.data.relational.core.conversion.DbActionExecutionException
 import org.springframework.stereotype.Component
@@ -11,6 +10,7 @@ import zues.law.LegalDate
 import zues.law.MajorityNotInForce
 import zues.law.MajorityRule
 import zues.law.majorityRuleOn
+import java.sql.SQLException
 import java.time.Instant
 import java.util.UUID
 
@@ -35,7 +35,9 @@ class LawMajorities : Majorities {
     override fun on(itemType: String, on: LegalDate): MajorityRule = majorityRuleOn(itemType, on)
 }
 
-/** The item's type is known to the law, but its majority is not confirmed: the item cannot be bound. */
+private const val FOREIGN_KEY_VIOLATION = "23503"   // SQLSTATE
+
+/** The item's type is known to the law, but no majority is in force for it on the meeting's day: the item cannot be bound. */
 class MajorityPending(message: String) : RuntimeException(message)
 
 /** Convening a general assembly and building its agenda, while it is a draft. */
@@ -50,8 +52,9 @@ class AssemblyService(
     // Rule: PM-GA-005
     @Transactional
     fun convene(entranceId: UUID, request: Convene): Assembly {
-        val office = enumValueOf<ConvenorOffice>(request.convenedAs)     // any other capacity may not convene
-        val mode = enumValueOf<MeetingMode>(request.mode)
+        val office = ConvenorOffice.entries.firstOrNull { it.name == request.convenedAs }     // any other capacity may not convene
+            ?: throw IllegalArgumentException("an assembly is convened as MB, BM or CTL (PM-GA-002), not as \"${request.convenedAs}\"")
+        val mode = MeetingMode.entries.firstOrNull { it.name == request.mode } ?: throw IllegalArgumentException("unknown mode \"${request.mode}\"")
         require(request.place.isNotBlank()) { "the place of the assembly is required" }
         val reason = request.urgencyReason?.trim()?.ifEmpty { null }
         require(!request.urgent || reason != null) { "an urgent assembly needs its justification (PM-GA-005)" }
@@ -65,9 +68,11 @@ class AssemblyService(
             return aggregates.insert(assembly)
         } catch (e: DbActionExecutionException) {
             // the registry's own tables are not this module's to read: the foreign keys say who is missing
-            val refused = e.cause as? DataIntegrityViolationException ?: throw e
-            if (refused.message.orEmpty().contains("foreign key")) throw NoSuchElementException("the entrance or the convenor is not registered")
-            throw e
+            val refused = generateSequence<Throwable>(e) { it.cause }.filterIsInstance<SQLException>().firstOrNull() ?: throw e
+            if (refused.sqlState != FOREIGN_KEY_VIOLATION) throw e
+            // the constraint's name is in the message whatever language the server speaks
+            if (refused.message.orEmpty().contains("convened_by")) throw IllegalArgumentException("the convenor ${request.convenedBy} is not a registered party")
+            throw NoSuchElementException("no entrance $entranceId")
         }
     }
 
@@ -80,10 +85,11 @@ class AssemblyService(
     fun addAgendaItem(entranceId: UUID, assemblyId: UUID, text: String, itemType: String): Pair<AgendaItem, MajorityRule> {
         require(text.isNotBlank()) { "an agenda item needs its text" }
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
+        check(assembly.status == AssemblyStatus.DRAFT.name && assembly.noticePostedAt == null) { "the agenda is open only while the assembly is a draft" }
         val majority = try {
             majorities.on(itemType, toSofiaDate(assembly.scheduledAt))
         } catch (e: MajorityNotInForce) {
-            if (e.pending != null) throw MajorityPending(e.message.orEmpty())
+            if (e.known || e.pending != null) throw MajorityPending(e.message.orEmpty())
             throw IllegalArgumentException("unknown agenda item type $itemType")
         }
         val ordinal = (agenda.findByAssemblyIdOrderByOrdinal(assemblyId).maxOfOrNull { it.ordinal } ?: 0) + 1

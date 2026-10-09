@@ -120,10 +120,16 @@ data class MajorityRule(
 /** An item type the catalogue names but gives no number for: nothing is in force until counsel answers. */
 data class PendingMajority(val itemType: String, val source: String, val rule: String, val todoLegal: String)
 
-/** No majority is in force for the item type on the date; [pending] says whether it is known and waiting. */
-class MajorityNotInForce(val itemType: String, val pending: PendingMajority?) : RuntimeException(
-    pending?.let { "no majority is confirmed for $itemType (${it.rule}, ${it.source}) — TODO(legal): ${it.rule}" }
-        ?: "no majority for item type $itemType — stop and ask (PM-SYS-001)",
+/**
+ * No majority is in force for the item type on the date. [known] says the law names the type: either its number
+ * waits on counsel ([pending]), or it has one that is not yet in force on that date.
+ */
+class MajorityNotInForce(val itemType: String, val on: LegalDate, val known: Boolean, val pending: PendingMajority?) : RuntimeException(
+    when {
+        pending != null -> "no majority is confirmed for $itemType (${pending.rule}, ${pending.source}) — TODO(legal): ${pending.rule}"
+        known -> "the majority for $itemType is not yet in force on $on"
+        else -> "no majority for item type $itemType — stop and ask (PM-SYS-001)"
+    },
 )
 
 private val MAJORITY_RULES: List<MajorityRule> = listOf(
@@ -142,4 +148,7 @@ private val PENDING_MAJORITIES: List<PendingMajority> = listOf(
 /** The majority in force for an item type on the legal date, from [rules]. Rule: PM-SYS-002, PM-VOTE-004 */
 fun majorityRuleOn(itemType: String, on: LegalDate, rules: List<MajorityRule> = MAJORITY_RULES): MajorityRule =
     rules.filter { it.itemType == itemType && it.inForceFrom <= on }.maxByOrNull { it.inForceFrom }
-        ?: throw MajorityNotInForce(itemType, PENDING_MAJORITIES.firstOrNull { it.itemType == itemType })
+        ?: throw rules.any { it.itemType == itemType }.let { dated ->
+            // a type with a dated number is no longer waiting on counsel, whatever the pending list still says
+            MajorityNotInForce(itemType, on, dated, if (dated) null else PENDING_MAJORITIES.firstOrNull { it.itemType == itemType })
+        }

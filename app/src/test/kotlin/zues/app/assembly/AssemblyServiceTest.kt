@@ -102,7 +102,26 @@ class AssemblyServiceTest {
         assertThatThrownBy {
             service { type, on -> majorityRuleOn(type, on, listOf(later)) }
                 .addAgendaItem(entranceId, assembly.id, "Отдаване на покрива под наем", "COMMON_PART_USE_RIGHT")
-        }.isInstanceOf(MajorityPending::class.java)
+        }.isInstanceOf(MajorityPending::class.java).hasMessageContaining("not yet in force on 2026-11-20").hasMessageNotContaining("TODO(legal)")
+    }
+
+    @Test
+    fun `PM-SYS-004 the meeting's day is its Sofia day - a threshold in force from that day binds an assembly late on the UTC day before`() {
+        val fromThe21st = MajorityRule(
+            "COMMON_PART_USE_RIGHT", "88.5", Comparison.AT_LEAST, Denominator.TOTAL, "2026-11-21", "чл. 17 ЗУЕС", false, "PM-VOTE-004",
+        )
+        val lateEvening = Convene(convenor, "BM", Instant.parse("2026-11-20T22:30:00Z"), "фоайето", "IN_PERSON")   // 00:30 on the 21st in Sofia
+        val assembly = service().convene(entranceId, lateEvening).also { whenever(assemblies.lock(it.id, entranceId)).thenReturn(it) }
+        val (item, _) = service { type, on -> majorityRuleOn(type, on, listOf(fromThe21st)) }
+            .addAgendaItem(entranceId, assembly.id, "Отдаване на покрива под наем", "COMMON_PART_USE_RIGHT")
+        assertThat(item.majorityRuleId).isEqualTo("COMMON_PART_USE_RIGHT@2026-11-21")
+    }
+
+    @Test
+    fun `an assembly that is no longer a draft does not take an agenda item here`() {
+        val assembly = draft()
+        whenever(assemblies.lock(assembly.id, entranceId)).thenReturn(assembly.copy(noticePostedAt = Instant.parse("2026-11-01T10:00:00Z")))
+        assertThatThrownBy { service().addAgendaItem(entranceId, assembly.id, "Разни", "GENERAL") }.isInstanceOf(IllegalStateException::class.java)
     }
 
     @Test

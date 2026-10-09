@@ -82,6 +82,11 @@ class AssemblyController(private val assemblies: AssemblyService) {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
+    /** The assembly is no longer a draft. */
+    @ExceptionHandler(IllegalStateException::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))
+
     /** The item's majority waits on counsel: the request is understood and cannot be carried out. */
     @ExceptionHandler(MajorityPending::class)
     @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)

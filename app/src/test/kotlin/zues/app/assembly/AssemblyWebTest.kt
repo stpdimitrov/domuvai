@@ -77,6 +77,10 @@ class AssemblyWebTest {
                 .content("""{"text":"Покривът под наем","itemType":"COMMON_PART_USE_RIGHT"}"""),
         ).andExpect(status().isUnprocessableEntity).andExpect(jsonPath("$.error").value("TODO(legal): PM-VOTE-004"))
 
+        whenever(assemblies.addAgendaItem(any(), any(), any(), eq("GENERAL"))).thenThrow(IllegalStateException("not a draft"))
+        mvc.perform(post("$base/${draft.id}/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Разни","itemType":"GENERAL"}"""))
+            .andExpect(status().isConflict)
+
         whenever(assemblies.read(entranceId, draft.id)).thenThrow(NoSuchElementException("no assembly"))
         mvc.perform(get("$base/${draft.id}")).andExpect(status().isNotFound)
     }

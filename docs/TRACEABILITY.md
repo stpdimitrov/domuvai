@@ -106,7 +106,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-001` | — | — |  |
 | `PM-VOTE-002` | — | — |  |
 | `PM-VOTE-003` | — | — |  |
-| `PM-VOTE-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:117` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:37` | ⚠ |
+| `PM-VOTE-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:122` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:37` | ⚠ |
 | `PM-VOTE-005` | — | — |  |
 | `PM-VOTE-006` | — | — |  |
 | `PM-VOTE-007` | — | — |  |
@@ -277,7 +277,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
 | `PM-SYS-002` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:138` | `app/src/main/kotlin/zues/app/money/Arrears.kt:73` |  |
 | `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
-| `PM-SYS-004` | `app/src/test/kotlin/zues/app/registry/BookWebTest.kt:70` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
+| `PM-SYS-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyServiceTest.kt:109` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
 | `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |
 | `PM-SYS-006` | — | — |  |
 | `PM-SYS-007` | — | — |  |
