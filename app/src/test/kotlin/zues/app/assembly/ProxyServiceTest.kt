@@ -27,7 +27,10 @@ class ProxyServiceTest {
     private val aggregates: JdbcAggregateTemplate = mock {
         on { insert(any<Any>()) } doAnswer { (it.arguments[0] as Proxy).also { p -> registered += p } }
     }
-    private val assemblies: AssemblyRepository = mock { on { lock(any(), any()) } doAnswer { current } }
+    private val assemblies: AssemblyRepository = mock {
+        on { lock(any(), any()) } doAnswer { current?.takeIf { a -> a.id == it.arguments[0] && a.entranceId == it.arguments[1] } }
+        on { findById(any<UUID>()) } doAnswer { java.util.Optional.ofNullable(current?.takeIf { a -> a.id == it.arguments[0] }) }
+    }
     private val agenda: AgendaItemRepository = mock {
         on { findByAssemblyIdOrderByOrdinal(any()) } doAnswer {
             (1..3).map { n -> AgendaItem(UUID.randomUUID(), entranceId, assembly.id, n, "т. $n", "GENERAL", "GENERAL@2009-01-01") }
@@ -98,7 +101,25 @@ class ProxyServiceTest {
     }
 
     @Test
-    fun `PM-GA-010 the limit is per agent and per assembly - another agent is not affected`() {
+    fun `PM-GA-010 the limit is on the person, whatever kind of representative they are for each principal`() {
+        val max = constantOn("GA_PROXY_MAX_PRINCIPALS", "2026-11-20").value.toInt()
+        val kinds = listOf("OWNER", "HOUSEHOLD_MEMBER", "THIRD_PARTY")
+        repeat(max) { proxy(kind = kinds[it % kinds.size]) }
+        assertThatThrownBy { proxy(kind = "THIRD_PARTY") }.isInstanceOf(ProxyLimitReached::class.java)
+    }
+
+    @Test
+    fun `PM-GA-010 a proxy is not passed on - a represented person represents nobody, and a representative is not represented`() {
+        val absent = UUID.randomUUID()
+        proxy(principal = absent)                                                    // absent is represented by the agent
+        assertThatThrownBy { proxy(by = absent) }.isInstanceOf(IllegalStateException::class.java).hasMessageContaining("PM-GA-010")
+        assertThatThrownBy { proxy(principal = agent, by = UUID.randomUUID()) }      // the agent hands their principals to another
+            .isInstanceOf(IllegalStateException::class.java).hasMessageContaining("PM-GA-010")
+        assertThat(registered).hasSize(1)
+    }
+
+    @Test
+    fun `PM-GA-010 the limit is per agent - another agent is not affected`() {
         val max = constantOn("GA_PROXY_MAX_PRINCIPALS", "2026-11-20").value.toInt()
         repeat(max) { proxy() }
         assertThat(proxy(by = UUID.randomUUID()).agentPartyId).isNotEqualTo(agent)
@@ -109,7 +130,13 @@ class ProxyServiceTest {
     fun `an assembly that is missing, or past its notice, takes no proxy`() {
         current = assembly.copy(status = "OPEN")
         assertThatThrownBy { proxy() }.isInstanceOf(IllegalStateException::class.java)
-        current = null
-        assertThatThrownBy { proxy() }.isInstanceOf(NoSuchElementException::class.java)
+        current = assembly
+        // through another entrance's path the assembly is not there: nothing is registered, nothing is listed
+        val elsewhere = UUID.randomUUID()
+        assertThatThrownBy { service.register(elsewhere, assembly.id, RegisterProxy(UUID.randomUUID(), agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN")) }
+            .isInstanceOf(NoSuchElementException::class.java)
+        proxy()
+        assertThatThrownBy { service.forAssembly(elsewhere, assembly.id) }.isInstanceOf(NoSuchElementException::class.java)
+        assertThat(service.forAssembly(entranceId, assembly.id)).hasSize(1)
     }
 }

@@ -28,8 +28,8 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /**
- * Proxies against real PostgreSQL, through the HTTP layer: what is captured reads back, the limit holds over
- * stored rows, and the table itself refuses what the service refuses. Docker-gated.
+ * Proxies against real PostgreSQL, through the HTTP layer: what is captured reads back, the service's limit holds
+ * over stored rows, and the table refuses a malformed row. The limit itself is the service's, not the table's. Docker-gated.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -137,5 +137,10 @@ class ProxyPersistenceIT {
 
         // the limit is per assembly: the same agent may represent at another one
         created(assembly(entrance()), proxy(party(), agent))
+
+        // through another entrance's path this assembly's proxies are neither listed nor added to
+        val elsewhere = proxies.replace(Regex("entrances/[^/]+"), "entrances/${entrance()}")
+        mvc.perform(get(elsewhere)).andExpect(status().isNotFound)
+        mvc.perform(post(elsewhere).contentType(MediaType.APPLICATION_JSON).content(proxy(party(), party()))).andExpect(status().isNotFound)
     }
 }

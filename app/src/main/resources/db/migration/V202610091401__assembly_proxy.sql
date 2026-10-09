@@ -8,11 +8,11 @@ CREATE TABLE assembly.proxy (
   agent_party_id      uuid NOT NULL REFERENCES registry.party(id),
   agent_kind          text NOT NULL CHECK (agent_kind IN ('HOUSEHOLD_MEMBER','OWNER','THIRD_PARTY')),
   scope               text NOT NULL CHECK (scope IN ('WHOLE_AGENDA','LISTED_ITEMS')),
-  scope_items         text CHECK (scope_items ~ '^\d+(,\d+)*$'),
-  form                text NOT NULL CHECK (form IN ('WRITTEN','NOTARISED','LAWYER')),
+  scope_items         text CHECK (scope_items ~ '^\d{1,3}(,\d{1,3})*$'),
+  form                text NOT NULL CHECK (form IN ('WRITTEN','NOTARISED','LAWYER_AUTHORISATION')),
   registered_at       timestamptz NOT NULL,
   CONSTRAINT proxy_not_for_oneself CHECK (principal_party_id <> agent_party_id),
   CONSTRAINT proxy_scope_lists_its_items CHECK ((scope = 'LISTED_ITEMS') = (scope_items IS NOT NULL)),
-  -- a principal is represented by one person at an assembly, so no share is ever represented twice
+  -- a principal is represented by one person at an assembly
   CONSTRAINT proxy_one_per_principal UNIQUE (assembly_id, principal_party_id)
 );

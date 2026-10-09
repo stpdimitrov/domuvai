@@ -55,7 +55,7 @@ class ProxyWebTest {
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.limit").value(3))
-            .andExpect(jsonPath("$.error").value("one person represents at most 3 owners at an assembly (чл. 14 ЗУЕС) — PM-GA-010"))
+            .andExpect(jsonPath("$.error").value("one person represents at most 3 principals at an assembly (чл. 14 ЗУЕС) — PM-GA-010"))
     }
 
     @Test

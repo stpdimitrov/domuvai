@@ -37,7 +37,7 @@ enum class AgentKind { HOUSEHOLD_MEMBER, OWNER, THIRD_PARTY }
 enum class ProxyScope { WHOLE_AGENDA, LISTED_ITEMS }
 
 /** The form the authorisation was given in. What each kind of agent needs is PM-GA-011's to judge. */
-enum class AuthorisationForm { WRITTEN, NOTARISED, LAWYER }
+enum class AuthorisationForm { WRITTEN, NOTARISED, LAWYER_AUTHORISATION }
 
 interface ProxyRepository : ListCrudRepository<Proxy, UUID> {
     fun findByAssemblyId(assemblyId: UUID): List<Proxy>
@@ -55,7 +55,7 @@ data class RegisterProxy(
 
 /** The agent already represents as many as one person may: the refusal carries the limit in force. */
 class ProxyLimitReached(val limit: Int, val source: String) : IllegalStateException(
-    "one person represents at most $limit owners at an assembly ($source) — PM-GA-010",
+    "one person represents at most $limit principals at an assembly ($source) — PM-GA-010",
 )
 
 @Service
@@ -77,6 +77,7 @@ class ProxyService(
         // the assembly's row is locked, so two registrations for one agent are counted one after the other
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
         check(assembly.status in PROXIES_OPEN) { "an assembly that is ${assembly.status} takes no new proxies" }
+        require((request.items as List<Int?>).none { it == null }) { "an agenda item is named by its number" }
         val items = request.items.distinct().sorted()
         if (scope == ProxyScope.LISTED_ITEMS) {
             require(items.isNotEmpty()) { "a proxy for listed items names at least one" }
@@ -87,7 +88,13 @@ class ProxyService(
         }
         val registered = proxies.findByAssemblyId(assemblyId)
         check(registered.none { it.principalPartyId == request.principalPartyId }) { "this principal already has a proxy at this assembly" }
-        val limit = constantOn("GA_PROXY_MAX_PRINCIPALS", toSofiaDate(assembly.scheduledAt))   // TODO(legal): PM-GA-010 — unconfirmed
+        // A represented person does not attend, so cannot represent; and nobody passes on what they were given —
+        // otherwise one person stands for more than the limit through another's proxies.
+        check(registered.none { it.principalPartyId == request.agentPartyId }) { "the representative is represented at this assembly, and cannot represent (PM-GA-010)" }
+        check(registered.none { it.agentPartyId == request.principalPartyId }) { "the principal represents others at this assembly, and cannot be represented (PM-GA-010)" }
+        // TODO(legal): PM-GA-010 — the number is unconfirmed, and so is what it counts: here, the principals (owners or
+        // users alike) one party represents at one assembly, whatever kind of representative it is for each.
+        val limit = constantOn("GA_PROXY_MAX_PRINCIPALS", toSofiaDate(assembly.scheduledAt))
         if (registered.count { it.agentPartyId == request.agentPartyId } >= limit.value.toInt()) {
             throw ProxyLimitReached(limit.value.toInt(), limit.source)
         }
@@ -104,8 +111,11 @@ class ProxyService(
     }
 
     @Transactional(readOnly = true)
-    fun forAssembly(entranceId: UUID, assemblyId: UUID): List<Proxy> =
-        proxies.findByAssemblyId(assemblyId).filter { it.entranceId == entranceId }
+    fun forAssembly(entranceId: UUID, assemblyId: UUID): List<Proxy> {
+        assemblies.findById(assemblyId).filter { it.entranceId == entranceId }
+            .orElseThrow { NoSuchElementException("no assembly $assemblyId in entrance $entranceId") }
+        return proxies.findByAssemblyId(assemblyId)
+    }
 
     private inline fun <reified E : Enum<E>> named(value: String, what: String): E =
         enumValues<E>().firstOrNull { it.name == value }
