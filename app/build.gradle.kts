@@ -55,5 +55,7 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // Tests run with sign-in switched off in so many words (ADR-011); the ones about sign-in configure an issuer of their own.
+    systemProperty("domuvai.auth.mode", "off")
     outputs.dir("build/openapi")   // OpenApiContractTest writes the raw spec here (ADR-013)
 }

@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.modulith.Modulithic
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
-import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.web.SecurityFilterChain
 
 /**
@@ -23,21 +22,25 @@ class DomuvaiApplication {
 
     /**
      * Who is let in (ADR-011). Declared here, on the application class, so that every web slice test runs behind the
-     * same rule as the application. Stateless: no session and no cookie, so nothing for a forged form to ride on.
+     * same rule as the application. Stateless: no session, no cookie, no password and nothing to log out of — so
+     * nothing for a forged form to ride on. The decoder is built here from the issuer's keys and is never a bean:
+     * no other configuration can put one without the audience check in its place.
      */
     @Bean
     fun apiSecurity(
         http: HttpSecurity,
         @Value("\${domuvai.auth.issuer-uri:}") issuer: String,
         @Value("\${domuvai.auth.audience:}") audience: String,
-        decoder: ObjectProvider<JwtDecoder>,
+        @Value("\${domuvai.auth.mode:}") mode: String,
+        keys: ObjectProvider<IssuerKeys>,
     ): SecurityFilterChain {
-        val auth = ApiAuth(issuer.trim(), audience.trim())
-        http.csrf { it.disable() }.sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+        val auth = ApiAuth(issuer, audience, mode)
+        http.csrf { it.disable() }.logout { it.disable() }.requestCache { it.disable() }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
         if (!auth.required) return http.authorizeHttpRequests { it.anyRequest().permitAll() }.build()
         return http
             .authorizeHttpRequests { it.requestMatchers("/actuator/health", "/actuator/health/**").permitAll().anyRequest().authenticated() }
-            .oauth2ResourceServer { server -> server.jwt { it.decoder(decoder.getIfAvailable { auth.decoder() }) } }
+            .oauth2ResourceServer { server -> server.jwt { it.decoder(auth.decoder(keys.getIfAvailable { ApiAuth.DISCOVERED })) } }
             .build()
     }
 }

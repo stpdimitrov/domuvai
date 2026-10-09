@@ -45,7 +45,7 @@ jobs:
 
       - name: Start the API — Flyway migrates the empty database
         run: |
-          nohup java -jar app/build/libs/app.jar > api.log 2>&1 &
+          DOMUVAI_AUTH=off nohup java -jar app/build/libs/app.jar > api.log 2>&1 &   # open: the web cannot sign in yet (ADR-011, AUTH-03)
           curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
 
       - name: Seed the demo entrance, and a small one with a business unit, through the public API

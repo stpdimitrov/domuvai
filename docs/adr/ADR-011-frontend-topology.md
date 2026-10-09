@@ -104,7 +104,9 @@ The Gate-1 green light (S-41) was reached and the frontend was built from the ow
 
 **Decision (the owner's, 2026-10-08).** The identity provider is **Keycloak, self-hosted** — the default this record marked. Nothing in the architecture above changes: the `api` validates tokens and issues none, the session lives in `web`, the token says who is asking and never what they may do.
 
-**How the `api` is configured.** Two values, both or neither: `DOMUVAI_AUTH_ISSUER` (the realm's issuer URL — discovery and keys are read from it) and `DOMUVAI_AUTH_AUDIENCE` (the audience a token must be issued for). With both, every `/api/**` request needs a token that issuer signed, in date, for that audience; the health endpoint stays open. With an issuer and no audience the application does not start: a realm signs tokens for every application in it, and one issued for another must never be accepted by default. With neither, the `api` is open and says so at start — a developer's machine, and CI until the web can sign in.
+**How the `api` is configured.** Two values, both or neither: `DOMUVAI_AUTH_ISSUER` (the realm's issuer URL, https — discovery and keys are read from it) and `DOMUVAI_AUTH_AUDIENCE` (the audience a token must be issued for). With both, every `/api/**` request needs a token that issuer signed, in date, for that audience; the health endpoint stays open. With an issuer and no audience the application does not start: a realm signs tokens for every application in it, and one issued for another must never be accepted by default.
+
+**Closed unless told otherwise.** With neither value the application does not start either — unless `DOMUVAI_AUTH=off` says in so many words that it runs open: a developer's machine, the tests, and CI's end-to-end job until the web can sign in. A deployment that loses its settings stays shut; it never comes up open because something was forgotten. This is the console's own rule (PM-DEBT-011), applied to the `api`.
 
 **The slices.**
 
@@ -117,4 +119,4 @@ The Gate-1 green light (S-41) was reached and the frontend was built from the ow
 
 **What stays open until AUTH-04.** A valid token lets a request in; it does not yet limit what the request may read. So AUTH-01 to AUTH-03 make the system *closed to strangers*, not yet *scoped per entrance* — a deployment with real residents' data waits for AUTH-04 and the row-level backstop of ADR-002.
 
-**A constraint of this repository's tooling.** The developer machine has no container runtime, so a Keycloak cannot run beside the tests there. The `api`'s tests stand in for the issuer with a key of their own (it is standard OIDC: any issuer's signature is checked the same way); a real Keycloak runs in CI's end-to-end job from AUTH-03 on.
+**A constraint of this repository's tooling.** The developer machine has no container runtime, so a Keycloak cannot run beside the tests there. The `api`'s tests stand in for the issuer with a key of their own and sign real tokens with it, so the signature, the issuer, the audience and the dates are checked by the application's own decoder (it is standard OIDC: any issuer's signature is checked the same way); reading the keys from a discovery document is not exercised there. A real Keycloak runs in CI's end-to-end job from AUTH-03 on.
