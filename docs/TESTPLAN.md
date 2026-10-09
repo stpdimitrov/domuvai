@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **63** (27%) |
-| Remaining | **170** |
+| Proved by a test named after the rule | **65** (28%) |
+| Remaining | **168** |
 | Proposed slices at ~10 rules each | **20** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-74 rule(s) remaining across 8 slice(s).
+72 rule(s) remaining across 8 slice(s).
 
 ### S-G2-01 · `assembly` · GA · 10 rule(s) · ⚠ 2 unconfirmed
 
@@ -131,18 +131,17 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-001` | MUST | Entrance carries `management_form` ∈ {GA, ASSOCIATION, GA+ASSOCIATION, CLOSED_COMPLEX}. |
 | `PM-GOV-002` | MUST | Entrance governance config exposes exactly these two bodies; no third body type is creatable. |
 | `PM-GOV-003` | MUST | Saving a 4-member board is rejected. |
-| `PM-GOV-004` | MUST | At mandate end the status becomes `EXPIRED_ACTING` and an election task is raised 60 days before expiry. |
 | `PM-GOV-005` | MUST | Countdown widget on the manager dashboard. |
 | `PM-GOV-006` | MUST | Selecting an occupant as a board candidate is blocked. |
 | `PM-GOV-007` | MUST | Annual audit task auto-created; GA agenda template includes the controller's report. |
 | `PM-GOV-008` | MUST | `CTL` role gets read-all, write-none except its own reports. |
 | `PM-GOV-010` | MUST | Onboarding a building into a PMC portfolio requires an uploaded protocol meeting this majority. |
+| `PM-GOV-011` | MUST | The "apply for renovation programme" flow blocks until an association exists. |
 
-### S-G2-07 · `identity-org` · GOV · 8 rule(s)
+### S-G2-07 · `identity-org` · GOV · 7 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-GOV-011` | MUST | The "apply for renovation programme" flow blocks until an association exists. |
 | `PM-GOV-013` | MUST | Document generator produces the agreement from stored data. |
 | `PM-GOV-014` | MUST | Protocol picker forces selection of the deciding body. |
 | `PM-GOV-015` | MUST | Remuneration = 0 is a valid configured state, not a missing value. |
@@ -151,7 +150,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-009` | SHOULD | Declining a nomination requires a reason code. |
 | `PM-GOV-017` | SHOULD | Violation records cite the rule version in force on the incident date. |
 
-### S-G2-08 · `policy` · SEC · 11 rule(s) · ⚠ 1 unconfirmed
+### S-G2-08 · `policy` · SEC · 10 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
@@ -164,7 +163,6 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-SEC-007` | MUST | Request workflow with a 30-day clock. |
 | `PM-SEC-008` | MUST | Incident workflow with the clock started at detection. |
 | `PM-SEC-010` | MUST | Encryption settings are asserted by an automated compliance check, not by documentation alone. |
-| `PM-SEC-011` | MUST | Temporal role table. |
 | `PM-SEC-012` | MUST NOT | A stolen phone exposes one household's data at most, never the building's. |
 
 ## Gate 3 — collection beats their portfolio average

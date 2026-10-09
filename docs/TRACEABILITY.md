@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 62 | 27% |
-| **Proved by a test named after the rule** | **63** | **27%** |
-| No implementation and no test | 169 | 73% |
+| Referenced in code (`// Rule:`) | 64 | 27% |
+| **Proved by a test named after the rule** | **65** | **28%** |
+| No implementation and no test | 167 | 72% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -45,14 +45,14 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:83` |  |
 | `PM-BOOK-012` | `app/src/test/kotlin/zues/app/money/HeadcountCheckTest.kt:53` | `app/src/main/kotlin/zues/app/money/HeadcountCheck.kt:17` |  |
 
-## GOV — Governance & mandates  ·  0/18 covered
+## GOV — Governance & mandates  ·  1/18 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-GOV-001` | — | — |  |
 | `PM-GOV-002` | — | — |  |
 | `PM-GOV-003` | — | — |  |
-| `PM-GOV-004` | — | — |  |
+| `PM-GOV-004` | `app/src/test/kotlin/zues/app/identity_org/MandateTest.kt:23` | `app/src/main/kotlin/zues/app/identity_org/MandateRoles.kt:32` |  |
 | `PM-GOV-005` | — | — |  |
 | `PM-GOV-006` | — | — |  |
 | `PM-GOV-007` | — | — |  |
@@ -253,7 +253,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-DOC-008` | — | — |  |
 | `PM-DOC-009` | — | — |  |
 
-## SEC — Access control & privacy  ·  1/12 covered
+## SEC — Access control & privacy  ·  2/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -267,7 +267,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SEC-008` | — | — |  |
 | `PM-SEC-009` | — | — | ⚠ |
 | `PM-SEC-010` | — | — |  |
-| `PM-SEC-011` | — | — |  |
+| `PM-SEC-011` | `app/src/test/kotlin/zues/app/identity_org/MandateRolesIT.kt:68` | `app/src/main/kotlin/zues/app/identity_org/MandateRoles.kt:58` |  |
 | `PM-SEC-012` | — | — |  |
 
 ## SYS — Cross-cutting system rules  ·  6/15 covered
