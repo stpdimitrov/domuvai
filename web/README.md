@@ -29,7 +29,8 @@ PG="$(brew --prefix postgresql@16)/bin"
 "$PG/pg_ctl" -D "$(brew --prefix)/var/postgresql@16" -l "$(brew --prefix)/var/log/postgresql@16.log" start
 "$PG/psql" -d postgres -c "CREATE ROLE postgres LOGIN SUPERUSER PASSWORD 'postgres'"
 "$PG/createdb" -O postgres domuvai
-./gradlew :app:bootRun                        # from the repo root; Flyway migrates the empty database
+DOMUVAI_AUTH=off ./gradlew :app:bootRun       # from the repo root; Flyway migrates the empty database. Off in so many
+                                              # words: the api does not start without sign-in configured (ADR-011)
 python3 tools/seed_demo.py                    # prints the entrance id; a database seeded before WEB-18 has no October run — recreate it to get one
 cd web && API_URL=http://localhost:8080 npm run dev
 ```

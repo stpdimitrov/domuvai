@@ -38,7 +38,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | [008](adr/ADR-008-explicit-denominator.md) | Every majority carries its denominator explicitly | **Accepted** |
 | [009](adr/ADR-009-agent-holds-no-credential.md) | The agent holds no write credential | **Accepted** |
 | [010](adr/ADR-010-backend-language.md) | Backend is Kotlin · Spring Boot · Spring Modulith; frontend stays Next.js/TS | **Accepted** |
-| [011](adr/ADR-011-frontend-topology.md) | Frontend is a separate Next.js app; contract-first (OpenAPI-generated client); build gate-by-gate; **monorepo** (`web/` here); **OIDC · stateless api · Next.js BFF session** (provider deferred, Keycloak marked) | **Accepted** |
+| [011](adr/ADR-011-frontend-topology.md) | Frontend is a separate Next.js app; contract-first (OpenAPI-generated client); build gate-by-gate; **monorepo** (`web/` here); **OIDC · stateless api · Next.js BFF session** · provider **Keycloak** (amended 2026-10-08) | **Accepted** |
 | [012](adr/ADR-012-intake-format-agnostic.md) | Intake is format-agnostic — a per-import column mapping onto known domain fields, not a canonical spreadsheet; a pilot sheet is validation, not schema; a go-live gate caps the risk (§7) | **Accepted** |
 | [013](adr/ADR-013-openapi-from-code.md) | The published OpenAPI contract is **generated from the running code** (springdoc); the hand catalogue becomes the rule-traceability map (a running endpoint must cite its rules; unbuilt operations stay, marked planned); the wire format is what runs (`/api/<module>/…`, `camelCase`) | **Accepted** |
 

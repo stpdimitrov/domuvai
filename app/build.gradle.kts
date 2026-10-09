@@ -28,6 +28,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // The api is a stateless OAuth2 resource server (ADR-011): it validates tokens an OIDC issuer signed, and issues none.
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // module boundaries + the durable outbox (event publication registry)
@@ -41,6 +43,7 @@ dependencies {
     implementation("org.postgresql:postgresql")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testImplementation("org.testcontainers:junit-jupiter")
@@ -52,5 +55,7 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // Tests run with sign-in switched off in so many words (ADR-011); the ones about sign-in configure an issuer of their own.
+    systemProperty("domuvai.auth.mode", "off")
     outputs.dir("build/openapi")   // OpenApiContractTest writes the raw spec here (ADR-013)
 }

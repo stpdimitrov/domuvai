@@ -27,6 +27,16 @@ spring:
         schema-initialization:
           enabled: true
 
+# Sign-in (ADR-011): the api validates tokens signed by an OIDC issuer — Keycloak — and issued for this api.
+# Both set: every /api/** request needs such a token. Closed unless told otherwise: with no issuer the application
+# does not start, unless DOMUVAI_AUTH=off says in so many words that it runs open — a machine of one's own.
+# An issuer with no audience stops the application at start.
+domuvai:
+  auth:
+    issuer-uri: ${DOMUVAI_AUTH_ISSUER:}
+    audience: ${DOMUVAI_AUTH_AUDIENCE:}
+    mode: ${DOMUVAI_AUTH:}
+
 management:
   endpoints:
     web:
