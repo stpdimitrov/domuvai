@@ -14,7 +14,9 @@ import zues.law.Comparison
 import zues.law.Denominator
 import zues.law.MajorityRule
 import zues.law.majorityRuleOn
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.UUID
 
 /**
@@ -26,7 +28,8 @@ class AssemblyServiceTest {
     private val aggregates: JdbcAggregateTemplate = mock { on { insert(any<Any>()) } doAnswer { it.arguments[0] } }
     private val assemblies: AssemblyRepository = mock()
     private val agenda: AgendaItemRepository = mock()
-    private fun service(majorities: Majorities = LawMajorities()) = AssemblyService(aggregates, assemblies, agenda, majorities)
+    private val clock = Clock.fixed(Instant.parse("2026-10-09T09:00:00Z"), ZoneOffset.UTC)
+    private fun service(majorities: Majorities = LawMajorities()) = AssemblyService(aggregates, assemblies, agenda, majorities, clock)
 
     private val entranceId = UUID.randomUUID()
     private val convenor = UUID.randomUUID()
@@ -118,9 +121,9 @@ class AssemblyServiceTest {
     }
 
     @Test
-    fun `an assembly that is no longer a draft does not take an agenda item here`() {
+    fun `an assembly past its notice - any status but DRAFT and NOTICED - takes no agenda item`() {
         val assembly = draft()
-        whenever(assemblies.lock(assembly.id, entranceId)).thenReturn(assembly.copy(noticePostedAt = Instant.parse("2026-11-01T10:00:00Z")))
+        whenever(assemblies.lock(assembly.id, entranceId)).thenReturn(assembly.copy(status = "OPEN"))
         assertThatThrownBy { service().addAgendaItem(entranceId, assembly.id, "Разни", "GENERAL") }.isInstanceOf(IllegalStateException::class.java)
     }
 

@@ -25,6 +25,9 @@ data class Assembly(
     val urgent: Boolean,
     val urgencyReason: String?,
     val noticePostedAt: Instant? = null,
+    val noticePostingId: UUID? = null,
+    /** When the date, hour, place or agenda last changed; a notice posted before it stated something else (PM-GA-006). */
+    val noticeContentChangedAt: Instant? = null,
 )
 
 /** Who may convene: the management board, the manager, the control board or controller. Rule: PM-GA-002 */
@@ -32,7 +35,8 @@ enum class ConvenorOffice { MB, BM, CTL }
 
 enum class MeetingMode { IN_PERSON, VIDEO, HYBRID }
 
-enum class AssemblyStatus { DRAFT }
+/** `NOTICED` is reached only by a recorded posting act (Rule: PM-GA-007). */
+enum class AssemblyStatus { DRAFT, NOTICED }
 
 /** One item of the agenda, bound to the majority that decides it (Rule: PM-VOTE-004). */
 @Table("agenda_item")
