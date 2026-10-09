@@ -31,6 +31,8 @@ const PENDING = "sign-in begun";
 const TIMEOUT_MS = 10_000;
 /** The issuer's keys are read again for a key not seen before, but no more often than this — seconds. */
 const KEYS_EVERY = 30;
+/** And they are read again after this long whatever they hold, so a key the issuer withdrew stops being believed. */
+const KEYS_FOR = 3600;
 
 const text = (value: unknown): string | null => (typeof value === "string" && value ? value : null);
 const seconds = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null);
@@ -69,9 +71,11 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
 
   const keysFor = async (kid: string | undefined): Promise<Jwk[]> => {
     const known = keys?.keys.some((k) => kid !== undefined && k.kid === kid);
-    if (!keys || (!known && deps.now() - keys.read >= KEYS_EVERY)) {
+    const age = keys ? deps.now() - keys.read : 0;
+    if (!keys || age >= KEYS_FOR || (!known && age >= KEYS_EVERY)) {
       const set = await get((await discover()).jwks);
-      keys = { read: deps.now(), keys: Array.isArray(set.keys) ? (set.keys as Jwk[]) : [] };
+      if (!Array.isArray(set.keys)) throw new Error("the issuer's keys are not a key set");   // not remembered: the next sign-in asks again
+      keys = { read: deps.now(), keys: set.keys as Jwk[] };
     }
     return keys.keys;
   };
@@ -111,6 +115,7 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
     /**
      * A sign-in begun: the issuer's address to send the browser to, and the sealed value the browser keeps until it
      * comes back. State, nonce and PKCE verifier are fresh for every attempt and are in that sealed value only.
+     * Throws when the issuer cannot be reached or its document is refused — nobody is sent anywhere.
      */
     async begin(wanted: string | null | undefined): Promise<{ url: string; pending: string }> {
       const pending: Pending = { state: random(), nonce: random(), verifier: random(), returnTo: returnPath(wanted) };
@@ -159,10 +164,15 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
       if (!checked.ok) return refused(checked.why);
       const name = text(checked.claims.preferred_username) ?? text(checked.claims.name);
       const signedIn = session(answer.body, { subject: checked.claims.sub, name }, null);
-      return signedIn ? { ok: true, session: signedIn, returnTo: begun.returnTo } : refused("the issuer's answer carries no bearer token");
+      return signedIn ? { ok: true, session: signedIn, returnTo: returnPath(begun.returnTo) } : refused("the issuer's answer carries no bearer token");
     },
 
-    /** The session with a fresh access token. Refused by the issuer is signed out — the old token is never kept. */
+    /**
+     * The session with a fresh access token. Refused by the issuer is signed out: the access token it had is never
+     * kept in use. An issuer that does not answer, or says to come back later, is "unreachable" — the caller's to
+     * decide, and never a reason to go on with the old access token past its time. The refresh token is the new one
+     * when the issuer gives one, the same one when it does not.
+     */
     async renew(current: Session): Promise<Renewed> {
       if (!current.refreshToken) return { kind: "refused" };
       let answer: Awaited<ReturnType<typeof token>>;
@@ -171,7 +181,7 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
       } catch {
         return { kind: "unreachable" };
       }
-      if (answer.status >= 500) return { kind: "unreachable" };
+      if (answer.status >= 500 || answer.status === 429 || answer.status === 408) return { kind: "unreachable" };
       const renewed = answer.status === 200 ? session(answer.body, { subject: current.subject, name: current.name }, current.refreshToken) : null;
       return renewed ? { kind: "renewed", session: renewed } : { kind: "refused" };
     },

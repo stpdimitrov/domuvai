@@ -59,8 +59,9 @@ export function readSignIn(env: Env): Settings {
 
 /**
  * Where a person goes once signed in: the path they asked for, if it is a path on this site — never another site's
- * address, however it is spelled (`//host`, `/\host`, a scheme, a control character) — and never the sign-in routes
- * themselves. Anything else is the console's first page.
+ * address, however it is spelled (`//host`, `/\host`, `/.//host`, a scheme, a control character) — and never the
+ * sign-in routes themselves, however those are spelled. Anything else is the console's first page. What is checked
+ * is the path as a browser will read it, after its dot segments are resolved — not the text that was asked for.
  */
 export const HOME = "/portfolio";
 export function returnPath(wanted: string | null | undefined): string {
@@ -71,6 +72,12 @@ export function returnPath(wanted: string | null | undefined): string {
   } catch {
     return HOME;
   }
-  if (url.origin !== "https://this.invalid" || url.pathname === "/auth" || url.pathname.startsWith("/auth/")) return HOME;
+  let spelled: string;
+  try {
+    spelled = decodeURIComponent(url.pathname).toLowerCase();
+  } catch {
+    return HOME;
+  }
+  if (url.origin !== "https://this.invalid" || url.pathname.includes("//") || /[/\\]{2}|^\/auth(\/|$)/.test(spelled)) return HOME;
   return url.pathname + url.search;
 }

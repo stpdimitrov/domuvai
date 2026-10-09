@@ -15,6 +15,13 @@ export type Tamper = {
   tokenAnswer?: (body: Record<string, unknown>) => Record<string, unknown>;
   document?: (document: Record<string, unknown>) => Record<string, unknown>;
   down?: boolean;
+  /** The token endpoint's status, whatever was asked. */
+  status?: number;
+  /** A refresh answered without a new refresh token, as an issuer that does not rotate them does. */
+  keepRefresh?: boolean;
+  /** What the issuer publishes beside (before) its signing key. */
+  otherKeys?: Record<string, unknown>[];
+  keys?: unknown;
 };
 
 const encode = (value: unknown) => base64url(new TextEncoder().encode(JSON.stringify(value)));
@@ -31,6 +38,8 @@ export async function fakeIssuer(signIn: SignIn, clock: { now: number }) {
     asked: [] as { url: string; form: URLSearchParams | null }[],
     subject: "f3b0c7de-0000-4000-8000-000000000001",
     refreshes: 0,
+    lastRefresh: "",
+    publicKey: pair.publicKey,
 
     async sign(claims: Record<string, unknown>): Promise<string> {
       const t = issuer.tamper;
@@ -61,7 +70,8 @@ export async function fakeIssuer(signIn: SignIn, clock: { now: number }) {
         const document = { issuer: signIn.issuer, authorization_endpoint: `${signIn.issuer}/auth`, token_endpoint: `${signIn.issuer}/token`, jwks_uri: `${signIn.issuer}/certs` };
         return answer(issuer.tamper.document ? issuer.tamper.document(document) : document);
       }
-      if (url === `${signIn.issuer}/certs`) return answer({ keys: [jwk] });
+      if (url === `${signIn.issuer}/certs`) return answer({ keys: issuer.tamper.keys !== undefined ? issuer.tamper.keys : [...(issuer.tamper.otherKeys ?? []), jwk] });
+      if (issuer.tamper.status) return answer({ error: "temporarily_unavailable" }, issuer.tamper.status);
       if (url !== `${signIn.issuer}/token` || !form) return answer({ error: "not_found" }, 404);
       if (form.get("client_id") !== signIn.clientId || form.get("client_secret") !== signIn.clientSecret) return answer({ error: "unauthorized_client" }, 401);
 
@@ -70,13 +80,14 @@ export async function fakeIssuer(signIn: SignIn, clock: { now: number }) {
           access_token: `access-${++issuer.refreshes}`,
           token_type: "Bearer",
           expires_in: 300,
-          refresh_token: `refresh-${issuer.refreshes}`,
+          refresh_token: issuer.tamper.keepRefresh ? undefined : `refresh-${issuer.refreshes}`,
           refresh_expires_in: 1800,
           id_token: await issuer.sign({ iss: signIn.issuer, aud: signIn.clientId, azp: signIn.clientId, sub: issuer.subject, exp: clock.now + 300, iat: clock.now, nonce, preferred_username: "ivan" }),
         };
+        if (body.refresh_token) issuer.lastRefresh = body.refresh_token;
         return answer(issuer.tamper.tokenAnswer ? issuer.tamper.tokenAnswer(body) : body);
       };
-      if (form.get("grant_type") === "refresh_token") return form.get("refresh_token") === `refresh-${issuer.refreshes}` ? tokens() : answer({ error: "invalid_grant" }, 400);
+      if (form.get("grant_type") === "refresh_token") return form.get("refresh_token") === issuer.lastRefresh ? tokens() : answer({ error: "invalid_grant" }, 400);
       const begun = codes.get(form.get("code") ?? "");
       codes.delete(form.get("code") ?? "");   // a code is spent once, whatever comes of it
       const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(form.get("code_verifier") ?? ""))));

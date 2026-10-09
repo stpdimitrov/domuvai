@@ -34,6 +34,7 @@ export async function checkIdToken(token: unknown, expected: Expected, keysFor: 
   }
 
   if (header.alg !== "RS256") return refused("not signed with RS256");
+  if (header.crit !== undefined) return refused("asks for something this server does not understand");
   const kid = typeof header.kid === "string" ? header.kid : undefined;
   const candidates = (await keysFor(kid)).filter(
     (k) => k.kty === "RSA" && (k.use ?? "sig") === "sig" && (k.alg ?? "RS256") === "RS256" && (kid === undefined || k.kid === kid),

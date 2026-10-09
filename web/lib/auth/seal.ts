@@ -63,6 +63,7 @@ export async function open<T>(secret: string, purpose: string, sealed: string | 
   if (!sealed) return null;
   try {
     const bytes = fromBase64url(sealed);
+    if (base64url(bytes) !== sealed) return null;   // one spelling only: base64 would let the last character vary
     const plain = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: bytes.subarray(0, 12), additionalData: encoder.encode(purpose) },
       await key(secret, purpose),

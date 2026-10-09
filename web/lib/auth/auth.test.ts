@@ -60,11 +60,14 @@ test("the issuer and the web's own address are https, http for this machine only
 test("after sign-in a person goes to a path on this site, never to another site and never back into sign-in", () => {
   for (const kept of ["/portfolio", "/entrance/charges?entrance=1&period=2026-10", "/debts", "/a/b/c", "/auth-notes"]) assert.equal(returnPath(kept), kept);
   for (const elsewhere of [undefined, null, "", "portfolio", "//evil.example", "/\\evil.example", "/\\/evil.example", "\\/evil.example", "https://evil.example/",
-    "https:evil.example", "/ok\\..\\x", "/a\nb", "/a\tb", "/a\u0000", "javascript:alert(1)", " /portfolio", "/auth/login", "/auth/callback?code=1", "/auth", "/x/../auth/logout", "/%61uth/../auth/login/.."]) {
+    "https:evil.example", "/ok\\..\\x", "/a\nb", "/a\tb", "/a\u0000", "javascript:alert(1)", " /portfolio", "/auth/login", "/auth/callback?code=1", "/auth", "/x/../auth/logout", "/%61uth/../auth/login/..",
+    "/.//evil.example", "/x/..//evil.example/a", "/%2e//evil.example", "/..//evil.example?x=1", "/./\\evil.example", "/a//b", "/%2f/evil.example", "/x/%2e%2e//evil.example",
+    "/%5cevil.example", "/a/%2F%2Fb", "/%61uth/login", "/Auth/login", "/AUTH/callback", "/%41uth", "/%zz"]) {
     assert.equal(returnPath(elsewhere), HOME, JSON.stringify(elsewhere));
   }
   assert.equal(returnPath("/debts#frag"), "/debts");
   assert.equal(returnPath("/x/../debts"), "/debts");
+  for (const input of ["/.//evil.example", "/debts", "//evil.example", "/x/..//e", "/%2e%2e//e", "/a/./b"]) assert.match(returnPath(input), /^\/(?![/\\])/, input);
 });
 
 // ── the seal ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -82,6 +85,9 @@ test("a sealed value opens only as it was sealed: this secret, this purpose, una
   for (let i = 0; i < sealed.length; i += 7) {                                                   // altered anywhere
     const altered = sealed.slice(0, i) + (sealed[i] === "A" ? "B" : "A") + sealed.slice(i + 1);
     assert.equal(await open(secret, "session", altered, 999), null, `altered at ${i}`);
+  }
+  for (const last of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") {     // the last character too: one spelling only
+    if (last !== sealed.at(-1)) assert.equal(await open(secret, "session", sealed.slice(0, -1) + last, 999), null, `ending in ${last}`);
   }
   for (const not of [undefined, null, "", "x", sealed.slice(0, 20), sealed.slice(4), sealed + "AAAA", "not base64 at all!", "{}"]) {
     assert.equal(await open(secret, "session", not, 999), null);
@@ -188,8 +194,8 @@ test("an ID token that does not carry this sign-in's nonce is refused", async ()
 test("an ID token is believed only when the issuer's key signed it with RS256", async () => {
   const { issuer, web } = await world();
   const other = await newKey();
-  const hmac = async (head: string) => {
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("k1"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const hmac = async (head: string) => {      // the classic confusion: the issuer's public key, used as a shared secret
+    const key = await crypto.subtle.importKey("raw", await crypto.subtle.exportKey("spki", issuer.publicKey), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     return base64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(head))));
   };
   const attempt = async (answer: (body: Record<string, unknown>) => Promise<Record<string, unknown>> | Record<string, unknown>) => {
@@ -216,6 +222,25 @@ test("an ID token is believed only when the issuer's key signed it with RS256", 
   await refusal(attempt((b) => ({ ...b, id_token: reheaded(b, { alg: "none" }) + "." + parts(b)[2] })), /not signed with RS256/);
   await refusal(attempt(async (b) => { const head = reheaded(b, { alg: "HS256", kid: "k1" }); return { ...b, id_token: `${head}.${await hmac(head)}` }; }), /not signed with RS256/);
   await refusal(attempt((b) => ({ ...b, id_token: reheaded(b, { alg: "RS256", kid: "k1" }).split(".")[0] + "." + base64url(new TextEncoder().encode(JSON.stringify({ sub: "someone-else" }))) + "." + parts(b)[2] })), /signature is not the issuer's/);
+  issuer.tamper = { header: { crit: ["exp"] } };
+  await refusal(attempt((b) => b), /does not understand/);
+  issuer.tamper = { signWith: other, header: { kid: undefined } };                                         // no kid: every key is tried, none fits
+  await refusal(attempt((b) => b), /signature is not the issuer's/);
+  // a key the issuer publishes for something other than signing RS256 is not believed, though it would verify
+  const others = async (shape: object) => [{ ...(await crypto.subtle.exportKey("jwk", other.publicKey)), kid: "k1", ...shape }];
+  for (const shape of [{ use: "enc" }, { alg: "RS512" }, { alg: "PS256" }, { kty: "EC" }, { kid: "k2" }]) {
+    issuer.tamper = { signWith: other, keys: await others(shape) };
+    await refusal(attempt((b) => b), /signature is not the issuer's/);
+  }
+  issuer.tamper = { signWith: other, keys: await others({}) };
+  assert.equal((await attempt((b) => b)).ok, true);                                                        // the same key, published for signing
+  for (const keys of [[], "none", null]) {
+    issuer.tamper = { keys };
+    await refusal(attempt((b) => b), /signature is not the issuer's|keys could not be read/);
+  }
+  issuer.tamper = { header: { kid: undefined }, otherKeys: await others({ kid: "k0" }) };                  // no kid: the right key is found among several
+  assert.equal((await attempt((b) => b)).ok, true);
+  issuer.tamper = {};
   await refusal(attempt((b) => ({ ...b, id_token: undefined })), /id token: none given/);
   await refusal(attempt((b) => ({ ...b, id_token: "a.b" })), /not a signed token/);
   await refusal(attempt((b) => ({ ...b, id_token: "!.!.!" })), /unreadable/);
@@ -236,7 +261,8 @@ test("an ID token from another issuer, for another client, out of date or naming
     [/out of date/, (c) => ({ ...c, exp: clock.now })],
     [/out of date/, (c) => ({ ...c, exp: undefined })],
     [/out of date/, (c) => ({ ...c, exp: String(clock.now + 300) })],
-    [/issued in the future/, (c) => ({ ...c, iat: clock.now + 3600 })],
+    [/issued in the future/, (c) => ({ ...c, iat: clock.now + 31 })],
+    [/issued in the future/, (c) => ({ ...c, iat: undefined })],
     [/not yet valid/, (c) => ({ ...c, nbf: clock.now + 3600 })],
     [/names nobody/, (c) => ({ ...c, sub: undefined })],
     [/names nobody/, (c) => ({ ...c, sub: " " })],
@@ -246,7 +272,7 @@ test("an ID token from another issuer, for another client, out of date or naming
     const { url, pending } = await web.begin("/debts");
     await refusal(web.finish(issuer.signInAt(url), pending), why);
   }
-  issuer.tamper = { claims: (c) => ({ ...c, aud: ["domuvai-web"], azp: undefined }) };
+  issuer.tamper = { claims: (c) => ({ ...c, aud: ["domuvai-web"], azp: undefined, iat: clock.now + 30, exp: clock.now + 1 }) };
   const { url, pending } = await web.begin("/debts");
   assert.equal((await web.finish(issuer.signInAt(url), pending)).ok, true);
 });
@@ -307,7 +333,29 @@ test("the issuer's document must name this issuer and keep its endpoints on its 
 
 // ── renewal ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
-test("a session is renewed with its refresh token; refused, it is over; the old token is never kept", async () => {
+test("the issuer's keys are read again after an hour, and at most every half minute for a key not seen before", async () => {
+  const { issuer, web, clock } = await world();
+  const keyReads = () => issuer.asked.filter((a) => a.url.endsWith("/certs")).length;
+  const signIn = async () => { const { url, pending } = await web.begin("/debts"); return web.finish(issuer.signInAt(url), pending); };
+  assert.equal((await signIn()).ok, true);
+  assert.equal((await signIn()).ok, true);
+  assert.equal(keyReads(), 1);
+  issuer.tamper = { header: { kid: "new" } };
+  assert.equal((await signIn()).ok, false);
+  assert.equal(keyReads(), 1);                    // asked a moment ago: not again yet
+  clock.now += 30;
+  assert.equal((await signIn()).ok, false);
+  assert.equal(keyReads(), 2);
+  issuer.tamper = {};
+  clock.now += 3599;
+  assert.equal((await signIn()).ok, true);
+  assert.equal(keyReads(), 2);
+  clock.now += 1;
+  assert.equal((await signIn()).ok, true);
+  assert.equal(keyReads(), 3);
+});
+
+test("a session is renewed with its refresh token; refused, it is over; the old access token is never kept", async () => {
   const { issuer, web, clock } = await world();
   const { url, pending } = await web.begin("/debts");
   const finished = await web.finish(issuer.signInAt(url), pending);
@@ -323,7 +371,19 @@ test("a session is renewed with its refresh token; refused, it is over; the old 
   assert.deepEqual(await web.renew({ ...finished.session, refreshToken: null }), { kind: "refused" });
   issuer.tamper = { down: true };
   assert.deepEqual(await web.renew(finished.session), { kind: "unreachable" });
-  issuer.tamper = { tokenAnswer: (b) => ({ ...b, access_token: "" }) };
+  for (const status of [500, 503, 429, 408]) {
+    issuer.tamper = { status };
+    assert.deepEqual(await web.renew(finished.session), { kind: "unreachable" }, String(status));
+  }
+  for (const status of [400, 401, 403]) {
+    issuer.tamper = { status };
+    assert.deepEqual(await web.renew(finished.session), { kind: "refused" }, String(status));
+  }
   assert.ok(renewed.kind === "renewed");
-  assert.deepEqual(await web.renew(renewed.session), { kind: "refused" });
+  issuer.tamper = { keepRefresh: true };                                                          // an issuer that does not rotate: the same refresh token, a new access token
+  const again = await web.renew(renewed.session);
+  assert.ok(again.kind === "renewed");
+  assert.deepEqual([again.session.accessToken, again.session.refreshToken], ["access-3", "refresh-2"]);
+  issuer.tamper = { tokenAnswer: (b) => ({ ...b, access_token: "" }) };
+  assert.deepEqual(await web.renew(again.session), { kind: "refused" });
 });
