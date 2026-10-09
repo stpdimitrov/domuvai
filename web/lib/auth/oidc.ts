@@ -21,7 +21,8 @@ export type Session = {
 type Pending = { state: string; nonce: string; verifier: string; returnTo: string };
 type Endpoints = { authorization: string; token: string; jwks: string; endSession: string | null };
 
-export type Finished = { ok: true; session: Session; returnTo: string } | { ok: false; why: string };
+/** Refused, `answered` says whether it was this browser's own sign-in that was answered — only then is it spent. */
+export type Finished = { ok: true; session: Session; returnTo: string } | { ok: false; why: string; answered: boolean };
 export type Renewed = { kind: "renewed"; session: Session } | { kind: "refused" } | { kind: "unreachable" };
 export type Deps = { fetch: typeof fetch; now: () => number };
 
@@ -139,10 +140,12 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
      * browser kept from `begin`. Nothing is asked of the issuer until the state returned is the state sealed.
      */
     async finish(query: URLSearchParams, pending: string | null | undefined): Promise<Finished> {
-      const refused = (why: string): Finished => ({ ok: false, why });
+      let answered = false;
+      const refused = (why: string): Finished => ({ ok: false, why, answered });
       const begun = await open<Pending>(signIn.sessionSecret, PENDING, pending, deps.now());
       if (!begun) return refused("no sign-in was begun in this browser, or it took too long");
       if (!same(query.get("state") ?? "", begun.state)) return refused("the answer is not to the sign-in this browser began");
+      answered = true;
       if (query.has("error")) return refused("the issuer refused the sign-in");
       const code = query.get("code");
       if (!code) return refused("the issuer sent no code");
@@ -184,6 +187,29 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
       if (answer.status >= 500 || answer.status === 429 || answer.status === 408) return { kind: "unreachable" };
       const renewed = answer.status === 200 ? session(answer.body, { subject: current.subject, name: current.name }, current.refreshToken) : null;
       return renewed ? { kind: "renewed", session: renewed } : { kind: "refused" };
+    },
+
+    /**
+     * The issuer's own session, ended — asked from this server with the session's refresh token, as Keycloak's
+     * logout endpoint takes it, so no token passes through a browser. False when it could not be: the caller signs
+     * the person out here all the same.
+     */
+    async end(current: Session): Promise<boolean> {
+      try {
+        const { endSession } = await discover();
+        if (!endSession || !current.refreshToken) return false;
+        const response = await deps.fetch(endSession, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ client_id: signIn.clientId, client_secret: signIn.clientSecret, refresh_token: current.refreshToken }).toString(),
+          redirect: "error",
+          cache: "no-store",
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
     },
   };
 }

@@ -62,6 +62,10 @@ const ATTEND: Attendee[] = [
   { ap: "маг. 2", name: "„Дентал Плюс“ ООД", pct: "5,920800%" },
 ];
 
+// Rendered when asked for, never when the build runs: a prerendered page is answered as one any cache between the
+// server and the person may keep and hand to the next — and a console page is for the signed-in person (PM-DEBT-011).
+export const dynamic = "force-dynamic";
+
 export default function AssemblyPage() {
   return (
     <div className="asm">

@@ -22,10 +22,12 @@ async function world() {
   return { clock, issuer, web };
 }
 const tokenCalls = (issuer: { asked: { url: string }[] }) => issuer.asked.filter((a) => a.url.endsWith("/token")).length;
-async function refusal(finishing: Promise<{ ok: boolean; why?: string }>, why: RegExp) {
+async function refusal(finishing: Promise<{ ok: boolean; why?: string; answered?: boolean }>, why: RegExp) {
   const finished = await finishing;
   assert.equal(finished.ok, false);
   assert.match(finished.why ?? "", why);
+  // a sign-in is spent by an answer to it, and by nothing else: another site's request to the callback cancels nothing
+  assert.equal(finished.answered, !/no sign-in was begun|not to the sign-in/.test(finished.why ?? ""), finished.why);
 }
 
 // ── settings ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -312,7 +314,7 @@ test("no refusal repeats a token, a secret or the issuer's own words", async () 
     return String(input).endsWith("/token") ? new Response(await response.text(), { status: 400 }) : response;
   }) as typeof fetch;
   const finished = await relyingParty(SIGN_IN, { fetch: failing, now: () => 1_800_000_000 }).finish(issuer.signInAt(url), pending);
-  assert.deepEqual(finished, { ok: false, why: "the issuer refused the code: no reason given" });
+  assert.deepEqual(finished, { ok: false, why: "the issuer refused the code: no reason given", answered: true });
 });
 
 test("the issuer's document must name this issuer and keep its endpoints on its own origin", async () => {

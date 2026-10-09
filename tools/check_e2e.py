@@ -9,9 +9,10 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
    formats included (uuid, date, date-time).
 3. Each live screen renders the seeded entrance's figures — each with its label or its row, so the same amount
    elsewhere on the page cannot stand in for it — and no error state.
-4. PM-DEBT-011: a second server from the same build, not switched on (web/lib/consoleSwitch.ts), serves no console
+4. PM-DEBT-011: a second server from the same build, with nothing set (web/lib/auth/gate.ts), serves no console
    path — each in the build's route manifest, never typed, answers a load, a client navigation, a prefetch and a HEAD
-   with the 404 a missing page gets — and its landing links to none of them.
+   with the 404 a missing page gets — and its landing links to none of them. A third, with sign-in configured, serves
+   a person who is not signed in the landing and the sign-in routes only; and no page is prerendered.
 5. #79: the landing sends a demo request nowhere by itself, so it never says one arrived. The first server has an
    address to write to (web/lib/contact.ts) and offers the form with it; the second has none, a third has a value
    that is not an address, and they offer neither.
@@ -27,14 +28,16 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
     versions the API serves.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
-Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
+Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --signin-web URL --contact ADDRESS --entrance ID
 """
 import argparse
 import html
+import http.client
 import json
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -189,8 +192,11 @@ def web_calls():
         where = path.relative_to(ROOT)
         if len(ANY_CALL.findall(source)) > len(literal):
             unreadable.append(f"{where}: an API call whose path is not a plain string literal")
-        # the typed client itself is where fetch belongs — and the one module that asks the sign-in issuer, never the API
-        if where.as_posix() not in ("web/lib/api/client.ts", "web/lib/auth/oidc.ts"):
+        # the typed client itself is where fetch belongs — and the one module that asks the sign-in issuer, which must
+        # then never ask the API: it names neither the API's address nor a path of it
+        if where.as_posix() == "web/lib/auth/oidc.ts":
+            unreadable += [f"{where}: {word!r} — the module that asks the issuer must not call the API" for word in ("API_URL", "/api/") if word in source]
+        elif where.as_posix() != "web/lib/api/client.ts":
             unreadable += [f"{where}: {pattern.pattern!r} — call the API through the typed client, path as a literal"
                            for pattern in UNREADABLE if pattern.search(source)]
     return found, unreadable
@@ -209,10 +215,10 @@ def routes(next_dir):
 
 def console_closed(web, closed_web, next_dir):
     """
-    Rule: PM-DEBT-011 — the console names debtors and what they owe, and there is no sign-in yet, so a server not
-    switched on serves none of it: every path but the landing answers each way of asking with the 404 a missing page
-    gets, and the landing links to none of them. The switched-on server serves each static page (200) and each route
-    handler (not 404), and its landing does link in — so a 404 or a missing link on the other is the switch's doing.
+    Rule: PM-DEBT-011 — the console names debtors and what they owe, so a server where sign-in is not configured, and
+    that is not told to run without it, serves none of it: every path but the landing answers each way of asking with the 404 a missing page
+    gets, and the landing links to none of them. The server told to run without sign-in serves each static page (200) and each route
+    handler (not 404), and its landing does link in — so a 404 or a missing link on the other is the rule's doing.
     A dynamic path is checked closed only: open, an unknown id may rightly be a 404.
     """
     served = routes(next_dir)
@@ -226,21 +232,85 @@ def console_closed(web, closed_web, next_dir):
         for name, method, h in ASKS:
             got = fetch(closed_web, url(route), method=method, headers=h)
             if got[0] != 404 or got != nowhere[name]:
-                failures.append(f"PM-DEBT-011: {url(route)} asked as {name} where the console is not switched on answers "
+                failures.append(f"PM-DEBT-011: {url(route)} asked as {name} where sign-in is not configured answers "
                                 f"HTTP {got[0]} — expected the 404 a missing page gets")
         if "[" in route or "(" in route:
             continue
         opened = fetch(web, url(route))[0]
         if (opened != 200) if served[route] == "page" else (opened == 404):
-            failures.append(f"PM-DEBT-011: {url(route)} answers HTTP {opened} where the console is switched on — its 404 proves nothing")
+            failures.append(f"PM-DEBT-011: {url(route)} answers HTTP {opened} where the console is served — its 404 proves nothing")
     links = lambda landing: [r for r in console if f'href="{url(r)}"' in landing]
     (status, landing), (opened, landing_open) = fetch(closed_web, "/"), fetch(web, "/")
-    failures += [f"PM-DEBT-011: the landing answers HTTP {status} where the console is not switched on"] if status != 200 else []
+    failures += [f"PM-DEBT-011: the landing answers HTTP {status} where sign-in is not configured"] if status != 200 else []
     failures += [f"PM-DEBT-011: the landing links to {r}, which this server does not serve" for r in links(landing)]
     if opened != 200 or not links(landing_open):
-        failures.append("PM-DEBT-011: the switched-on landing links to no console path — a link missing from the other proves nothing")
-    print(f"{'BAD' if failures else 'ok '} PM-DEBT-011 not switched on: {len(console)} console paths × {len(ASKS)} ways asked "
+        failures.append("PM-DEBT-011: the open landing links to no console path — a link missing from the other proves nothing")
+    print(f"{'BAD' if failures else 'ok '} PM-DEBT-011 sign-in not configured: {len(console)} console paths × {len(ASKS)} ways asked "
           f"answer the 404 a missing page gets, the landing links to none")
+    return failures
+
+
+def ask(base, url, method="GET", headers=None):
+    """One request, as sent — no redirect followed, the path not tidied: status, the Location header, the body."""
+    target = urllib.parse.urlsplit(base)
+    connection = http.client.HTTPConnection(target.hostname, target.port, timeout=60)
+    try:
+        connection.request(method, url, headers=headers or {})
+        response = connection.getresponse()
+        return response.status, response.getheader("location") or "", response.read().decode("utf-8", "replace")
+    except OSError as e:
+        return 0, "", str(e)
+    finally:
+        connection.close()
+
+
+# Spellings of a console path that a server might tidy into one after the gate has looked at it.
+SIDEWAYS = ["/_next/static/../portfolio", "/_next/static/%2e%2e/portfolio", "/_next/static/..%2fportfolio", "/_next/static/..%5cportfolio",
+            "//portfolio", "/portfolio/", "/./portfolio", "/_next/data/x/portfolio.json", "/_next/image?url=%2Fportfolio&w=64&q=75"]
+
+
+def signed_in_only(signin_web, closed_web, next_dir):
+    """
+    Rule: PM-DEBT-011 — where people sign in, a person who is not signed in is served the landing and the sign-in
+    routes and nothing else: every other path in the build's route manifest sends a load to sign in — at this site's
+    own address, and back to the path asked for — and answers any other way of asking with a 401. A session cookie
+    this server did not seal counts for nothing. Sign-out is refused to a request that does not come from this site's
+    own pages. And no page is prerendered: such a page is answered as one a cache may keep and hand to anyone.
+    """
+    failures = []
+    kept = [r for r in json.loads((next_dir / "prerender-manifest.json").read_text(encoding="utf-8"))["routes"] if r != "/_not-found"]
+    failures += [f"PM-DEBT-011: {r} is prerendered — render it when asked for (export const dynamic = \"force-dynamic\")" for r in kept]
+
+    url = lambda route: re.sub(r"\[+\.*([^\]]+)\]+", r"\1", route)
+    console = sorted(url(r) for r in routes(next_dir) if r != "/" and not r.startswith("/auth/"))
+    forged = {"Cookie": "domuvai-session.0=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA; __Host-domuvai-session.0=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+    # A browser says how it asks (Sec-Fetch-Mode); Next hides its router's own headers from middleware. A client that
+    # says nothing is taken for a person loading a page.
+    loads = [("a load", "GET", {"Sec-Fetch-Mode": "navigate"}), ("a load by a client that does not say how it asks", "GET", {})]
+    others = [(name, method, {**h, "Sec-Fetch-Mode": "cors"}) for name, method, h in ASKS if h] + [("a HEAD", "HEAD", {}), ("a POST", "POST", {})]
+    for path in console + ["/no-such-page"]:
+        wanted = f"/auth/login?return={urllib.parse.quote(path, safe='')}"           # this site's own, relative or spelled out
+        for cookie in ({}, forged):
+            for name, method, h in loads + others:
+                status, location, body = ask(signin_web, path, method, {**h, **cookie})
+                if (name, method, h) in loads and (status != 302 or location not in (wanted, signin_web + wanted)):
+                    failures.append(f"PM-DEBT-011: {path} asked as {name}, not signed in, answers HTTP {status} → {location or 'nowhere'} — expected 302 → {wanted}")
+                if (name, method, h) in others and (status != 401 or len(body) > 100):
+                    failures.append(f"PM-DEBT-011: {path} asked as {name}, not signed in, answers HTTP {status} — expected a bare 401")
+    for base, where in ((signin_web, "people sign in"), (closed_web, "sign-in is not configured")):
+        for path in SIDEWAYS:
+            status, location, body = ask(base, path)
+            if status not in (302, 308, 401, 404) or "€" in body or len(body) > 2000:     # a way round, a refusal — never a page
+                failures.append(f"PM-DEBT-011: {path} answers HTTP {status} with {len(body)} characters where {where}, to a person not signed in")
+    for origin in ({}, {"Origin": "http://evil.example"}, {"Origin": "null"}, {"Origin": signin_web + "/"}, {"Origin": signin_web.upper()}):
+        status, _, _ = ask(signin_web, "/auth/logout", "POST", origin)
+        if status != 403:
+            failures.append(f"sign-out asked with {origin or 'no Origin'} answers HTTP {status} — expected 403: only this site's own pages sign a person out")
+    status, _, landing = ask(signin_web, "/")
+    if status != 200 or 'href="/portfolio"' not in landing:
+        failures.append(f"the landing where people sign in answers HTTP {status}, or shows no way in")
+    print(f"{'BAD' if failures else 'ok '} PM-DEBT-011 not signed in: {len(console) + 1} paths × {len(loads) + len(others)} ways asked × with and without a forged "
+          f"cookie lead to sign-in or a 401; {len(SIDEWAYS)} sideways spellings serve nothing; sign-out is this site's own; nothing is prerendered")
     return failures
 
 
@@ -413,14 +483,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument("--api", required=True)
     parser.add_argument("--web", required=True)
-    parser.add_argument("--closed-web", required=True, help="the same build, not switched on (PM-DEBT-011), with no address to write to (#79)")
+    parser.add_argument("--closed-web", required=True, help="the same build, with nothing set (PM-DEBT-011), with no address to write to (#79)")
     parser.add_argument("--bad-contact-web", required=True, help="the same build, started with a DOMUVAI_CONTACT_EMAIL that is not an address (#79)")
     parser.add_argument("--contact", required=True, help="the address --web was started with, DOMUVAI_CONTACT_EMAIL (#79)")
+    parser.add_argument("--signin-web", required=True, help="the same build, with sign-in configured and nobody signed in (PM-DEBT-011)")
     parser.add_argument("--entrance", required=True)
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
     failures = console_closed(web, args.closed_web.rstrip("/"), args.next_dir)
+    failures += signed_in_only(args.signin_web.rstrip("/"), args.closed_web.rstrip("/"), args.next_dir)
     without_address = {"no address to write to": args.closed_web.rstrip("/"),
                        "a value that is not an address": args.bad_contact_web.rstrip("/")}
     failures += demo_request(web, without_address, args.contact, args.next_dir)
