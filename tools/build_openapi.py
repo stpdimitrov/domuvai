@@ -62,6 +62,15 @@ RUNNING = {
    ('Record a title to a unit — effective-dated, with its share', ['PM-ORG-005', 'PM-ORG-011']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
    ("The owners and users of an entrance's units as of a date — names only", ['PM-ORG-011', 'PM-BOOK-011']),
+ # ---- assembly
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies'):
+   ('Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification',
+    ['PM-GA-002', 'PM-GA-005']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda'):
+   ('Put an item on a draft agenda, bound to the majority the law has in force for its type — cited with its rule and source',
+    ['PM-VOTE-004']),
+ ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
+   ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity
  ('get', '/api/identity/me'):
    ("Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do", ['PM-SEC-001']),
@@ -146,8 +155,8 @@ PLANNED = [
   'List office holders as at a date', ['PM-GOV-004', 'PM-SEC-011']),
  ('post', '/entrances/{entrance_id}/mandates', 'identity-org',
   'Record an election', ['PM-GOV-003', 'PM-GOV-004', 'PM-GOV-005']),
- ('post', '/entrances/{entrance_id}/assemblies', 'assembly',
-  'Convene an assembly', ['PM-GA-001', 'PM-GA-002', 'PM-GA-003', 'PM-GA-006']),
+ ('post', '/entrances/{entrance_id}/assemblies/petition', 'assembly',
+  'Demand an assembly by petition of owners, and convene it if the demand is not met', ['PM-GA-001', 'PM-GA-003']),
  ('post', '/assemblies/{assembly_id}/notice', 'assembly',
   'Generate the notice and record the posting act with its evidence',
   ['PM-GA-004', 'PM-GA-007', 'PM-GA-008', 'PM-SYS-013']),
