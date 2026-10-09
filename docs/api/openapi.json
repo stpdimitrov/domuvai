@@ -16,6 +16,21 @@
         ],
         "type": "object"
       },
+      "AddAgendaItemRequest": {
+        "properties": {
+          "itemType": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemType",
+          "text"
+        ],
+        "type": "object"
+      },
       "AgeingBucket": {
         "properties": {
           "amountMinor": {
@@ -29,6 +44,64 @@
         "required": [
           "amountMinor",
           "band"
+        ],
+        "type": "object"
+      },
+      "AgendaItemAdded": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "itemType": {
+            "type": "string"
+          },
+          "majority": {
+            "$ref": "#/components/schemas/MajorityView"
+          },
+          "ordinal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "itemType",
+          "majority",
+          "ordinal",
+          "text"
+        ],
+        "type": "object"
+      },
+      "AgendaItemView": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "itemType": {
+            "type": "string"
+          },
+          "majorityRuleId": {
+            "type": "string"
+          },
+          "ordinal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "itemType",
+          "majorityRuleId",
+          "ordinal",
+          "text"
         ],
         "type": "object"
       },
@@ -60,6 +133,63 @@
         },
         "required": [
           "animalIds"
+        ],
+        "type": "object"
+      },
+      "AssemblyView": {
+        "properties": {
+          "agenda": {
+            "items": {
+              "$ref": "#/components/schemas/AgendaItemView"
+            },
+            "type": "array"
+          },
+          "convenedAs": {
+            "type": "string"
+          },
+          "convenedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "place": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "urgencyReason": {
+            "type": "string"
+          },
+          "urgent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "agenda",
+          "convenedAs",
+          "convenedBy",
+          "entranceId",
+          "id",
+          "mode",
+          "place",
+          "scheduledAt",
+          "status",
+          "urgent"
         ],
         "type": "object"
       },
@@ -506,6 +636,42 @@
           "decisionId",
           "item",
           "priceMinor"
+        ],
+        "type": "object"
+      },
+      "Convene": {
+        "properties": {
+          "convenedAs": {
+            "type": "string"
+          },
+          "convenedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "place": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "urgencyReason": {
+            "type": "string"
+          },
+          "urgent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "convenedAs",
+          "convenedBy",
+          "mode",
+          "place",
+          "scheduledAt",
+          "urgent"
         ],
         "type": "object"
       },
@@ -1339,6 +1505,41 @@
         "required": [
           "catalogueVersion",
           "engineVersion"
+        ],
+        "type": "object"
+      },
+      "MajorityView": {
+        "properties": {
+          "comparison": {
+            "type": "string"
+          },
+          "denominator": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "thresholdPct": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "comparison",
+          "denominator",
+          "id",
+          "rule",
+          "source",
+          "thresholdPct",
+          "verified"
         ],
         "type": "object"
       },
@@ -2334,6 +2535,307 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/assembly/entrances/{entranceId}/assemblies": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Convene"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-002",
+          "PM-GA-005"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Read an assembly with its agenda",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-002",
+          "PM-GA-005"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddAgendaItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgendaItemAdded"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Put an item on a draft agenda, bound to the majority the law has in force for its type — cited with its rule and source",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-004"
+        ]
+      }
+    },
     "/api/identity/me": {
       "get": {
         "operationId": "get_identity_me",
@@ -5752,6 +6254,10 @@
     }
   },
   "tags": [
+    {
+      "description": "",
+      "name": "assembly"
+    },
     {
       "description": "",
       "name": "identity"

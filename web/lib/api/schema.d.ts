@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/api/assembly/entrances/{entranceId}/assemblies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification */
+        post: operations["post_assembly_entrances_entranceId_assemblies"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read an assembly with its agenda */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put an item on a draft agenda, bound to the majority the law has in force for its type — cited with its rule and source */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/identity/me": {
         parameters: {
             query?: never;
@@ -712,10 +763,32 @@ export interface components {
         AbsencesRegisteredResponse: {
             absenceIds: string[];
         };
+        AddAgendaItemRequest: {
+            itemType: string;
+            text: string;
+        };
         AgeingBucket: {
             /** Format: int64 */
             amountMinor: number;
             band: string;
+        };
+        AgendaItemAdded: {
+            /** Format: uuid */
+            id: string;
+            itemType: string;
+            majority: components["schemas"]["MajorityView"];
+            /** Format: int32 */
+            ordinal: number;
+            text: string;
+        };
+        AgendaItemView: {
+            /** Format: uuid */
+            id: string;
+            itemType: string;
+            majorityRuleId: string;
+            /** Format: int32 */
+            ordinal: number;
+            text: string;
         };
         AllocatedPart: {
             /** Format: int64 */
@@ -724,6 +797,23 @@ export interface components {
         };
         AnimalsRegisteredResponse: {
             animalIds: string[];
+        };
+        AssemblyView: {
+            agenda: components["schemas"]["AgendaItemView"][];
+            convenedAs: string;
+            /** Format: uuid */
+            convenedBy: string;
+            /** Format: uuid */
+            entranceId: string;
+            /** Format: uuid */
+            id: string;
+            mode: string;
+            place: string;
+            /** Format: date-time */
+            scheduledAt: string;
+            status: string;
+            urgencyReason?: string;
+            urgent: boolean;
         };
         AssignTitleRequest: {
             /** Format: uuid */
@@ -854,6 +944,17 @@ export interface components {
             item: string;
             /** Format: int64 */
             priceMinor: number;
+        };
+        Convene: {
+            convenedAs: string;
+            /** Format: uuid */
+            convenedBy: string;
+            mode: string;
+            place: string;
+            /** Format: date-time */
+            scheduledAt: string;
+            urgencyReason?: string;
+            urgent: boolean;
         };
         DeclarationFiled: {
             /** Format: date */
@@ -1122,6 +1223,15 @@ export interface components {
         LawVersionView: {
             catalogueVersion: string;
             engineVersion: string;
+        };
+        MajorityView: {
+            comparison: string;
+            denominator: string;
+            id: string;
+            rule: string;
+            source: string;
+            thresholdPct: string;
+            verified: boolean;
         };
         ManualEntry: {
             designation: string;
@@ -1413,6 +1523,214 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    post_assembly_entrances_entranceId_assemblies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Convene"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssemblyView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_assemblies_assemblyId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssemblyView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAgendaItemRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgendaItemAdded"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     get_identity_me: {
         parameters: {
             query?: never;

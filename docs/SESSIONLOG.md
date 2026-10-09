@@ -2346,3 +2346,23 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/lib/auth/oidc.ts`, `web/README.md` (Sign-in), `docs/adr/ADR-011-frontend-topology.md` (the 2026-10-08 amendment).
 
 ---
+
+## S-G2-01a · 2026-10-09 · assembly — convening a general assembly and its agenda (PM-GA-002, PM-GA-005, PM-VOTE-004)
+
+**Did** — the first Kotlin in `assembly`. A general assembly is convened as a `DRAFT` by a party acting as `MB`, `BM` or `CTL` — any other capacity is refused, and the capacity is stored. An urgent assembly stores its justification; urgency without one, or a justification without urgency, is refused by the service and by the database. An agenda item has a type, and is bound to the majority `law` has in force for that type on the day the assembly meets (a Sofia day); the answer cites the rule and its article. `law` gained the typed, dated `MajorityRule` of ADR-008 (threshold, comparison, denominator). Three operations: convene, add an agenda item, read.
+
+**S-G2-01 is cut in four** — a (this) · b the posting act, `NOTICED`, the notice period, re-notice (PM-GA-004/006/007) · c proxies (PM-GA-009/010) · d the petition and the yearly flag (PM-GA-003/001), which wait: see Open.
+
+**Rules covered** — PM-GA-002 · PM-GA-005 (the recording; its 24 hours is used by the notice check, part b) · PM-VOTE-004 (the mechanism; no number).
+
+**Tests added** — `AssemblyServiceTest` (11), `AssemblyWebTest` (5), `AssemblyPersistenceIT` (3; run on this machine's Postgres 16 from a scratch copy, none skipped). Five mutants killed: any capacity accepted · urgency without a justification accepted · the majority looked up on a fixed date instead of the meeting's day · on the meeting's UTC day instead of its Sofia day · a pending majority reported as an unknown type.
+
+**Review** — fresh context, ten findings. Taken: the database now refuses an assembly with no convenor, capacity or place and an agenda item with no type (`NOT VALID` checks, so a hand-written old row cannot fail the migration), and a justification of tabs or newlines · a missing entrance (404) is told from an unregistered convenor (400) by SQLSTATE and constraint name, not by the English message · an item is refused (409) once the assembly is no longer a draft · a majority that exists but is not yet in force on the meeting's day says so, instead of "waiting on counsel" · a test that fails if the meeting's day is taken in UTC · the raw-SQL refusals name their constraint and have a control insert that succeeds. Recorded, not changed: see Open.
+
+**Decisions** — mine, stated on #146: **PM-VOTE-004 has no number in the catalogue** (RULES.md §7 question 4), so none was written: `law` lists `COMMON_PART_USE_RIGHT` as pending with its citation and `TODO(legal): PM-VOTE-004`, an item of that type is refused (422) until a threshold is configured, and the test proves a configured one is what gets bound · the default majority's data (PM-VOTE-002, verified) is in `law` as item type `GENERAL` because an agenda item must be bound to something; PM-VOTE-002 is not claimed, its tally is S-G2-03's · an item's stored `majority_rule_id` is `<item type>@<in force from>` · the planned `POST /entrances/{id}/assemblies` left the planned list; what remains planned of it is the petition.
+
+**Open** — the convenor's office **and identity** are taken at their word — the body names both; nothing ties the convenor to the signed-in party or to a mandate: `identity_org` publishes no mandates and permissions are AUTH-04's. Until then PM-GA-002 is a recorded label, not an authorisation · `MajorityRule` has no `exclusions` yet (ADR-008 §2) — PM-VOTE-006's, S-G2-03 · a use-right question typed `GENERAL` by its author binds to the default majority: the type is the author's statement, nothing checks it · `db/test/constraints.sh` inserts an assembly with no convenor, which the new check now refuses first — its PM-VOTE-012 case passes for the wrong reason until the script states one (#148) · `registry` publishes no port for who holds title to what on a date, which PM-GA-003, the posting act's "one owner" and the proxy's principal all need — the port is specified in the sessions' shared notes, for the coordinator to schedule · counsel: the majority and denominator for PM-VOTE-004 · no `AssemblyConvened` event is published yet — nothing consumes it · rescheduling and the notice are part b.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/assembly/`, `docs/adr/ADR-008-explicit-denominator.md`, the `MajorityRule` block at the end of `law/src/main/kotlin/zues/law/Constants.kt`.
+
+---
