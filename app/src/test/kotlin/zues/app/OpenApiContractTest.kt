@@ -16,6 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import zues.app.identity_org.Logins
 import zues.app.intake.ImportService
 import zues.app.money.ArrearsService
 import zues.app.money.ChargeRunService
@@ -60,6 +61,7 @@ class OpenApiContractTest {
     @Autowired lateinit var mvc: MockMvc
 
     @MockitoBean lateinit var imports: ImportService
+    @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var headcount: HeadcountCheckService
     @MockitoBean lateinit var bookAccess: BookAccessService
     @MockitoBean lateinit var arrears: ArrearsService

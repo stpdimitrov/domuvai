@@ -2314,3 +2314,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/adr/ADR-011-frontend-topology.md` (the last amendment); then `python3 tools/lanes.py` and `gh pr list`.
 
 ---
+
+## AUTH-02 · 2026-10-09 · identity-org — a login is a party: the API knows who is asking; the Keycloak realm as files
+
+**Shipped** — a new module, `identity_org`. `identity_org.login` ties a login — the issuer and the subject of a sign-in token — to one registered party, with the moment it was tied; a login is tied to one party, and under one issuer a party has one login. `GET /api/identity/me` answers, for a request with a valid token, the token's subject and the party that login is tied to — no party when it is tied to none; with no token, which includes sign-in switched off, it is a 401. The party comes from the `api`'s own record, never from the caller and never from a claim. Tying a login is a service of the module (`Logins.tie`) with no endpoint. `infra/keycloak/domuvai-realm.json` and its README describe the realm `domuvai` and the web's client: the authorization-code flow with PKCE and no other, confidential with no secret in the file, a mapper that puts the audience `domuvai-api` in the access token, no self-registration, redirects to this machine only.
+
+**Verified** — the web tests sign real tokens with a key of their own, so the application's decoder reads them: a tied login is its party; an untied one is signed in with no party; a claim or a parameter naming another party changes nothing; no token, a token with no subject or a blank one, and sign-in switched off are a 401 with no lookup. On this machine's Postgres 16, from a scratch copy of `LoginsIT` (2 tests, none skipped): a tie reads back only under its own issuer and subject; a login is not tied twice, nor a party to two logins of one issuer, nor to a party nobody registered; nothing moves on a refusal. `RealmFileTest` holds the file to the points above. Three mutants killed (the party taken from a claim; a blank subject let through; nobody answered as somebody). Gates green.
+
+**Review** — fresh context, security-minded, ten points; no way to make `me` name a party that is not the caller's was found. Taken: a tie refused for being tied already no longer breaks the caller's transaction (`ON CONFLICT DO NOTHING`), and only a missing party is explained as one — anything else the database refuses is passed on; the README no longer says the realm has one client — Keycloak adds its own, whose tokens lack the audience. Recorded, not changed: see Open.
+
+**Decisions** — mine, stated on #143: the tie is a row the `api` keeps, not a claim in the token · no endpoint ties a login until the check that guards it exists (AUTH-04) — before that any signed-in person could declare themselves anyone · `me` gives the party's id and not its name: the name is the registry's · the contract's `me` cites PM-SEC-001 as the rule it serves, because every operation must cite one; the rule is not claimed and no test is named for it.
+
+**Open** — nothing can tie a login except code and SQL, so no login is a party yet outside the tests; the way to tie, to untie and to re-tie (a recreated Keycloak account gets a new subject; a changed issuer URL orphans every row) is AUTH-04's · the realm file has been imported into no Keycloak. On the first import (AUTH-03, in CI): that the access token carries `sub` — newer Keycloaks put it in the `basic` client scope — and the audience; and narrow the redirect addresses from `/*` to the one callback path · `me`'s own 401 carries no `WWW-Authenticate` header · AUTH-01's open points stand.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/identity_org/`, `infra/keycloak/README.md`, `docs/adr/ADR-011-frontend-topology.md` (the 2026-10-08 amendment).
+
+---
