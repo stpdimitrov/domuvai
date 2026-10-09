@@ -46,9 +46,12 @@ cd web && npm run build
 DOMUVAI_AUTH=off DOMUVAI_CONTACT_EMAIL=demo@example.test API_URL=http://localhost:8080 npx next start -p 3001 &
 DOMUVAI_CONTACT_EMAIL= npx next start -p 3002 &
 DOMUVAI_CONTACT_EMAIL='mailto:nobody@example.test' npx next start -p 3003 &
-for port in 3001 3002 3003; do curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"; done
+DOMUVAI_AUTH_ISSUER=http://localhost:9/realms/domuvai DOMUVAI_AUTH_CLIENT_ID=domuvai-web DOMUVAI_AUTH_CLIENT_SECRET="$(openssl rand -hex 24)" \
+  DOMUVAI_SESSION_SECRET="$(openssl rand -hex 32)" DOMUVAI_WEB_URL=http://localhost:3004 npx next start -p 3004 &   # sign-in configured, nobody signed in
+for port in 3001 3002 3003 3004; do curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"; done
 cd .. && python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3001 \
-  --closed-web http://localhost:3002 --bad-contact-web http://localhost:3003 --contact demo@example.test \
+  --closed-web http://localhost:3002 --bad-contact-web http://localhost:3003 --signin-web http://localhost:3004 \
+  --contact demo@example.test \
   --entrance <id>
 ```
 
@@ -147,7 +150,10 @@ check that never runs blocks the merge.
 seeded figures off the screens, and fails when a screen calls an operation it does not cover. A second server
 from the same build, with nothing set, must answer every path in the build's route manifest but the landing — a load,
 a client navigation, a prefetch, a HEAD — with the 404 a missing page gets, and its landing must link to none of
-them (PM-DEBT-011). It runs on every PR and is a required check on `main`.
+them (PM-DEBT-011). A third, with sign-in configured and nobody signed in, must send every load of those paths to
+sign in and answer any other way of asking with a 401 — a forged session cookie counting for nothing — refuse a
+sign-out that does not come from its own pages, and the build must hold no prerendered page. It runs on every PR and
+is a required check on `main`.
 
 ## Layout
 
@@ -258,10 +264,11 @@ sidebar (`entrance/`) — as sibling nested layouts under one flex shell. A hand
 (Обекти, Календар на сроковете, Доставчици, Документи, Екип, …) remain placeholders — screens not
 in the imported design.
 
-Every other screen is still static (typed mock data). No auth yet.
+Every other screen is still typed mock data. None is prerendered: a console page is rendered for the signed-in
+person who asked (see [Sign-in](#sign-in)), and CI fails on a prerendered one.
 
 **Auth (ADR-011):** OIDC · the `api` validates JWT and issues nothing · the session is an
-httpOnly cookie in this Next.js BFF. Provider deferred (Keycloak marked as the default).
+httpOnly cookie in this Next.js BFF. The provider is Keycloak.
 
 ## TODO before launch
 

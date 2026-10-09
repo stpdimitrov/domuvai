@@ -21,7 +21,8 @@ export type Session = {
 type Pending = { state: string; nonce: string; verifier: string; returnTo: string };
 type Endpoints = { authorization: string; token: string; jwks: string; endSession: string | null };
 
-export type Finished = { ok: true; session: Session; returnTo: string } | { ok: false; why: string };
+/** Refused, `answered` says whether it was this browser's own sign-in that was answered — only then is it spent. */
+export type Finished = { ok: true; session: Session; returnTo: string } | { ok: false; why: string; answered: boolean };
 export type Renewed = { kind: "renewed"; session: Session } | { kind: "refused" } | { kind: "unreachable" };
 export type Deps = { fetch: typeof fetch; now: () => number };
 
@@ -139,10 +140,12 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
      * browser kept from `begin`. Nothing is asked of the issuer until the state returned is the state sealed.
      */
     async finish(query: URLSearchParams, pending: string | null | undefined): Promise<Finished> {
-      const refused = (why: string): Finished => ({ ok: false, why });
+      let answered = false;
+      const refused = (why: string): Finished => ({ ok: false, why, answered });
       const begun = await open<Pending>(signIn.sessionSecret, PENDING, pending, deps.now());
       if (!begun) return refused("no sign-in was begun in this browser, or it took too long");
       if (!same(query.get("state") ?? "", begun.state)) return refused("the answer is not to the sign-in this browser began");
+      answered = true;
       if (query.has("error")) return refused("the issuer refused the sign-in");
       const code = query.get("code");
       if (!code) return refused("the issuer sent no code");

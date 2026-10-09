@@ -37,8 +37,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const headers = request.headers;
-  const navigation = request.method === "GET" && !headers.has("rsc") && !headers.has("next-router-prefetch") && (headers.get("sec-fetch-mode") ?? "navigate") === "navigate";
+  // A page asked for by a person: a GET the browser marks as a navigation. Next hides its own router's headers from
+  // middleware, so the browser's word is the one to go by; a client with no such word (a script, a check) is taken
+  // for a person and sent to sign in — which serves it nothing either.
+  const navigation = request.method === "GET" && (request.headers.get("sec-fetch-mode") ?? "navigate") === "navigate";
   const verdict = decide(m, { path: pathname, search, navigation }, session !== null);
 
   let response: NextResponse;

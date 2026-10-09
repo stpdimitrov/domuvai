@@ -11,8 +11,9 @@ const FAILED = `<!doctype html><html lang="bg"><meta charset="utf-8"><meta name=
 <p>Не успяхме да ви впишем. Нищо не е записано.</p><p><a href="${LOGIN}">Опитайте отново</a></p></body></html>`;
 
 /**
- * A sign-in finished, or refused (ADR-011, AUTH-03). What the browser kept from the beginning is taken back whatever
- * comes of it — it is good for one answer. The address a person is then sent to is built from this server's own
+ * A sign-in finished, or refused (ADR-011, AUTH-03). What the browser kept from the beginning is taken back once it
+ * is answered, whatever comes of the answer — it is good for one. A request that is not an answer to it (another
+ * site's, an old tab's) is refused and takes nothing back, so it cannot cancel a sign-in under way. The address a person is then sent to is built from this server's own
  * setting and a path on this site, never from the request. Why a sign-in was refused is logged — it names no token —
  * and not told to the browser.
  */
@@ -37,6 +38,6 @@ export async function GET(request: NextRequest) {
   if (response.status === 400) response.headers.set("content-type", "text/html; charset=utf-8");
   response.headers.set("cache-control", "no-store");
   response.headers.set("referrer-policy", "no-referrer");
-  response.cookies.set(pending, "", options(0));
+  if (finished.ok || finished.answered) response.cookies.set(pending, "", options(0));
   return response;
 }
