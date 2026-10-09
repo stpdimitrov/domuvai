@@ -2,10 +2,14 @@ name: e2e
 
 # E2E-01 — the whole chain on every PR: Postgres → the API from its jar (Flyway on an empty database) → a seed
 # through the public API → the production web server → tools/check_e2e.py, which validates every response the live
-# screens use against the published contract and reads the seeded figures off the screens themselves; a second web
-# server from the same build, with nothing set, must serve no console page (PM-DEBT-011). The landing offers the demo
+# screens use against the published contract and reads the seeded figures off the screens themselves.
+# AUTH-03 — signed in: a real Keycloak imports the realm this repository describes (infra/keycloak), the API runs
+# closed against it, and the check signs in as a person does — through Keycloak's own form — before it reads a screen;
+# then it signs out. A second web server from the same build, with nothing set, must serve no console page
+# (PM-DEBT-011); a fourth, told to run without sign-in, is what that one is compared with. The landing offers the demo
 # form only where the server has an address to write to — the first has one, the second none, a third a value that is
-# not an address (#79). Not path-filtered, so it runs on every PR — a required check on main.
+# not an address (#79). Every secret here is made at run time and masked; none is in the repository.
+# Not path-filtered, so it runs on every PR — a required check on main.
 on:
   push: { branches: [main] }
   pull_request:
@@ -13,8 +17,8 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env: { NEXT_TELEMETRY_DISABLED: '1' }
+    timeout-minutes: 20
+    env: { NEXT_TELEMETRY_DISABLED: '1', ISSUER: 'http://localhost:8180/realms/domuvai' }
     services:
       postgres:
         image: postgres:16
@@ -38,42 +42,84 @@ jobs:
         with: { python-version: '3.12' }
       - run: pip install -r tools/requirements.txt
 
+      - name: Start Keycloak with the realm this repository describes
+        run: |
+          mkdir -p "$RUNNER_TEMP/realm" && cp infra/keycloak/domuvai-realm.json "$RUNNER_TEMP/realm/"
+          admin=$(openssl rand -hex 16); echo "::add-mask::$admin"; echo "KC_ADMIN=$admin" >> "$GITHUB_ENV"
+          docker run -d --name keycloak -p 8180:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD="$admin" \
+            -v "$RUNNER_TEMP/realm:/opt/keycloak/data/import:ro" quay.io/keycloak/keycloak:26.3 start-dev --import-realm
+
       - name: Build the API and the web
         run: |
           ./gradlew :app:bootJar
           (cd web && npm ci && npm test && npm run build)   # the web's own tests: sign-in's checks (AUTH-03a)
 
-      - name: Start the API — Flyway migrates the empty database
+      - name: Start the API open, seed the demo entrance and a small one with a business unit through the public API, stop it
         run: |
-          DOMUVAI_AUTH=off nohup java -jar app/build/libs/app.jar > api.log 2>&1 &   # open: the web cannot sign in yet (ADR-011, AUTH-03)
+          # the seed carries no token, so it runs before the API is closed; everything checked below runs against it closed
+          DOMUVAI_AUTH=off nohup java -jar app/build/libs/app.jar > api-seed.log 2>&1 &
+          echo $! > api.pid
           curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
-
-      - name: Seed the demo entrance, and a small one with a business unit, through the public API
-        run: |
           entrance=$(python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
           echo "ENTRANCE=$entrance" >> "$GITHUB_ENV"
+          kill "$(cat api.pid)"
+          while kill -0 "$(cat api.pid)" 2>/dev/null; do sleep 1; done
 
-      - name: Start the web against the API — told to run without sign-in and with an address to write to, with neither, with a bad address, with sign-in configured (PM-DEBT-011, #79)
+      - name: A client secret, a person to sign in as, and the check's own client — made here, in the running Keycloak
+        run: |
+          curl -sf -o /dev/null --max-time 10 --retry 60 --retry-connrefused --retry-all-errors --retry-delay 3 "$ISSUER/.well-known/openid-configuration"
+          kc() { docker exec -i keycloak /opt/keycloak/bin/kcadm.sh "$@"; }
+          kc config credentials --server http://localhost:8080 --realm master --user admin --password "$KC_ADMIN"
+          secret=$(openssl rand -hex 24); password=$(openssl rand -hex 16); check=$(openssl rand -hex 24)
+          for value in "$secret" "$password" "$check"; do echo "::add-mask::$value"; done
+          id=$(kc get clients -r domuvai -q clientId=domuvai-web --fields id --format csv --noquotes)
+          kc update "clients/$id" -r domuvai -s "secret=$secret"
+          kc create users -r domuvai -s username=ivan -s enabled=true -s emailVerified=true -s email=ivan@example.test -s firstName=Ivan -s lastName=Petrov
+          kc set-password -r domuvai --username ivan --new-password "$password"
+          subject=$(kc get users -r domuvai -q username=ivan -q exact=true --fields id --format csv --noquotes)
+          # The check asks the API itself, so it needs a token of its own: a client that exists only in this run's
+          # Keycloak — never in the realm file, which gives no client a service account.
+          kc create clients -r domuvai -f - <<JSON
+          { "clientId": "e2e-check", "protocol": "openid-connect", "publicClient": false, "secret": "$check",
+            "standardFlowEnabled": false, "directAccessGrantsEnabled": false, "serviceAccountsEnabled": true,
+            "attributes": { "access.token.lifespan": "1800" },
+            "protocolMappers": [ { "name": "the api's audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+              "config": { "included.custom.audience": "domuvai-api", "access.token.claim": "true", "id.token.claim": "false" } } ] }
+          JSON
+          { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject"; } >> "$GITHUB_ENV"
+
+      - name: Start the API closed — it accepts only a token this Keycloak signed for it (ADR-011)
+        env: { DOMUVAI_AUTH_ISSUER: '${{ env.ISSUER }}', DOMUVAI_AUTH_AUDIENCE: domuvai-api }
+        run: |
+          nohup java -jar app/build/libs/app.jar > api.log 2>&1 &
+          curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/registry/entrances)" = 401   # closed: no token, no answer
+
+      - name: Start the web against the API — signing people in, with nothing set, with a bad address, told to run without sign-in (PM-DEBT-011, #79)
         working-directory: web
         env: { API_URL: 'http://localhost:8080' }
         run: |
-          DOMUVAI_AUTH=off DOMUVAI_CONTACT_EMAIL=demo@example.test nohup npx next start -p 3000 > ../web.log 2>&1 &
+          DOMUVAI_AUTH_ISSUER="$ISSUER" DOMUVAI_AUTH_CLIENT_ID=domuvai-web DOMUVAI_AUTH_CLIENT_SECRET="$WEB_SECRET" \
+            DOMUVAI_SESSION_SECRET="$(openssl rand -hex 32)" DOMUVAI_WEB_URL=http://localhost:3000 \
+            DOMUVAI_CONTACT_EMAIL=demo@example.test nohup npx next start -p 3000 > ../web.log 2>&1 &
           nohup npx next start -p 3001 > ../web-closed.log 2>&1 &
           DOMUVAI_CONTACT_EMAIL='mailto:nobody@example.test' nohup npx next start -p 3002 > ../web-bad-contact.log 2>&1 &
-          # sign-in configured, nobody signed in: the issuer's address answers nothing here, and nobody gets as far as asking it
-          DOMUVAI_AUTH_ISSUER=http://localhost:9/realms/domuvai DOMUVAI_AUTH_CLIENT_ID=domuvai-web DOMUVAI_AUTH_CLIENT_SECRET="$(openssl rand -hex 24)" \
-            DOMUVAI_SESSION_SECRET="$(openssl rand -hex 32)" DOMUVAI_WEB_URL=http://localhost:3003 nohup npx next start -p 3003 > ../web-signin.log 2>&1 &
+          DOMUVAI_AUTH=off nohup npx next start -p 3003 > ../web-open.log 2>&1 &
           for port in 3000 3001 3002 3003; do
             curl -sf -o /dev/null --max-time 10 --retry 30 --retry-connrefused --retry-delay 1 "http://localhost:$port/"
           done
 
-      - name: The chain, checked — contract conformance and the figures on screen
+      - name: The chain, checked signed in — sign-in, contract conformance, the figures on screen, sign-out
         run: |
-          python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
-            --closed-web http://localhost:3001 --bad-contact-web http://localhost:3002 --contact demo@example.test \
-            --signin-web http://localhost:3003 \
-            --entrance "$ENTRANCE"
+          token=$(curl -sf -d grant_type=client_credentials -d client_id=e2e-check -d "client_secret=$CHECK_SECRET" "$ISSUER/protocol/openid-connect/token" \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])')
+          echo "::add-mask::$token"
+          E2E_API_TOKEN="$token" python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
+            --open-web http://localhost:3003 --closed-web http://localhost:3001 --bad-contact-web http://localhost:3002 \
+            --contact demo@example.test --issuer "$ISSUER" --user ivan --subject "$SUBJECT" --entrance "$ENTRANCE"
 
       - name: Logs
         if: failure()
-        run: tail -n 150 api.log web.log web-closed.log web-bad-contact.log web-signin.log
+        run: |
+          tail -n 150 api-seed.log api.log web.log web-closed.log web-bad-contact.log web-open.log || true
+          docker logs keycloak 2>&1 | tail -n 120

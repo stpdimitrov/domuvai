@@ -6,6 +6,7 @@
   "resetPasswordAllowed": true,
   "bruteForceProtected": true,
   "accessTokenLifespan": 300,
+  "revokeRefreshToken": false,
   "clients": [
     {
       "clientId": "domuvai-web",
@@ -17,7 +18,7 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "redirectUris": ["http://localhost:3000/auth/callback", "http://127.0.0.1:3000/auth/callback"],
       "webOrigins": [],
       "attributes": { "pkce.code.challenge.method": "S256" },
       "protocolMappers": [
