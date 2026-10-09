@@ -6,15 +6,15 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **55** (24%) |
-| Remaining | **178** |
+| Proved by a test named after the rule | **57** (24%) |
+| Remaining | **176** |
 | Proposed slices at ~10 rules each | **20** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-19 rule(s) remaining across 3 slice(s).
+18 rule(s) remaining across 3 slice(s).
 
 ### S-G1-01 · `kernel` · SYS · 9 rule(s) · ⚠ 1 unconfirmed
 
@@ -38,11 +38,10 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-FEE-013` | MUST | Budget vs actual report is a first-class screen. |
 | `PM-FUND-011` | SHOULD | Multi-year plan with a funding gap indicator. |
 
-### S-G1-03 · `registry` · BOOK · ORG · 7 rule(s)
+### S-G1-03 · `registry` · BOOK · ORG · 6 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-BOOK-006` | MUST | Owner A querying owner B's household returns 403 and an audit entry. |
 | `PM-ORG-006` | MUST | Marking an entrance `CLOSED_COMPLEX` swaps GA-driven fee rules for contract-driven ones and requires an uploaded registered contract. |
 | `PM-ORG-007` | MUST | Missing entry reference raises a compliance flag on ownership change. |
 | `PM-ORG-012` | MUST | New owner onboarding shows all in-force decisions and outstanding plans. |
@@ -52,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-81 rule(s) remaining across 8 slice(s).
+80 rule(s) remaining across 8 slice(s).
 
 ### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s) · ⚠ 5 unconfirmed
 
@@ -158,12 +157,11 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-009` | SHOULD | Declining a nomination requires a reason code. |
 | `PM-GOV-017` | SHOULD | Violation records cite the rule version in force on the incident date. |
 
-### S-G2-08 · `policy` · SEC · 12 rule(s) · ⚠ 1 unconfirmed
+### S-G2-08 · `policy` · SEC · 11 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-SEC-009` | MUST NOT ⚠ | Camera asset requires a decision reference. |
-| `PM-SEC-001` | MUST | Permission matrix is testable and versioned. |
 | `PM-SEC-002` | MUST | Enforced at the query layer, not the UI. |
 | `PM-SEC-003` | MUST | Disclosure record with legal basis and requesting officer. |
 | `PM-SEC-004` | MUST | Audit entries cannot be deleted by any role. |
