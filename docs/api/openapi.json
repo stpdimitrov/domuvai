@@ -1969,6 +1969,68 @@
         ],
         "type": "object"
       },
+      "ProxyRefused": {
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "limit": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "ProxyView": {
+        "properties": {
+          "agentKind": {
+            "type": "string"
+          },
+          "agentPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "form": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "principalPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "registeredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentKind",
+          "agentPartyId",
+          "form",
+          "id",
+          "items",
+          "principalPartyId",
+          "registeredAt",
+          "scope"
+        ],
+        "type": "object"
+      },
       "ReadingRequest": {
         "properties": {
           "item": {
@@ -2141,6 +2203,43 @@
         },
         "required": [
           "fullName"
+        ],
+        "type": "object"
+      },
+      "RegisterProxy": {
+        "properties": {
+          "agentKind": {
+            "type": "string"
+          },
+          "agentPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "form": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "principalPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentKind",
+          "agentPartyId",
+          "form",
+          "items",
+          "principalPartyId",
+          "scope"
         ],
         "type": "object"
       },
@@ -3034,6 +3133,166 @@
           "PM-GA-006",
           "PM-GA-007",
           "PM-SYS-013"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_proxies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProxyView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "List the proxies registered for an assembly",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-009"
+        ]
+      },
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_proxies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterProxy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Register a proxy for an assembly — principal, agent, scope and form; refused past the limit one person may represent, with the limit shown",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-009",
+          "PM-GA-010"
         ]
       }
     },

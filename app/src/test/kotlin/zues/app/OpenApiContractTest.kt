@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.assembly.AssemblyService
 import zues.app.assembly.NoticeService
+import zues.app.assembly.ProxyService
 import zues.app.identity_org.Logins
 import zues.app.intake.ImportService
 import zues.app.money.ArrearsService
@@ -64,6 +65,7 @@ class OpenApiContractTest {
 
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var notices: NoticeService
+    @MockitoBean lateinit var proxies: ProxyService
     @MockitoBean lateinit var imports: ImportService
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var headcount: HeadcountCheckService

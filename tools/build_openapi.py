@@ -75,6 +75,11 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting'):
    ('Record the posting act with its photograph — the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
     ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
+   ('Register a proxy for an assembly — principal, agent, scope and form; refused past the limit one person may represent, with the limit shown',
+    ['PM-GA-009', 'PM-GA-010']),
+ ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
+   ('List the proxies registered for an assembly', ['PM-GA-009']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity

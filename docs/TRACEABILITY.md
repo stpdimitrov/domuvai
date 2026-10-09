@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 64 | 27% |
-| **Proved by a test named after the rule** | **65** | **28%** |
-| No implementation and no test | 167 | 72% |
+| Referenced in code (`// Rule:`) | 66 | 28% |
+| **Proved by a test named after the rule** | **67** | **29%** |
+| No implementation and no test | 165 | 71% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -68,7 +68,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GOV-017` | — | — |  |
 | `PM-GOV-018` | — | — |  |
 
-## GA — General assembly lifecycle  ·  5/26 covered
+## GA — General assembly lifecycle  ·  7/26 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -80,8 +80,8 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GA-006` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:193` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:101` |  |
 | `PM-GA-007` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:141` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:38` | ⚠ |
 | `PM-GA-008` | — | — |  |
-| `PM-GA-009` | — | — |  |
-| `PM-GA-010` | — | — | ⚠ |
+| `PM-GA-009` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:90` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:17` |  |
+| `PM-GA-010` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:126` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:70` | ⚠ |
 | `PM-GA-011` | — | — | ⚠ |
 | `PM-GA-012` | — | — |  |
 | `PM-GA-013` | — | — |  |
@@ -114,7 +114,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-009` | — | — |  |
 | `PM-VOTE-010` | — | — |  |
 | `PM-VOTE-011` | — | — |  |
-| `PM-VOTE-012` | — | `law/src/main/kotlin/zues/law/Constants.kt:104` |  |
+| `PM-VOTE-012` | — | `law/src/main/kotlin/zues/law/Constants.kt:110` |  |
 | `PM-VOTE-013` | — | — |  |
 | `PM-VOTE-014` | — | — |  |
 | `PM-VOTE-015` | — | — |  |
