@@ -2276,3 +2276,41 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `docs/adr/ADR-011-frontend-topology.md` (the 2026-10-08 amendment), `app/src/main/kotlin/zues/app/ApiSecurity.kt`, `DomuvaiApplication.kt`.
 
 ---
+
+## H-11 · 2026-10-09 · Handover — resume point before /compact
+
+**RESUME HERE.** `main` is at AUTH-01 (#141) or later. Nothing in flight: no open PR, every lane free. **Next, recommended: AUTH-02** — it blocks AUTH-03 and AUTH-04.
+
+**Shipped since H-10** (squash-merged, each reviewed in a fresh context before it merged):
+- #139 S-G1-02k — the headcount report: for an issued period, the units whose billed persons are not the persons the book declares for it (PM-BOOK-012).
+- #141 AUTH-01 — the `api` is an OAuth2 resource server, closed unless told otherwise; ADR-011 amended: the provider is Keycloak, and sign-in arrives in four slices.
+
+**Sign-in, where it stands** (ADR-011, the 2026-10-08 amendment):
+- AUTH-01, done: with `DOMUVAI_AUTH_ISSUER` and `DOMUVAI_AUTH_AUDIENCE` every `/api/**` request needs a token that issuer signed, in date, for that audience; health stays open. With nothing set the application does not start; `DOMUVAI_AUTH=off` is the one way to run it open.
+- AUTH-02, next: a login is a party — the token's subject tied to a registered party, `GET /api/identity/me`, and the Keycloak realm and its client described as files in this repo.
+- AUTH-03: the `web` signs in (authorization-code flow with PKCE, the session in an httpOnly cookie, the bearer passed on by the Next.js server); the console's switch gives way to "signed in". It will need a new npm dependency or a hand-written flow — the owner's permission is needed before any package is downloaded.
+- AUTH-04: who may do what — ADR-002's policy module over effective-dated grants, the book read first (PM-BOOK-006), with the actor taken from the token (PM-BOOK-007).
+- Until AUTH-04 a valid token lets a request in and limits nothing: closed to strangers, not yet scoped per entrance.
+
+**Starting the `api` on this machine now needs `DOMUVAI_AUTH=off`** — `DOMUVAI_AUTH=off java -jar app/build/libs/app.jar`. The tests get it from the Gradle test task; CI's end-to-end job sets it.
+
+**Numbers** — named-test coverage 55 of 233. The API runs 44 operations in four modules. Eleven gates. 384 application tests.
+
+**The owner's decisions since H-10:**
+- The identity provider is Keycloak (2026-10-08).
+- "Whatever you recommend" twice: taken as S-41e and S-G1-02k.
+- A standing preference, saved to memory: when options are offered, mark the recommended one, and name any step that blocks the others.
+
+**Findings and gaps open** — #100 what the business-use plan left for the owner and counsel · #57 signing the fund's handover statement · while the issuer cannot be reached every token is a 401, not a 503, with no short timeout · no Keycloak has been run against AUTH-01: this machine has no container runtime; a real one runs in CI from AUTH-03 · the headcount report runs only when asked and no screen shows it · the gaps H-10 lists still stand (an import waiting with no time limit if the process stops; the names-only reads unlogged; no separate database role; `Idempotency-Key` on registry, intake and charge-run writes).
+
+**Not built, and waiting on the owner** — recording operating expenses (who may pay, on what basis) · PM-SYS-015's payload budget and PM-SYS-009's fine ranges.
+
+**Next slices, proposed** — AUTH-02 (recommended; blocks the rest of sign-in) · `/compliance` live as far as overdue declarations and the headcount report go · operating expenses, once the owner answers.
+
+**The chain on one machine** — as in H-10, with one change: the `api` is started with `DOMUVAI_AUTH=off`, on the owner's port 8080 and on the harness's 8081 alike.
+
+**Operating procedure** — unchanged (`.claude/skills/zues-slice/SKILL.md`). Lessons of this stretch: a security review earned its cost — it turned an open-by-default `api` into a closed one and replaced a mocked decoder with real signed tokens, which is what made the production wiring testable · when auto-merge has not fired on a PR whose checks are green and whose state is clean, merge it; merging is the session's job · a wait on a PR's checks can outlast one command's time limit: let it run in the background and write meanwhile.
+
+**Read first next time** — `CLAUDE.md`, `docs/INDEX.md`, this entry, `docs/adr/ADR-011-frontend-topology.md` (the last amendment); then `python3 tools/lanes.py` and `gh pr list`.
+
+---
