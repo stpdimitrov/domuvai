@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/identity/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do */
+        get: operations["get_identity_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/intake/entrances/{entranceId}/fee-sheet/dry-run": {
         parameters: {
             query?: never;
@@ -1382,6 +1399,11 @@ export interface components {
         UnitsCreatedResponse: {
             unitIds: string[];
         };
+        WhoIsAsking: {
+            /** Format: uuid */
+            partyId?: string;
+            subject: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1391,6 +1413,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_identity_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhoIsAsking"];
+                };
+            };
+        };
+    };
     post_intake_entrances_entranceId_fee_sheet_dry_run: {
         parameters: {
             query?: never;

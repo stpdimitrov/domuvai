@@ -2308,6 +2308,21 @@
           "unitIds"
         ],
         "type": "object"
+      },
+      "WhoIsAsking": {
+        "properties": {
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject"
+        ],
+        "type": "object"
       }
     }
   },
@@ -2319,6 +2334,30 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/identity/me": {
+      "get": {
+        "operationId": "get_identity_me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhoIsAsking"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do",
+        "tags": [
+          "identity"
+        ],
+        "x-rules": [
+          "PM-SEC-001"
+        ]
+      }
+    },
     "/api/intake/entrances/{entranceId}/fee-sheet/dry-run": {
       "post": {
         "operationId": "post_intake_entrances_entranceId_fee_sheet_dry_run",
@@ -5713,6 +5752,10 @@
     }
   },
   "tags": [
+    {
+      "description": "",
+      "name": "identity"
+    },
     {
       "description": "Importing a firm's existing records. Owns no rules — it enforces ORG and BOOK on the way in.",
       "name": "intake"

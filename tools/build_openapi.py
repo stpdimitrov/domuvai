@@ -62,6 +62,9 @@ RUNNING = {
    ('Record a title to a unit — effective-dated, with its share', ['PM-ORG-005', 'PM-ORG-011']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
    ("The owners and users of an entrance's units as of a date — names only", ['PM-ORG-011', 'PM-BOOK-011']),
+ # ---- identity
+ ('get', '/api/identity/me'):
+   ("Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do", ['PM-SEC-001']),
  # ---- law
  ('get', '/api/law/version'):
    ('The rule catalogue and engine versions in force — the pair every computed record is stamped with', ['PM-SYS-010']),
