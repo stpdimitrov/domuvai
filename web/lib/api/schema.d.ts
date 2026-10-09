@@ -72,6 +72,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the proxies registered for an assembly */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
+        put?: never;
+        /** Register a proxy for an assembly — principal, agent, scope and form; refused past the limit one person may represent, with the limit shown */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule": {
         parameters: {
             query?: never;
@@ -1386,6 +1404,25 @@ export interface components {
             missingRequired: ("DESIGNATION" | "IDEAL_PARTS" | "OCCUPANTS" | "FEE_MINOR" | "BUILT_AREA" | "OWNER_NAME" | "CHILDREN_UNDER_6" | "ANIMALS" | "ABSENT_DAYS" | "BUSINESS_USE")[];
             unmappedColumns: string[];
         };
+        ProxyRefused: {
+            error: string;
+            /** Format: int32 */
+            limit?: number;
+        };
+        ProxyView: {
+            agentKind: string;
+            /** Format: uuid */
+            agentPartyId: string;
+            form: string;
+            /** Format: uuid */
+            id: string;
+            items: number[];
+            /** Format: uuid */
+            principalPartyId: string;
+            /** Format: date-time */
+            registeredAt: string;
+            scope: string;
+        };
         ReadingRequest: {
             item: string;
             quantity: string;
@@ -1434,6 +1471,16 @@ export interface components {
             fullName: string;
             idType?: string;
             idValue?: string;
+        };
+        RegisterProxy: {
+            agentKind: string;
+            /** Format: uuid */
+            agentPartyId: string;
+            form: string;
+            items: number[];
+            /** Format: uuid */
+            principalPartyId: string;
+            scope: string;
         };
         RegisterUnitsRequest: {
             units: components["schemas"]["NewUnitRequest"][];
@@ -1862,6 +1909,110 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_proxies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_proxies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterProxy"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
                 };
             };
         };

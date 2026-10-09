@@ -2448,3 +2448,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/assembly/NoticePosting.kt`, `NoticePeriod.kt`, `docs/RULES.md` §D.
 
 ---
+
+## S-G2-01c · 2026-10-09 · assembly — proxies and the limit per representative (PM-GA-009, PM-GA-010)
+
+**Did** — a proxy is registered for one assembly and records the principal, the agent and which of the rule's three kinds the agent is (household member, owner, third party), the scope (the whole agenda, or listed items of that assembly's agenda) and the form of the authorisation. A principal has one proxy at an assembly; nobody is their own. One agent represents at most `GA_PROXY_MAX_PRINCIPALS` principals at one assembly — read from `law` on the day the assembly meets, unverified there with its `TODO(legal)`; the registration past it is a 409 that shows the limit. Two operations: register a proxy, list an assembly's proxies.
+
+**Rules covered** — PM-GA-009 · PM-GA-010 (the mechanism; the number is the catalogue's "commonly 3", unconfirmed).
+
+**Tests added** — `ProxyServiceTest` (6), `ProxyWebTest` (3), `ProxyPersistenceIT` (2; run on this machine's Postgres 16 from a scratch copy, none skipped). Six mutants killed: one past the limit accepted · the limit counted over all agents · a second proxy for one principal · one's own proxy · a listed item the agenda does not have · the form not stored.
+
+**Decisions** — mine, stated on the claim: the limit counts principals per agent per assembly · one proxy per principal per assembly, so no share is represented twice · forms are `WRITTEN`, `NOTARISED`, `LAWYER`; which kind of agent needs which is PM-GA-011's, not judged here · proxies are taken while the assembly is `DRAFT` or `NOTICED`.
+
+**Open** — nothing checks that the principal is an owner or user, that an `OWNER` agent owns, or that a `HOUSEHOLD_MEMBER` is one and adult: `registry` publishes no port for it (specified in the sessions' notes) · counsel: the limit, and whether it counts owners, units or authorisations (RULES.md §7 question 2) · a proxy cannot be withdrawn yet · quorum and votes do not read proxies yet (S-G2-02/03) · **S-G2-01d is not built**: PM-GA-003 (the petition's share of ideal parts) waits on the same `registry` port, and PM-GA-001 (the yearly flag) on what "held" means, which S-G2-02 decides, and on `compliance`.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/assembly/Proxy.kt`, `docs/TESTPLAN.md` (S-G2-01, as regenerated), the port note in the sessions' shared notes.
+
+---

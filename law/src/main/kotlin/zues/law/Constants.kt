@@ -89,6 +89,12 @@ private val CONSTANTS: List<Constant> = listOf(
         todoLegal = "Confirm the shortened notice period for urgent cases, its unit (elapsed or clock hours), what counts as " +
             "urgent, and whether a notice re-posted after a change keeps the shortened period.",
     ),
+    // PM-GA-010 — how many owners one person may represent at an assembly. The catalogue says "commonly 3". Unconfirmed.
+    Constant(
+        "GA_PROXY_MAX_PRINCIPALS", "3", "2009-01-01", "чл. 14 ЗУЕС", false, rule = "PM-GA-010",
+        todoLegal = "Confirm the maximum number of owners one person may represent (RULES.md §7, question 2), and whether " +
+            "it counts owners, units or authorisations.",
+    ),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */
