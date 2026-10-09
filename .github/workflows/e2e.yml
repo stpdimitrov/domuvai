@@ -63,7 +63,7 @@ jobs:
           entrance=$(python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
           echo "ENTRANCE=$entrance" >> "$GITHUB_ENV"
           kill "$(cat api.pid)"
-          while curl -s -o /dev/null --max-time 2 http://localhost:8080/actuator/health; do sleep 1; done
+          while kill -0 "$(cat api.pid)" 2>/dev/null; do sleep 1; done
 
       - name: A client secret, a person to sign in as, and the check's own client — made here, in the running Keycloak
         run: |
@@ -82,6 +82,7 @@ jobs:
           kc create clients -r domuvai -f - <<JSON
           { "clientId": "e2e-check", "protocol": "openid-connect", "publicClient": false, "secret": "$check",
             "standardFlowEnabled": false, "directAccessGrantsEnabled": false, "serviceAccountsEnabled": true,
+            "attributes": { "access.token.lifespan": "1800" },
             "protocolMappers": [ { "name": "the api's audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
               "config": { "included.custom.audience": "domuvai-api", "access.token.claim": "true", "id.token.claim": "false" } } ] }
           JSON

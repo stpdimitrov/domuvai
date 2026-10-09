@@ -402,7 +402,10 @@ def sign_in(web, issuer, user, password, subject):
     for cookie in kept:
         flags = [part.strip().lower() for part in cookie.split(";")[1:]]
         failures += [f"sign-in: the session cookie is not {flag}" for flag in ("httponly", "samesite=lax", "path=/") if flag not in flags]
-    held = [("an address passed through", u) for u in browser.visited] + [("a cookie", c) for _, c in browser.set] + [("the page", page)]
+    # the web's cookies only: the issuer keeps its own session in signed cookies of its own, on its own site
+    held = [("an address passed through", u) for u in browser.visited] + [("a cookie of the web's", c) for o, c in browser.set if o == web] + [("the page", page)]
+    if any("domuvai-signin" in name for name in browser.cookies.get(urllib.parse.urlsplit(web).netloc, {})):
+        failures.append("sign-in: what the browser kept for the sign-in is still there after it — it is good for one answer")
     failures += [f"sign-in: a signed token is in {where}" for where, text in held if TOKEN.search(text)]
     failures += [f"sign-in: {word} is in an address the browser passed through" for word in ("access_token", "id_token", "refresh_token", "client_secret", "code_verifier")
                  if any(word in u for u in browser.visited)]
@@ -429,6 +432,14 @@ def sign_out(web, issuer, browser):
     """
     failures = []
     target = urllib.parse.urlsplit(web)
+    # First, that the issuer's session is there to end: a second browser window with the issuer's cookies and none of
+    # the web's is let straight in. Without this, "asks for the password again" below could be true for any reason.
+    window = Browser()
+    window.cookies = {site: dict(jar) for site, jar in browser.cookies.items() if site != target.netloc}
+    status, at, page = window.go(web + "/portfolio")
+    if status != 200 or not at.startswith(web + "/") or login_form(page):
+        failures.append(f"sign-out: before it, a browser holding the issuer's session is not let straight in (HTTP {status} at {at.split('?')[0]}) "
+                        "— so the issuer asking for the password afterwards would prove nothing")
     connection = http.client.HTTPConnection(target.hostname, target.port, timeout=60)
     try:
         connection.request("POST", "/auth/logout", headers={"Origin": web, "Cookie": browser.cookie_header(web)})
@@ -445,7 +456,7 @@ def sign_out(web, issuer, browser):
     if status != 200 or not at.startswith(issuer + "/") or not login_form(page):
         failures.append(f"sign-out: afterwards a console page leads to HTTP {status} at {at.split('?')[0]} — expected the issuer asking for "
                         "the password again; if it let the person straight back in, its own session was not ended")
-    print(f"{'BAD' if failures else 'ok '} sign-out: the cookie taken back, and the issuer asks for the password again")
+    print(f"{'BAD' if failures else 'ok '} sign-out: the cookie taken back, and the issuer — which let this browser straight in before — asks for the password again")
     return failures
 
 
