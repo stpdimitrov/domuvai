@@ -2330,3 +2330,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/identity_org/`, `infra/keycloak/README.md`, `docs/adr/ADR-011-frontend-topology.md` (the 2026-10-08 amendment).
 
 ---
+
+## S-G2-01a · 2026-10-09 · assembly — convening a general assembly and its agenda (PM-GA-002, PM-GA-005, PM-VOTE-004)
+
+**Did** — the first Kotlin in `assembly`. A general assembly is convened as a `DRAFT` by a party acting as `MB`, `BM` or `CTL` — any other capacity is refused, and the capacity is stored. An urgent assembly stores its justification; urgency without one, or a justification without urgency, is refused by the service and by the database. An agenda item has a type, and is bound to the majority `law` has in force for that type on the day the assembly meets (a Sofia day); the answer cites the rule and its article. `law` gained the typed, dated `MajorityRule` of ADR-008 (threshold, comparison, denominator). Three operations: convene, add an agenda item, read.
+
+**S-G2-01 is cut in four** — a (this) · b the posting act, `NOTICED`, the notice period, re-notice (PM-GA-004/006/007) · c proxies (PM-GA-009/010) · d the petition and the yearly flag (PM-GA-003/001), which wait: see Open.
+
+**Rules covered** — PM-GA-002 · PM-GA-005 (the recording; its 24 hours is used by the notice check, part b) · PM-VOTE-004 (the mechanism; no number).
+
+**Tests added** — `AssemblyServiceTest` (9), `AssemblyWebTest` (5), `AssemblyPersistenceIT` (3; run on this machine's Postgres 16 from a scratch copy, none skipped). Four mutants killed: any capacity accepted · urgency without a justification accepted · the majority looked up on a fixed date instead of the meeting's day · a pending majority reported as an unknown type.
+
+**Decisions** — mine, stated on #146: **PM-VOTE-004 has no number in the catalogue** (RULES.md §7 question 4), so none was written: `law` lists `COMMON_PART_USE_RIGHT` as pending with its citation and `TODO(legal): PM-VOTE-004`, an item of that type is refused (422) until a threshold is configured, and the test proves a configured one is what gets bound · the default majority's data (PM-VOTE-002, verified) is in `law` as item type `GENERAL` because an agenda item must be bound to something; PM-VOTE-002 is not claimed, its tally is S-G2-03's · an item's stored `majority_rule_id` is `<item type>@<in force from>` · the planned `POST /entrances/{id}/assemblies` left the planned list; what remains planned of it is the petition.
+
+**Open** — the convenor's office is taken at their word: `identity_org` publishes no mandates and permissions are AUTH-04's · `registry` publishes no port for who holds title to what on a date, which PM-GA-003, the posting act's "one owner" and the proxy's principal all need — the port is specified in the sessions' shared notes, for the coordinator to schedule · counsel: the majority and denominator for PM-VOTE-004 · no `AssemblyConvened` event is published yet — nothing consumes it · rescheduling and the notice are part b.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/assembly/`, `docs/adr/ADR-008-explicit-denominator.md`, the `MajorityRule` block at the end of `law/src/main/kotlin/zues/law/Constants.kt`.
+
+---
