@@ -27,13 +27,23 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 10. WEB-22 (PM-SYS-010): every screen under the console's layout has one footer, with the catalogue and engine
     versions the API serves.
 
+11. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
+    httpOnly cookie and no token; every screen above is then read signed in, from an api that is closed; the console
+    names the person, with the login the api read from the web's bearer; sign-out ends the session at the web and at
+    the issuer.
+
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
-Usage: check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --signin-web URL --contact ADDRESS --entrance ID
+Usage, in CI — a real issuer, the api closed (E2E_PASSWORD and E2E_API_TOKEN in the environment):
+  check_e2e.py --api URL --web URL --open-web URL --closed-web URL --bad-contact-web URL --contact ADDRESS --entrance ID
+               --issuer URL --user LOGIN --subject ID
+Usage, on a machine with no issuer — --web told to run without sign-in, the api open; sign-in itself is not checked:
+  check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --signin-web URL --contact ADDRESS --entrance ID
 """
 import argparse
 import html
 import http.client
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -55,6 +65,7 @@ DEMO_BASIS = [
 
 # (method, contract path) → how the live screens call it for the seeded entrance: the URL and the body.
 CALLS = {
+    ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
     ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
     ("GET", "/api/registry/entrances/{entranceId}/units"): lambda e: (f"/api/registry/entrances/{e}/units", None),
@@ -314,6 +325,141 @@ def signed_in_only(signin_web, closed_web, next_dir):
     return failures
 
 
+TOKEN = re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")       # a signed token, wherever it turns up
+
+
+class Browser:
+    """A person's browser, as far as sign-in goes: it keeps each site's cookies, follows where it is sent, and notes every address."""
+
+    def __init__(self):
+        self.cookies, self.visited, self.set = {}, [], []
+
+    def go(self, url, form=None, headers=None):
+        for _ in range(12):
+            target = urllib.parse.urlsplit(url)
+            origin = f"{target.scheme}://{target.netloc}"
+            jar = self.cookies.setdefault(target.netloc, {})
+            sent = {"Sec-Fetch-Mode": "navigate", **(headers or {})}
+            if jar:
+                sent["Cookie"] = "; ".join(f"{k}={v}" for k, v in jar.items())
+            if form is not None:
+                sent["Content-Type"] = "application/x-www-form-urlencoded"
+            connection = http.client.HTTPConnection(target.hostname, target.port, timeout=60)
+            try:
+                connection.request("POST" if form is not None else "GET", (target.path or "/") + (f"?{target.query}" if target.query else ""),
+                                   body=urllib.parse.urlencode(form) if form is not None else None, headers=sent)
+                response = connection.getresponse()
+                status, body, location = response.status, response.read().decode("utf-8", "replace"), response.getheader("location")
+                for cookie in response.msg.get_all("set-cookie") or []:
+                    name, _, value = cookie.split(";", 1)[0].partition("=")
+                    self.set.append((origin, cookie))
+                    if value and "max-age=0" not in cookie.lower().replace(" ", ""):
+                        jar[name.strip()] = value
+                    else:
+                        jar.pop(name.strip(), None)
+            finally:
+                connection.close()
+            self.visited.append(url)
+            if status not in (301, 302, 303, 307, 308) or not location:
+                return status, url, body
+            url, form, headers = urllib.parse.urljoin(url, location), None, None
+        return 0, url, "sent round in circles"
+
+    def cookie_header(self, base):
+        return "; ".join(f"{k}={v}" for k, v in self.cookies.get(urllib.parse.urlsplit(base).netloc, {}).items())
+
+
+def login_form(page):
+    """Where the issuer's sign-in page posts a name and a password to — Keycloak's own form — or None."""
+    form = re.search(r'<form\b[^>]*\bid="kc-form-login"[^>]*>', page)
+    action = re.search(r'\baction="([^"]+)"', form.group(0)) if form else None
+    return html.unescape(action.group(1)) if action else None
+
+
+def sign_in(web, issuer, user, password, subject):
+    """
+    ADR-011, AUTH-03 — a person signs in as a browser does: asks for a console page, is sent to the issuer, gives a
+    name and a password there, and comes back signed in to the page they asked for. What they then hold is an httpOnly
+    cookie and no token: none in an address they passed through, none in a cookie, none in the page. The console's
+    strip names them, and carries the login the api itself read from the web's bearer — the issuer's own id for this
+    person — so the token the web passes on is this person's and the api accepts it.
+    """
+    failures, browser, asked = [], Browser(), "/portfolio?asOf=2026-09-30"
+    status, at, page = browser.go(web + asked)
+    action = login_form(page)
+    if status != 200 or not at.startswith(issuer + "/") or not action:
+        return [f"sign-in: a console page asked for without a session leads to HTTP {status} at {at.split('?')[0]} — expected the issuer's sign-in form"], None
+    if not action.startswith(issuer + "/"):
+        return [f"sign-in: the issuer's form posts to {action.split('?')[0]}, not to the issuer"], None
+    status, at, page = browser.go(action, form={"username": user, "password": password, "credentialId": ""})
+    if (status, at) != (200, web + asked):
+        return [f"sign-in: after the issuer's form the browser is at {at.split('?')[0]} with HTTP {status} — expected {web + asked}. "
+                f"The issuer said: {visible_text(page)[:300]!r}"], None
+
+    kept = [cookie for origin, cookie in browser.set if origin == web and "domuvai-session" in cookie and "max-age=0" not in cookie.lower().replace(" ", "")]
+    if not kept:
+        failures.append("sign-in: the web handed the browser no session cookie")
+    for cookie in kept:
+        flags = [part.strip().lower() for part in cookie.split(";")[1:]]
+        failures += [f"sign-in: the session cookie is not {flag}" for flag in ("httponly", "samesite=lax", "path=/") if flag not in flags]
+    # the web's cookies only: the issuer keeps its own session in signed cookies of its own, on its own site
+    held = [("an address passed through", u) for u in browser.visited] + [("a cookie of the web's", c) for o, c in browser.set if o == web] + [("the page", page)]
+    if any("domuvai-signin" in name for name in browser.cookies.get(urllib.parse.urlsplit(web).netloc, {})):
+        failures.append("sign-in: what the browser kept for the sign-in is still there after it — it is good for one answer")
+    failures += [f"sign-in: a signed token is in {where}" for where, text in held if TOKEN.search(text)]
+    failures += [f"sign-in: {word} is in an address the browser passed through" for word in ("access_token", "id_token", "refresh_token", "client_secret", "code_verifier")
+                 if any(word in u for u in browser.visited)]
+
+    strip = re.search(r'<form\b[^>]*class="signed-in"[^>]*>.*?</form>', re.sub(r"<!--.*?-->", "", page, flags=re.S), re.S)
+    if not strip:
+        failures.append("who am I: the console shows nobody signed in")
+    else:
+        shown = visible_text(strip.group(0))
+        failures += [] if user in shown and "Изход" in shown else [f"who am I: the strip says {shown!r} — expected {user!r} and the way out"]
+        failures += [] if "без лице в книгата" in shown else [f"who am I: the strip says {shown!r} — this login is tied to no party, and it does not say so"]
+        failures += [] if f'data-login="{subject}"' in strip.group(0) else [
+            "who am I: the login the api read from the web's bearer is not the issuer's id for this person "
+            f"({subject}) — GET /api/identity/me through the web answered something else, or nothing"]
+    print(f"{'BAD' if failures else 'ok '} sign-in: through the issuer's own form and back to the page asked for; an httpOnly cookie and no token in "
+          f"{len(browser.visited)} addresses, {len(browser.set)} cookies or the page; the api names the same login the issuer does")
+    return failures, browser
+
+
+def sign_out(web, issuer, browser):
+    """
+    ADR-011, AUTH-03 — sign-out ends the session: the browser's cookie is taken back, a console page sends the person
+    to sign in again — and the issuer asks for the password again, so its own session is over too, not only the web's.
+    """
+    failures = []
+    target = urllib.parse.urlsplit(web)
+    # First, that the issuer's session is there to end: a second browser window with the issuer's cookies and none of
+    # the web's is let straight in. Without this, "asks for the password again" below could be true for any reason.
+    window = Browser()
+    window.cookies = {site: dict(jar) for site, jar in browser.cookies.items() if site != target.netloc}
+    status, at, page = window.go(web + "/portfolio")
+    if status != 200 or not at.startswith(web + "/") or login_form(page):
+        failures.append(f"sign-out: before it, a browser holding the issuer's session is not let straight in (HTTP {status} at {at.split('?')[0]}) "
+                        "— so the issuer asking for the password afterwards would prove nothing")
+    connection = http.client.HTTPConnection(target.hostname, target.port, timeout=60)
+    try:
+        connection.request("POST", "/auth/logout", headers={"Origin": web, "Cookie": browser.cookie_header(web)})
+        response = connection.getresponse()
+        response.read()
+        cleared = [c for c in response.msg.get_all("set-cookie") or [] if "domuvai-session" in c]
+        if response.status != 303 or not cleared or any("max-age=0" not in c.lower().replace(" ", "") for c in cleared):
+            failures.append(f"sign-out: HTTP {response.status}, {len(cleared)} session cookie(s) taken back — expected 303 and every piece")
+    finally:
+        connection.close()
+    for name in [n for n in browser.cookies.get(target.netloc, {}) if "domuvai-session" in n]:
+        del browser.cookies[target.netloc][name]
+    status, at, page = browser.go(web + "/portfolio")           # the issuer's own cookies are still in this browser
+    if status != 200 or not at.startswith(issuer + "/") or not login_form(page):
+        failures.append(f"sign-out: afterwards a console page leads to HTTP {status} at {at.split('?')[0]} — expected the issuer asking for "
+                        "the password again; if it let the person straight back in, its own session was not ended")
+    print(f"{'BAD' if failures else 'ok '} sign-out: the cookie taken back, and the issuer — which let this browser straight in before — asks for the password again")
+    return failures
+
+
 BUSINESS_LABEL = "ул. Шипка 16, вх. А"                  # the entrance tools/seed_demo.py gives a business unit
 
 
@@ -450,11 +596,16 @@ def demo_request(web, without_address, contact, next_dir):
     return failures
 
 
+# What this check holds once it is signed in: per server, the headers its requests carry — the session cookie for the
+# web, a bearer for the api. Never printed.
+CARRIED = {}
+
+
 def fetch(base, url, body=None, method=None, headers=None):
     request = urllib.request.Request(
         base + url, method=method or ("POST" if body is not None else "GET"),
         data=json.dumps(body).encode() if body is not None else None,
-        headers={"Content-Type": "application/json", **(headers or {})},
+        headers={"Content-Type": "application/json", **CARRIED.get(base, {}), **(headers or {})},
     )
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
@@ -486,13 +637,36 @@ def main():
     parser.add_argument("--closed-web", required=True, help="the same build, with nothing set (PM-DEBT-011), with no address to write to (#79)")
     parser.add_argument("--bad-contact-web", required=True, help="the same build, started with a DOMUVAI_CONTACT_EMAIL that is not an address (#79)")
     parser.add_argument("--contact", required=True, help="the address --web was started with, DOMUVAI_CONTACT_EMAIL (#79)")
-    parser.add_argument("--signin-web", required=True, help="the same build, with sign-in configured and nobody signed in (PM-DEBT-011)")
+    parser.add_argument("--signin-web", help="the same build, with sign-in configured and nobody signed in (PM-DEBT-011); --web itself when --user is given")
+    parser.add_argument("--open-web", help="the same build, told to run without sign-in (DOMUVAI_AUTH=off); --web itself when no --user is given")
+    parser.add_argument("--issuer", help="the realm's issuer URL, when --web signs people in")
+    parser.add_argument("--user", help="the login to sign in with at the issuer; its password is read from E2E_PASSWORD, never from the command line")
+    parser.add_argument("--subject", help="the issuer's own id for --user")
     parser.add_argument("--entrance", required=True)
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
-    failures = console_closed(web, args.closed_web.rstrip("/"), args.next_dir)
-    failures += signed_in_only(args.signin_web.rstrip("/"), args.closed_web.rstrip("/"), args.next_dir)
+    # Two ways to run. In CI (--user): --web signs people in at a real issuer and the api is closed — this check signs
+    # in as a person does and reads every screen signed in, and asks the api with a bearer of its own (E2E_API_TOKEN).
+    # On a machine with no issuer: --web runs without sign-in, the api open, and nobody is signed in or out.
+    if os.environ.get("CI") and not args.user:
+        sys.exit("e2e: in CI the chain is checked signed in — give --user, --subject, --issuer, E2E_PASSWORD and E2E_API_TOKEN")
+    signin_web = (args.signin_web or (web if args.user else "")).rstrip("/")
+    open_web = (args.open_web or ("" if args.user else web)).rstrip("/")
+    if not signin_web or not open_web or (args.user and not (args.issuer and args.subject and os.environ.get("E2E_PASSWORD"))):
+        sys.exit("e2e: give --signin-web (without --user), or --open-web, --issuer, --subject and E2E_PASSWORD (with --user)")
+    if os.environ.get("E2E_API_TOKEN"):
+        CARRIED[api] = {"Authorization": f"Bearer {os.environ['E2E_API_TOKEN']}"}
+    failures = console_closed(open_web, args.closed_web.rstrip("/"), args.next_dir)
+    failures += signed_in_only(signin_web, args.closed_web.rstrip("/"), args.next_dir)
+    browser = None
+    if args.user:
+        problems, browser = sign_in(web, args.issuer.rstrip("/"), args.user, os.environ["E2E_PASSWORD"], args.subject)
+        failures += problems
+        if browser:
+            CARRIED[web] = {"Cookie": browser.cookie_header(web)}      # every screen below is read signed in
+    else:
+        print("—   sign-in, who-am-I and sign-out NOT checked: no --user (a machine with no issuer). CI checks them.")
     without_address = {"no address to write to": args.closed_web.rstrip("/"),
                        "a value that is not an address": args.bad_contact_web.rstrip("/")}
     failures += demo_request(web, without_address, args.contact, args.next_dir)
@@ -504,6 +678,9 @@ def main():
 
     for (method, path), call in CALLS.items():
         url, body = call(entrance)
+        if path == "/api/identity/me" and api not in CARRIED:
+            print(f"—   {method:4} {path}  NOT checked: it answers only a request with a token, and this run has none")
+            continue
         status, raw = fetch(api, url, body)
         if status not in (200, 201):
             failures.append(f"{method} {path}: HTTP {status} {raw[:200]}")
@@ -584,6 +761,9 @@ def main():
     shown = payouts and payout in visible_text(fetch(web, f"/entrance/fund?entrance={entrance}&period={payouts[0]['valueDate'][:7]}")[1])
     failures += [] if shown else [f"/entrance/fund: the month of the fund's payout does not show {payout!r}"]
     print(f"{'ok ' if shown else 'BAD'} /entrance/fund  the fund's payout in the journal of its month")
+
+    if browser:
+        failures += sign_out(web, args.issuer.rstrip("/"), browser)
 
     for failure in failures:
         print(f"  ✗ {failure}")
