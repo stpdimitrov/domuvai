@@ -123,6 +123,9 @@ The issuer and the web's address are https; http is accepted for this machine on
   about to run out; refused by the issuer is signed out.
 - **Sign-out** is the `Изход` button in the console's footer: a POST to `/auth/logout` from this site's own pages.
   The cookie is taken back and the issuer is told, from this server, to end its own session.
+- **Who is signed in** stands beside it: the name the issuer gives the person, and what the API answers this
+  request's own token (`GET /api/identity/me`) — the login it read, and whether that login is tied to a registered
+  party (`без лице в книгата` when it is tied to none, which is every login until AUTH-04 can tie one).
 
 `lib/auth/`: `settings.ts` (the settings, the return path) · `oidc.ts` (begin, finish, renew, end) · `idToken.ts` ·
 `seal.ts` · `gate.ts` (who is served what; the cookies) · `party.ts`, `server.ts` (the wiring). `*.test.ts` run them
@@ -144,16 +147,21 @@ then `npm run build` (strict type-check of every use). A breaking API change fai
 production (ADR-011 §2.2). It is folder-scoped (ADR-011), so it does not run when neither changes — **do not make it a required status check**: a required
 check that never runs blocks the merge.
 
-`.github/workflows/e2e.yml` (E2E-01) runs **the whole chain on every PR**: Postgres → the API from its jar
-(Flyway on an empty database) → `tools/seed_demo.py` through the public API → `next start` →
-`tools/check_e2e.py`. The check validates every response the live screens use against the contract, reads the
-seeded figures off the screens, and fails when a screen calls an operation it does not cover. A second server
-from the same build, with nothing set, must answer every path in the build's route manifest but the landing — a load,
-a client navigation, a prefetch, a HEAD — with the 404 a missing page gets, and its landing must link to none of
-them (PM-DEBT-011). A third, with sign-in configured and nobody signed in, must send every load of those paths to
-sign in and answer any other way of asking with a 401 — a forged session cookie counting for nothing — refuse a
-sign-out that does not come from its own pages, and the build must hold no prerendered page. It runs on every PR and
-is a required check on `main`.
+`.github/workflows/e2e.yml` (E2E-01) runs **the whole chain on every PR**, signed in: Postgres → the API from its jar
+(Flyway on an empty database) → `tools/seed_demo.py` through the public API → a real Keycloak that imports
+`infra/keycloak/domuvai-realm.json` → the API restarted **closed** against it → `next start` → `tools/check_e2e.py`.
+The check signs in as a person does — through Keycloak's own form — and holds an httpOnly cookie and no token; then
+it validates every response the live screens use against the contract, reads the seeded figures off the screens,
+and fails when a screen calls an operation it does not cover; the console's strip must carry the login the API read
+from the web's bearer; sign-out must end the session at the web and at Keycloak. Before signing in, every path in
+the build's route manifest must send a load to sign in and answer any other way of asking with a 401 — a forged
+session cookie counting for nothing — and the build must hold no prerendered page. A second server from the same
+build, with nothing set, must answer every such path with the 404 a missing page gets, and its landing must link to
+none of them (PM-DEBT-011). The client's secret, the person and the password are made in that run; none is in the
+repository. It runs on every PR and is a required check on `main`.
+
+On a machine with no issuer the check runs as in [Against the real API and a database](#against-the-real-api-and-a-database):
+the web told to run without sign-in, the API open — and it says that sign-in itself was not checked.
 
 ## Layout
 

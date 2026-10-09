@@ -42,6 +42,18 @@ class RealmFileTest {
         assertThat(realm["clients"].map { it["clientId"].asText() }).containsExactly("domuvai-web")
         val back = web["redirectUris"].map { it.asText() }
         assertThat(back).isNotEmpty()
-        assertThat(back).allSatisfy { assertThat(URI(it.removeSuffix("*")).host).isIn("localhost", "127.0.0.1") }
+        // the one path a sign-in comes back to (web/lib/auth/settings.ts) and nothing wider: no wildcard
+        assertThat(back).allSatisfy {
+            assertThat(URI(it).host).isIn("localhost", "127.0.0.1")
+            assertThat(URI(it).path).isEqualTo("/auth/callback")
+            assertThat(it).doesNotContain("*", "?", "#")
+        }
+    }
+
+    @Test
+    fun `a refresh token is not spent by its first use`() {
+        // The web renews a session in its middleware, and a page with its prefetches renews more than once at the same
+        // moment: with refresh tokens spent on first use, every renewal but one is refused and the person is signed out.
+        assertThat(realm["revokeRefreshToken"].asBoolean()).isFalse()
     }
 }
