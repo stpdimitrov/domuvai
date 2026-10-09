@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 57 | 24% |
-| **Proved by a test named after the rule** | **58** | **25%** |
-| No implementation and no test | 174 | 75% |
+| Referenced in code (`// Rule:`) | 59 | 25% |
+| **Proved by a test named after the rule** | **60** | **26%** |
+| No implementation and no test | 172 | 74% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -28,7 +28,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:72` | `app/src/main/kotlin/zues/app/registry/OwnershipService.kt:19` |  |
 | `PM-ORG-012` | — | — |  |
 
-## BOOK — Owners' book & residents  ·  10/12 covered
+## BOOK — Owners' book & residents  ·  11/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
@@ -37,7 +37,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-003` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:65` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:10` |  |
 | `PM-BOOK-004` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:65` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:11` |  |
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
-| `PM-BOOK-006` | — | — |  |
+| `PM-BOOK-006` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:68` | `app/src/main/kotlin/zues/app/policy/Policy.kt:67` |  |
 | `PM-BOOK-007` | `app/src/test/kotlin/zues/app/registry/BookAccessServiceTest.kt:50` | `app/src/main/kotlin/zues/app/registry/BookAccess.kt:15` |  |
 | `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:336` |  |
 | `PM-BOOK-009` | — | — |  |
@@ -253,11 +253,11 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-DOC-008` | — | — |  |
 | `PM-DOC-009` | — | — |  |
 
-## SEC — Access control & privacy  ·  0/12 covered
+## SEC — Access control & privacy  ·  1/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-SEC-001` | — | — |  |
+| `PM-SEC-001` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:39` | `app/src/main/kotlin/zues/app/policy/Policy.kt:7` |  |
 | `PM-SEC-002` | — | — |  |
 | `PM-SEC-003` | — | — |  |
 | `PM-SEC-004` | — | — |  |
