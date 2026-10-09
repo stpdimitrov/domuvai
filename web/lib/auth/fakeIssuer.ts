@@ -67,13 +67,18 @@ export async function fakeIssuer(signIn: SignIn, clock: { now: number }) {
       if (issuer.tamper.down) throw new TypeError("fetch failed");
       const answer = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
       if (url === `${signIn.issuer}/.well-known/openid-configuration`) {
-        const document = { issuer: signIn.issuer, authorization_endpoint: `${signIn.issuer}/auth`, token_endpoint: `${signIn.issuer}/token`, jwks_uri: `${signIn.issuer}/certs` };
+        const document = { issuer: signIn.issuer, authorization_endpoint: `${signIn.issuer}/auth`, token_endpoint: `${signIn.issuer}/token`, jwks_uri: `${signIn.issuer}/certs`, end_session_endpoint: `${signIn.issuer}/logout` };
         return answer(issuer.tamper.document ? issuer.tamper.document(document) : document);
       }
       if (url === `${signIn.issuer}/certs`) return answer({ keys: issuer.tamper.keys !== undefined ? issuer.tamper.keys : [...(issuer.tamper.otherKeys ?? []), jwk] });
       if (issuer.tamper.status) return answer({ error: "temporarily_unavailable" }, issuer.tamper.status);
-      if (url !== `${signIn.issuer}/token` || !form) return answer({ error: "not_found" }, 404);
+      if ((url !== `${signIn.issuer}/token` && url !== `${signIn.issuer}/logout`) || !form) return answer({ error: "not_found" }, 404);
       if (form.get("client_id") !== signIn.clientId || form.get("client_secret") !== signIn.clientSecret) return answer({ error: "unauthorized_client" }, 401);
+      if (url === `${signIn.issuer}/logout`) {
+        if (form.get("refresh_token") !== issuer.lastRefresh) return answer({ error: "invalid_grant" }, 400);
+        issuer.lastRefresh = "";                 // the session is over: its refresh token renews nothing
+        return new Response(null, { status: 204 });
+      }
 
       const tokens = async (nonce?: string) => {
         const body = {

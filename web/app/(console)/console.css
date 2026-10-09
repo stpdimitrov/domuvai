@@ -28,6 +28,22 @@
   font: 400 11px/1 "IBM Plex Mono", monospace;
   color: #5c605e;
 }
+/* who is signed in, and the way out — at the footer's other end */
+.signed-in {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.signed-in button {
+  font: inherit;
+  color: #14584a;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
 .console-main {
   flex: 1;

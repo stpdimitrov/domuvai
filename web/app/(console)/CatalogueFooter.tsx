@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { api } from "@/lib/api/client";
 import { reach } from "@/lib/console";
+import SignedIn from "./SignedIn";
 
 /**
  * The console's footer (Rule: PM-SYS-010): the rule catalogue's version and the engine's, as the API states them on
@@ -12,6 +13,7 @@ export default async function CatalogueFooter() {
   const version = await reach(() => api.GET("/api/law/version"));
   return (
     <footer className="console-foot">
+      <SignedIn />
       {version?.data ? (
         <>
           Каталог на правилата v{version.data.catalogueVersion} · изчислител {version.data.engineVersion}
