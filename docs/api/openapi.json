@@ -59,6 +59,9 @@
           "majority": {
             "$ref": "#/components/schemas/MajorityView"
           },
+          "noticeVoided": {
+            "type": "boolean"
+          },
           "ordinal": {
             "format": "int32",
             "type": "integer"
@@ -71,6 +74,7 @@
           "id",
           "itemType",
           "majority",
+          "noticeVoided",
           "ordinal",
           "text"
         ],
@@ -160,6 +164,10 @@
             "type": "string"
           },
           "mode": {
+            "type": "string"
+          },
+          "noticePostedAt": {
+            "format": "date-time",
             "type": "string"
           },
           "place": {
@@ -1668,6 +1676,50 @@
         ],
         "type": "object"
       },
+      "NoticePostingView": {
+        "properties": {
+          "convenorPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "photoHash": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "statedAgenda": {
+            "type": "string"
+          },
+          "statedPlace": {
+            "type": "string"
+          },
+          "statedScheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "witnessPartyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "convenorPartyId",
+          "id",
+          "photoHash",
+          "postedAt",
+          "statedAgenda",
+          "statedPlace",
+          "statedScheduledAt",
+          "witnessPartyId"
+        ],
+        "type": "object"
+      },
       "OldestDebt": {
         "properties": {
           "dueOn": {
@@ -1964,6 +2016,27 @@
         ],
         "type": "object"
       },
+      "RecordPostingRequest": {
+        "properties": {
+          "photoHash": {
+            "type": "string"
+          },
+          "postedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "witnessPartyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "photoHash",
+          "postedAt",
+          "witnessPartyId"
+        ],
+        "type": "object"
+      },
       "RegisterAbsencesRequest": {
         "properties": {
           "absences": {
@@ -2082,6 +2155,22 @@
         },
         "required": [
           "units"
+        ],
+        "type": "object"
+      },
+      "RescheduleRequest": {
+        "properties": {
+          "place": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "place",
+          "scheduledAt"
         ],
         "type": "object"
       },
@@ -2623,12 +2712,13 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification",
+        "summary": "Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification; a date no notice could be in time for is blocked",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-002",
+          "PM-GA-004",
           "PM-GA-005"
         ]
       }
@@ -2827,12 +2917,230 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Put an item on a draft agenda, bound to the majority the law has in force for its type — cited with its rule and source",
+        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — cited with its rule and source; after posting it voids the notice",
         "tags": [
           "assembly"
         ],
         "x-rules": [
-          "PM-VOTE-004"
+          "PM-VOTE-004",
+          "PM-GA-006"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_notice_posting",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPostingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticePostingView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Record the posting act with its photograph — the only way an assembly becomes NOTICED; refused when posted too close to the meeting",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-004",
+          "PM-GA-005",
+          "PM-GA-006",
+          "PM-GA-007",
+          "PM-SYS-013"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_schedule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Move the meeting — blocked when no notice could be in time; a posted notice is void and the assembly a draft again",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-004",
+          "PM-GA-006"
         ]
       }
     },

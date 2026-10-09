@@ -64,11 +64,17 @@ RUNNING = {
    ("The owners and users of an entrance's units as of a date — names only", ['PM-ORG-011', 'PM-BOOK-011']),
  # ---- assembly
  ('post', '/api/assembly/entrances/{entranceId}/assemblies'):
-   ('Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification',
-    ['PM-GA-002', 'PM-GA-005']),
+   ('Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification; a date no notice could be in time for is blocked',
+    ['PM-GA-002', 'PM-GA-004', 'PM-GA-005']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda'):
-   ('Put an item on a draft agenda, bound to the majority the law has in force for its type — cited with its rule and source',
-    ['PM-VOTE-004']),
+   ('Put an item on the agenda, bound to the majority the law has in force for its type — cited with its rule and source; after posting it voids the notice',
+    ['PM-VOTE-004', 'PM-GA-006']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule'):
+   ('Move the meeting — blocked when no notice could be in time; a posted notice is void and the assembly a draft again',
+    ['PM-GA-004', 'PM-GA-006']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting'):
+   ('Record the posting act with its photograph — the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
+    ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity
@@ -158,8 +164,7 @@ PLANNED = [
  ('post', '/entrances/{entrance_id}/assemblies/petition', 'assembly',
   'Demand an assembly by petition of owners, and convene it if the demand is not met', ['PM-GA-001', 'PM-GA-003']),
  ('post', '/assemblies/{assembly_id}/notice', 'assembly',
-  'Generate the notice and record the posting act with its evidence',
-  ['PM-GA-004', 'PM-GA-007', 'PM-GA-008', 'PM-SYS-013']),
+  'Generate the notice document and send the electronic notification beside the posting', ['PM-GA-008', 'PM-SYS-013']),
  ('post', '/assemblies/{assembly_id}/sessions', 'assembly',
   'Open a session and record the quorum reached', ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015']),
  ('post', '/agenda-items/{agenda_item_id}/votes', 'assembly',

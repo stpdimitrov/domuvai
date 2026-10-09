@@ -24,6 +24,7 @@ class AssemblyWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var assemblies: AssemblyService
+    @MockitoBean lateinit var notices: NoticeService
 
     private val entranceId = UUID.randomUUID()
     private val convenor = UUID.randomUUID()
@@ -55,7 +56,7 @@ class AssemblyWebTest {
     fun `PM-VOTE-004 POST an agenda item answers the majority it was bound to, with its rule and source`() {
         val majority = MajorityRule("COMMON_PART_USE_RIGHT", "88.5", Comparison.AT_LEAST, Denominator.TOTAL, "2026-01-01", "чл. 17 ЗУЕС", false, "PM-VOTE-004")
         val item = AgendaItem(UUID.randomUUID(), entranceId, draft.id, 1, "Покривът под наем", "COMMON_PART_USE_RIGHT", majority.id)
-        whenever(assemblies.addAgendaItem(entranceId, draft.id, "Покривът под наем", "COMMON_PART_USE_RIGHT")).thenReturn(item to majority)
+        whenever(assemblies.addAgendaItem(entranceId, draft.id, "Покривът под наем", "COMMON_PART_USE_RIGHT")).thenReturn(AgendaItemBound(item, majority, noticeVoided = true))
         mvc.perform(
             post("$base/${draft.id}/agenda").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"text":"Покривът под наем","itemType":"COMMON_PART_USE_RIGHT"}"""),
@@ -67,6 +68,39 @@ class AssemblyWebTest {
             .andExpect(jsonPath("$.majority.source").value("чл. 17 ЗУЕС"))
             .andExpect(jsonPath("$.majority.rule").value("PM-VOTE-004"))
             .andExpect(jsonPath("$.majority.verified").value(false))
+            .andExpect(jsonPath("$.noticeVoided").value(true))
+    }
+
+    @Test
+    fun `PM-GA-007 POST the posting act answers 201 with both signatories, the photograph and what the notice stated`() {
+        val witness = UUID.randomUUID()
+        val posted = Instant.parse("2026-11-01T08:00:00Z")
+        val photo = "ab".repeat(32)
+        whenever(notices.recordPosting(entranceId, draft.id, posted, witness, photo)).thenReturn(
+            NoticePosting(UUID.randomUUID(), entranceId, draft.id, posted, convenor, witness, photo, at, "фоайето", "1. Отчет", posted),
+        )
+        mvc.perform(
+            post("$base/${draft.id}/notice-posting").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"postedAt":"$posted","witnessPartyId":"$witness","photoHash":"$photo"}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.convenorPartyId").value(convenor.toString()))
+            .andExpect(jsonPath("$.witnessPartyId").value(witness.toString()))
+            .andExpect(jsonPath("$.photoHash").value(photo))
+            .andExpect(jsonPath("$.statedAgenda").value("1. Отчет"))
+    }
+
+    @Test
+    fun `PM-GA-004 a posting act too close to the meeting is a 409, and a meeting scheduled too soon a 400`() {
+        whenever(notices.recordPosting(any(), any(), any(), any(), any())).thenThrow(NoticeTooLate("PM-GA-004"))
+        mvc.perform(
+            post("$base/${draft.id}/notice-posting").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"postedAt":"$at","witnessPartyId":"${UUID.randomUUID()}","photoHash":"${"ab".repeat(32)}"}"""),
+        ).andExpect(status().isConflict).andExpect(jsonPath("$.error").value("PM-GA-004"))
+
+        whenever(assemblies.reschedule(any(), any(), any(), any())).thenThrow(IllegalArgumentException("PM-GA-004"))
+        mvc.perform(post("$base/${draft.id}/schedule").contentType(MediaType.APPLICATION_JSON).content("""{"scheduledAt":"$at","place":"двора"}"""))
+            .andExpect(status().isBadRequest)
     }
 
     @Test

@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification */
+        /** Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification; a date no notice could be in time for is blocked */
         post: operations["post_assembly_entrances_entranceId_assemblies"];
         delete?: never;
         options?: never;
@@ -47,8 +47,42 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Put an item on a draft agenda, bound to the majority the law has in force for its type — cited with its rule and source */
+        /** Put an item on the agenda, bound to the majority the law has in force for its type — cited with its rule and source; after posting it voids the notice */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record the posting act with its photograph — the only way an assembly becomes NOTICED; refused when posted too close to the meeting */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_notice_posting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move the meeting — blocked when no notice could be in time; a posted notice is void and the assembly a draft again */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_schedule"];
         delete?: never;
         options?: never;
         head?: never;
@@ -777,6 +811,7 @@ export interface components {
             id: string;
             itemType: string;
             majority: components["schemas"]["MajorityView"];
+            noticeVoided: boolean;
             /** Format: int32 */
             ordinal: number;
             text: string;
@@ -808,6 +843,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             mode: string;
+            /** Format: date-time */
+            noticePostedAt?: string;
             place: string;
             /** Format: date-time */
             scheduledAt: string;
@@ -1265,6 +1302,21 @@ export interface components {
             separateEntrance: boolean;
             unitType: string;
         };
+        NoticePostingView: {
+            /** Format: uuid */
+            convenorPartyId: string;
+            /** Format: uuid */
+            id: string;
+            photoHash: string;
+            /** Format: date-time */
+            postedAt: string;
+            statedAgenda: string;
+            statedPlace: string;
+            /** Format: date-time */
+            statedScheduledAt: string;
+            /** Format: uuid */
+            witnessPartyId: string;
+        };
         OldestDebt: {
             /** Format: date */
             dueOn: string;
@@ -1348,6 +1400,13 @@ export interface components {
             unitId: string;
             valueDate: string;
         };
+        RecordPostingRequest: {
+            photoHash: string;
+            /** Format: date-time */
+            postedAt: string;
+            /** Format: uuid */
+            witnessPartyId: string;
+        };
         RegisterAbsencesRequest: {
             absences: components["schemas"]["NewAbsenceRequest"][];
         };
@@ -1378,6 +1437,11 @@ export interface components {
         };
         RegisterUnitsRequest: {
             units: components["schemas"]["NewUnitRequest"][];
+        };
+        RescheduleRequest: {
+            place: string;
+            /** Format: date-time */
+            scheduledAt: string;
         };
         RetentionApplied: {
             /** Format: int32 */
@@ -1683,6 +1747,148 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgendaItemAdded"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_notice_posting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPostingRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticePostingView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_schedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssemblyView"];
                 };
             };
             /** @description Bad Request */

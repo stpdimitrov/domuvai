@@ -2366,3 +2366,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/assembly/`, `docs/adr/ADR-008-explicit-denominator.md`, the `MajorityRule` block at the end of `law/src/main/kotlin/zues/law/Constants.kt`.
 
 ---
+
+## S-G2-01b · 2026-10-09 · assembly — the posting act, the notice period and re-notice (PM-GA-004, PM-GA-006, PM-GA-007)
+
+**Did** — an assembly leaves `DRAFT` only by a recorded posting act: when the notice was posted, the convenor (taken from the assembly), one further signatory, the SHA-256 of the photograph, and what the notice stated — date and hour, place, the full agenda. Acts are append-only. The notice must be posted `GA_NOTICE_DAYS` whole Sofia days before the meeting, or `GA_URGENT_NOTICE_HOURS` hours for an urgent one — both read from `law` on the day of posting: an assembly that could no longer be noticed in time cannot be scheduled or moved there, and an act too close to the meeting is refused. After posting, a new agenda item or a change of date, hour or place voids the notice — the assembly is a draft again and the next act starts its own period. Two operations added: record the posting act, move the meeting.
+
+**Rules covered** — PM-GA-004 · PM-GA-006 (the notice's content and re-notice; blocking a decision outside the announced agenda is S-G2-03's, which will read the agenda the act keeps) · PM-GA-007 · PM-GA-005's number, unverified in `law` with its `TODO(legal)`.
+
+**Tests added** — `NoticeServiceTest` (10), two more in `AssemblyWebTest`, three more in `AssemblyPersistenceIT` (6 in all; run on this machine's Postgres 16 from a scratch copy, none skipped). Nine mutants killed: 6 days accepted · the meeting's UTC day for its Sofia day · the urgent period ignored · the convenor signing alone · a late act accepted · an empty agenda noticed · a second act on a noticed assembly · a late item not voiding the notice · a move too close to the meeting.
+
+**Decisions** — mine, stated on the claim: "the convenor and one owner" is read as two different people · the 7 days are whole calendar days with no roll off a weekend or holiday — a minimum interval before a fixed meeting, not a deadline landing on a day · a posting act too late for the meeting is refused and not stored · the photograph is recorded by its hash; storing it is `evidence`'s · posting acts live in `assembly` until `notify` exists (DEVBRIEF gives them to `notify`, with `NoticePosted` as the seam).
+
+**Open** — whether the second signatory is an owner cannot be checked: `registry` publishes no port for who holds title on a date (the same port PM-GA-003 waits for) · counsel: the urgent period (PM-GA-005) and who may be the second signatory (PM-GA-007 ⚠) · moving the meeting across a change of law leaves each item bound to the majority of the old day — no dated change exists yet; re-bind when one does · the posting time is the caller's statement of what the paper act says, bounded only by "not in the future" · PM-SYS-013 is cited on the operation and not claimed: no electronic notification exists to be mistaken for delivery · no `AssemblyConvened` event.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/assembly/NoticePosting.kt`, `NoticePeriod.kt`, `docs/RULES.md` §D.
+
+---
