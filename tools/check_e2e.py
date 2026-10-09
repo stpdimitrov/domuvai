@@ -9,7 +9,7 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
    formats included (uuid, date, date-time).
 3. Each live screen renders the seeded entrance's figures — each with its label or its row, so the same amount
    elsewhere on the page cannot stand in for it — and no error state.
-4. PM-DEBT-011: a second server from the same build, not switched on (web/lib/consoleSwitch.ts), serves no console
+4. PM-DEBT-011: a second server from the same build, with nothing set (web/lib/auth/gate.ts), serves no console
    path — each in the build's route manifest, never typed, answers a load, a client navigation, a prefetch and a HEAD
    with the 404 a missing page gets — and its landing links to none of them.
 5. #79: the landing sends a demo request nowhere by itself, so it never says one arrived. The first server has an
@@ -209,10 +209,10 @@ def routes(next_dir):
 
 def console_closed(web, closed_web, next_dir):
     """
-    Rule: PM-DEBT-011 — the console names debtors and what they owe, and there is no sign-in yet, so a server not
-    switched on serves none of it: every path but the landing answers each way of asking with the 404 a missing page
-    gets, and the landing links to none of them. The switched-on server serves each static page (200) and each route
-    handler (not 404), and its landing does link in — so a 404 or a missing link on the other is the switch's doing.
+    Rule: PM-DEBT-011 — the console names debtors and what they owe, so a server where sign-in is not configured, and
+    that is not told to run without it, serves none of it: every path but the landing answers each way of asking with the 404 a missing page
+    gets, and the landing links to none of them. The server told to run without sign-in serves each static page (200) and each route
+    handler (not 404), and its landing does link in — so a 404 or a missing link on the other is the rule's doing.
     A dynamic path is checked closed only: open, an unknown id may rightly be a 404.
     """
     served = routes(next_dir)
@@ -226,20 +226,20 @@ def console_closed(web, closed_web, next_dir):
         for name, method, h in ASKS:
             got = fetch(closed_web, url(route), method=method, headers=h)
             if got[0] != 404 or got != nowhere[name]:
-                failures.append(f"PM-DEBT-011: {url(route)} asked as {name} where the console is not switched on answers "
+                failures.append(f"PM-DEBT-011: {url(route)} asked as {name} where sign-in is not configured answers "
                                 f"HTTP {got[0]} — expected the 404 a missing page gets")
         if "[" in route or "(" in route:
             continue
         opened = fetch(web, url(route))[0]
         if (opened != 200) if served[route] == "page" else (opened == 404):
-            failures.append(f"PM-DEBT-011: {url(route)} answers HTTP {opened} where the console is switched on — its 404 proves nothing")
+            failures.append(f"PM-DEBT-011: {url(route)} answers HTTP {opened} where the console is served — its 404 proves nothing")
     links = lambda landing: [r for r in console if f'href="{url(r)}"' in landing]
     (status, landing), (opened, landing_open) = fetch(closed_web, "/"), fetch(web, "/")
-    failures += [f"PM-DEBT-011: the landing answers HTTP {status} where the console is not switched on"] if status != 200 else []
+    failures += [f"PM-DEBT-011: the landing answers HTTP {status} where sign-in is not configured"] if status != 200 else []
     failures += [f"PM-DEBT-011: the landing links to {r}, which this server does not serve" for r in links(landing)]
     if opened != 200 or not links(landing_open):
-        failures.append("PM-DEBT-011: the switched-on landing links to no console path — a link missing from the other proves nothing")
-    print(f"{'BAD' if failures else 'ok '} PM-DEBT-011 not switched on: {len(console)} console paths × {len(ASKS)} ways asked "
+        failures.append("PM-DEBT-011: the open landing links to no console path — a link missing from the other proves nothing")
+    print(f"{'BAD' if failures else 'ok '} PM-DEBT-011 sign-in not configured: {len(console)} console paths × {len(ASKS)} ways asked "
           f"answer the 404 a missing page gets, the landing links to none")
     return failures
 
@@ -413,7 +413,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument("--api", required=True)
     parser.add_argument("--web", required=True)
-    parser.add_argument("--closed-web", required=True, help="the same build, not switched on (PM-DEBT-011), with no address to write to (#79)")
+    parser.add_argument("--closed-web", required=True, help="the same build, with nothing set (PM-DEBT-011), with no address to write to (#79)")
     parser.add_argument("--bad-contact-web", required=True, help="the same build, started with a DOMUVAI_CONTACT_EMAIL that is not an address (#79)")
     parser.add_argument("--contact", required=True, help="the address --web was started with, DOMUVAI_CONTACT_EMAIL (#79)")
     parser.add_argument("--entrance", required=True)

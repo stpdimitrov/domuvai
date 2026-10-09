@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
-import { consoleOpen } from "@/lib/consoleSwitch";
+import { signInMode } from "@/lib/auth/server";
 import { contactEmail } from "@/lib/contact";
 import HeroVideo from "./HeroVideo";
 import LandingNav from "./LandingNav";
@@ -34,7 +34,7 @@ const TRUST = [
 
 export default async function LandingPage() {
   await connection();                          // per request: the switch is the server's, not the build's
-  const open = consoleOpen();                  // Rule: PM-DEBT-011 — no link into a console this server does not serve
+  const open = signInMode().kind !== "closed";                  // Rule: PM-DEBT-011 — no link into a console this server does not serve
   const start = open ? "/portfolio" : "#demo";
   const contact = contactEmail();              // #79 — where to write: the server's setting, or nowhere yet
   return (

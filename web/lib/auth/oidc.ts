@@ -185,6 +185,29 @@ export function relyingParty(signIn: SignIn, deps: Deps = { fetch: (...args) => 
       const renewed = answer.status === 200 ? session(answer.body, { subject: current.subject, name: current.name }, current.refreshToken) : null;
       return renewed ? { kind: "renewed", session: renewed } : { kind: "refused" };
     },
+
+    /**
+     * The issuer's own session, ended — asked from this server with the session's refresh token, as Keycloak's
+     * logout endpoint takes it, so no token passes through a browser. False when it could not be: the caller signs
+     * the person out here all the same.
+     */
+    async end(current: Session): Promise<boolean> {
+      try {
+        const { endSession } = await discover();
+        if (!endSession || !current.refreshToken) return false;
+        const response = await deps.fetch(endSession, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ client_id: signIn.clientId, client_secret: signIn.clientSecret, refresh_token: current.refreshToken }).toString(),
+          redirect: "error",
+          cache: "no-store",
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    },
   };
 }
 
