@@ -75,10 +75,10 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GA-001` | — | — |  |
 | `PM-GA-002` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:77` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:12` |  |
 | `PM-GA-003` | — | — | ⚠ |
-| `PM-GA-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:208` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:124` |  |
+| `PM-GA-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:223` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:124` |  |
 | `PM-GA-005` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:13` | ⚠ |
-| `PM-GA-006` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:181` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:101` |  |
-| `PM-GA-007` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:141` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:35` | ⚠ |
+| `PM-GA-006` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:193` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:101` |  |
+| `PM-GA-007` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:141` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:38` | ⚠ |
 | `PM-GA-008` | — | — |  |
 | `PM-GA-009` | — | — |  |
 | `PM-GA-010` | — | — | ⚠ |
@@ -106,7 +106,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-001` | — | — |  |
 | `PM-VOTE-002` | — | — |  |
 | `PM-VOTE-003` | — | — |  |
-| `PM-VOTE-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:130` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:38` | ⚠ |
+| `PM-VOTE-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:130` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:41` | ⚠ |
 | `PM-VOTE-005` | — | — |  |
 | `PM-VOTE-006` | — | — |  |
 | `PM-VOTE-007` | — | — |  |
@@ -114,7 +114,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-009` | — | — |  |
 | `PM-VOTE-010` | — | — |  |
 | `PM-VOTE-011` | — | — |  |
-| `PM-VOTE-012` | — | `law/src/main/kotlin/zues/law/Constants.kt:102` |  |
+| `PM-VOTE-012` | — | `law/src/main/kotlin/zues/law/Constants.kt:104` |  |
 | `PM-VOTE-013` | — | — |  |
 | `PM-VOTE-014` | — | — |  |
 | `PM-VOTE-015` | — | — |  |

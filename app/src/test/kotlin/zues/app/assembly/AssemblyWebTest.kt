@@ -73,19 +73,19 @@ class AssemblyWebTest {
 
     @Test
     fun `PM-GA-007 POST the posting act answers 201 with both signatories, the photograph and what the notice stated`() {
-        val witness = UUID.randomUUID()
+        val coSignatory = UUID.randomUUID()
         val posted = Instant.parse("2026-11-01T08:00:00Z")
         val photo = "ab".repeat(32)
-        whenever(notices.recordPosting(entranceId, draft.id, posted, witness, photo)).thenReturn(
-            NoticePosting(UUID.randomUUID(), entranceId, draft.id, posted, convenor, witness, photo, at, "фоайето", "1. Отчет", posted),
+        whenever(notices.recordPosting(entranceId, draft.id, posted, coSignatory, photo)).thenReturn(
+            NoticePosting(UUID.randomUUID(), entranceId, draft.id, posted, convenor, coSignatory, photo, at, "фоайето", "1. Отчет", posted),
         )
         mvc.perform(
             post("$base/${draft.id}/notice-posting").contentType(MediaType.APPLICATION_JSON)
-                .content("""{"postedAt":"$posted","witnessPartyId":"$witness","photoHash":"$photo"}"""),
+                .content("""{"postedAt":"$posted","coSignatoryPartyId":"$coSignatory","photoHash":"$photo"}"""),
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.convenorPartyId").value(convenor.toString()))
-            .andExpect(jsonPath("$.witnessPartyId").value(witness.toString()))
+            .andExpect(jsonPath("$.coSignatoryPartyId").value(coSignatory.toString()))
             .andExpect(jsonPath("$.photoHash").value(photo))
             .andExpect(jsonPath("$.statedAgenda").value("1. Отчет"))
     }
@@ -95,7 +95,7 @@ class AssemblyWebTest {
         whenever(notices.recordPosting(any(), any(), any(), any(), any())).thenThrow(NoticeTooLate("PM-GA-004"))
         mvc.perform(
             post("$base/${draft.id}/notice-posting").contentType(MediaType.APPLICATION_JSON)
-                .content("""{"postedAt":"$at","witnessPartyId":"${UUID.randomUUID()}","photoHash":"${"ab".repeat(32)}"}"""),
+                .content("""{"postedAt":"$at","coSignatoryPartyId":"${UUID.randomUUID()}","photoHash":"${"ab".repeat(32)}"}"""),
         ).andExpect(status().isConflict).andExpect(jsonPath("$.error").value("PM-GA-004"))
 
         whenever(assemblies.reschedule(any(), any(), any(), any())).thenThrow(IllegalArgumentException("PM-GA-004"))

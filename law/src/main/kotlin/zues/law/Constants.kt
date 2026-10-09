@@ -80,12 +80,14 @@ private val CONSTANTS: List<Constant> = listOf(
         rule = "PM-BOOK-010",
         todoLegal = "Confirm no statute requires keeping a departed animal's veterinary passport number longer than 3 months.",
     ),
-    // PM-GA-004 — the notice is posted at least 7 days before the meeting. The statute states the figure.
+    // PM-GA-004 — the notice is posted at least 7 days before the meeting. The statute states the figure. How the
+    // days are counted — whether the day of posting counts — is the caller's reading, stated where it is applied.
     Constant("GA_NOTICE_DAYS", "7", "2009-01-01", "чл. 13 ал. 1 ЗУЕС", true, rule = "PM-GA-004"),
     // PM-GA-005 — in urgent cases the notice may be posted as late as 24 hours before. Unconfirmed.
     Constant(
         "GA_URGENT_NOTICE_HOURS", "24", "2009-01-01", "чл. 13 ЗУЕС", false, rule = "PM-GA-005",
-        todoLegal = "Confirm the shortened notice period for urgent cases, its unit, and what counts as urgent.",
+        todoLegal = "Confirm the shortened notice period for urgent cases, its unit (elapsed or clock hours), what counts as " +
+            "urgent, and whether a notice re-posted after a change keeps the shortened period.",
     ),
 )
 

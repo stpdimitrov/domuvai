@@ -39,13 +39,13 @@ data class AgendaItemAdded(
 data class RescheduleRequest(val scheduledAt: Instant, val place: String)
 
 /** The posting act as certified: when, the photograph's SHA-256, and the one signatory beside the convenor. */
-data class RecordPostingRequest(val postedAt: Instant, val witnessPartyId: UUID, val photoHash: String)
+data class RecordPostingRequest(val postedAt: Instant, val coSignatoryPartyId: UUID, val photoHash: String)
 
 data class NoticePostingView(
     val id: UUID,
     val postedAt: Instant,
     val convenorPartyId: UUID,
-    val witnessPartyId: UUID,
+    val coSignatoryPartyId: UUID,
     val photoHash: String,
     val statedScheduledAt: Instant,
     val statedPlace: String,
@@ -94,8 +94,8 @@ class AssemblyController(private val assemblies: AssemblyService, private val no
     @PostMapping("/{assemblyId}/notice-posting")
     @ResponseStatus(HttpStatus.CREATED)
     fun recordPosting(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: RecordPostingRequest): NoticePostingView =
-        notices.recordPosting(entranceId, assemblyId, request.postedAt, request.witnessPartyId, request.photoHash).let {
-            NoticePostingView(it.id, it.postedAt, it.convenorPartyId, it.witnessPartyId, it.photoHash, it.statedScheduledAt, it.statedPlace, it.statedAgenda)
+        notices.recordPosting(entranceId, assemblyId, request.postedAt, request.coSignatoryPartyId, request.photoHash).let {
+            NoticePostingView(it.id, it.postedAt, it.convenorPartyId, it.coSignatoryPartyId, it.photoHash, it.statedScheduledAt, it.statedPlace, it.statedAgenda)
         }
 
     @GetMapping("/{assemblyId}")

@@ -79,7 +79,7 @@ class AssemblyService(
         val assembly = Assembly(
             id = UUID.randomUUID(), entranceId = entranceId, convenedBy = request.convenedBy, convenedAs = office.name,
             scheduledAt = request.scheduledAt, place = request.place.trim(), mode = mode.name,
-            status = AssemblyStatus.DRAFT.name, urgent = request.urgent, urgencyReason = reason,
+            status = AssemblyStatus.DRAFT.name, urgent = request.urgent, urgencyReason = reason, noticeContentChangedAt = clock.instant(),
         )
         try {
             return aggregates.insert(assembly)
@@ -114,7 +114,7 @@ class AssemblyService(
         val item = aggregates.insert(
             AgendaItem(UUID.randomUUID(), entranceId, assemblyId, ordinal, text.trim(), majority.itemType, majority.id),
         )
-        return AgendaItemBound(item, majority, noticeVoided = voidNotice(assembly))
+        return AgendaItemBound(item, majority, noticeVoided = noticeContentChanged(assembly))
     }
 
     /**
@@ -128,17 +128,23 @@ class AssemblyService(
         require(place.isNotBlank()) { "the place of the assembly is required" }
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
         check(assembly.status in AGENDA_OPEN) { "an assembly that is ${assembly.status} cannot be moved" }
+        if (scheduledAt == assembly.scheduledAt && place.trim() == assembly.place) return assembly     // nothing moved: the notice stands
         requireNoticeStillPossible(scheduledAt, assembly.urgent)
-        return assemblies.save(
-            assembly.copy(scheduledAt = scheduledAt, place = place.trim(), status = AssemblyStatus.DRAFT.name, noticePostedAt = null),
-        )
+        val moved = assembly.copy(scheduledAt = scheduledAt, place = place.trim())
+        noticeContentChanged(moved)
+        return assemblies.findById(assemblyId).orElseThrow()
     }
 
-    /** A posted notice no longer says what the assembly is: back to a draft. True when there was one to void. */
-    private fun voidNotice(assembly: Assembly): Boolean {
-        if (assembly.status != AssemblyStatus.NOTICED.name) return false
-        assemblies.save(assembly.copy(status = AssemblyStatus.DRAFT.name, noticePostedAt = null))
-        return true
+    /**
+     * What a notice must state has changed. A posted notice no longer says what the assembly is, so the
+     * assembly is a draft again; and no posting from before this moment can be its notice. True when a
+     * posted notice was voided.
+     */
+    private fun noticeContentChanged(assembly: Assembly): Boolean {
+        assemblies.save(
+            assembly.copy(status = AssemblyStatus.DRAFT.name, noticePostedAt = null, noticePostingId = null, noticeContentChangedAt = clock.instant()),
+        )
+        return assembly.status == AssemblyStatus.NOTICED.name
     }
 
     /** Scheduling a meeting that a notice posted this instant would already be too late for is blocked. */

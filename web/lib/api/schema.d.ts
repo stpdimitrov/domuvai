@@ -1304,6 +1304,8 @@ export interface components {
         };
         NoticePostingView: {
             /** Format: uuid */
+            coSignatoryPartyId: string;
+            /** Format: uuid */
             convenorPartyId: string;
             /** Format: uuid */
             id: string;
@@ -1314,8 +1316,6 @@ export interface components {
             statedPlace: string;
             /** Format: date-time */
             statedScheduledAt: string;
-            /** Format: uuid */
-            witnessPartyId: string;
         };
         OldestDebt: {
             /** Format: date */
@@ -1401,11 +1401,11 @@ export interface components {
             valueDate: string;
         };
         RecordPostingRequest: {
+            /** Format: uuid */
+            coSignatoryPartyId: string;
             photoHash: string;
             /** Format: date-time */
             postedAt: string;
-            /** Format: uuid */
-            witnessPartyId: string;
         };
         RegisterAbsencesRequest: {
             absences: components["schemas"]["NewAbsenceRequest"][];

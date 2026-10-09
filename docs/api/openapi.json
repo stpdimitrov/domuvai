@@ -1678,6 +1678,10 @@
       },
       "NoticePostingView": {
         "properties": {
+          "coSignatoryPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "convenorPartyId": {
             "format": "uuid",
             "type": "string"
@@ -1702,21 +1706,17 @@
           "statedScheduledAt": {
             "format": "date-time",
             "type": "string"
-          },
-          "witnessPartyId": {
-            "format": "uuid",
-            "type": "string"
           }
         },
         "required": [
+          "coSignatoryPartyId",
           "convenorPartyId",
           "id",
           "photoHash",
           "postedAt",
           "statedAgenda",
           "statedPlace",
-          "statedScheduledAt",
-          "witnessPartyId"
+          "statedScheduledAt"
         ],
         "type": "object"
       },
@@ -2018,22 +2018,22 @@
       },
       "RecordPostingRequest": {
         "properties": {
+          "coSignatoryPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "photoHash": {
             "type": "string"
           },
           "postedAt": {
             "format": "date-time",
             "type": "string"
-          },
-          "witnessPartyId": {
-            "format": "uuid",
-            "type": "string"
           }
         },
         "required": [
+          "coSignatoryPartyId",
           "photoHash",
-          "postedAt",
-          "witnessPartyId"
+          "postedAt"
         ],
         "type": "object"
       },

@@ -25,6 +25,9 @@ data class Assembly(
     val urgent: Boolean,
     val urgencyReason: String?,
     val noticePostedAt: Instant? = null,
+    val noticePostingId: UUID? = null,
+    /** When the date, hour, place or agenda last changed; a notice posted before it stated something else (PM-GA-006). */
+    val noticeContentChangedAt: Instant? = null,
 )
 
 /** Who may convene: the management board, the manager, the control board or controller. Rule: PM-GA-002 */

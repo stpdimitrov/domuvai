@@ -146,11 +146,14 @@ class AssemblyPersistenceIT {
         val id = created(base, convening(convenor)).get("id").asText()
         created("$base/$id/agenda", """{"text":"Отчет на управителя","itemType":"GENERAL"}""")
         val photo = "3f".repeat(32)
-        val posted = Instant.now().minusSeconds(3600).truncatedTo(ChronoUnit.SECONDS)
-        fun posting(witness: UUID) = """{"postedAt":"$posted","witnessPartyId":"$witness","photoHash":"$photo"}"""
+        val posted = Instant.now().truncatedTo(ChronoUnit.MICROS)                       // after the agenda was last touched
+        fun posting(coSignatory: UUID) = """{"postedAt":"$posted","coSignatoryPartyId":"$coSignatory","photoHash":"$photo"}"""
 
-        assertThatThrownBy { jdbc.update("UPDATE assembly.assembly SET status = 'NOTICED' WHERE id = ?::uuid", id) }
-            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("assembly_noticed_by_posting")
+        // neither the status alone nor a posting time alone makes it noticed: there must be an act, and its own
+        for (set in listOf("status = 'NOTICED'", "status = 'NOTICED', notice_posted_at = now()", "status = 'OPEN'")) {
+            assertThatThrownBy { jdbc.update("UPDATE assembly.assembly SET $set WHERE id = ?::uuid", id) }
+                .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("assembly_noticed_by_posting")
+        }
         // a signatory nobody registered, and the convenor signing twice, are the caller's errors
         mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(UUID.randomUUID()))).andExpect(status().isBadRequest)
         mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(convenor))).andExpect(status().isBadRequest)
@@ -168,6 +171,15 @@ class AssemblyPersistenceIT {
         jdbc.update("UPDATE assembly.notice_posting SET photo_hash = ? WHERE assembly_id = ?::uuid", "00".repeat(32), id)
         jdbc.update("DELETE FROM assembly.notice_posting WHERE assembly_id = ?::uuid", id)
         assertThat(jdbc.queryForObject("SELECT photo_hash FROM assembly.notice_posting WHERE assembly_id = ?::uuid", String::class.java, id)).isEqualTo(photo)
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.notice_posting CASCADE") }.hasMessageContaining("is not emptied")
+        // another assembly cannot borrow this one's act
+        val other = created(base, convening(convenor)).get("id").asText()
+        assertThatThrownBy {
+            jdbc.update(
+                "UPDATE assembly.assembly SET status = 'NOTICED', notice_posted_at = now(), notice_posting_id = ?::uuid WHERE id = ?::uuid",
+                act.get("id").asText(), other,
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("assembly_notice_posting_is_its_own")
         assertThatThrownBy {
             jdbc.update(
                 "INSERT INTO assembly.notice_posting SELECT gen_random_uuid(), entrance_id, assembly_id, posted_at, convenor_party_id, convenor_party_id, " +
@@ -184,17 +196,20 @@ class AssemblyPersistenceIT {
         val owner = party()
         val base = "/api/assembly/entrances/$entranceId/assemblies"
         val id = created(base, convening(convenor)).get("id").asText()
-        val posting = """{"postedAt":"${Instant.now().minusSeconds(60)}","witnessPartyId":"$owner","photoHash":"${"3f".repeat(32)}"}"""
-        mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting)).andExpect(status().isConflict)   // no agenda yet
+        fun posting(at: Instant = Instant.now()) = """{"postedAt":"$at","coSignatoryPartyId":"$owner","photoHash":"${"3f".repeat(32)}"}"""
+        mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting())).andExpect(status().isConflict)   // no agenda yet
         assertThat(created("$base/$id/agenda", """{"text":"Отчет","itemType":"GENERAL"}""").get("noticeVoided").asBoolean()).isFalse()
-        created("$base/$id/notice-posting", posting)
+        val first = Instant.now()
+        created("$base/$id/notice-posting", posting(first))
 
         assertThat(created("$base/$id/agenda", """{"text":"Ремонт на покрива","itemType":"GENERAL"}""").get("noticeVoided").asBoolean()).isTrue()
         val voided = read(base, id)
         assertThat(voided.get("status").asText()).isEqualTo("DRAFT")
         assertThat(voided.has("noticePostedAt")).isFalse()
 
-        assertThat(created("$base/$id/notice-posting", posting).get("statedAgenda").asText()).isEqualTo("1. Отчет\n2. Ремонт на покрива")
+        // the first posting stated one item: its time cannot serve the new agenda
+        mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(first))).andExpect(status().isBadRequest)
+        assertThat(created("$base/$id/notice-posting", posting()).get("statedAgenda").asText()).isEqualTo("1. Отчет\n2. Ремонт на покрива")
         assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.notice_posting WHERE assembly_id = ?::uuid", Int::class.java, id)).isEqualTo(2)
 
         // moving the meeting voids the notice too
