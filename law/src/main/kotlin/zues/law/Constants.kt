@@ -91,3 +91,64 @@ fun numberOn(code: String, on: LegalDate): Double = constantOn(code, on).value.t
 
 /** Every constant whose number is not yet confirmed against the consolidated statute. */
 fun unverified(): List<Constant> = CONSTANTS.filter { !it.verified }
+
+/** Against which ideal parts a majority is counted — never implied. Rule: PM-VOTE-012 (ADR-008) */
+enum class Denominator { TOTAL, REPRESENTED }
+
+/** "More than 50%" and "at least 75%" are different tests of the same number. */
+enum class Comparison { MORE_THAN, AT_LEAST }
+
+/**
+ * A majority is a typed, dated value — never a bare percentage (ADR-008). [itemType] is the kind of
+ * agenda item it decides; [thresholdPct] is an exact decimal percent of the [denominator].
+ */
+data class MajorityRule(
+    val itemType: String,
+    val thresholdPct: String,
+    val comparison: Comparison,
+    val denominator: Denominator,
+    val inForceFrom: LegalDate,
+    val source: String,
+    val verified: Boolean,
+    val rule: String,
+    val todoLegal: String? = null,
+) {
+    /** What an agenda item stores: the type and the date its majority came into force. */
+    val id: String get() = "$itemType@$inForceFrom"
+}
+
+/** An item type the catalogue names but gives no number for: nothing is in force until counsel answers. */
+data class PendingMajority(val itemType: String, val source: String, val rule: String, val todoLegal: String)
+
+/**
+ * No majority is in force for the item type on the date. [known] says the law names the type: either its number
+ * waits on counsel ([pending]), or it has one that is not yet in force on that date.
+ */
+class MajorityNotInForce(val itemType: String, val on: LegalDate, val known: Boolean, val pending: PendingMajority?) : RuntimeException(
+    when {
+        pending != null -> "no majority is confirmed for $itemType (${pending.rule}, ${pending.source}) — TODO(legal): ${pending.rule}"
+        known -> "the majority for $itemType is not yet in force on $on"
+        else -> "no majority for item type $itemType — stop and ask (PM-SYS-001)"
+    },
+)
+
+private val MAJORITY_RULES: List<MajorityRule> = listOf(
+    // PM-VOTE-002 — the default: more than 50% of the ideal parts represented at the meeting.
+    MajorityRule("GENERAL", "50", Comparison.MORE_THAN, Denominator.REPRESENTED, "2009-01-01", "чл. 17 ЗУЕС", true, "PM-VOTE-002"),
+)
+
+private val PENDING_MAJORITIES: List<PendingMajority> = listOf(
+    // TODO(legal): PM-VOTE-004 — the catalogue states no threshold and no denominator (RULES.md §7, question 4).
+    PendingMajority(
+        "COMMON_PART_USE_RIGHT", "чл. 17 ЗУЕС", "PM-VOTE-004",
+        "Confirm the majority, and its denominator, for granting rights of use over common parts or changing their purpose.",
+    ),
+)
+
+/** The majority in force for an item type on the legal date, from [rules]. Rule: PM-SYS-002, PM-VOTE-004 */
+fun majorityRuleOn(itemType: String, on: LegalDate, rules: List<MajorityRule> = MAJORITY_RULES): MajorityRule =
+    rules.filter { it.itemType == itemType && it.inForceFrom <= on }.maxByOrNull { it.inForceFrom }
+        ?: throw rules.any { it.itemType == itemType }.let { dated ->
+            // a type with a dated number is no longer waiting on counsel, whatever the pending list still says
+            MajorityNotInForce(itemType, on, dated, if (dated) null else PENDING_MAJORITIES.firstOrNull { it.itemType == itemType })
+        }

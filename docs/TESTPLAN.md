@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **57** (24%) |
-| Remaining | **176** |
+| Proved by a test named after the rule | **60** (26%) |
+| Remaining | **173** |
 | Proposed slices at ~10 rules each | **20** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,30 +51,27 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-80 rule(s) remaining across 8 slice(s).
+77 rule(s) remaining across 8 slice(s).
 
-### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s) · ⚠ 5 unconfirmed
+### S-G2-01 · `assembly` · GA · 10 rule(s) · ⚠ 3 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-GA-003` | MUST ⚠ | Petition feature accumulates signatures until the 20% threshold, then unlocks self-convening. |
-| `PM-GA-005` | MUST ⚠ | Urgent flag requires a free-text justification stored on the assembly. |
 | `PM-GA-007` | MUST ⚠ | Assembly cannot move to `NOTICED` without the posting act. |
 | `PM-GA-010` | MUST ⚠ | Registering a 4th proxy for the same agent is rejected with the configured limit shown. |
-| `PM-VOTE-004` | MUST ⚠ | Item type `COMMON_PART_USE_RIGHT` uses the configured threshold with source citation. |
 | `PM-GA-001` | MUST | If no GA is held by 31 December, a red compliance flag is raised on 1 January. |
-| `PM-GA-002` | MUST | Convene action available to `MB`, `BM`, `CTL`. |
 | `PM-GA-004` | MUST | Scheduling a GA 6 days out is blocked; the system records the posting act with photo evidence. |
 | `PM-GA-006` | MUST | Adding an agenda item after notice posting forces re-notice with a new 7-day clock. |
 | `PM-GA-009` | MUST | Proxy registration captures principal, agent, scope and form. |
+| `PM-GA-012` | MUST | Live quorum meter; at 50.99% the meeting cannot open. |
+| `PM-GA-013` | MUST | Session 2 opens automatically 60 minutes later with the lowered threshold. |
+| `PM-GA-014` | MUST | Session 3 has `quorum_pct = 0`; the agenda is carried over unchanged. |
 
 ### S-G2-02 · `assembly` · GA · 10 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-GA-012` | MUST | Live quorum meter; at 50.99% the meeting cannot open. |
-| `PM-GA-013` | MUST | Session 2 opens automatically 60 minutes later with the lowered threshold. |
-| `PM-GA-014` | MUST | Session 3 has `quorum_pct = 0`; the agenda is carried over unchanged. |
 | `PM-GA-015` | MUST | Quorum rule is selected from the ownership concentration at notice date. |
 | `PM-GA-016` | MUST | Remote attendee is counted in quorum only after identity verification passes. |
 | `PM-GA-017` | MUST | Only agenda items tagged `ABSENTEE_ELIGIBLE` accept post-meeting ballots; the tally reopens until day 7. |
@@ -82,14 +79,14 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GA-019` | MUST | Day 8 without minutes raises an overdue compliance task. |
 | `PM-GA-020` | MUST | `announced_at` sets `appeal_deadline = announced_at + 30 days`. |
 | `PM-GA-021` | MUST | Generated PDF fails validation if attendance percentages are missing. |
+| `PM-GA-022` | MUST | Each protocol records the physical archive location. |
+| `PM-GA-023` | MUST | Decision shows a countdown; after 30 days status becomes `FINAL`. |
+| `PM-GA-024` | MUST | Litigation flag does not pause the execution clock; a court stay does. |
 
 ### S-G2-03 · `assembly` · GA · VOTE · 10 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-GA-022` | MUST | Each protocol records the physical archive location. |
-| `PM-GA-023` | MUST | Decision shows a countdown; after 30 days status becomes `FINAL`. |
-| `PM-GA-024` | MUST | Litigation flag does not pause the execution clock; a court stay does. |
 | `PM-GA-025` | MUST | Every decision creates an execution task with a computed due date. |
 | `PM-VOTE-001` | MUST | An unbound item cannot be put to a vote. |
 | `PM-VOTE-002` | MUST | An item with no explicit threshold resolves to >50% of represented ideal parts and states the denominator used. |
@@ -97,14 +94,14 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-VOTE-005` | MUST | An item typed USEFUL_EXPENSE or CREDIT fails at 74.9% and passes at 75%. |
 | `PM-VOTE-006` | MUST | The respondent's ideal parts are removed from both numerator and denominator. |
 | `PM-VOTE-007` | MUST | An item typed MAJOR_REPAIR, MAJOR_RENEWAL or ENERGY_EFFICIENCY fails at 50.9% and passes at 51%. |
-
-### S-G2-04 · `assembly` · GA · VOTE · 12 rule(s) · ⚠ 1 unconfirmed
-
-| Rule | | Test must prove |
-|---|---|---|
 | `PM-VOTE-008` | MUST | A vote rejecting a `NECESSARY` work order is flagged unlawful and blocked from becoming a decision. |
 | `PM-VOTE-009` | MUST | A standing authorisation with a monetary cap unlocks the manager's emergency-spend path. |
 | `PM-VOTE-010` | MUST | Each is a distinct agenda item type. |
+
+### S-G2-04 · `assembly` · GA · VOTE · 9 rule(s) · ⚠ 1 unconfirmed
+
+| Rule | | Test must prove |
+|---|---|---|
 | `PM-VOTE-011` | MUST | Result line reads e.g. "62.41% of 78.10% represented; threshold 51% of total — NOT PASSED". |
 | `PM-VOTE-012` | MUST | Explicit `denominator` field per majority rule: `TOTAL` or `REPRESENTED`. |
 | `PM-VOTE-013` | MUST | Provisional result is labelled `PROVISIONAL` until day 7 closes. |

@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 55 | 24% |
-| **Proved by a test named after the rule** | **57** | **24%** |
-| No implementation and no test | 176 | 76% |
+| Referenced in code (`// Rule:`) | 59 | 25% |
+| **Proved by a test named after the rule** | **60** | **26%** |
+| No implementation and no test | 172 | 74% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -68,15 +68,15 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GOV-017` | — | — |  |
 | `PM-GOV-018` | — | — |  |
 
-## GA — General assembly lifecycle  ·  0/26 covered
+## GA — General assembly lifecycle  ·  2/26 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-GA-001` | — | — |  |
-| `PM-GA-002` | — | — |  |
+| `PM-GA-002` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:69` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:12` |  |
 | `PM-GA-003` | — | — | ⚠ |
 | `PM-GA-004` | — | — |  |
-| `PM-GA-005` | — | — | ⚠ |
+| `PM-GA-005` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:97` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:13` | ⚠ |
 | `PM-GA-006` | — | — |  |
 | `PM-GA-007` | — | — | ⚠ |
 | `PM-GA-008` | — | — |  |
@@ -99,14 +99,14 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GA-025` | — | — |  |
 | `PM-GA-026` | — | — |  |
 
-## VOTE — Majorities & decision routing  ·  0/16 covered
+## VOTE — Majorities & decision routing  ·  1/16 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-VOTE-001` | — | — |  |
 | `PM-VOTE-002` | — | — |  |
 | `PM-VOTE-003` | — | — |  |
-| `PM-VOTE-004` | — | — | ⚠ |
+| `PM-VOTE-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:122` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:37` | ⚠ |
 | `PM-VOTE-005` | — | — |  |
 | `PM-VOTE-006` | — | — |  |
 | `PM-VOTE-007` | — | — |  |
@@ -114,7 +114,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-009` | — | — |  |
 | `PM-VOTE-010` | — | — |  |
 | `PM-VOTE-011` | — | — |  |
-| `PM-VOTE-012` | — | — |  |
+| `PM-VOTE-012` | — | `law/src/main/kotlin/zues/law/Constants.kt:95` |  |
 | `PM-VOTE-013` | — | — |  |
 | `PM-VOTE-014` | — | — |  |
 | `PM-VOTE-015` | — | — |  |
@@ -277,7 +277,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
 | `PM-SYS-002` | `app/src/test/kotlin/zues/app/money/ArrearsIT.kt:138` | `app/src/main/kotlin/zues/app/money/Arrears.kt:73` |  |
 | `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
-| `PM-SYS-004` | `app/src/test/kotlin/zues/app/registry/BookWebTest.kt:70` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
+| `PM-SYS-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyServiceTest.kt:109` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
 | `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |
 | `PM-SYS-006` | — | — |  |
 | `PM-SYS-007` | — | — |  |
