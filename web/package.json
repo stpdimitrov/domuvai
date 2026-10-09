@@ -7,6 +7,7 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
+    "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\"",
     "gen:api": "openapi-typescript ../docs/api/openapi.json -o lib/api/schema.d.ts"
   },
   "dependencies": {
