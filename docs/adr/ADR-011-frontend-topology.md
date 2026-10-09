@@ -99,3 +99,22 @@ The Gate-1 green light (S-41) was reached and the frontend was built from the ow
 **Convergence (restores §2.2).** The next frontend milestone is to **generate the OpenAPI TS client and replace the mock data screen by screen**, starting with the Gate-1 screens whose backend exists (`portfolio` / `entrance` / `charges` / `fund` / `debts`). At that point the generated client becomes the enforced boundary as §2.2 intends. The **auth provider** (Keycloak, marked above) is picked at the first screen that needs login.
 
 **A gap this exposed.** CI (`ci.yml`) runs only the backend gate pack — **`web/` is ungated**, so a broken web build merges silently. Adding a `web` CI job (install · typecheck · `next build`) is the immediate next frontend slice.
+
+## Amendment · 2026-10-08 · The provider is Keycloak; sign-in arrives in four slices
+
+**Decision (the owner's, 2026-10-08).** The identity provider is **Keycloak, self-hosted** — the default this record marked. Nothing in the architecture above changes: the `api` validates tokens and issues none, the session lives in `web`, the token says who is asking and never what they may do.
+
+**How the `api` is configured.** Two values, both or neither: `DOMUVAI_AUTH_ISSUER` (the realm's issuer URL — discovery and keys are read from it) and `DOMUVAI_AUTH_AUDIENCE` (the audience a token must be issued for). With both, every `/api/**` request needs a token that issuer signed, in date, for that audience; the health endpoint stays open. With an issuer and no audience the application does not start: a realm signs tokens for every application in it, and one issued for another must never be accepted by default. With neither, the `api` is open and says so at start — a developer's machine, and CI until the web can sign in.
+
+**The slices.**
+
+| Slice | What | Needs |
+|---|---|---|
+| **AUTH-01** | The `api` is a resource server, as above | — |
+| **AUTH-02** | A login is a party: the token's subject is tied to a registered party, and the `api` knows who is asking (`GET /api/identity/me`). The realm and its client are described as files in this repo | AUTH-01 |
+| **AUTH-03** | The `web` signs in: the authorization-code flow with PKCE against the realm, the session in an httpOnly cookie, the bearer passed to the `api` by the Next.js server. The console's switch (PM-DEBT-011) gives way to "signed in" | AUTH-02 |
+| **AUTH-04** | Who may do what: the policy module of ADR-002 over effective-dated grants — the book read first (PM-BOOK-006), with the actor taken from the token, not from the caller (PM-BOOK-007) | AUTH-02 |
+
+**What stays open until AUTH-04.** A valid token lets a request in; it does not yet limit what the request may read. So AUTH-01 to AUTH-03 make the system *closed to strangers*, not yet *scoped per entrance* — a deployment with real residents' data waits for AUTH-04 and the row-level backstop of ADR-002.
+
+**A constraint of this repository's tooling.** The developer machine has no container runtime, so a Keycloak cannot run beside the tests there. The `api`'s tests stand in for the issuer with a key of their own (it is standard OIDC: any issuer's signature is checked the same way); a real Keycloak runs in CI's end-to-end job from AUTH-03 on.

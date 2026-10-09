@@ -2260,3 +2260,17 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/money/HeadcountCheck.kt`.
 
 ---
+
+## AUTH-01 · 2026-10-08 · policy — the API accepts only requests carrying a valid token, where sign-in is configured
+
+**Shipped** — the `api` is an OAuth2 resource server (ADR-011). With `DOMUVAI_AUTH_ISSUER` and `DOMUVAI_AUTH_AUDIENCE` set, every `/api/**` request needs a bearer token that the issuer signed, in date, and issued for this audience; anything else is a 401, and the health endpoint stays open. An issuer without an audience, or the reverse, stops the application at start. With neither, the `api` answers as before and warns at start that it is open. No session, no cookie, no password: the `api` issues no credential. The rule is one `SecurityFilterChain` declared on the application class, so every web slice test runs behind it (`DomuvaiApplication`, `ApiAuth`). ADR-011 is amended: the provider is Keycloak (the owner's decision), the two settings, and the four slices sign-in arrives in.
+
+**Verified** — the suite behind the new rule: 383 tests, none failing. New tests: with sign-in configured, no token, a token the issuer did not sign and a password are each a 401, a signed one is let in; a token is refused for another audience, another issuer or out of date; a half-configured sign-in is refused. On the real jar, started with an issuer and an audience: health 200; three reads and a write with no token 401; a made-up bearer 401 although the issuer was unreachable; started with an issuer alone, it did not start and said why. A full-context persistence test passes in open mode on this machine's Postgres 16. Three mutants killed (the audience not checked; always open; configured but nothing required). Gates green.
+
+**Decisions** — the owner's, 2026-10-08: Keycloak. Mine, stated on #140: the `api` stays open where sign-in is not configured, since nothing can sign in until the web's own slice · an audience is required with an issuer · the issuer's keys are read on the first token, not at start, so the `api` starts whether or not the issuer is up.
+
+**Open** — a valid token lets a request in and limits nothing yet: who may read what is AUTH-04, and a deployment with real data waits for it · the token's subject is not yet tied to a party (AUTH-02), so the book's `actor` is still the caller's claim · the web sends no token, so the `api` cannot be closed where the console runs until AUTH-03 · no Keycloak has been run against this: the developer machine has no container runtime, and the tests stand in for the issuer · a 401 carries no body, only the standard header.
+
+**Read first next time** — `docs/adr/ADR-011-frontend-topology.md` (the 2026-10-08 amendment), `app/src/main/kotlin/zues/app/ApiSecurity.kt`, `DomuvaiApplication.kt`.
+
+---
