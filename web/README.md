@@ -13,6 +13,7 @@ npm install
 npm run dev      # http://localhost:3000
 npm run build    # production build + type-check
 npm run gen:api  # regenerate lib/api/schema.d.ts from docs/api/openapi.json
+npm test         # the web's own tests — Node's test runner, no package (lib/**/*.test.ts)
 ```
 
 Live screens call `api` from this Next.js server (never from the browser), at `API_URL`
@@ -82,6 +83,21 @@ address before the landing is public. Storing a request, or sending it from the 
 The address is **`office@newcleardigital.com`** (the owner, 2026-10-01). No deployment exists yet, so nothing sets it
 for a public server: set `DOMUVAI_CONTACT_EMAIL=office@newcleardigital.com` in that server's environment when one
 does. On a developer's machine put the same line in `web/.env.local`, which git ignores.
+
+## Sign-in
+
+`lib/auth/` is the web's side of sign-in (ADR-011, AUTH-03), written by hand on Web Crypto and `fetch` — no package:
+the authorization-code flow with PKCE (S256) against the realm in `infra/keycloak/`. It is the checks themselves and
+nothing is wired to a route yet (AUTH-03b does that): the console is still served by [the switch](#the-console-switch).
+
+- `settings.ts` — the five settings, all or nothing: `DOMUVAI_AUTH_ISSUER` (the api's value), `DOMUVAI_AUTH_CLIENT_ID`,
+  `DOMUVAI_AUTH_CLIENT_SECRET`, `DOMUVAI_SESSION_SECRET` (32 characters or more) and `DOMUVAI_WEB_URL` (this site's own
+  address — the return address is built from it, never from a request). https, http for this machine only.
+- `oidc.ts` — a sign-in begun (fresh state, nonce and verifier, sealed for the browser to keep), finished (the state
+  compared before the issuer is asked anything, the verifier sent with the code, the ID token checked) and renewed.
+- `idToken.ts` — signature (RS256 by the issuer's published keys, nothing else), issuer, audience, expiry, nonce.
+- `seal.ts` — AES-256-GCM under a key derived from the session secret.
+- `auth.test.ts` runs them against `fakeIssuer.ts`, which signs real tokens and checks the verifier as an issuer does.
 
 ## The API client
 

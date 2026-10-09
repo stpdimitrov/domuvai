@@ -41,7 +41,7 @@ jobs:
       - name: Build the API and the web
         run: |
           ./gradlew :app:bootJar
-          (cd web && npm ci && npm run build)
+          (cd web && npm ci && npm test && npm run build)   # the web's own tests: sign-in's checks (AUTH-03a)
 
       - name: Start the API — Flyway migrates the empty database
         run: |

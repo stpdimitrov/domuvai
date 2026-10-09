@@ -189,7 +189,8 @@ def web_calls():
         where = path.relative_to(ROOT)
         if len(ANY_CALL.findall(source)) > len(literal):
             unreadable.append(f"{where}: an API call whose path is not a plain string literal")
-        if where.as_posix() != "web/lib/api/client.ts":             # the typed client itself is where fetch belongs
+        # the typed client itself is where fetch belongs — and the one module that asks the sign-in issuer, never the API
+        if where.as_posix() not in ("web/lib/api/client.ts", "web/lib/auth/oidc.ts"):
             unreadable += [f"{where}: {pattern.pattern!r} — call the API through the typed client, path as a literal"
                            for pattern in UNREADABLE if pattern.search(source)]
     return found, unreadable
