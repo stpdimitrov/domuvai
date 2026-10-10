@@ -4,7 +4,9 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
+import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -28,6 +30,14 @@ data class Assembly(
     val noticePostingId: UUID? = null,
     /** When the date, hour, place or agenda last changed; a notice posted before it stated something else (PM-GA-006). */
     val noticeContentChangedAt: Instant? = null,
+    /** Convened by the owners on this petition (Rule: PM-GA-003) — with what unlocked it, kept as it was that day. */
+    val petitionId: UUID? = null,
+    val demandUnmetNote: String? = null,
+    val petitionHeldPct: BigDecimal? = null,
+    val petitionThresholdPct: BigDecimal? = null,
+    val petitionWeighedOn: LocalDate? = null,
+    val lawVersion: String? = null,
+    val engineVersion: String? = null,
 )
 
 /** Who may convene: the management board, the manager, the control board or controller. Rule: PM-GA-002 */
@@ -54,6 +64,8 @@ interface AssemblyRepository : ListCrudRepository<Assembly, UUID> {
     /** The assembly, its row locked until the transaction ends — so two items never take one ordinal. */
     @Query("SELECT * FROM assembly.assembly WHERE id = :id AND entrance_id = :entranceId FOR UPDATE")
     fun lock(id: UUID, entranceId: UUID): Assembly?
+
+    fun findByPetitionId(petitionId: UUID): Assembly?
 }
 
 interface AgendaItemRepository : ListCrudRepository<AgendaItem, UUID> {

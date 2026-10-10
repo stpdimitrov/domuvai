@@ -36,6 +36,9 @@ class LawMajorities : Majorities {
     override fun on(itemType: String, on: LegalDate): MajorityRule = majorityRuleOn(itemType, on)
 }
 
+/** The capacity of an assembly convened by the owners on a petition — never accepted from a caller. */
+const val OWNERS = "OWNERS"
+
 private val AGENDA_OPEN = setOf(AssemblyStatus.DRAFT.name, AssemblyStatus.NOTICED.name)
 
 /** An agenda item as bound, and whether adding it voided a posted notice (PM-GA-006). */
@@ -70,6 +73,18 @@ class AssemblyService(
     fun convene(entranceId: UUID, request: Convene): Assembly {
         val office = ConvenorOffice.entries.firstOrNull { it.name == request.convenedAs }     // any other capacity may not convene
             ?: throw IllegalArgumentException("an assembly is convened as MB, BM or CTL (PM-GA-002), not as \"${request.convenedAs}\"")
+        return draft(entranceId, request.copy(convenedAs = office.name)) { it }
+    }
+
+    /**
+     * The owners convene on their petition (PM-GA-003). Not reachable by naming a capacity: [PetitionService]
+     * calls it once the petition is weighed, and [onPetition] puts the petition and what unlocked it on the draft.
+     */
+    @Transactional
+    fun conveneByOwners(entranceId: UUID, request: Convene, onPetition: (Assembly) -> Assembly): Assembly =
+        draft(entranceId, request.copy(convenedAs = OWNERS), onPetition)
+
+    private fun draft(entranceId: UUID, request: Convene, complete: (Assembly) -> Assembly): Assembly {
         val mode = MeetingMode.entries.firstOrNull { it.name == request.mode } ?: throw IllegalArgumentException("unknown mode \"${request.mode}\"")
         require(request.place.isNotBlank()) { "the place of the assembly is required" }
         val reason = request.urgencyReason?.trim()?.ifEmpty { null }
@@ -77,12 +92,12 @@ class AssemblyService(
         require(request.urgent || reason == null) { "a justification of urgency was given for an assembly not marked urgent (PM-GA-005)" }
         requireNoticeStillPossible(request.scheduledAt, request.urgent)
         val assembly = Assembly(
-            id = UUID.randomUUID(), entranceId = entranceId, convenedBy = request.convenedBy, convenedAs = office.name,
+            id = UUID.randomUUID(), entranceId = entranceId, convenedBy = request.convenedBy, convenedAs = request.convenedAs,
             scheduledAt = request.scheduledAt, place = request.place.trim(), mode = mode.name,
             status = AssemblyStatus.DRAFT.name, urgent = request.urgent, urgencyReason = reason, noticeContentChangedAt = clock.instant(),
         )
         try {
-            return aggregates.insert(assembly)
+            return aggregates.insert(complete(assembly))
         } catch (e: DbActionExecutionException) {
             // the registry's own tables are not this module's to read: the foreign keys say who is missing
             if (missingReference(e)?.contains("convened_by") == true) throw IllegalArgumentException("the convenor ${request.convenedBy} is not a registered party")

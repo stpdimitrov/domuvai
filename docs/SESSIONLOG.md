@@ -2516,3 +2516,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/registry/Holdings.kt`, `Units.kt` beside it, the S-G2-01c entry above.
 
 ---
+
+## S-G2-01d · 2026-10-10 · assembly — the owners' petition to convene (PM-GA-003)
+
+**Did** — owners demand an assembly by petition. An owner opens it and signs; other owners in the entrance sign, once each; signatures are append-only. The petition's weight is read, never stored: the ideal parts its signatories own on the day it is weighed — through `registry.Holdings`, by title share — against `GA_PETITION_MIN_PCT`, the threshold `law` has in force that day (the catalogue's 20%, unverified, with its `TODO(legal)`). At or past the threshold, one of the signatories convenes an assembly `OWNERS`-convened on the petition, once, stating how the demand was made and that it was not met; the assembly keeps the share held, the threshold, the day and the catalogue and engine versions it was unlocked with. The ordinary convene still takes only `MB`, `BM`, `CTL`. Four operations: open, sign, read, convene on a petition. First use of `Holdings` outside `registry`.
+
+**Rules covered** — PM-GA-003 (the mechanism; the number unconfirmed).
+
+**Tests added** — `PetitionServiceTest` (8), `PetitionWebTest` (4), `PetitionPersistenceIT` (2, against the real registry; run on this machine's Postgres 16 from a scratch copy, none skipped). Thirteen mutants killed: exactly the threshold not unlocking · an unweighable petition unlocking · a unit with a holder of use weighed · any such unit in the entrance blocking a petition it has no part in · an over-owned unit weighed · every owner's parts counted, not the signatories' · convening on an unweighable petition · convening below the threshold · a non-signatory convening · no statement that the demand was unmet · a non-owner signing · the UTC day for the Sofia day · a second assembly on one petition.
+
+**Decisions** — **the owner's, 2026-10-10, through the coordinator: a unit with both an owner and a holder of a right of use is not weighed until counsel answers.** If a signatory owns such a unit the petition says it cannot be weighed, names the unit and why, and unlocks nothing; entrances with owners only work in full. Mine, stated on #173: the same refusal for a signatory's unit owned for more than the whole (`overHeldUnitIds`) · only such units **of signatories** block — a unit nobody signing owns is not being weighed · the weight is the signatories' ownership on the day of weighing, so a signatory who sold no longer counts · the catalogue gives no period after which a demand is unmet, so none runs: the convening signatory's statement is recorded · the opener signs · a petition is closed to signatures once convened on.
+
+**For counsel** (recorded here and in `law`'s `todoLegal` for `GA_PETITION_MIN_PCT`; `docs/RULES.md` §7 was outside this slice's files — the three belong there): **(1) whose ideal parts count, for a petition, quorum and votes, when a unit has both an owner and a holder of a right of use** · (2) the share that may demand an assembly (20%?) · (3) the period after which an unmet demand lets the owners convene, and how the demand must be made.
+
+**Open** — the signatory's and convenor's identity come from the request body until permissions reach `assembly` · a signature cannot be withdrawn · nobody is notified that a demand reached the threshold · the weight is exact: co-owners holding thirds can sum to a hair under a threshold they hold in law (shares are decimals — the S-G2-01p entry) · a weight resting on `DERIVED` ideal parts is flagged, not refused · who may read a petition's signatories is the policy's · PM-GA-001 (the yearly flag) is the last S-G2-01 rule unbuilt: it needs a "held" assembly, S-G2-02's.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/assembly/Petition.kt`, `app/src/main/kotlin/zues/app/registry/Holdings.kt`, this entry's "For counsel".
+
+---
