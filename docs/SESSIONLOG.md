@@ -2498,3 +2498,21 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/identity_org/LoginAdministration.kt`, `Administrators.kt`, `app/src/main/kotlin/zues/app/policy/Policy.kt`, #164.
 
 ---
+
+## S-G2-01p · 2026-10-10 · registry — the port for who holds what on a date (PM-ORG-004, PM-ORG-005, PM-ORG-011)
+
+**Did** — `registry` publishes a second port beside `Units`: `Holdings`. `inForce(entrance, on, role)` answers, in one read, the titles of one role in force on the date asked — party, unit, share, and the ideal parts that share stands for (the unit's parts × the share, an exact decimal), with whether the unit's parts were declared or derived — and the units those titles over-hold: shares summing to more than the whole, beyond what the rounding of stored shares explains. `residents(entrance, on)` answers the household members in residence who are tied to a party. Read-only: no endpoint, no migration, nothing in `assembly`.
+
+**Rules covered** — PM-ORG-004 · PM-ORG-005 · PM-ORG-011 — each already had a named test; these are the same rules proved on the read other modules will consume. PM-BOOK-011 is respected (ids and numbers only: no name, no identity number, no designation) and not claimed — the port is not a list a resident sees.
+
+**Tests added** — `HoldingsAdapterTest` (9), `HoldingsPersistenceIT` (2; run on this machine's Postgres 16 from a scratch copy, none skipped). Nine mutants killed: the day of sale given to the seller · a title counted before it begins · a co-owner given the whole unit's parts · both roles answered in one call · six sixths named as an excess · a real excess not named · a stray title breaking the read · a departed resident answered · a derived weight passed as declared.
+
+**Review** — fresh context, seven findings. Taken: **an owner and a holder of use over one unit each carried the unit's full parts in one list**, so a sum across roles counted the unit twice — the port now answers one role per call, and judges over-holding role by role · **six co-owners of a sixth were named over-owned** (6 × 0.166667 = 1.000002) and would have lost their vote — an excess is now one beyond half a last decimal per stored share · holdings and the over-held units come from one read, not two that could disagree · a title filed under an entrance for another entrance's unit no longer fails the whole read (#170 for the missing constraint) · the "child under six" flag is no longer handed over — no consumer needs it · PM-BOOK-011 no longer claimed · no bare `user` identifier; the fixture's holder of use is „Ползвател“, not a renter.
+
+**Decisions** — mine, stated on #168: ideal parts cross the boundary as exact decimal strings, like `Units` · one role per call, and the port decides nothing about who votes · the rounding bound follows from the share column's precision (`numeric(7,6)`); it is not a legal number.
+
+**Open** — **for the owner: when a unit has both an owner and a holder of a right of use, whose ideal parts count at the assembly** — no rule in the catalogue says; the port answers each apart and `assembly` must not guess · **whether a household member is an adult cannot be answered**: the book records no date of birth — PM-GA-009's "adult household member" needs a fact the book does not hold · shares are decimals, so thirds and sixths are approximations: co-owners' holdings can sum to a hair under or over the unit's parts (at most half a last decimal per share); exact shares need a numerator and denominator in the book · the book still accepts titles that over-hold a unit; refusing them at write time is a slice of its own · a household member registered through the API has no party, so only imported households appear as residents · the port is an in-process read: what a person may be shown stays the policy's (PM-BOOK-006) · `OwnershipService.votingWeights` computes similar sums and could be served by the port · next for `assembly`, when told: S-G2-01d (PM-GA-003 through this port), the owner checks for the posting act and proxies, S-G2-02's quorum.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/registry/Holdings.kt`, `Units.kt` beside it, the S-G2-01c entry above.
+
+---
