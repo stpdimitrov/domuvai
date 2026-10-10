@@ -107,6 +107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/identity/logins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tie a login of the api's own issuer to a registered party — only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403. On the record, refusals too */
+        post: operations["post_identity_logins"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/identity/logins/untie": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Untie a login — only the deployment's administrator; an issuer may be named to clear what a changed issuer URL left. On the record, refusals too */
+        post: operations["post_identity_logins_untie"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/identity/me": {
         parameters: {
             query?: never;
@@ -1283,6 +1317,17 @@ export interface components {
             catalogueVersion: string;
             engineVersion: string;
         };
+        LoginTied: {
+            issuer: string;
+            /** Format: uuid */
+            partyId: string;
+            subject: string;
+        };
+        LoginUntied: {
+            /** Format: uuid */
+            partyId?: string;
+            untied: boolean;
+        };
         MajorityView: {
             comparison: string;
             denominator: string;
@@ -1554,6 +1599,11 @@ export interface components {
             /** Format: int64 */
             totalMinor?: number;
         };
+        TieLogin: {
+            /** Format: uuid */
+            partyId?: string;
+            subject?: string;
+        };
         TitleAssignedResponse: {
             /** Format: uuid */
             titleId: string;
@@ -1623,6 +1673,10 @@ export interface components {
         };
         UnitsCreatedResponse: {
             unitIds: string[];
+        };
+        UntieLogin: {
+            issuer?: string;
+            subject?: string;
         };
         WhoIsAsking: {
             /** Format: uuid */
@@ -2081,6 +2135,120 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_identity_logins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TieLogin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginTied"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_identity_logins_untie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UntieLogin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginUntied"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

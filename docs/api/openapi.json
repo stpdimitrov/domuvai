@@ -1527,6 +1527,41 @@
         ],
         "type": "object"
       },
+      "LoginTied": {
+        "properties": {
+          "issuer": {
+            "type": "string"
+          },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "issuer",
+          "partyId",
+          "subject"
+        ],
+        "type": "object"
+      },
+      "LoginUntied": {
+        "properties": {
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "untied": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "untied"
+        ],
+        "type": "object"
+      },
       "MajorityView": {
         "properties": {
           "comparison": {
@@ -2477,6 +2512,18 @@
         ],
         "type": "object"
       },
+      "TieLogin": {
+        "properties": {
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TitleAssignedResponse": {
         "properties": {
           "titleId": {
@@ -2707,6 +2754,17 @@
         "required": [
           "unitIds"
         ],
+        "type": "object"
+      },
+      "UntieLogin": {
+        "properties": {
+          "issuer": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "WhoIsAsking": {
@@ -3411,6 +3469,154 @@
         "x-rules": [
           "PM-GA-004",
           "PM-GA-006"
+        ]
+      }
+    },
+    "/api/identity/logins": {
+      "post": {
+        "operationId": "post_identity_logins",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TieLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginTied"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Tie a login of the api's own issuer to a registered party — only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403. On the record, refusals too",
+        "tags": [
+          "identity"
+        ],
+        "x-rules": [
+          "PM-SEC-001",
+          "PM-SEC-004"
+        ]
+      }
+    },
+    "/api/identity/logins/untie": {
+      "post": {
+        "operationId": "post_identity_logins_untie",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UntieLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginUntied"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Untie a login — only the deployment's administrator; an issuer may be named to clear what a changed issuer URL left. On the record, refusals too",
+        "tags": [
+          "identity"
+        ],
+        "x-rules": [
+          "PM-SEC-001",
+          "PM-SEC-004"
         ]
       }
     },
