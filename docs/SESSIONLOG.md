@@ -2602,3 +2602,17 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/registry/BookLists.kt`, `BookAccess.kt`, `.github/workflows/e2e.yml` (the administrator's step), #164.
 
 ---
+
+## ADR-002a · 2026-10-10 · docs — ADR-002 amended: what AUTH-04 decided, on the record after the fact
+
+**Did** — AUTH-04a…e built decisions that lived only in this log and on issues; no ADR had changed, against "no code before its ADR". An `Amendment · 2026-10-10` to ADR-002 records them, dated as decisions already built: roles are derived, not copied (the owner's option A); the administrator is named in configuration, ties logins and records mandates, and reads no book; the matrix and its version; who reads the names lists and who runs the retention pass; what sign-in switched off means for each guarded operation; what §4 promised and what exists — row-level security does not; what stays deferred. Each point says who decided it: the owner, or the building session. `docs/INDEX.md`, "Decisions already made" in `CLAUDE.md` and ADR-011's sign-in section point to it. No code.
+
+**Rules covered** — none claimed; the amendment cites PM-SEC-001/002/003/004/011, PM-BOOK-006/007/010/011, PM-GOV-003/004/006/008, PM-ORG-011, PM-PMC-007.
+
+**Decisions** — ADR-002, amended. No new ADR: the amendment changes nothing §2 decided, and the skill's rule is that an Accepted ADR is amended, not rewritten.
+
+**Open** — the session's points in the amendment stand until the owner accepts or reverses them · everything under the amendment's "Deferred".
+
+**Read first next time** — `docs/adr/ADR-002-authorization.md` (the amendment), #164.
+
+---

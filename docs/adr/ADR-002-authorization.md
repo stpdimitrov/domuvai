@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted** · 2026-09-13 |
+| **Status** | **Accepted** · 2026-09-13 · amended 2026-10-10 (what AUTH-04 built — see the amendment at the end) |
 | **Date** | 2026-09-13 |
 | **Deciders** | Stoyan Dimitrov |
 | **Supersedes** | — |
@@ -86,3 +86,86 @@ The policy module takes `(subject, action, resource, as_at_date)` and returns a 
 ## 6 Deferred
 
 - Whether the Ministry of Interior lawful-request workflow (PM-SEC-003) is a policy path or a separate audited export. Decide when the first request arrives; until then it is not implemented at all.
+
+---
+
+## Amendment · 2026-10-10 · What AUTH-04 built — where roles come from, who the administrator is, and what "sign-in off" means
+
+**Why this is here.** §2 decides the shape: one policy module, `(subject, action, resource, as_at_date)` → a decision and its rule, row-level security as the backstop. It does not say where a role comes from, who gives the first one, or what happens where nobody is signed in. Slices AUTH-04a…e (#155, #160, #165, #167, #177, #180; 2026-10-09/10) had to settle those to build anything. They were settled in the session, recorded on issues and in `docs/SESSIONLOG.md`, and built — **before** this record. That is the wrong order (no code before its ADR), and this amendment is the catch-up: it records decisions already made and running, dated as such. Nothing here is new.
+
+**Deciders.** Stoyan Dimitrov decided the points marked *owner* below (2026-10-09 in the AUTH-04 session, recorded on #151; 2026-10-10 through the coordinating session, recorded on #171 and #178). The points marked *session* were decided by the building session, stated in each slice's contract before it merged, and stand until the owner says otherwise. **Status of the amendment: Accepted** for the owner's points; the session's points are recorded here so that they can be accepted or reversed deliberately rather than inherited silently.
+
+### 1 Roles are derived, not copied — *owner*
+
+Three options were put (#151): **A** derive each role from the fact that already says it; **B** whoever creates an entrance or commits its import becomes its manager; **C** a separate table of grants for every role. **A was chosen.** B makes a self-declared manager with no protocol behind it; C keeps each fact twice — a title and an OWN grant, a mandate and a BM grant — and the two drift.
+
+| Role (PM-SEC-001) | Comes from | In force on a date |
+|---|---|---|
+| OWN · USR | `registry.title` (PM-ORG-011) | `[valid_from, valid_to)` |
+| BM · MB | `identity_org.management_mandate` | from `valid_from`; past `valid_to` until a successor (PM-GOV-004) |
+| CTL · CSH | `identity_org.management_mandate` | `[valid_from, valid_to)` |
+| SYS_ADMIN | the deployment's configuration | while configured — not dated (see §6 below) |
+| OCC · PMC staff · MUN | nobody holds them | until their modules exist |
+
+The policy module reads no table and imports no other module. The modules that own the facts answer it through one port, `RoleSource` (`TitleRoles` in `registry`, `MandateRoles` and `Administrators` in `identity_org`), and each answer names its entrance; an answer for another entrance is dropped, not trusted. So §2's "role grants" are not a table: STAGE1 §5's `role_grant` is not built and is not planned.
+
+*Session:* a mandate's last day is excluded · a successor is the day recorded on the mandate, or failing that the first day of a later executive mandate of the entrance · the controller and the cashier do not continue past their dates — PM-GOV-004 names the board and the manager only · mandates are recorded in the order they began, and a new executive mandate ends the ones it succeeds (*owner*, 2026-10-10: it stamps the predecessor automatically; PM-GOV-003 and PM-GOV-006 are not enforced at recording — they are `assembly`'s).
+
+### 2 The administrator — *owner*
+
+SYS_ADMIN is the login, or logins, named in `DOMUVAI_AUTH_ADMINS` — subjects of the api's own issuer. **Never created through the API**: nobody promotes themselves. It may do exactly two things — **tie and untie a login to a party**, and **record and end a mandate of an entrance** from its protocol — and it **does not read the book**: чл. 7 ал. 4 does not name it (PM-BOOK-006). This is how the first manager of an entrance comes to exist: the operator records the mandate from the paper protocol.
+
+*Session:* the administrator is a login, not a party, and its login is never tied to one — tied, it would hold that party's roles · its lines in the matrix are carried on their own kind of resource only (a login is the deployment's, a mandate an entrance's), and nothing an entrance's source says can make an administrator · every tie, untie, record, end and refused attempt by a signed-in login is an insert-only entry (`identity_org.login_act`, `identity_org.mandate_act`; PM-SEC-004), written in the act's own transaction · a mandate's row is kept by a trigger: added, its end recorded once, nothing else changed, never removed (PM-SEC-011).
+
+### 3 The matrix, and its version — *session*
+
+The matrix is data in one place, `Policy.MATRIX`, with `Policy.MATRIX_VERSION`; a test pins every line to the number, so a change to the matrix is a change to the version (PM-SEC-001: "testable and versioned"). Every decision carries the version and the rule that decided; a refusal cites the rule that governs the action. Version 4, as running:
+
+| Action | Who | Rule |
+|---|---|---|
+| read an entrance's book, its access log, the owners list, the overdue-declarations list | BM · MB · CTL | PM-BOOK-006 |
+| read one unit's entry in the book | BM · MB · CTL · an OWN holder of that unit | PM-BOOK-006 |
+| anonymise what is past its retention window | BM · MB | PM-BOOK-010 |
+| tie or untie a login | SYS_ADMIN | PM-SEC-001 |
+| record or end a mandate of an entrance | SYS_ADMIN | PM-SEC-001 |
+
+Everything else is refused. *Owner* (2026-10-10, #178): the two names lists are read by the manager, the board and the controller; **the retention pass is run by the manager and the board only** — the controller reads all and writes none (PM-GOV-008), the administrator does neither; every served and refused read of the lists is entered in `registry.book_access` with the reader from the sign-in and a **fixed purpose naming the list**, since a screen states none (PM-BOOK-007).
+
+*Session:* who may is decided **as at the day of the access, in Sofia** — never the date the book or a list is asked for; a former manager does not read "as of" his own term · the reader is the party the api's own record ties the token's login to, never a parameter and never a claim · the decision comes first and a refused caller learns nothing else — not whether the entrance exists, nor what the request lacked · a refusal is a 403 and an entry that stays · the guard is on what an HTTP caller is given; other modules that use a module's services in-process are not callers.
+
+### 4 With sign-in switched off — *owner* for the lists and the retention pass, *session* for the book
+
+`DOMUVAI_AUTH=off` (ADR-011) means there is no token, so nobody is asking and nothing can be decided. "Off" is the mode said in so many words; a setting that is missing or misspelt is not off.
+
+| | With sign-in off |
+|---|---|
+| the book, its access log | refused (*session*, AUTH-04b) |
+| the owners list, the overdue-declarations list | served, and entered as given to nobody — outcome `OPEN` (*owner*, Q3) |
+| the retention pass | **refused** — "an act that cannot be undone never runs with nobody accountable" (*owner*, Q3) |
+| tying a login, recording a mandate | refused: there is no login, so no administrator (*session*) |
+
+The lists stay served so that the console works on a developer's machine, where no identity provider runs. The cost, accepted: one more thing that depends on that switch being off in production — the application refuses to start open unless told, and says so loudly when it is.
+
+### 5 How it is enforced — what §4 promised, and what exists
+
+- **One implementation of the matrix:** holds. `ModularityTests` verifies `policy` depends on no module.
+- **A disclosure record with actor, purpose, timestamp and rule (§4.2):** holds for the book, its log, the two lists and the retention pass.
+- **A test replays a past date (§4.4):** holds — `MandateRolesIT`, `MandateAdministrationIT`.
+- **Every slice:** a fresh-context security review before merge, and mutants that must be killed — "always allow", "the date ignored", "the actor taken from the caller" among them.
+- **Not yet true — §4.1 and §4.3:** no CI rule forbids a module from deciding access on its own, and **row-level security is not built**. Until it is, the policy module is the only lock, and §2's "no single mistake is sufficient" does not yet hold.
+
+### 6 Deferred — still open after AUTH-04
+
+- **Row-level security** (§2, §4.3) — its own slice.
+- **The unguarded operations** — only the nine named in §3 ask the policy; every other operation of the api asks only for a valid token. Listed by priority in #164, with owners' names still reaching callers through the money module's statements and arrears (PM-SEC-002).
+- **For counsel:** whether "the owner for their own data" (PM-BOOK-006) is the whole entry of the owner's unit or only the person's own line — the matrix has the line, no endpoint serves it · whether the control board continues in office past its term as the management board does (чл. 24) · whether PM-SEC-011's "prove, for any past date" means as the record now stands or as it was known on the day — a mandate recorded late changes the answer for days already past.
+- **For the owner:** an administrator can untie a manager's login and tie another login to that party, and can record a mandate on an invented protocol reference; both are on the record, and nothing reads or alerts on the record yet.
+- **PM-SEC-011 is not met for SYS_ADMIN:** who was an administrator on a past day is configuration, not dated data.
+- A reader-stated purpose for the names lists; an owner's read of their own data; a resident directory (PM-BOOK-011); who may see an entrance's units; no separate database role guards the insert-only tables against the database's owner.
+- §6's Ministry of Interior request (PM-SEC-003): unchanged — not built, and refused.
+
+### 7 What would reverse this amendment
+
+- A second source for the same role appears — a grants table beside titles or mandates — or a role is needed that no existing fact says (firm staff per building, PM-PMC-007): that reopens §1.
+- An administrator needs to act for more than one deployment's issuer, or must be provable for a past date: that reopens §2 in favour of dated data.
+- An identity provider can run wherever the console runs: then §4's exception for the lists has no reason left, and they are refused with sign-in off like everything else.

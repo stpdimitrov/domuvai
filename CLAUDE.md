@@ -43,7 +43,7 @@ Every feature states which mode it serves. Rules tagged `BOTH` apply in both.
 | ADR | Decision |
 |---|---|
 | 001 | Dated data + pure functions. **No rules engine.** |
-| 002 | One policy module (`:policy`), RLS by `entrance_id` as an independent backstop |
+| 002 | One policy module (`zues.app.policy`), RLS by `entrance_id` as an independent backstop. **Amended 2026-10-10:** roles are **derived, never copied** (titles → OWN/USR, mandates → BM/MB/CTL/CSH; no grants table); the administrator is named in `DOMUVAI_AUTH_ADMINS`, ties logins and records mandates, and reads no book; a new access rule is a line in `Policy.MATRIX` with a version bump — never a check of a module's own. RLS is not built yet |
 | 003 | **Three deployables** (`api`, `worker`, `web`), **fourteen modules**, boundaries enforced in CI (Spring Modulith + ArchUnit; ADR-003 amendment), one Postgres, schema per module |
 | 004 | A shared facility is a cost-sharing agreement with a custodian entrance — **never a second tenant axis** |
 | 005 | The entrance is the isolation unit; the account belongs to it, not to the firm |
