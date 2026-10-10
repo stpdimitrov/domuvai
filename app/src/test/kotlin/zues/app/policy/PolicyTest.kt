@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            1 to listOf(
+            2 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -47,6 +47,7 @@ class PolicyTest {
                 "READ_UNIT_BOOK_DATA MB PM-BOOK-006",
                 "READ_UNIT_BOOK_DATA CTL PM-BOOK-006",
                 "READ_UNIT_BOOK_DATA OWN PM-BOOK-006 own unit",
+                "TIE_LOGIN SYS_ADMIN PM-SEC-001",
             ),
         )
         assertThat(Role.entries.map { it.name }).containsExactly("OWN", "USR", "OCC", "BM", "MB", "CTL", "CSH", "PMC_STAFF", "MUN", "SYS_ADMIN")
@@ -56,7 +57,8 @@ class PolicyTest {
     fun `PM-SEC-001 every role and action the matrix does not name is refused, each decision naming a rule and the version`() {
         for (role in Role.entries) for (action in Action.entries) {
             val decision = policy.decide(holder(role), action, Resource.OfEntrance(entrance), day)
-            val named = Policy.MATRIX.any { it.role == role && it.action == action && !it.ownUnitOnly }
+            // the administrator's lines are the deployment's: holding SYS_ADMIN "in an entrance" carries none of them
+            val named = Policy.MATRIX.any { it.role == role && it.action == action && !it.ownUnitOnly && role != Role.SYS_ADMIN }
             assertThat(decision.allowed).describedAs("$role $action").isEqualTo(named)
             assertThat(decision.ruleId).describedAs("$role $action").matches("PM-[A-Z]+-\\d{3}")
             assertThat(decision.role).isEqualTo(if (named) role else null)
@@ -72,16 +74,16 @@ class PolicyTest {
         )
         for (role in Role.entries) {
             val decision = policy.decide(holder(role, setOf(flat1)), Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat1), day)
-            assertThat(decision).describedAs("$role").isEqualTo(Decision(expected.getValue(role), "PM-BOOK-006", role.takeIf { expected.getValue(it) }, 1))
+            assertThat(decision).describedAs("$role").isEqualTo(Decision(expected.getValue(role), "PM-BOOK-006", role.takeIf { expected.getValue(it) }, 2))
         }
     }
 
     @Test
     fun `PM-BOOK-006 the manager, the board and the controller read the book — and nobody else does, the administrator included`() {
         for (role in listOf(Role.BM, Role.MB, Role.CTL))
-            assertThat(policy.decide(holder(role), Action.READ_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(true, "PM-BOOK-006", role, 1))
+            assertThat(policy.decide(holder(role), Action.READ_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(true, "PM-BOOK-006", role, 2))
         for (role in listOf(Role.OWN, Role.USR, Role.OCC, Role.CSH, Role.PMC_STAFF, Role.MUN, Role.SYS_ADMIN))
-            assertThat(policy.decide(holder(role, setOf(flat1)), Action.READ_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 1))
+            assertThat(policy.decide(holder(role, setOf(flat1)), Action.READ_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 2))
     }
 
     @Test
@@ -89,7 +91,7 @@ class PolicyTest {
         holds(Asking(null, UUID.randomUUID()), Role.BM)                                 // somebody else is the manager
         val nobody = listOf(person(), Asking(Login("https://id.example.test/realms/domuvai", "untied"), null), Asking(null, null))
         for (who in nobody) for (action in Action.entries)
-            assertThat(policy.decide(who, action, Resource.OfUnit(entrance, flat1), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 1))
+            assertThat(policy.decide(who, action, Resource.OfUnit(entrance, flat1), day)).isEqualTo(Decision(false, action.governedBy, null, 2))
         assertThat(Policy(emptyList()).decide(holder(Role.BM), Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
     }
 
@@ -104,12 +106,12 @@ class PolicyTest {
     fun `PM-BOOK-006 a manager of one entrance reads nothing of another — even from a source that answers for the wrong entrance`() {
         val careless = Policy(listOf(RoleSource { _, _, _ -> setOf(Held(Role.BM, entrance), Held(Role.OWN, entrance, setOf(flat1))) }))
         assertThat(careless.decide(person(), Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isTrue()
-        assertThat(careless.decide(person(), Action.READ_BOOK, Resource.OfEntrance(another), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 1))
+        assertThat(careless.decide(person(), Action.READ_BOOK, Resource.OfEntrance(another), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 2))
         assertThat(careless.decide(person(), Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(another, flat1), day).allowed).isFalse()
         assertThat(careless.rolesOf(person(), another, day)).isEmpty()
         val manager = holder(Role.BM)
         assertThat(policy.decide(manager, Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isTrue()
-        assertThat(policy.decide(manager, Action.READ_BOOK, Resource.OfEntrance(another), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 1))
+        assertThat(policy.decide(manager, Action.READ_BOOK, Resource.OfEntrance(another), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 2))
         assertThat(policy.decide(manager, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(another, flat1), day).allowed).isFalse()
     }
 
@@ -117,8 +119,8 @@ class PolicyTest {
     fun `PM-BOOK-006 an owner reads the data of a unit they hold — and not another owner's unit, nor the whole book`() {
         val ownerA = holder(Role.OWN, setOf(flat1))
         val ownerB = holder(Role.OWN, setOf(flat2))
-        assertThat(policy.decide(ownerA, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat1), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.OWN, 1))
-        assertThat(policy.decide(ownerA, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat2), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 1))
+        assertThat(policy.decide(ownerA, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat1), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.OWN, 2))
+        assertThat(policy.decide(ownerA, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat2), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 2))
         assertThat(policy.decide(ownerB, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat2), day).allowed).isTrue()
         assertThat(policy.decide(ownerA, Action.READ_UNIT_BOOK_DATA, Resource.OfEntrance(entrance), day).allowed).isFalse()
         assertThat(policy.decide(ownerA, Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
@@ -129,8 +131,8 @@ class PolicyTest {
     @Test
     fun `PM-BOOK-006 an owner who is also the manager reads every unit, their own as the manager`() {
         val both = holder(Role.OWN, setOf(flat1)).also { holds(it, Role.BM) }
-        assertThat(policy.decide(both, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat2), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.BM, 1))
-        assertThat(policy.decide(both, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat1), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.BM, 1))
+        assertThat(policy.decide(both, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat2), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.BM, 2))
+        assertThat(policy.decide(both, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat1), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.BM, 2))
         assertThat(policy.decide(both, Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isTrue()
     }
 
@@ -151,7 +153,56 @@ class PolicyTest {
     fun `the roles of every source count — a role one source knows is not lost because another knows none`() {
         val who = person()
         val two = Policy(listOf(RoleSource { _, _, _ -> emptySet() }, RoleSource { asked, at, _ -> if (asked == who) setOf(Held(Role.CTL, at)) else emptySet() }))
-        assertThat(two.decide(who, Action.READ_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.CTL, 1))
+        assertThat(two.decide(who, Action.READ_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(true, "PM-BOOK-006", Role.CTL, 2))
         assertThat(two.decide(person(), Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
+    }
+
+    /** A deployment whose administrators are these logins, from a day on — beside the test's entrance holdings. */
+    private fun withAdministrators(vararg admins: Asking, from: LocalDate = day.minusYears(1)): Policy = Policy(
+        listOf(
+            RoleSource { who, entranceId, asAt -> policy.rolesOf(who, entranceId, asAt) },
+            object : RoleSource {
+                override fun held(who: Asking, entranceId: UUID, asAt: LocalDate): Set<Held> = emptySet()
+                override fun administers(who: Asking, asAt: LocalDate) = who in admins && !asAt.isBefore(from)
+            },
+        ),
+    )
+
+    @Test
+    fun `PM-SEC-001 a login is tied by the deployment's administrator and by nobody else — whatever they hold in an entrance`() {
+        val admin = Asking(Login("https://id.example.test/realms/domuvai", "operator"), null)      // a login; in nobody's book
+        val deployment = withAdministrators(admin)
+        assertThat(deployment.decide(admin, Action.TIE_LOGIN, Resource.Deployment, day)).isEqualTo(Decision(true, "PM-SEC-001", Role.SYS_ADMIN, 2))
+        // the administrator's line is the deployment's: asked of an entrance or a unit, it carries nothing
+        for (resource in listOf(Resource.OfEntrance(entrance), Resource.OfUnit(entrance, flat1)))
+            assertThat(deployment.decide(admin, Action.TIE_LOGIN, resource, day)).isEqualTo(Decision(false, "PM-SEC-001", null, 2))
+        for (role in Role.entries) {
+            val holder = holder(role, setOf(flat1))
+            for (resource in listOf(Resource.Deployment, Resource.OfEntrance(entrance), Resource.OfUnit(entrance, flat1)))
+                assertThat(deployment.decide(holder, Action.TIE_LOGIN, resource, day)).describedAs("$role $resource").isEqualTo(Decision(false, "PM-SEC-001", null, 2))
+        }
+        for (nobody in listOf(person(), Asking(Login("https://id.example.test/realms/domuvai", "untied"), null), Asking(null, null)))
+            assertThat(deployment.decide(nobody, Action.TIE_LOGIN, Resource.Deployment, day).allowed).isFalse()
+        assertThat(deployment.decide(admin, Action.TIE_LOGIN, Resource.Deployment, day.minusYears(2)).allowed).isFalse()   // the date reaches this answer too
+    }
+
+    @Test
+    fun `PM-SEC-001 an entrance's holding never makes an administrator — a source that answers SYS_ADMIN for an entrance is not believed`() {
+        val careless = Policy(listOf(RoleSource { _, at, _ -> setOf(Held(Role.SYS_ADMIN, at), Held(Role.CSH, at)) }))
+        val who = person()
+        assertThat(careless.rolesOf(who, entrance, day)).containsExactly(Held(Role.CSH, entrance))
+        assertThat(careless.administers(who, day)).isFalse()
+        for (resource in listOf(Resource.Deployment, Resource.OfEntrance(entrance)))
+            assertThat(careless.decide(who, Action.TIE_LOGIN, resource, day)).isEqualTo(Decision(false, "PM-SEC-001", null, 2))
+    }
+
+    @Test
+    fun `PM-BOOK-006 the administrator reads nothing of the book, and nobody at all administers nothing`() {
+        val admin = Asking(Login("https://id.example.test/realms/domuvai", "operator"), UUID.randomUUID())
+        val deployment = withAdministrators(admin, Asking(null, null))
+        assertThat(deployment.decide(admin, Action.READ_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(false, "PM-BOOK-006", null, 2))
+        assertThat(deployment.decide(admin, Action.READ_UNIT_BOOK_DATA, Resource.OfUnit(entrance, flat1), day).allowed).isFalse()
+        assertThat(deployment.decide(admin, Action.READ_BOOK, Resource.Deployment, day).allowed).isFalse()
+        assertThat(deployment.decide(Asking(null, null), Action.TIE_LOGIN, Resource.Deployment, day).allowed).isFalse()
     }
 }

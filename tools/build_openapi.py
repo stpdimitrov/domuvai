@@ -85,6 +85,10 @@ RUNNING = {
  # ---- identity
  ('get', '/api/identity/me'):
    ("Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do", ['PM-SEC-001']),
+ ('post', '/api/identity/logins'):
+   ("Tie a login of the api's own issuer to a registered party — only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403. On the record, refusals too", ['PM-SEC-001', 'PM-SEC-004']),
+ ('post', '/api/identity/logins/untie'):
+   ("Untie a login — only the deployment's administrator; an issuer may be named to clear what a changed issuer URL left. On the record, refusals too", ['PM-SEC-001', 'PM-SEC-004']),
  # ---- law
  ('get', '/api/law/version'):
    ('The rule catalogue and engine versions in force — the pair every computed record is stamped with', ['PM-SYS-010']),
