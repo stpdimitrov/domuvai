@@ -120,9 +120,11 @@ class PetitionPersistenceIT {
         mvc.perform(post("$base/$id/assembly").contentType(MediaType.APPLICATION_JSON).content(meeting(first))).andExpect(status().isConflict)
         mvc.perform(post("$base/$id/signatures").contentType(MediaType.APPLICATION_JSON).content("""{"partyId":"$third"}""")).andExpect(status().isConflict)
         val copy = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, notice_content_changed_at, " +
-            "petition_id, demand_unmet_note, petition_held_pct, petition_threshold_pct, petition_weighed_on, law_version, engine_version) " +
+            "petition_id, demand_unmet_note, petition_held_pct, petition_threshold_pct, petition_weighed_on, law_version, engine_version, " +
+            "petition_threshold_constant, petition_threshold_verified) " +
             "SELECT gen_random_uuid(), entrance_id, convened_by, %s, place, scheduled_at, mode, status, notice_content_changed_at, " +
-            "%s, %s, %s, petition_threshold_pct, petition_weighed_on, law_version, engine_version FROM assembly.assembly WHERE petition_id = '$id'"
+            "%s, %s, %s, petition_threshold_pct, petition_weighed_on, law_version, engine_version, petition_threshold_constant, petition_threshold_verified " +
+            "FROM assembly.assembly WHERE petition_id = '$id'"
         fun refused(convenedAs: String, petition: String, note: String, held: String, constraint: String) =
             assertThatThrownBy { jdbc.update(copy.format(convenedAs, petition, note, held)) }
                 .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
@@ -132,7 +134,16 @@ class PetitionPersistenceIT {
         refused("'BM'", "'$another'", "demand_unmet_note", "petition_held_pct", "assembly_owners_convene_on_petition")   // an office, on a petition
         refused("'OWNERS'", "'$another'", "'  '", "petition_held_pct", "assembly_owners_convene_on_petition")            // no statement
         refused("'OWNERS'", "'$another'", "demand_unmet_note", "19.99", "assembly_owners_convene_on_petition")           // below its own threshold
-        assertThat(jdbc.update(copy.format("'OWNERS'", "'$another'", "demand_unmet_note", "petition_held_pct"))).isEqualTo(1)   // the control
+        val elsewhere = entrance().let { other -> owned(other).first().first.let { created("/api/assembly/entrances/$other/petitions", """{"openedBy":"$it","subject":"Чуждо"}""").get("id").asText() } }
+        refused("'OWNERS'", "'$elsewhere'", "demand_unmet_note", "petition_held_pct", "assembly_petition_is_its_entrances")   // another entrance's petition
+        assertThat(jdbc.update(copy.format("'OWNERS'", "'$another'", "demand_unmet_note", "petition_held_pct"))).isEqualTo(1)   // the control: the table checks the record's shape, not the weighing
+        assertThat(row["petition_threshold_constant"] as String).startsWith("GA_PETITION_MIN_PCT@")
+        assertThat(row["petition_threshold_verified"]).isEqualTo(false)
+
+        // what was signed is not rewritten under its signatures
+        jdbc.update("UPDATE assembly.petition SET subject = 'Друго' WHERE id = ?::uuid", id)
+        jdbc.update("DELETE FROM assembly.petition WHERE id = ?::uuid", another)
+        assertThat(jdbc.queryForObject("SELECT subject FROM assembly.petition WHERE id = ?::uuid", String::class.java, id)).isEqualTo("Ремонт на покрива")
 
         // signatures are evidence
         jdbc.update("UPDATE assembly.petition_signature SET party_id = ? WHERE petition_id = ?::uuid", third, id)
@@ -145,7 +156,7 @@ class PetitionPersistenceIT {
     }
 
     @Test
-    fun `PM-GA-003 a signatory's unit that also has a holder of use is not weighed - the petition says why and nothing is convened`() {
+    fun `PM-GA-003 a unit that also has a holder of use is not weighed - the petition says why and nothing is convened`() {
         val entranceId = entrance()
         val owners = owned(entranceId)
         val (third, thirdUnit) = owners[2]                                           // 30%: past the threshold alone
@@ -156,7 +167,7 @@ class PetitionPersistenceIT {
 
         title(entranceId, thirdUnit, party(), "USR")                                 // a right of use over the same unit
         val weighed = read()
-        assertThat(weighed.get("heldPct").asText()).isEqualTo("30")
+        assertThat(weighed.get("heldPct").asText()).isEqualTo("0")                    // the unit is left out of the figure
         assertThat(weighed.get("unlocked").asBoolean()).isFalse()
         assertThat(weighed.get("cannotWeigh").single().asText()).contains(thirdUnit.toString()).contains("TODO(legal): PM-GA-003")
         val refusal = mvc.perform(post("$base/$id/assembly").contentType(MediaType.APPLICATION_JSON).content(meeting(third)))

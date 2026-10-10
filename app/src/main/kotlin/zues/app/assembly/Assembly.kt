@@ -36,6 +36,8 @@ data class Assembly(
     val petitionHeldPct: BigDecimal? = null,
     val petitionThresholdPct: BigDecimal? = null,
     val petitionWeighedOn: LocalDate? = null,
+    val petitionThresholdConstant: String? = null,
+    val petitionThresholdVerified: Boolean? = null,
     val lawVersion: String? = null,
     val engineVersion: String? = null,
 )

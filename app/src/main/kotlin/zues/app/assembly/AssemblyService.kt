@@ -80,6 +80,7 @@ class AssemblyService(
      * The owners convene on their petition (PM-GA-003). Not reachable by naming a capacity: [PetitionService]
      * calls it once the petition is weighed, and [onPetition] puts the petition and what unlocked it on the draft.
      */
+    // Rule: PM-GA-003
     @Transactional
     fun conveneByOwners(entranceId: UUID, request: Convene, onPetition: (Assembly) -> Assembly): Assembly =
         draft(entranceId, request.copy(convenedAs = OWNERS), onPetition)

@@ -41,7 +41,7 @@ interface PetitionSignatureRepository : ListCrudRepository<PetitionSignature, UU
 /**
  * A petition weighed on a day: the ideal parts its signatories own that day against the threshold the law
  * has in force that day. [cannotWeigh] is why it cannot be weighed at all; a petition that cannot be
- * weighed unlocks nothing, whatever [heldPct] says.
+ * weighed unlocks nothing, and [heldPct] leaves out every unit that must not be weighed.
  */
 data class PetitionWeight(
     val on: LocalDate,
@@ -49,8 +49,11 @@ data class PetitionWeight(
     val thresholdPct: BigDecimal,
     val thresholdSource: String,
     val thresholdVerified: Boolean,
+    val thresholdConstant: String,
     val cannotWeigh: List<String>,
     val derivedParts: Boolean,
+    /** The signatories who own in the entrance on [on] — one who has sold is a signature, no longer an owner. */
+    val owners: Set<UUID>,
 ) {
     /** "At least" the threshold (PM-GA-003), and nothing in the way of weighing it. */
     val unlocked: Boolean get() = cannotWeigh.isEmpty() && heldPct >= thresholdPct
@@ -125,6 +128,7 @@ class PetitionService(
         val signed = signatures.findByPetitionIdOrderBySignedAt(petitionId).map { it.partyId }.toSet()
         require(request.convenedBy in signed) { "the owners' assembly is convened by one of the petition's signatories (PM-GA-003)" }
         val weight = weigh(entranceId, signed, today())
+        require(request.convenedBy in weight.owners) { "the convening signatory no longer owns in the entrance (PM-GA-003)" }
         if (weight.cannotWeigh.isNotEmpty()) throw PetitionLocked("the petition cannot be weighed: " + weight.cannotWeigh.joinToString("; "))
         if (!weight.unlocked) {
             throw PetitionLocked(
@@ -137,6 +141,7 @@ class PetitionService(
             it.copy(
                 petitionId = petition.id, demandUnmetNote = request.demandUnmet.trim(), petitionHeldPct = weight.heldPct,
                 petitionThresholdPct = weight.thresholdPct, petitionWeighedOn = weight.on,
+                petitionThresholdConstant = weight.thresholdConstant, petitionThresholdVerified = weight.thresholdVerified,
                 lawVersion = CATALOGUE_VERSION, engineVersion = ENGINE_VERSION,
             )
         }
@@ -144,31 +149,38 @@ class PetitionService(
 
     /**
      * What the signatories own on [on], by title share and never by a count of units (PM-ORG-004, PM-ORG-005),
-     * against the threshold in force that day (PM-SYS-002). A unit that cannot be weighed without guessing is
-     * not weighed, and the petition says so.
+     * against the threshold in force that day (PM-SYS-002). The day is the day of weighing: a petition is
+     * weighed when it is read and when the owners convene on it, never from a stored figure.
+     *
+     * The owner's decision of 2026-10-10: while counsel has not said whose ideal parts count for a unit with both
+     * an owner and a holder of a right of use, such a unit is not weighed — and a petition in an entrance that has
+     * one cannot be weighed at all, since who may demand, and with what, is the same open question.
      */
     // Rule: PM-GA-003
+    // TODO(legal): PM-GA-003 — whose ideal parts count for a unit with both an owner and a holder of a right of use
     internal fun weigh(entranceId: UUID, signatories: Set<UUID>, on: LocalDate): PetitionWeight {
         val owned = holdings.inForce(entranceId, on, TitleRole.OWN)
         val theirs = owned.holdings.filter { it.partyId in signatories }
-        val units = theirs.map { it.unitId }.toSet()
-        val alsoUsed = holdings.inForce(entranceId, on, TitleRole.USR).holdings.map { it.unitId }.toSet()
-        // TODO(legal): PM-GA-003 — whose ideal parts count for a unit with both an owner and a holder of a right of
-        // use is with counsel (the owner's decision of 2026-10-10): until answered such a unit is not weighed.
-        val cannotWeigh = units.filter { it in alsoUsed }.sortedBy { it.toString() }.map {
+        val ownedUnits = owned.holdings.map { it.unitId }.toSet()
+        val bothRoles = holdings.inForce(entranceId, on, TitleRole.USR).holdings.map { it.unitId }.filter { it in ownedUnits }.toSet()
+        val overHeld = theirs.map { it.unitId }.filter { it in owned.overHeldUnitIds }.toSet()
+        val cannotWeigh = bothRoles.sortedBy { it.toString() }.map {
             "unit $it has both an owner and a holder of a right of use — whose ideal parts count is not settled (TODO(legal): PM-GA-003)"
-        } + units.filter { it in owned.overHeldUnitIds }.sortedBy { it.toString() }.map {
+        } + overHeld.sortedBy { it.toString() }.map {
             "unit $it is owned for more than the whole of it — weighing it would count it twice (PM-ORG-005)"
         }
+        val weighed = theirs.filter { it.unitId !in bothRoles && it.unitId !in overHeld }
         val threshold = constantOn("GA_PETITION_MIN_PCT", on.toString())           // TODO(legal): PM-GA-003 — unconfirmed
         return PetitionWeight(
             on = on,
-            heldPct = theirs.fold(BigDecimal.ZERO) { sum, held -> sum + BigDecimal(held.idealParts) },
+            heldPct = weighed.fold(BigDecimal.ZERO) { sum, held -> sum + BigDecimal(held.idealParts) },
             thresholdPct = BigDecimal(threshold.value),
             thresholdSource = threshold.source,
             thresholdVerified = threshold.verified,
+            thresholdConstant = "${threshold.code}@${threshold.inForceFrom}",
             cannotWeigh = cannotWeigh,
-            derivedParts = theirs.any { it.idealPartsSource != "DECLARED" },
+            derivedParts = weighed.any { it.idealPartsSource != "DECLARED" },
+            owners = theirs.map { it.partyId }.toSet(),
         )
     }
 

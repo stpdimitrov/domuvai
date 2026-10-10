@@ -179,8 +179,6 @@ PLANNED = [
   'List office holders as at a date', ['PM-GOV-004', 'PM-SEC-011']),
  ('post', '/entrances/{entrance_id}/mandates', 'identity-org',
   'Record an election', ['PM-GOV-003', 'PM-GOV-004', 'PM-GOV-005']),
- ('get', '/entrances/{entrance_id}/assemblies/yearly', 'assembly',
-  'Whether the entrance held its assembly for a calendar year', ['PM-GA-001']),
  ('post', '/assemblies/{assembly_id}/notice', 'assembly',
   'Generate the notice document and send the electronic notification beside the posting', ['PM-GA-008', 'PM-SYS-013']),
  ('post', '/assemblies/{assembly_id}/sessions', 'assembly',

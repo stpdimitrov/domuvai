@@ -32,7 +32,7 @@ class PetitionWebTest {
 
     private fun weighed(held: String, cannotWeigh: List<String> = emptyList()) = PetitionRead(
         petition, listOf(owner),
-        PetitionWeight(LocalDate.parse("2026-10-09"), BigDecimal(held), BigDecimal("20"), "чл. 12 ЗУЕС", false, cannotWeigh, false), null,
+        PetitionWeight(LocalDate.parse("2026-10-09"), BigDecimal(held), BigDecimal("20"), "чл. 12 ЗУЕС", false, "GA_PETITION_MIN_PCT@2009-01-01", cannotWeigh, false, setOf(owner)), null,
     )
 
     @Test
