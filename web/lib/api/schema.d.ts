@@ -175,6 +175,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/identity/entrances/{entranceId}/mandates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too */
+        post: operations["post_identity_entrances_entranceId_mandates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record the day a mandate ended — once; only the deployment's administrator. On the record, refusals too */
+        post: operations["post_identity_entrances_entranceId_mandates_mandateId_end"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/identity/logins": {
         parameters: {
             query?: never;
@@ -1170,6 +1204,11 @@ export interface components {
             rowsParsed: number;
             violations: string[];
         };
+        EndMandate: {
+            /** Format: date */
+            on?: string;
+            protocolRef?: string;
+        };
         EndStayRequest: {
             on: string;
         };
@@ -1416,6 +1455,17 @@ export interface components {
             thresholdPct: string;
             verified: boolean;
         };
+        MandateEnded: {
+            /** Format: uuid */
+            mandateId: string;
+            /** Format: date */
+            on: string;
+        };
+        MandateRecorded: {
+            /** Format: uuid */
+            mandateId: string;
+            succeeded: string[];
+        };
         ManualEntry: {
             designation: string;
             /** @enum {string} */
@@ -1589,6 +1639,16 @@ export interface components {
             item: string;
             quantity: string;
             unitId: string;
+        };
+        RecordMandate: {
+            body?: string;
+            /** Format: uuid */
+            partyId?: string;
+            protocolRef?: string;
+            /** Format: date */
+            validFrom?: string;
+            /** Format: date */
+            validTo?: string;
         };
         RecordPaymentRequest: {
             /** Format: int64 */
@@ -2465,6 +2525,147 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_identity_entrances_entranceId_mandates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordMandate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MandateRecorded"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_identity_entrances_entranceId_mandates_mandateId_end: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                mandateId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndMandate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MandateEnded"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

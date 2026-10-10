@@ -37,7 +37,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-003` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:90` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:10` |  |
 | `PM-BOOK-004` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:90` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:11` |  |
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
-| `PM-BOOK-006` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:70` | `app/src/main/kotlin/zues/app/policy/Policy.kt:86` |  |
+| `PM-BOOK-006` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:73` | `app/src/main/kotlin/zues/app/policy/Policy.kt:90` |  |
 | `PM-BOOK-007` | `app/src/test/kotlin/zues/app/registry/BookAccessServiceTest.kt:79` | `app/src/main/kotlin/zues/app/registry/BookAccess.kt:21` |  |
 | `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:336` |  |
 | `PM-BOOK-009` | — | — |  |
@@ -52,7 +52,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GOV-001` | — | — |  |
 | `PM-GOV-002` | — | — |  |
 | `PM-GOV-003` | — | — |  |
-| `PM-GOV-004` | `app/src/test/kotlin/zues/app/identity_org/MandateTest.kt:23` | `app/src/main/kotlin/zues/app/identity_org/MandateRoles.kt:32` |  |
+| `PM-GOV-004` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationIT.kt:125` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:129` |  |
 | `PM-GOV-005` | — | — |  |
 | `PM-GOV-006` | — | — |  |
 | `PM-GOV-007` | — | — |  |
@@ -267,7 +267,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SEC-008` | — | — |  |
 | `PM-SEC-009` | — | — | ⚠ |
 | `PM-SEC-010` | — | — |  |
-| `PM-SEC-011` | `app/src/test/kotlin/zues/app/identity_org/MandateRolesIT.kt:68` | `app/src/main/kotlin/zues/app/identity_org/MandateRoles.kt:58` |  |
+| `PM-SEC-011` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationTest.kt:136` | `app/src/main/kotlin/zues/app/identity_org/MandateRoles.kt:58` |  |
 | `PM-SEC-012` | — | — |  |
 
 ## SYS — Cross-cutting system rules  ·  6/15 covered
