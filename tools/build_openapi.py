@@ -49,19 +49,19 @@ RUNNING = {
  ('get', '/api/registry/entrances/{entranceId}/book/access-log'):
    ("Export who read the entrance's book or was refused it, why and when — oldest first; read by whoever may read the book, and logged too", ['PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/entrances/{entranceId}/book/retention'):
-   ("Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible",
-    ['PM-BOOK-010']),
+   ("Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible; run by the entrance's manager and board only, and logged whether run or refused (403)",
+    ['PM-BOOK-010', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-GOV-008']),
  ('post', '/api/registry/entrances/{entranceId}/book/declarations'):
    ('File a declaration for entry in the book — dated by the system, on the template in force',
     ['PM-BOOK-003', 'PM-BOOK-004']),
  ('get', '/api/registry/entrances/{entranceId}/book/declarations/overdue'):
-   ('Owners and users past their declaration deadline on a date — names only', ['PM-BOOK-003', 'PM-BOOK-011']),
+   ("Owners and users past their declaration deadline on a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-BOOK-003', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/parties'):
    ('Register a party — a person or company that can hold a title', ['PM-BOOK-002']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/titles'):
    ('Record a title to a unit — effective-dated, with its share', ['PM-ORG-005', 'PM-ORG-011']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
-   ("The owners and users of an entrance's units as of a date — names only", ['PM-ORG-011', 'PM-BOOK-011']),
+   ("The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  # ---- assembly
  ('post', '/api/assembly/entrances/{entranceId}/assemblies'):
    ('Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification; a date no notice could be in time for is blocked',

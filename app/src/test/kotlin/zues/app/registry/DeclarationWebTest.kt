@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
@@ -15,17 +16,24 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import zues.app.identity_org.Logins
+import zues.app.identity_org.WhoAsks
+import zues.app.policy.Asking
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.UUID
 
+/** The declaration endpoints with the services mocked and sign-in switched off — so nobody is asking; who may read the overdue list is BookListsWebTest's. */
 @WebMvcTest(DeclarationController::class)
+@Import(WhoAsks::class)
 class DeclarationWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var declarations: DeclarationService
+    @MockitoBean lateinit var lists: BookLists
+    @MockitoBean lateinit var logins: Logins
 
     @TestConfiguration
     class FixedClock {
@@ -54,8 +62,8 @@ class DeclarationWebTest {
 
     @Test
     fun `PM-SYS-004 GET overdue defaults to today in Sofia and names the holder only`() {
-        whenever(declarations.overdue(entranceId, LocalDate.parse("2026-06-10"))).thenReturn(
-            listOf(OverdueDeclaration(unitId, "ап. 1", "Мария Георгиева", "OWN", LocalDate.parse("2026-05-01"), LocalDate.parse("2026-05-18"))),
+        whenever(lists.overdue(entranceId, LocalDate.parse("2026-06-10"), Asking(null, null))).thenReturn(
+            BookAnswer.Served(listOf(OverdueDeclaration(unitId, "ап. 1", "Мария Георгиева", "OWN", LocalDate.parse("2026-05-01"), LocalDate.parse("2026-05-18")))),
         )
         mvc.perform(get("/api/registry/entrances/$entranceId/book/declarations/overdue"))
             .andExpect(status().isOk)

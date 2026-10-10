@@ -9,6 +9,10 @@ name: e2e
 # (PM-DEBT-011); a fourth, told to run without sign-in, is what that one is compared with. The landing offers the demo
 # form only where the server has an address to write to — the first has one, the second none, a third a value that is
 # not an address (#79). Every secret here is made at run time and masked; none is in the repository.
+# AUTH-04 — who may do what: the names a screen draws from the book are for the entrance's manager, board and controller.
+# So a third identity is this run's administrator (DOMUVAI_AUTH_ADMINS), and through the API — never SQL — it says who
+# the person signing in and the check's own client are, and records the first as the manager and the second as the
+# controller of every seeded entrance.
 # Not path-filtered, so it runs on every PR — a required check on main.
 on:
   push: { branches: [main] }
@@ -65,35 +69,83 @@ jobs:
           kill "$(cat api.pid)"
           while kill -0 "$(cat api.pid)" 2>/dev/null; do sleep 1; done
 
-      - name: A client secret, a person to sign in as, and the check's own client — made here, in the running Keycloak
+      - name: A client secret, a person to sign in as, the check's own client and the run's administrator — made here, in the running Keycloak
         run: |
           curl -sf -o /dev/null --max-time 10 --retry 60 --retry-connrefused --retry-all-errors --retry-delay 3 "$ISSUER/.well-known/openid-configuration"
           kc() { docker exec -i keycloak /opt/keycloak/bin/kcadm.sh "$@"; }
           kc config credentials --server http://localhost:8080 --realm master --user admin --password "$KC_ADMIN"
-          secret=$(openssl rand -hex 24); password=$(openssl rand -hex 16); check=$(openssl rand -hex 24)
-          for value in "$secret" "$password" "$check"; do echo "::add-mask::$value"; done
+          secret=$(openssl rand -hex 24); password=$(openssl rand -hex 16); check=$(openssl rand -hex 24); administrator=$(openssl rand -hex 24)
+          for value in "$secret" "$password" "$check" "$administrator"; do echo "::add-mask::$value"; done
           id=$(kc get clients -r domuvai -q clientId=domuvai-web --fields id --format csv --noquotes)
           kc update "clients/$id" -r domuvai -s "secret=$secret"
           kc create users -r domuvai -s username=ivan -s enabled=true -s emailVerified=true -s email=ivan@example.test -s firstName=Ivan -s lastName=Petrov
           kc set-password -r domuvai --username ivan --new-password "$password"
           subject=$(kc get users -r domuvai -q username=ivan -q exact=true --fields id --format csv --noquotes)
-          # The check asks the API itself, so it needs a token of its own: a client that exists only in this run's
+          # The check asks the API itself, so it needs a token of its own; and somebody has to be the deployment's
+          # administrator (AUTH-04c) — a login that is nobody in the book. Two clients that exist only in this run's
           # Keycloak — never in the realm file, which gives no client a service account.
-          kc create clients -r domuvai -f - <<JSON
-          { "clientId": "e2e-check", "protocol": "openid-connect", "publicClient": false, "secret": "$check",
+          service_client() {
+            kc create clients -r domuvai -f - <<JSON
+          { "clientId": "$1", "protocol": "openid-connect", "publicClient": false, "secret": "$2",
             "standardFlowEnabled": false, "directAccessGrantsEnabled": false, "serviceAccountsEnabled": true,
             "attributes": { "access.token.lifespan": "1800" },
             "protocolMappers": [ { "name": "the api's audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
               "config": { "included.custom.audience": "domuvai-api", "access.token.claim": "true", "id.token.claim": "false" } } ] }
           JSON
-          { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject"; } >> "$GITHUB_ENV"
+            kc get "clients/$(kc get clients -r domuvai -q "clientId=$1" --fields id --format csv --noquotes)/service-account-user" -r domuvai --fields id --format csv --noquotes
+          }
+          check_subject=$(service_client e2e-check "$check" | tail -n 1)
+          administrator_subject=$(service_client e2e-administrator "$administrator" | tail -n 1)
+          test -n "$subject" && test -n "$check_subject" && test -n "$administrator_subject"
+          { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject";
+            echo "CHECK_SUBJECT=$check_subject"; echo "ADMINISTRATOR_SECRET=$administrator"; echo "ADMINISTRATOR_SUBJECT=$administrator_subject"; } >> "$GITHUB_ENV"
 
       - name: Start the API closed — it accepts only a token this Keycloak signed for it (ADR-011)
-        env: { DOMUVAI_AUTH_ISSUER: '${{ env.ISSUER }}', DOMUVAI_AUTH_AUDIENCE: domuvai-api }
+        env: { DOMUVAI_AUTH_ISSUER: '${{ env.ISSUER }}', DOMUVAI_AUTH_AUDIENCE: domuvai-api, DOMUVAI_AUTH_ADMINS: '${{ env.ADMINISTRATOR_SUBJECT }}' }
         run: |
           nohup java -jar app/build/libs/app.jar > api.log 2>&1 &
           curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/registry/entrances)" = 401   # closed: no token, no answer
+
+      - name: The administrator says who is who — the person signing in is each entrance's manager, the check's client its controller (AUTH-04)
+        run: |
+          token() { curl -sf -d grant_type=client_credentials -d "client_id=$1" -d "client_secret=$2" "$ISSUER/protocol/openid-connect/token" \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])'; }
+          administrator=$(token e2e-administrator "$ADMINISTRATOR_SECRET"); check=$(token e2e-check "$CHECK_SECRET")
+          echo "::add-mask::$administrator"; echo "::add-mask::$check"
+          entrance="$ENTRANCE"
+          # Before anybody is anybody the names are refused — to the check's client, and to the administrator, who never reads them.
+          for bearer in "$check" "$administrator"; do
+            test "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $bearer" "http://localhost:8080/api/registry/entrances/$entrance/book/declarations/overdue")" = 403
+          done
+          ADMINISTRATOR="$administrator" python3 - <<'PY'
+          import datetime, json, os, urllib.request
+          API = "http://localhost:8080"
+          def call(method, path, body=None):
+              request = urllib.request.Request(API + path, method=method, data=json.dumps(body).encode() if body is not None else None,
+                                               headers={"Content-Type": "application/json", "Authorization": f"Bearer {os.environ['ADMINISTRATOR']}"})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  raw = response.read().decode()
+                  return json.loads(raw) if raw else None
+          today = datetime.date.today()
+          first, last = str(today - datetime.timedelta(days=2)), str(today + datetime.timedelta(days=365))   # in force today, in Sofia as here
+          offices = {"BM": (os.environ["SUBJECT"], "Иван Петров (управител)"), "CTL": (os.environ["CHECK_SUBJECT"], "Проверката (контрольор)")}
+          for office, (subject, name) in offices.items():
+              party = call("POST", "/api/registry/parties", {"fullName": name})["partyId"]
+              call("POST", "/api/identity/logins", {"subject": subject, "partyId": party})
+              for entrance in call("GET", "/api/registry/entrances"):
+                  call("POST", f"/api/identity/entrances/{entrance['id']}/mandates",
+                       {"body": office, "partyId": party, "validFrom": first, "validTo": last, "protocolRef": "the end-to-end run"})
+          PY
+          # … and now the controller is given the names — and still anonymises nothing: reads all, writes none. The
+          # administrator, who said who everybody is, is given none of it.
+          code() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $1" ${3:+-X "$3"} "http://localhost:8080/api/registry/entrances/$entrance/$2"; }
+          test "$(code "$check" book/declarations/overdue)" = 200
+          test "$(code "$check" "owners?on=2026-09-01")" = 200
+          test "$(code "$check" book/retention POST)" = 403
+          test "$(code "$administrator" book/declarations/overdue)" = 403
+          test "$(code "$administrator" "owners?on=2026-09-01")" = 403
+          test "$(code "$administrator" book/retention POST)" = 403
 
       - name: Start the web against the API — signing people in, with nothing set, with a bad address, told to run without sign-in (PM-DEBT-011, #79)
         working-directory: web

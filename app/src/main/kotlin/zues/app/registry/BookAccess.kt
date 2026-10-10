@@ -4,6 +4,7 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.Repository
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.policy.Action
@@ -44,6 +45,12 @@ enum class BookAccessKind {
     BOOK_READ,
     /** this log was exported */
     LOG_EXPORT,
+    /** the owners and users of the entrance's units were listed, by name */
+    OWNERS_LIST,
+    /** those past the deadline to declare for the book were listed, by name */
+    OVERDUE_LIST,
+    /** what is past its retention window was anonymised */
+    RETENTION,
 }
 
 /** Reads only: an entry is written once, through the aggregate template, and never saved over or deleted. */
@@ -97,30 +104,51 @@ class BookAccessService(
     private val aggregates: JdbcAggregateTemplate,
     private val policy: Policy,
     private val clock: Clock,
+    @Value("\${domuvai.auth.mode:}") mode: String = "",
 ) {
+    /**
+     * Whether the api was told, in so many words, to run with sign-in switched off (`DOMUVAI_AUTH=off`) — the one way
+     * it starts without an issuer, and it does not start told so beside one (ADR-011). Anything else, a setting that
+     * is missing or misspelt included, is not open.
+     */
+    private val open = mode.trim().equals("off", ignoreCase = true)
+
     // Rule: PM-BOOK-006
     // Rule: PM-BOOK-007
     @Transactional
     fun read(entranceId: UUID, on: LocalDate, who: Asking, purpose: String): BookAnswer<CondominiumBook> =
-        decided(entranceId, who, purpose, BookAccessKind.BOOK_READ, on) { book.forEntrance(entranceId, on) }
+        decided(entranceId, who, purpose, BookAccessKind.BOOK_READ, on, Action.READ_BOOK) { book.forEntrance(entranceId, on) }
 
     /** Rule: PM-BOOK-007 — the entrance's entries, oldest first, this export's own among them. Read by whoever may read the book (Rule: PM-BOOK-006). */
     @Transactional
     fun export(entranceId: UUID, who: Asking, purpose: String): BookAnswer<List<BookAccessView>> =
-        decided(entranceId, who, purpose, BookAccessKind.LOG_EXPORT, null) {
+        decided(entranceId, who, purpose, BookAccessKind.LOG_EXPORT, null, Action.READ_BOOK) {
             val rows = log.findByEntranceIdOrderByAtAscIdAsc(entranceId)
             val names = parties.findAllById(rows.mapNotNull { it.actor }.toSet()).associate { it.id to it.fullName }
             rows.map { BookAccessView(it.id, it.actor, names[it.actor], it.purpose, it.kind, it.bookDate, it.at, it.outcome, it.ruleId, it.loginIssuer, it.loginSubject) }
         }
 
     /**
+     * What a console screen is given from the book, or does to it — a names list, the retention pass (Rule:
+     * PM-BOOK-006, PM-BOOK-007, PM-BOOK-010): decided and entered as a read of the book is, under the standing
+     * [purpose] of the list itself, since a screen states none. With sign-in switched off nobody is asking and nothing
+     * can be decided: these stay as open as everything else is in that mode, and nothing is entered — there is nobody
+     * to enter. The book itself and its log are never served that way.
+     */
+    @Transactional
+    internal fun <T> standing(entranceId: UUID, who: Asking, kind: BookAccessKind, action: Action, on: LocalDate, purpose: String, serve: () -> T): BookAnswer<T> {
+        require(kind in STANDING) { "$kind is not read under a standing purpose: the book and its log are read by somebody who says why" }
+        return if (open && who.login == null && who.party == null) BookAnswer.Served(serve()) else decided(entranceId, who, purpose, kind, on, action, serve)
+    }
+
+    /**
      * The decision first, then its entry, then — only if allowed — what was asked for. A reader the policy refuses
      * learns nothing else: not whether the entrance is registered, nor what was wrong with the request. The refusal is
      * entered wherever there is an entrance to enter it under.
      */
-    private fun <T> decided(entranceId: UUID, who: Asking, purpose: String, kind: BookAccessKind, bookDate: LocalDate?, serve: () -> T): BookAnswer<T> {
+    private fun <T> decided(entranceId: UUID, who: Asking, purpose: String, kind: BookAccessKind, bookDate: LocalDate?, action: Action, serve: () -> T): BookAnswer<T> {
         val now = clock.instant()
-        val decision = policy.decide(who, Action.READ_BOOK, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(now)))
+        val decision = policy.decide(who, action, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(now)))
         // A served read is a party's: an allowance to a login tied to no party would have nobody to put on the record.
         val served = decision.allowed && who.party != null
         val registered = entrances.existsById(entranceId)
@@ -139,5 +167,10 @@ class BookAccessService(
             )
         }
         return if (served) BookAnswer.Served(serve()) else BookAnswer.Refused(decision.ruleId)
+    }
+
+    private companion object {
+        /** What may be read under a standing purpose, and stays open with sign-in off — never the book itself, nor its log. */
+        val STANDING = setOf(BookAccessKind.OWNERS_LIST, BookAccessKind.OVERDUE_LIST, BookAccessKind.RETENTION)
     }
 }

@@ -20,6 +20,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
@@ -212,6 +213,61 @@ class BookPersistenceIT {
             arrayOf(entrance, manager, "SERVED", "PM-BOOK-006", realm, null), arrayOf(entrance, manager, "PEEKED", "PM-BOOK-006", realm, "x"),
             arrayOf(entrance, manager, "SERVED", "any rule", realm, "x"),
         )) assertThatThrownBy { jdbc.update(row, *bad) }.describedAs(bad.joinToString()).isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `PM-BOOK-006 the owners list, the overdue list and the retention pass are the manager's and the board's — the controller reads and does not anonymise, an owner gets none`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 11", "А", "GA")).entranceId
+        val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
+        val ownerA = person("Иван Петров", "login-11-owner-a")
+        ownership.assignTitle(entrance, flat1, AssignTitle(ownerA, "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "login-11-owner-b"), "OWN", validFrom = "2020-01-01"))
+        val manager = person("Мария Иванова", "login-11-manager")
+        val controller = person("Елена Колева", "login-11-controller")
+        mandate(entrance, "BM", manager, today.minusMonths(1), today.plusMonths(11))
+        mandate(entrance, "CTL", controller, today.minusMonths(1), today.plusMonths(11))
+        mandate(entrance, "MB", person("Радка Тонева", "login-11-board"), today.minusMonths(1), today.plusMonths(11))
+        val owners = "/api/registry/entrances/$entrance/owners"
+        val overdue = "/api/registry/entrances/$entrance/book/declarations/overdue"
+        val retention = "/api/registry/entrances/$entrance/book/retention"
+        fun entries(kind: String, outcome: String) =
+            jdbc.queryForObject("SELECT count(*) FROM book_access WHERE entrance_id = ? AND kind = ? AND outcome = ?", Long::class.java, entrance, kind, outcome)
+
+        // Owner A is in the list himself, and still is not given his neighbours' names — nor may he anonymise anything.
+        mvc.perform(get(owners).param("on", today.toString()).by("login-11-owner-a")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-006"))
+        mvc.perform(get(overdue).by("login-11-owner-a")).andExpect(status().isForbidden)
+        mvc.perform(post(retention).by("login-11-owner-a")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-010"))
+        mvc.perform(get(owners).param("on", today.toString()).by("login-of-nobody")).andExpect(status().isForbidden)
+
+        mvc.perform(get(owners).param("on", today.toString()).by("login-11-manager")).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(2))
+        mvc.perform(get(overdue).by("login-11-manager")).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(2))      // neither owner ever declared
+        mvc.perform(post(retention).by("login-11-manager")).andExpect(status().isOk).andExpect(jsonPath("$.on").value(today.toString()))
+        mvc.perform(post(retention).by("login-11-board")).andExpect(status().isOk)
+        mvc.perform(get(owners).param("on", today.toString()).by("login-11-controller")).andExpect(status().isOk)
+        mvc.perform(get(overdue).by("login-11-controller")).andExpect(status().isOk)
+        mvc.perform(post(retention).by("login-11-controller")).andExpect(status().isForbidden)                                    // reads all, writes none
+            .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("anonymised by the manager and the board")))
+
+        assertThat(listOf(entries("OWNERS_LIST", "SERVED"), entries("OWNERS_LIST", "REFUSED"), entries("OVERDUE_LIST", "SERVED"), entries("OVERDUE_LIST", "REFUSED"),
+            entries("RETENTION", "SERVED"), entries("RETENTION", "REFUSED"))).containsExactly(2L, 2L, 2L, 1L, 2L, 2L)
+        assertThat(jdbc.queryForMap("SELECT actor, purpose, rule_id, login_subject, book_date FROM book_access WHERE entrance_id = ? AND kind = 'RETENTION' AND outcome = 'SERVED' AND actor = ?", entrance, manager).values)
+            .containsExactly(manager, BookLists.RETENTION_PURPOSE, "PM-BOOK-010", "login-11-manager", java.sql.Date.valueOf(today))
+
+        // This test's application runs with sign-in switched off: a request with no token is nobody's, and the lists stay
+        // as open as everything else is then — with nothing entered. The book itself is not served that way.
+        val before = jdbc.queryForObject("SELECT count(*) FROM book_access WHERE entrance_id = ?", Long::class.java, entrance)
+        mvc.perform(get(owners).param("on", today.toString())).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(2))
+        mvc.perform(get(overdue)).andExpect(status().isOk)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM book_access WHERE entrance_id = ?", Long::class.java, entrance)).isEqualTo(before)
+        mvc.perform(get("/api/registry/entrances/$entrance/book").param("purpose", "проверка")).andExpect(status().isForbidden)
+
+        // The table takes the new kinds dated, and no other.
+        val row = "INSERT INTO book_access (id, entrance_id, actor, purpose, kind, book_date, at) VALUES (gen_random_uuid(), ?, ?, 'проверка', ?, ?::date, now())"
+        for (kind in listOf("OWNERS_LIST", "OVERDUE_LIST", "RETENTION")) {
+            assertThatThrownBy { jdbc.update(row, entrance, manager, kind, null) }.describedAs(kind).isInstanceOf(DataIntegrityViolationException::class.java)
+            jdbc.update(row, entrance, manager, kind, "2026-06-01")
+        }
+        assertThatThrownBy { jdbc.update(row, entrance, manager, "UNITS_LIST", "2026-06-01") }.isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
     @Test

@@ -22,6 +22,9 @@ enum class Action(val governedBy: String) {
     /** the book's entry for one unit — what its owner declared for it: its owners, its household */
     READ_UNIT_BOOK_DATA("PM-BOOK-006"),
 
+    /** anonymising what the book holds past its retention window — irreversible */
+    ANONYMISE_BOOK("PM-BOOK-010"),
+
     /** tying a login to a party, or untying it: saying who a signed-in person is */
     TIE_LOGIN("PM-SEC-001"),
 
@@ -105,11 +108,12 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 3
+        const val MATRIX_VERSION = 4
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
-         * own data — nobody else. Who a login is, and who holds an entrance's offices: the deployment's administrator —
+         * own data — nobody else. Anonymising it: the manager and the board, who keep it — the controller reads and
+         * does not write (PM-GOV-008). Who a login is, and who holds an entrance's offices: the deployment's administrator —
          * and nobody else.
          */
         /**
@@ -129,6 +133,8 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.READ_UNIT_BOOK_DATA, Role.MB, "PM-BOOK-006"),
             Permit(Action.READ_UNIT_BOOK_DATA, Role.CTL, "PM-BOOK-006"),
             Permit(Action.READ_UNIT_BOOK_DATA, Role.OWN, "PM-BOOK-006", ownUnitOnly = true),
+            Permit(Action.ANONYMISE_BOOK, Role.BM, "PM-BOOK-010"),
+            Permit(Action.ANONYMISE_BOOK, Role.MB, "PM-BOOK-010"),
             Permit(Action.TIE_LOGIN, Role.SYS_ADMIN, "PM-SEC-001"),
             Permit(Action.RECORD_MANDATE, Role.SYS_ADMIN, "PM-SEC-001"),
         )
