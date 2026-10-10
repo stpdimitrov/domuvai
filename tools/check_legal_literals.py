@@ -25,6 +25,7 @@ watch -= {0, 1, 2}
 LAW = ROOT/'law'
 SRC = [p for p in ROOT.rglob('*.kt')
        if 'build' not in p.parts and 'node_modules' not in p.parts
+       and '.claude' not in p.relative_to(ROOT).parts   # other sessions' worktrees are not this checkout
        and LAW not in p.parents and 'test' not in p.parts]   # a test may name the value it asserts
 
 N = r'(\d{1,4})'

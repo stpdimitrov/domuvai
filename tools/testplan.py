@@ -48,7 +48,7 @@ TEST_RE = re.compile(r"fun\s+`(PM-[A-Z]+-\d{3}[^`]*)`")
 def covered() -> set[str]:
     out = set()
     for p in ROOT.rglob('*.kt'):
-        if 'build' in p.parts or 'node_modules' in p.parts: continue
+        if 'build' in p.parts or 'node_modules' in p.parts or '.claude' in p.relative_to(ROOT).parts: continue   # not other sessions' worktrees
         for name in TEST_RE.findall(p.read_text()):
             out |= set(RULE_RE.findall(name))
     return out

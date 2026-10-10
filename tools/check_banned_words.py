@@ -11,7 +11,8 @@ BANNED = {
 # `fee` and `balance` are banned only as stored column names
 COLUMNISH = {'fee': 'use charge', 'balance': 'derive it from postings (ADR-006)'}
 IDENT = re.compile(r'\b(?:val|var|fun|class|object|interface|enum|typealias)\s+(\w+)|(\w+)\s*:')
-SRC = [p for p in ROOT.rglob('*.kt') if 'build' not in p.parts and 'node_modules' not in p.parts]
+SRC = [p for p in ROOT.rglob('*.kt') if 'build' not in p.parts and 'node_modules' not in p.parts
+       and '.claude' not in p.relative_to(ROOT).parts]   # other sessions' worktrees are not this checkout
 
 bad = []
 for p in SRC:

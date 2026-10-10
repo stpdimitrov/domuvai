@@ -10,8 +10,11 @@ not a claim. So any number of sessions boot, read this map and pick free work; n
 list of names up to date.
 
     python3 tools/lanes.py                    the map: taken lanes, free lanes and their next slice
-    python3 tools/lanes.py check <lane>       exit 1 if someone else holds <lane>
-    python3 tools/lanes.py claim <lane> --title "S-nn …" --body-file contract.md
+    python3 tools/lanes.py check <lane> [--mine <n>]   exit 1 if <lane> is held — unless by claim #<n>, the one this session opened
+    python3 tools/lanes.py claim <lane> [--also <lane> …] --title "S-nn …" --body-file contract.md
+
+A claim belongs to the session that opened it, not to a GitHub account: one owner's sessions all sign in as the
+same person, so an open claim is never taken for "mine" unless the session names it (`--mine`).
 
 `git config zues.lane <lane>` marks a preferred lane: it is listed first, never reserved.
 Needs `gh`, authenticated for this repository. Not a gate — it reads the network.
@@ -87,10 +90,6 @@ def claims_of(issues: list[dict]) -> list[tuple[dict, list[str]]]:
     return sorted(held, key=lambda c: c[0]['number'])
 
 
-def me() -> str:
-    return gh('api', 'user', '-q', '.login').strip()
-
-
 def show() -> int:
     issues = lane_issues()
     touched: dict[str, list[dict]] = {}
@@ -135,50 +134,56 @@ def show() -> int:
     return 0
 
 
-def check(lane: str, login: str) -> int:
-    """0 if the lane is free or already yours; 1, naming the holder, if someone else holds it."""
+def check(lane: str, mine: int | None = None) -> int:
+    """0 if the lane is free, or held by claim #mine — the one this session opened; 1, naming the holder, otherwise."""
     held = claims_of(lane_issues().get(lane, []))
-    others = [(i, whos) for i, whos in held if login not in whos]
+    others = [(i, whos) for i, whos in held if i['number'] != mine]
     if others:
         issue, whos = others[0]
-        print(f'{lane} is held by {", ".join(whos)} — #{issue["number"]} {issue["title"]}. Pick a free lane.')
+        print(f'{lane} is held by {", ".join(whos)} — #{issue["number"]} {issue["title"]}. Pick a free lane '
+              f'(if this session opened #{issue["number"]} itself: check {lane} --mine {issue["number"]}).')
         return 1
     print(f'{lane} is {"yours" if held else "free"}')
     return 0
 
 
-def claim(lane: str, title: str, body_file: str) -> int:
-    """Open the slice issue that claims the lane, assigned to you, then settle any race."""
-    login = me()
-    if check(lane, login):
+def claim(lanes: list[str], title: str, body_file: str) -> int:
+    """Open the slice issue that claims the lane — or lanes, together — assigned to you, then settle any race."""
+    if any([check(lane) for lane in lanes]):
         return 1
-    gh('label', 'create', LABEL + lane, '--force', '--color', '1d76db',
-       '--description', f'the {lane} lane — held by an assigned open issue (tools/lanes.py)')
-    url = gh('issue', 'create', '--title', title, '--label', LABEL + lane, '--assignee', '@me',
-             '--body-file', body_file).strip()
+    for lane in lanes:
+        gh('label', 'create', LABEL + lane, '--force', '--color', '1d76db',
+           '--description', f'the {lane} lane — held by an assigned open issue (tools/lanes.py)')
+    url = gh('issue', 'create', '--title', title, '--assignee', '@me', '--body-file', body_file,
+             *[arg for lane in lanes for arg in ('--label', LABEL + lane)]).strip()
     number = int(url.rstrip('/').rsplit('/', 1)[1])
     # Two sessions can claim one free lane in the same moment: the lower issue number wins.
-    rivals = [i for i, whos in claims_of(lane_issues().get(lane, [])) if login not in whos and i['number'] < number]
+    issues = lane_issues()
+    rivals = [i for lane in lanes for i, _ in claims_of(issues.get(lane, [])) if i['number'] < number]
     if rivals:
-        print(f'{url}\nlost the race: #{rivals[0]["number"]} claimed {lane} first — close yours: gh issue close {number}')
+        print(f'{url}\nlost the race: #{rivals[0]["number"]} claimed first — close yours: gh issue close {number}')
         return 1
-    print(f'{url}\n{lane} is yours — branch: git fetch && git switch -c slice/S-nn-<name> origin/main')
+    print(f'{url}\n{", ".join(lanes)}: yours, as #{number} — branch: git fetch && git switch -c slice/S-nn-<name> origin/main')
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='Who is working where — lanes claimed live on GitHub.')
     sub = parser.add_subparsers(dest='command')
-    sub.add_parser('check').add_argument('lane', choices=LANES)
+    checking = sub.add_parser('check')
+    checking.add_argument('lane', choices=LANES)
+    checking.add_argument('--mine', type=int, metavar='N', help='the claim issue this session opened itself')
     claiming = sub.add_parser('claim')
     claiming.add_argument('lane', choices=LANES)
+    claiming.add_argument('--also', action='append', default=[], choices=LANES, metavar='LANE',
+                          help='a second lane the slice must touch — claimed and freed with the first')
     claiming.add_argument('--title', required=True, help='S-nn <slice name> (<lane> · <rule ids>)')
     claiming.add_argument('--body-file', required=True, help='the slice contract, in the CLAUDE.md shape')
     args = parser.parse_args()
     if args.command == 'check':
-        return check(args.lane, me())
+        return check(args.lane, args.mine)
     if args.command == 'claim':
-        return claim(args.lane, args.title, args.body_file)
+        return claim(list(dict.fromkeys([args.lane, *args.also])), args.title, args.body_file)
     return show()
 
 

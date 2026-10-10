@@ -22,7 +22,8 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | — | [TRACEABILITY.md](TRACEABILITY.md) | Rule → test → implementation. Generated |
 | — | [TESTPLAN.md](TESTPLAN.md) | The remaining rules as ranked slices. Generated |
 | — | [api/openapi.json](api/openapi.json) | The HTTP contract. **Generated from the running code** (ADR-013), each operation citing its rules; validated as OpenAPI 3.1 |
-| — | [SESSIONLOG.md](SESSIONLOG.md) | Boot here every session — the **last** entry only (newest at the end) |
+| — | [sessionlog/](sessionlog/) | Boot here every session — the **newest** file only (names sort by time) |
+| — | [SESSIONLOG.md](SESSIONLOG.md) | The archive: every entry before 2026-10-10. Takes no new entry |
 
 ## Decisions
 
