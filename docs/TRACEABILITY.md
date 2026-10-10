@@ -18,14 +18,14 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-ORG-001` | `app/src/test/kotlin/zues/app/registry/EntranceRegistrationTest.kt:34` | `app/src/main/kotlin/zues/app/registry/RegistryModel.kt:9` |  |
 | `PM-ORG-002` | `app/src/test/kotlin/zues/app/intake/IntakeDryRunTest.kt:45` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:58` |  |
 | `PM-ORG-003` | `app/src/test/kotlin/zues/app/registry/IdealPartsDerivationTest.kt:14` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:35` |  |
-| `PM-ORG-004` | `app/src/test/kotlin/zues/app/registry/HoldingsAdapterTest.kt:43` | `app/src/main/kotlin/zues/app/registry/Holdings.kt:15` |  |
-| `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/HoldingsAdapterTest.kt:55` | `app/src/main/kotlin/zues/app/registry/Holdings.kt:16` |  |
+| `PM-ORG-004` | `app/src/test/kotlin/zues/app/registry/HoldingsAdapterTest.kt:44` | `app/src/main/kotlin/zues/app/registry/Holdings.kt:15` |  |
+| `PM-ORG-005` | `app/src/test/kotlin/zues/app/registry/HoldingsAdapterTest.kt:57` | `app/src/main/kotlin/zues/app/registry/Holdings.kt:16` |  |
 | `PM-ORG-006` | — | — |  |
 | `PM-ORG-007` | — | — |  |
 | `PM-ORG-008` | — | — |  |
 | `PM-ORG-009` | `app/src/test/kotlin/zues/app/registry/ImportAdoptionTest.kt:96` | `app/src/main/kotlin/zues/app/registry/PropertyUnit.kt:29` |  |
 | `PM-ORG-010` | — | — |  |
-| `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/HoldingsAdapterTest.kt:99` | `app/src/main/kotlin/zues/app/registry/Holdings.kt:34` |  |
+| `PM-ORG-011` | `app/src/test/kotlin/zues/app/registry/HoldingsAdapterTest.kt:114` | `app/src/main/kotlin/zues/app/registry/Holdings.kt:43` |  |
 | `PM-ORG-012` | — | — |  |
 
 ## BOOK — Owners' book & residents  ·  11/12 covered

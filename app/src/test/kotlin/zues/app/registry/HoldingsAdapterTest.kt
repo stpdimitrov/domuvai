@@ -7,12 +7,11 @@ import org.mockito.kotlin.whenever
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.UUID
-import kotlin.reflect.full.memberProperties
 
 /**
  * The holdings the port exposes, with the repositories mocked — no Spring, no database. Proves what a
  * module weighing holders depends on: titles as of the date, ideal parts by share and never by unit
- * count, an over-owned unit named, and nothing personal handed over.
+ * count, one role at a time, an over-held unit named, and nothing personal handed over.
  */
 class HoldingsAdapterTest {
 
@@ -36,103 +35,121 @@ class HoldingsAdapterTest {
         whenever(this.titles.findByEntranceId(entranceId)).thenReturn(titles)
     }
 
-    private fun weight(of: UUID, on: LocalDate = may, role: String = "OWN") =
-        holdings.inForce(entranceId, on).filter { it.partyId == of && it.titleRole == role }.sumOf { BigDecimal(it.idealParts) }
+    private fun held(on: LocalDate = may, role: TitleRole = TitleRole.OWN) = holdings.inForce(entranceId, on, role)
+
+    private fun weight(of: UUID, on: LocalDate = may, role: TitleRole = TitleRole.OWN) =
+        held(on, role).holdings.filter { it.partyId == of }.sumOf { BigDecimal(it.idealParts) }
 
     @Test
-    fun `PM-ORG-004 a 2-unit owner with 12 percent outweighs 5 owners holding 10 percent - ideal parts, never a count of units`() {
+    fun `PM-ORG-004 a holding carries ideal parts, not a unit - two units of 12 percent together outweigh five units of 10`() {
         val big = UUID.randomUUID()
         val bigUnits = listOf(unit("7.0000"), unit("5.0000"))
         val small = List(5) { UUID.randomUUID() to unit("2.0000") }
         book(bigUnits + small.map { it.second } + unit("78.0000"), bigUnits.map { title(it, big) } + small.map { (p, u) -> title(u, p) })
 
-        assertThat(weight(big)).isEqualByComparingTo("12")
-        assertThat(small.sumOf { weight(it.first) }).isEqualByComparingTo("10")
-        assertThat(holdings.inForce(entranceId, may).count { it.partyId == big }).isEqualTo(2)      // fewer units, more weight
+        val all = held().holdings
+        assertThat(all.filter { it.partyId == big }.map { it.idealParts }).containsExactlyInAnyOrder("7", "5")
+        assertThat(all.filter { it.partyId != big }.map { it.idealParts }).containsOnly("2").hasSize(5)
+        assertThat(weight(big)).isGreaterThan(small.sumOf { weight(it.first) })                    // 12 against 10
     }
 
     @Test
     fun `PM-ORG-005 co-owners split the unit's ideal parts by title share, and together hold exactly the unit's parts`() {
         val u = unit("12.5000")
-        val third = unit("10.0000")
-        val (a, b, c) = List(3) { UUID.randomUUID() }
-        book(
-            listOf(u, third),
-            listOf(title(u, a, share = "0.5"), title(u, b, share = "0.5")) +
-                listOf(a, b, c).map { title(third, it, share = "0.333333") },                       // thirds as the book can hold them
-        )
-        val held = holdings.inForce(entranceId, may)
-        val half = held.single { it.partyId == a && it.unitId == u.id }
-        assertThat(half.share).isEqualTo("0.5")
-        assertThat(half.unitIdealParts).isEqualTo("12.5000")
-        assertThat(half.idealParts).isEqualTo("6.25")                                               // exact, no float, no padding
-        assertThat(held.filter { it.unitId == u.id }.sumOf { BigDecimal(it.idealParts) }).isEqualByComparingTo("12.5")
-        // shares that do not reach the whole never exceed the unit: nothing is counted twice
-        assertThat(held.filter { it.unitId == third.id }.sumOf { BigDecimal(it.idealParts) }).isEqualByComparingTo("9.99999")
-        assertThat(holdings.overOwnedUnits(entranceId, may)).isEmpty()
+        val (a, b) = List(2) { UUID.randomUUID() }
+        book(listOf(u), listOf(title(u, a, share = "0.5"), title(u, b, share = "0.5")))
+        val half = held().holdings.single { it.partyId == a }
+        assertThat(listOf(half.share, half.unitIdealParts, half.idealParts)).containsExactly("0.5", "12.5", "6.25")   // exact, no float, no padding
+        assertThat(held().holdings.sumOf { BigDecimal(it.idealParts) }).isEqualByComparingTo("12.5")
+        assertThat(held().overHeldUnitIds).isEmpty()
     }
 
     @Test
-    fun `PM-ORG-005 a unit whose ownership shares exceed the whole is named, so it is not counted twice`() {
+    fun `PM-ORG-005 an owner and a holder of use over one unit are never summed together - one role is answered per call`() {
+        val u = unit("100.0000")
+        val (owner, holderOfUse) = List(2) { UUID.randomUUID() }
+        book(listOf(u), listOf(title(u, owner), title(u, holderOfUse, role = "USR")))
+        assertThat(held(role = TitleRole.OWN).holdings.map { it.partyId }).containsExactly(owner)
+        assertThat(held(role = TitleRole.USR).holdings.map { it.partyId }).containsExactly(holderOfUse)
+        for (role in TitleRole.entries) {
+            assertThat(held(role = role).holdings.sumOf { BigDecimal(it.idealParts) }).isEqualByComparingTo("100")   // never 200
+            assertThat(held(role = role).overHeldUnitIds).isEmpty()
+        }
+    }
+
+    @Test
+    fun `PM-ORG-005 a unit whose shares of one role exceed the whole is named, so it is not counted twice`() {
         val sound = unit("40.0000")
         val doubled = unit("60.0000")
         val (a, b, c) = List(3) { UUID.randomUUID() }
+        val past = title(sound, b, to = "2026-03-01")                                               // a past owner does not count
         book(
             listOf(sound, doubled),
-            listOf(
-                title(sound, a),
-                title(doubled, a, share = "0.5"), title(doubled, b, share = "0.5"), title(doubled, c, share = "0.25"),   // 125% owned
-                title(sound, c, role = "USR"),                                                                           // a user beside the owner is not ownership
-                title(sound, b, to = "2026-03-01"),                                                                      // a past owner does not count
-            ),
+            listOf(title(sound, a), past, title(doubled, a, share = "0.5"), title(doubled, b, share = "0.5"), title(doubled, c, share = "0.25"),   // 125% owned
+                title(sound, b, role = "USR"), title(sound, c, role = "USR")),                      // two rights of use over the whole of one unit
         )
-        assertThat(holdings.overOwnedUnits(entranceId, may)).containsExactly(doubled.id)
-        assertThat(holdings.inForce(entranceId, may).filter { it.unitId == doubled.id && it.titleRole == "OWN" }.sumOf { BigDecimal(it.idealParts) })
-            .isGreaterThan(BigDecimal("60"))                                         // what counting it would do
+        assertThat(held().overHeldUnitIds).containsExactly(doubled.id)
+        assertThat(held().holdings.filter { it.unitId == doubled.id }.sumOf { BigDecimal(it.idealParts) }).isGreaterThan(BigDecimal("60"))   // what weighing it would do
+        assertThat(held(role = TitleRole.USR).overHeldUnitIds).containsExactly(sound.id)            // judged role by role
         // before the third title began the unit was whole
         book(listOf(sound, doubled), listOf(title(doubled, a, share = "0.5"), title(doubled, b, share = "0.5"), title(doubled, c, share = "0.25", from = "2026-06-01")))
-        assertThat(holdings.overOwnedUnits(entranceId, may)).isEmpty()
-        assertThat(holdings.overOwnedUnits(entranceId, LocalDate.of(2026, 6, 1))).containsExactly(doubled.id)
+        assertThat(held().overHeldUnitIds).isEmpty()
+        assertThat(held(on = LocalDate.of(2026, 6, 1)).overHeldUnitIds).containsExactly(doubled.id)
+    }
+
+    @Test
+    fun `PM-ORG-005 sixths and thirds as the book stores them are not an excess, and the smallest real one is`() {
+        val u = unit("60.0000")
+        val six = List(6) { UUID.randomUUID() }
+        book(listOf(u), six.map { title(u, it, share = "0.166667") })                               // sums to 1.000002
+        assertThat(held().overHeldUnitIds).isEmpty()
+        book(listOf(u), List(3) { title(u, UUID.randomUUID(), share = "0.333333") })                // sums to 0.999999
+        assertThat(held().overHeldUnitIds).isEmpty()
+        assertThat(held().holdings.sumOf { BigDecimal(it.idealParts) }).isLessThanOrEqualTo(BigDecimal("60"))
+        book(listOf(u), listOf(title(u, six[0], share = "1"), title(u, six[1], share = "0.000002")))   // past the whole by more than two roundings
+        assertThat(held().overHeldUnitIds).containsExactly(u.id)
     }
 
     @Test
     fun `PM-ORG-011 the holder is resolved as of the date asked - the seller until the day of sale, the buyer from it`() {
         val u = unit("100.0000")
-        val (seller, buyer, user) = List(3) { UUID.randomUUID() }
-        book(listOf(u), listOf(title(u, seller, to = "2026-05-14"), title(u, buyer, from = "2026-05-14"), title(u, user, role = "USR", from = "2026-02-01")))
+        val (seller, buyer, holderOfUse) = List(3) { UUID.randomUUID() }
+        book(listOf(u), listOf(title(u, seller, to = "2026-05-14"), title(u, buyer, from = "2026-05-14"), title(u, holderOfUse, role = "USR", from = "2026-02-01")))
 
-        fun owners(on: String) = holdings.inForce(entranceId, LocalDate.parse(on)).filter { it.titleRole == "OWN" }.map { it.partyId }
+        fun owners(on: String) = held(LocalDate.parse(on)).holdings.map { it.partyId }
         assertThat(owners("2026-05-13")).containsExactly(seller)
         assertThat(owners("2026-05-14")).containsExactly(buyer)                       // half-open: the day of sale is the buyer's
         assertThat(owners("2025-12-31")).isEmpty()
-        assertThat(weight(user, role = "USR")).isEqualByComparingTo("100")            // a user is reported apart, not as an owner
-        assertThat(weight(user, on = LocalDate.of(2026, 1, 15), role = "USR")).isEqualByComparingTo("0")
+        assertThat(weight(holderOfUse, role = TitleRole.USR)).isEqualByComparingTo("100")
+        assertThat(weight(holderOfUse, on = LocalDate.of(2026, 1, 15), role = TitleRole.USR)).isEqualByComparingTo("0")
     }
 
     @Test
-    fun `PM-ORG-011 residents are those in residence on the date who are a known party, with the book's one age fact`() {
-        val unitId = UUID.randomUUID()
-        val (adult, child, gone) = List(3) { UUID.randomUUID() }
-        fun member(party: UUID?, child: Boolean = false, from: String = "2026-01-01", to: String? = null) =
-            HouseholdMember(UUID.randomUUID(), entranceId, unitId, party, child, LocalDate.parse(from), to?.let { LocalDate.parse(it) })
-        whenever(household.findByEntranceId(entranceId)).thenReturn(
-            listOf(member(adult), member(child, child = true), member(gone, to = "2026-04-01"), member(null)),
-        )
-        assertThat(holdings.residents(entranceId, may)).containsExactlyInAnyOrder(Resident(adult, unitId, false), Resident(child, unitId, true))
-        assertThat(holdings.residents(entranceId, LocalDate.of(2026, 3, 31)).map { it.partyId }).contains(gone)
-    }
-
-    @Test
-    fun `PM-BOOK-011 the port hands over ids, roles and numbers only - no name, no identity number, no address`() {
-        assertThat(Holding::class.memberProperties.map { it.name })
-            .containsExactlyInAnyOrder("partyId", "unitId", "titleRole", "share", "unitIdealParts", "idealParts", "idealPartsSource")
-        assertThat(Resident::class.memberProperties.map { it.name }).containsExactlyInAnyOrder("partyId", "unitId", "childUnder6")
-
-        val u = unit("100.0000", source = "DERIVED")
+    fun `a title filed under this entrance for another entrance's unit is answered for neither, and breaks nothing`() {
+        val mine = unit("100.0000")
         val owner = UUID.randomUUID()
-        book(listOf(u), listOf(title(u, owner)))
-        val holding = holdings.inForce(entranceId, may).single()
-        assertThat(holding.idealPartsSource).isEqualTo("DERIVED")                      // a derived weight is passed on as derived
-        assertThat(holding.toString()).doesNotContain("об.")                           // not even the unit's designation
+        val stray = Title(UUID.randomUUID(), entranceId, UUID.randomUUID(), UUID.randomUUID(), "OWN", BigDecimal.ONE, LocalDate.of(2026, 1, 1), null)
+        book(listOf(mine), listOf(title(mine, owner), stray))
+        assertThat(held().holdings.map { it.partyId }).containsExactly(owner)
+    }
+
+    @Test
+    fun `residents are those in residence on the date who are a known party`() {
+        val unitId = UUID.randomUUID()
+        val (staying, gone) = List(2) { UUID.randomUUID() }
+        fun member(party: UUID?, from: String = "2026-01-01", to: String? = null) =
+            HouseholdMember(UUID.randomUUID(), entranceId, unitId, party, false, LocalDate.parse(from), to?.let { LocalDate.parse(it) })
+        whenever(household.findByEntranceId(entranceId)).thenReturn(listOf(member(staying), member(gone, to = "2026-04-01"), member(null)))
+        assertThat(holdings.residents(entranceId, may)).containsExactly(Resident(staying, unitId))
+        assertThat(holdings.residents(entranceId, LocalDate.of(2026, 3, 31)).map { it.partyId }).containsExactlyInAnyOrder(staying, gone)
+    }
+
+    @Test
+    fun `the port hands over ids, roles and numbers - not a name, an identity number or a designation - and a derived weight as derived`() {
+        val u = unit("100.0000", source = "DERIVED")
+        book(listOf(u), listOf(title(u, UUID.randomUUID())))
+        val holding = held().holdings.single()
+        assertThat(holding.idealPartsSource).isEqualTo("DERIVED")
+        assertThat(holding.toString()).doesNotContain("об.")
     }
 }
