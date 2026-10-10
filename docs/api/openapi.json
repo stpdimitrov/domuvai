@@ -251,16 +251,27 @@
           "kind": {
             "type": "string"
           },
+          "loginIssuer": {
+            "type": "string"
+          },
+          "loginSubject": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
           "purpose": {
+            "type": "string"
+          },
+          "ruleId": {
             "type": "string"
           }
         },
         "required": [
-          "actor",
-          "actorName",
           "at",
           "id",
           "kind",
+          "outcome",
           "purpose"
         ],
         "type": "object"
@@ -5564,17 +5575,8 @@
           },
           {
             "in": "query",
-            "name": "actor",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "purpose",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -5604,6 +5606,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5618,13 +5633,14 @@
             "description": "Not Found"
           }
         },
-        "summary": "Read the Book of the Condominium as of a date — the read names who and why, and is logged",
+        "summary": "Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-BOOK-001",
           "PM-BOOK-002",
+          "PM-BOOK-006",
           "PM-BOOK-007"
         ]
       }
@@ -5644,17 +5660,8 @@
           },
           {
             "in": "query",
-            "name": "actor",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "purpose",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -5687,6 +5694,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5701,11 +5721,12 @@
             "description": "Not Found"
           }
         },
-        "summary": "Export who read the entrance's book, why and when — oldest first; the export is logged too",
+        "summary": "Export who read the entrance's book or was refused it, why and when — oldest first; read by whoever may read the book, and logged too",
         "tags": [
           "registry"
         ],
         "x-rules": [
+          "PM-BOOK-006",
           "PM-BOOK-007"
         ]
       }
@@ -5892,6 +5913,19 @@
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
