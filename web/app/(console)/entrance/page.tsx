@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, reach, type EntranceAt } from "@/lib/console";
+import { unanswered, unansweredBy } from "@/lib/refusal";
 
 export const metadata: Metadata = { title: "Вход — Етаж" };
 
@@ -42,21 +43,21 @@ async function load(entranceId: string | undefined): Promise<Loaded> {
     reach(() => api.GET("/api/money/entrances/{entranceId}/operating-account", { params: { path } })),
   ]);
   if (!units) return { kind: "down" };
-  if (!units.data) return { kind: "refused", entrance, message: refusal(units) };
+  if (!units.data) return { kind: "refused", entrance, message: unansweredBy(units, "обектите на входа") };
   return {
     kind: "ok",
     entrance,
     units: units.data,
     overdue: overdue?.data
-      ?? { failed: overdue ? `API отказа просрочените декларации: ${refusal(overdue)}` : "Бекендът не подаде просрочените декларации." },
+      ?? { failed: unansweredBy(overdue, "просрочените декларации") },
     // The API's 404 says which account the entrance does not have — a fact about it, said as one. Any other refusal,
     // another 404 among them, is shown as it came.
     fund: fund?.data
       ?? (fund?.response.status === 404 && refusal(fund).includes("PM-FUND-001") ? null
-        : { failed: fund ? `API отказа фонда: ${refusal(fund)}` : "Бекендът не подаде фонда." }),
+        : { failed: unansweredBy(fund, "фонда") }),
     operating: operating?.data
       ?? (operating?.response.status === 404 && refusal(operating).includes("no operating account") ? null
-        : { failed: operating ? `API отказа оперативната сметка: ${refusal(operating)}` : "Бекендът не подаде оперативната сметка." }),
+        : { failed: unansweredBy(operating, "оперативната сметка") }),
   };
 }
 
@@ -130,10 +131,10 @@ export default async function EntrancePage({ searchParams }: { searchParams: Pro
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
+            {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
             {view.kind === "unknown" && <>Вход <code>{view.id}</code> не е регистриран. <Link href="/portfolio">Към портфейла</Link></>}
-            {view.kind === "refused" && <>API отказа обектите на входа: {view.message}</>}
+            {view.kind === "refused" && view.message}
           </div>
         </div>
       ) : (
@@ -201,7 +202,7 @@ function Body({ view, q }: { view: Extract<Loaded, { kind: "ok" }>; q: string })
             <div className="kv-row"><span>Последно ОС</span><span className="v" style={DIM}>—</span></div>
             <div className="kv-row">
               <span>Книга на собствениците</span>
-              {failed(overdue) ? <span style={FAILED}>не се зареди</span>
+              {failed(overdue) ? <span style={FAILED}>не е прочетена</span>
                 : overdue.length > 0 ? <span style={{ color: "#8E2318", fontWeight: 500 }}>{count(overdue.length, "просрочена декларация", "просрочени декларации")}</span>
                   : <span>без просрочени декларации</span>}
             </div>

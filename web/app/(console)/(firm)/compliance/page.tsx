@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entrances, inTurn, isPeriod, monthName, reach, shiftPeriod, thisPeriod } from "@/lib/console";
+import { unanswered } from "@/lib/refusal";
 
 export const metadata: Metadata = { title: "Съответствие — Етаж" };
 
@@ -53,14 +54,6 @@ async function load(period: string): Promise<Loaded> {
     return { entrance, overdue: part<Overdue[]>(overdue), headcount: noRun ? { kind: "none" } : checked };
   });
   return { kind: "ok", rows };
-}
-
-/** How an answer that did not come is said: a refusal as a refusal, in the API's own words. */
-function unanswered(p: Exclude<Part<unknown>, { kind: "ok" } | { kind: "none" }>, what: string): string {
-  if (p.kind === "down") return `Бекендът не подаде ${what}.`;
-  if (p.status === 403) return `Нямате право да четете ${what}: ${p.message}`;
-  if (p.status === 401) return `Входът ви не беше приет за ${what}. Излезте и влезте отново.`;
-  return `API отказа ${what}: ${p.message}`;
 }
 
 const ROLE: Record<string, string> = { OWN: "собственик", USR: "ползвател" };   // the registry's TitleRole
@@ -132,7 +125,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && unanswered({ kind: "refused", status: view.status, message: view.message }, "списъка на входовете")}
+            {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
           </div>
         </div>
@@ -176,7 +169,7 @@ function Declarations({ rows, late, unread }: { rows: Row[]; late: number; unrea
               <span className="gnote">{r.overdue.kind === "ok" ? count(r.overdue.data.length, "просрочена декларация", "просрочени декларации") : "—"}</span>
             </div>
             {r.overdue.kind !== "ok" && r.overdue.kind !== "none" && (
-              <div className="cp-od pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{unanswered(r.overdue, "просрочените декларации на входа")}</div></div>
+              <div className="cp-od pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{unanswered(r.overdue.kind === "down" ? null : r.overdue, "просрочените декларации на входа")}</div></div>
             )}
             {r.overdue.kind === "ok" && r.overdue.data.length === 0 && (
               <div className="cp-od pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма просрочена декларация.</div></div>
@@ -243,7 +236,7 @@ function HeadcountChecks({ rows, period, differing, unread }: { rows: Row[]; per
                 <div className="cp-hc pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>За {monthName(period)} няма издадено начисление — няма какво да се свери.</div></div>
               )}
               {h.kind !== "ok" && h.kind !== "none" && (
-                <div className="cp-hc pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{unanswered(h, "сверката на входа")}</div></div>
+                <div className="cp-hc pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{unanswered(h.kind === "down" ? null : h, "сверката на входа")}</div></div>
               )}
               {h.kind === "ok" && h.data.mismatches.length === 0 && (
                 <div className="cp-hc pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Начислените лица са лицата по книга.</div></div>

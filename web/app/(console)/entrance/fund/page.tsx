@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthDays, monthName, reach, shiftPeriod, thisPeriod, type EntranceAt } from "@/lib/console";
+import { unanswered, unansweredBy } from "@/lib/refusal";
 
 export const metadata: Metadata = { title: "Каса и фонд — Етаж" };
 
@@ -49,7 +50,7 @@ async function load(entranceId: string | undefined, period: string, account: str
   if (!fund.data) {
     // The API's 404 names PM-FUND-001 when the entrance has no fund account; any other refusal is shown as it came.
     const message = refusal(fund);
-    return fund.response.status === 404 && message.includes("PM-FUND-001") ? { kind: "nofund", entrance } : { kind: "refused", entrance, message };
+    return fund.response.status === 404 && message.includes("PM-FUND-001") ? { kind: "nofund", entrance } : { kind: "refused", entrance, message: unansweredBy(fund, "фонда") };
   }
   return {
     kind: "ok",
@@ -58,11 +59,11 @@ async function load(entranceId: string | undefined, period: string, account: str
     // The API's 404 says so when the entrance has no operating account; any other refusal is shown as it came.
     operating: operating?.data
       ?? (operating?.response.status === 404 && refusal(operating).includes("no operating account") ? null
-        : { failed: operating ? `API отказа оперативната сметка: ${refusal(operating)}` : "Бекендът не подаде оперативната сметка." }),
+        : { failed: unansweredBy(operating, "оперативната сметка") }),
     handovers: handovers?.data
-      ?? { failed: handovers ? `API отказа отчетите: ${refusal(handovers)}` : "Бекендът не подаде отчетите." },
+      ?? { failed: unansweredBy(handovers, "отчетите") },
     journal: journal?.data
-      ?? { failed: journal ? `API отказа дневника: ${refusal(journal)}` : "Бекендът не подаде дневника." },
+      ?? { failed: unansweredBy(journal, "дневника") },
   };
 }
 
@@ -173,11 +174,11 @@ export default async function FundPage({ searchParams }: { searchParams: Promise
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
+            {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
             {view.kind === "nofund" && <>Входът няма регистрирана сметка на фонд „Ремонт и обновяване“ — фондът се създава от общото събрание, а парите му се държат в отделна банкова сметка (чл. 50 ЗУЕС). Регистрирайте сметката в <code>money</code>, после опреснете.</>}
-            {view.kind === "refused" && <>API отказа: {view.message}</>}
+            {view.kind === "refused" && view.message}
           </div>
         </div>
       )}

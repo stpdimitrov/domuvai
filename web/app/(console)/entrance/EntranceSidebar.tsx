@@ -57,15 +57,6 @@ export default function EntranceSidebar() {
       {ENTRANCE.map((i) => (
         <Item key={i.label} {...i} href={own(i.href)} active={i.href !== "#" && pathname === i.href} />
       ))}
-
-      <div className="sidebar-user">
-        <div className="avatar">МП</div>
-        <div className="who">
-          Мария Петрова
-          <br />
-          <span className="firm">Домоуправител Про ООД</span>
-        </div>
-      </div>
     </aside>
   );
 }

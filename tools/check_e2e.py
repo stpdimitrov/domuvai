@@ -138,7 +138,7 @@ SCREENS = {
         "Няма статии в дневника за септември 2026 по тази сметка.", "0 статии · всяка с равни дебит и кредит €0,00 €0,00",
     ],
     "/entrance/fund?entrance={e}&period=2026-08": ["Дневник · август 2026", "Няма статии в дневника за август 2026."],
-    "/debts?asOf=2026-09-30": [                              # the firm sidebar still carries the design's sample names
+    "/debts?asOf=2026-09-30": [
         "2 обекта дължат, 2 в просрочие · 1 вход от 2 · към 30.09.2026",   # the second is the seed's business entrance: nothing issued, nothing owed
         "ул. Шипка 14, вх. Б · 2 обекта с неплатено €156,50",  # the entrance's total (PM-DEBT-001)
         "ап. 5 Надя Тодорова €80,00 — €80,00 — 15 дни — —",            # owed, the oldest debt's days overdue (PM-DEBT-002)
@@ -180,7 +180,7 @@ SCREENS = {
 }
 # The words of every error state the live screens have. None may appear for the seeded entrance.
 ERRORS = [
-    "Бекендът не отговаря", "Бекендът не подаде", "API отказа", "не е регистриран", "Няма регистриран вход",
+    "Бекендът не отговаря", "Бекендът не подаде", "API отказа", "Нямате право", "Входът ви не беше приет", "не е регистриран", "Няма регистриран вход",
     "няма регистрирана сметка на фонд", "няма регистрирана оперативна сметка", "не се заредиха", "не се зареди ",
     "незаредени", "незареден", "версията не е достъпна",
 ]
@@ -794,6 +794,12 @@ def main():
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
     failures += [f"{url}: no single footer saying {footer!r}" for url in bare] if served else ["/api/law/version: no version served"]
     print(f"{'ok ' if served and not bare else 'BAD'} PM-SYS-010 the footer  {len(under) - len(bare)}/{len(under)} screens show {footer!r}")
+
+    # WEB-24 — no console screen carries the design's sample person, firm or "recently opened" addresses any more
+    names = ["Мария Петрова", "Домоуправител Про", "Последно отваряни", "Витоша 102", "Младост 3"]
+    named = [(url, name) for url in under for name in names if name in visible_text(fetch(web, url)[1])]
+    failures += [f"{url}: still shows the design's sample ({name!r})" for url, name in named]
+    print(f"{'ok ' if not named else 'BAD'} the sidebars  {len(under)} screens carry none of the design's sample names")
 
     # WEB-21 — a parameter given twice arrives as a list: every live screen answers it, none fails on it
     twice = ["/compliance?period=2026-09&period=2026-08", "/debts?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?show=owing&show=fund",

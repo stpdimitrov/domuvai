@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entrances, eur, inTurn, isDay, reach } from "@/lib/console";
+import { unanswered, unansweredBy } from "@/lib/refusal";
 
 export const metadata: Metadata = { title: "Портфейл — Етаж" };
 
@@ -16,10 +17,9 @@ type Row =
 type Loaded =
   | { kind: "ok"; asOf: string; rows: Row[] }
   | { kind: "down" }
-  | { kind: "unlisted"; message: string }
+  | { kind: "unlisted"; status: number; message: string }
   | { kind: "none" };
 
-const refusal = (r: { error?: { error?: string }; response: Response }) => r.error?.error ?? `HTTP ${r.response.status}`;
 
 /**
  * One screen, one server-side aggregation (ADR-011): every entrance with its units, what it owes as of a date
@@ -40,8 +40,8 @@ async function load(asOf: string): Promise<Loaded> {
       reach(() => api.GET("/api/money/entrances/{entranceId}/fund", { params: { path } })),
     ]);
     if (!units || !arrears) return { entrance, kind: "failed", message: "Бекендът не подаде входа." };
-    if (!units.data) return { entrance, kind: "failed", message: `API отказа обектите на входа: ${refusal(units)}` };
-    if (!arrears.data) return { entrance, kind: "failed", message: `API отказа задълженията на входа: ${refusal(arrears)}` };
+    if (!units.data) return { entrance, kind: "failed", message: unansweredBy(units, "обектите на входа") };
+    if (!arrears.data) return { entrance, kind: "failed", message: unansweredBy(arrears, "задълженията на входа") };
     return {
       entrance,
       kind: "ok",
@@ -107,7 +107,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
+            {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
           </div>
         </div>
