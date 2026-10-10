@@ -420,7 +420,9 @@ def sign_in(web, issuer, user, password, subject):
     else:
         shown = visible_text(strip.group(0))
         failures += [] if user in shown and "Изход" in shown else [f"who am I: the strip says {shown!r} — expected {user!r} and the way out"]
-        failures += [] if "без лице в книгата" in shown else [f"who am I: the strip says {shown!r} — this login is tied to no party, and it does not say so"]
+        # AUTH-04: the run's administrator tied this login to a party before the screens were read (e2e.yml), so the strip
+        # no longer says the person is nobody in the book — the web is told so by the api's own record, not by the token.
+        failures += [] if "без лице в книгата" not in shown else [f"who am I: the strip says {shown!r} — this login is tied to a party, and it says it is nobody in the book"]
         failures += [] if f'data-login="{subject}"' in strip.group(0) else [
             "who am I: the login the api read from the web's bearer is not the issuer's id for this person "
             f"({subject}) — GET /api/identity/me through the web answered something else, or nothing"]

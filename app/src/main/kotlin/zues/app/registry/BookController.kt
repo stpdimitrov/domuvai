@@ -28,7 +28,7 @@ import java.util.UUID
 @RequestMapping("/api/registry/entrances/{entranceId}/book")
 class BookController(
     private val access: BookAccessService,
-    private val retention: BookRetentionService,
+    private val lists: BookLists,
     private val who: WhoAsks,
     private val clock: Clock,
 ) {
@@ -40,38 +40,27 @@ class BookController(
         @RequestParam(required = false) purpose: String?,
         signedIn: JwtAuthenticationToken?,
     ): CondominiumBook =
-        served(access.read(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())), who.of(signedIn), purpose.orEmpty()))
+        access.read(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())), who.of(signedIn), purpose.orEmpty()).orForbidden()
 
     /** Who read the book, or was refused it, why and when (PM-BOOK-007) — the entrance's entries, oldest first. This export is an entry too. */
     @GetMapping("/access-log")
     fun accessLog(@PathVariable entranceId: UUID, @RequestParam(required = false) purpose: String?, signedIn: JwtAuthenticationToken?): List<BookAccessView> =
-        served(access.export(entranceId, who.of(signedIn), purpose.orEmpty()))
-
-    /** The refusal leaves the service as an answer, so its entry is kept; it becomes a 403 only here. */
-    private fun <T> served(answer: BookAnswer<T>): T = when (answer) {
-        is BookAnswer.Served -> answer.value
-        is BookAnswer.Refused -> throw BookReadForbidden(answer.ruleId)
-    }
+        access.export(entranceId, who.of(signedIn), purpose.orEmpty()).orForbidden()
 
     /**
      * Anonymise the field groups past their retention window — a resident's link to a named person,
      * an animal's passport number — as of today in Sofia (PM-BOOK-010, PM-SYS-004). It takes no date,
      * and no window starts before its move-out was recorded, so nothing is anonymised early.
-     * Irreversible.
+     * Irreversible — run by the manager and the board only, and entered in the log (PM-BOOK-006, PM-BOOK-007).
      */
     @PostMapping("/retention")
-    fun applyRetention(@PathVariable entranceId: UUID): RetentionApplied =
-        retention.anonymiseDue(entranceId, LocalDate.parse(toSofiaDate(clock.instant())))
+    fun applyRetention(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): RetentionApplied =
+        lists.anonymiseDue(entranceId, LocalDate.parse(toSofiaDate(clock.instant())), who.of(signedIn)).orForbidden()
 
     /** No such entrance. */
     @ExceptionHandler(NoSuchElementException::class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
-
-    /** Not one of those who may read the book (PM-BOOK-006) → 403, naming the rule. Nobody signed in is refused the same way. */
-    @ExceptionHandler(BookReadForbidden::class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
-    fun onForbidden(e: BookReadForbidden): Map<String, String> = mapOf("error" to "the book is read by the manager, the board and the controller of this entrance", "rule" to e.ruleId)
 
     /** No purpose, or one too long, from a reader who may read → 400: the book is not served off the record. */
     @ExceptionHandler(BookAccessRefused::class)

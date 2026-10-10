@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **69** (30%) |
-| Remaining | **164** |
+| Proved by a test named after the rule | **70** (30%) |
+| Remaining | **163** |
 | Proposed slices at ~10 rules each | **19** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-68 rule(s) remaining across 7 slice(s).
+67 rule(s) remaining across 7 slice(s).
 
 ### S-G2-01 · `assembly` · GA · 10 rule(s)
 
@@ -126,15 +126,14 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-005` | MUST | Countdown widget on the manager dashboard. |
 | `PM-GOV-006` | MUST | Selecting an occupant as a board candidate is blocked. |
 | `PM-GOV-007` | MUST | Annual audit task auto-created; GA agenda template includes the controller's report. |
-| `PM-GOV-008` | MUST | `CTL` role gets read-all, write-none except its own reports. |
 | `PM-GOV-010` | MUST | Onboarding a building into a PMC portfolio requires an uploaded protocol meeting this majority. |
 | `PM-GOV-011` | MUST | The "apply for renovation programme" flow blocks until an association exists. |
+| `PM-GOV-013` | MUST | Document generator produces the agreement from stored data. |
 
-### S-G2-06 · `identity-org` · GOV · 7 rule(s)
+### S-G2-06 · `identity-org` · GOV · 6 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-GOV-013` | MUST | Document generator produces the agreement from stored data. |
 | `PM-GOV-014` | MUST | Protocol picker forces selection of the deciding body. |
 | `PM-GOV-015` | MUST | Remuneration = 0 is a valid configured state, not a missing value. |
 | `PM-GOV-016` | MUST | Dashboard shows "internal rules missing" until a version is published. |

@@ -76,7 +76,7 @@ class BookWebTest {
     @Autowired lateinit var mvc: MockMvc
 
     @MockitoBean lateinit var access: BookAccessService
-    @MockitoBean lateinit var retention: BookRetentionService
+    @MockitoBean lateinit var lists: BookLists
     @MockitoBean lateinit var logins: Logins
 
     private val entranceId = UUID.randomUUID()
@@ -160,8 +160,9 @@ class BookWebTest {
 
     @Test
     fun `PM-BOOK-010 POST retention anonymises what is due today in Sofia and says what it did`() {
-        whenever(retention.anonymiseDue(entranceId, LocalDate.parse("2026-06-01"))).thenReturn(
-            RetentionApplied(LocalDate.parse("2026-06-01"), householdUnlinked = 1, animalPassportsCleared = 2),
+        whenever(logins.partyOf(ISSUER, "login-manager")).thenReturn(manager)
+        whenever(lists.anonymiseDue(entranceId, LocalDate.parse("2026-06-01"), theManager)).thenReturn(
+            BookAnswer.Served(RetentionApplied(LocalDate.parse("2026-06-01"), householdUnlinked = 1, animalPassportsCleared = 2)),
         )
         mvc.perform(post("$url/retention").param("on", "2030-01-01").by("login-manager"))       // ignored: no caller date
             .andExpect(status().isOk)
@@ -233,7 +234,7 @@ class BookOpenTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var access: BookAccessService
-    @MockitoBean lateinit var retention: BookRetentionService
+    @MockitoBean lateinit var lists: BookLists
     @MockitoBean lateinit var logins: Logins
 
     @Test

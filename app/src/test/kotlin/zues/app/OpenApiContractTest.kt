@@ -36,6 +36,7 @@ import zues.app.money.LedgerReads
 import zues.app.money.PaymentService
 import zues.app.money.StatementService
 import zues.app.registry.BookAccessService
+import zues.app.registry.BookLists
 import zues.app.registry.BookRetentionService
 import zues.app.registry.BookService
 import zues.app.registry.DeclarationService
@@ -89,6 +90,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var statements: StatementService
     @MockitoBean lateinit var book: BookService
     @MockitoBean lateinit var retention: BookRetentionService
+    @MockitoBean lateinit var bookLists: BookLists
     @MockitoBean lateinit var declarations: DeclarationService
     @MockitoBean lateinit var ownership: OwnershipService
     @MockitoBean lateinit var registry: RegistryService

@@ -763,7 +763,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Owners and users past their declaration deadline on a date — names only */
+        /** Owners and users past their declaration deadline on a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403) */
         get: operations["get_registry_entrances_entranceId_book_declarations_overdue"];
         put?: never;
         post?: never;
@@ -782,7 +782,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible */
+        /** Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible; run by the entrance's manager and board only, and logged whether run or refused (403) */
         post: operations["post_registry_entrances_entranceId_book_retention"];
         delete?: never;
         options?: never;
@@ -797,7 +797,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The owners and users of an entrance's units as of a date — names only */
+        /** The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403) */
         get: operations["get_registry_entrances_entranceId_owners"];
         put?: never;
         post?: never;
@@ -4169,6 +4169,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4217,6 +4228,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4400,6 +4422,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4437,6 +4470,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4547,6 +4591,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4593,6 +4648,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4652,6 +4718,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4721,6 +4798,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4772,6 +4860,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4842,6 +4941,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4893,6 +5003,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4963,6 +5084,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -5023,6 +5155,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -5071,6 +5214,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

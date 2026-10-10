@@ -17,12 +17,15 @@ import java.math.BigDecimal
 import java.util.UUID
 
 @WebMvcTest(OwnershipController::class)
+@org.springframework.context.annotation.Import(zues.app.identity_org.WhoAsks::class)
 class OwnershipWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var ownership: OwnershipService
+    @MockitoBean lateinit var lists: BookLists
+    @MockitoBean lateinit var logins: zues.app.identity_org.Logins
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
@@ -66,8 +69,8 @@ class OwnershipWebTest {
 
     @Test
     fun `PM-BOOK-011 the owners response carries the name but no id number`() {
-        whenever(ownership.ownersAsOf(any(), any()))
-            .thenReturn(listOf(OwnerView(unitId, "Иван Петров", "OWN", BigDecimal("1.000000"))))
+        whenever(lists.owners(any(), any(), any()))
+            .thenReturn(BookAnswer.Served(listOf(OwnerView(unitId, "Иван Петров", "OWN", BigDecimal("1.000000")))))
         mvc.perform(get("/api/registry/entrances/$entranceId/owners").param("on", "2026-05-01"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$[0].partyName").value("Иван Петров"))
