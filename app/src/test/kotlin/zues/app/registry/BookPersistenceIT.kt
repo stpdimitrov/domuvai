@@ -253,12 +253,16 @@ class BookPersistenceIT {
         assertThat(jdbc.queryForMap("SELECT actor, purpose, rule_id, login_subject, book_date FROM book_access WHERE entrance_id = ? AND kind = 'RETENTION' AND outcome = 'SERVED' AND actor = ?", entrance, manager).values)
             .containsExactly(manager, BookLists.RETENTION_PURPOSE, "PM-BOOK-010", "login-11-manager", java.sql.Date.valueOf(today))
 
-        // This test's application runs with sign-in switched off: a request with no token is nobody's, and the lists stay
-        // as open as everything else is then — with nothing entered. The book itself is not served that way.
-        val before = jdbc.queryForObject("SELECT count(*) FROM book_access WHERE entrance_id = ?", Long::class.java, entrance)
+        // This test's application runs with sign-in switched off: a request with no token is nobody's. The two lists are
+        // still given then, each entered as given to nobody. The retention pass is not run — it cannot be undone, and
+        // nobody would answer for it — and the book itself is not served.
         mvc.perform(get(owners).param("on", today.toString())).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(2))
         mvc.perform(get(overdue)).andExpect(status().isOk)
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM book_access WHERE entrance_id = ?", Long::class.java, entrance)).isEqualTo(before)
+        assertThat(jdbc.queryForList("SELECT kind FROM book_access WHERE entrance_id = ? AND outcome = 'OPEN' AND actor IS NULL AND login_subject IS NULL ORDER BY kind", String::class.java, entrance))
+            .containsExactly("OVERDUE_LIST", "OWNERS_LIST")
+        mvc.perform(post(retention)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-010"))
+        assertThat(entries("RETENTION", "SERVED")).isEqualTo(2)                                                                    // none added
+        assertThat(entries("RETENTION", "REFUSED")).isEqualTo(3)
         mvc.perform(get("/api/registry/entrances/$entrance/book").param("purpose", "проверка")).andExpect(status().isForbidden)
 
         // The table takes the new kinds dated, and no other.
@@ -268,6 +272,11 @@ class BookPersistenceIT {
             jdbc.update(row, entrance, manager, kind, "2026-06-01")
         }
         assertThatThrownBy { jdbc.update(row, entrance, manager, "UNITS_LIST", "2026-06-01") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        // "Given to nobody" is a names list's only: not the book's, not the retention pass's, and not with a reader named.
+        val open = "INSERT INTO book_access (id, entrance_id, actor, purpose, kind, book_date, at, outcome, rule_id) VALUES (gen_random_uuid(), ?, ?, 'проверка', ?, ?::date, now(), 'OPEN', 'PM-BOOK-006')"
+        for ((kind, actor, date) in listOf(Triple("BOOK_READ", null, "2026-06-01"), Triple("RETENTION", null, "2026-06-01"), Triple("LOG_EXPORT", null, null), Triple("OWNERS_LIST", manager, "2026-06-01")))
+            assertThatThrownBy { jdbc.update(open, entrance, actor, kind, date) }.describedAs("$kind $actor").isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThatThrownBy { jdbc.update(open.replace("'OPEN'", "'SERVED'"), entrance, null, "OWNERS_LIST", "2026-06-01") }.isInstanceOf(DataIntegrityViolationException::class.java)   // a served entry still needs its reader
     }
 
     @Test

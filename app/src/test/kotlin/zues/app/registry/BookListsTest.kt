@@ -153,12 +153,18 @@ class BookListsTest {
     }
 
     @Test
-    fun `with sign-in switched off nobody is asking and the lists stay open, with nothing entered — but only then, and only for nobody`() {
+    fun `PM-BOOK-007 with sign-in switched off nobody is asking — the two lists are still given, each entered as given to nobody, before it is drawn`() {
         val open = lists(mode = " OFF ")
         assertThat(open.owners(entranceId, on, Asking(null, null))).isEqualTo(BookAnswer.Served(theOwners))
         assertThat(open.overdue(entranceId, on, Asking(null, null))).isEqualTo(BookAnswer.Served(theOverdue))
-        assertThat(open.anonymiseDue(entranceId, today, Asking(null, null))).isEqualTo(BookAnswer.Served(applied))
-        assertThat(written).isEmpty()
+        assertThat(written.map { listOf(it.kind, it.outcome, it.actor, it.loginSubject, it.bookDate, it.ruleId, it.purpose) }).containsExactly(
+            listOf("OWNERS_LIST", "OPEN", null, null, on, "PM-BOOK-006", BookLists.OWNERS_PURPOSE),
+            listOf("OVERDUE_LIST", "OPEN", null, null, on, "PM-BOOK-006", BookLists.OVERDUE_PURPOSE),
+        )
+        inOrder(aggregates, ownership) {
+            verify(aggregates).insert(any<BookAccessRow>())
+            verify(ownership).ownersAsOf(entranceId, on)
+        }
         // somebody who is asking is decided on, sign-in off or not; and with sign-in configured, nobody is refused
         assertThat(open.owners(entranceId, on, person("owner", Role.OWN))).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
         assertThat(open.owners(entranceId, on, Asking(null, UUID.randomUUID()))).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
@@ -166,6 +172,21 @@ class BookListsTest {
         // open is said in so many words: a setting that is missing, empty or anything else is not open
         for (notOff in listOf("", " ", "of", "open", "true", "0ff"))
             assertThat(lists(mode = notOff).owners(entranceId, on, Asking(null, null))).describedAs("'$notOff'").isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
+        // a list of an entrance nobody registered has nowhere to be entered, and is drawn by the service as it would be
+        val unregistered = UUID.randomUUID()
+        written.clear()
+        open.owners(unregistered, on, Asking(null, null))
+        assertThat(written).isEmpty()
+    }
+
+    @Test
+    fun `PM-BOOK-010 with sign-in switched off the retention pass is refused — what cannot be undone never runs with nobody accountable — and the refusal is entered`() {
+        val open = lists(mode = "off")
+        assertThat(open.anonymiseDue(entranceId, today, Asking(null, null))).isEqualTo(BookAnswer.Refused("PM-BOOK-010"))
+        verifyNoInteractions(retention)
+        assertThat(written.map { listOf(it.kind, it.outcome, it.actor, it.ruleId) }).containsExactly(listOf("RETENTION", "REFUSED", null, "PM-BOOK-010"))
+        // the manager, were there a way to be one in that mode, would still be the manager
+        assertThat(open.anonymiseDue(entranceId, today, person("manager", Role.BM))).isEqualTo(BookAnswer.Served(applied))
     }
 
     @Test

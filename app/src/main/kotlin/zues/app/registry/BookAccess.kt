@@ -38,7 +38,12 @@ data class BookAccessRow(
     val loginSubject: String? = null,
 )
 
-enum class BookAccessOutcome { SERVED, REFUSED }
+enum class BookAccessOutcome {
+    SERVED,
+    REFUSED,
+    /** a names list given with sign-in switched off: to nobody, and entered so */
+    OPEN,
+}
 
 enum class BookAccessKind {
     /** the Book of the Condominium was read */
@@ -132,13 +137,20 @@ class BookAccessService(
      * What a console screen is given from the book, or does to it — a names list, the retention pass (Rule:
      * PM-BOOK-006, PM-BOOK-007, PM-BOOK-010): decided and entered as a read of the book is, under the standing
      * [purpose] of the list itself, since a screen states none. With sign-in switched off nobody is asking and nothing
-     * can be decided: these stay as open as everything else is in that mode, and nothing is entered — there is nobody
-     * to enter. The book itself and its log are never served that way.
+     * can be decided: a names list is still given, as everything else is in that mode, and entered as given to nobody.
+     * The retention pass is not: what cannot be undone never runs with nobody accountable — it is refused like any
+     * other caller the policy does not allow. The book itself and its log are never served that way either.
      */
     @Transactional
     internal fun <T> standing(entranceId: UUID, who: Asking, kind: BookAccessKind, action: Action, on: LocalDate, purpose: String, serve: () -> T): BookAnswer<T> {
         require(kind in STANDING) { "$kind is not read under a standing purpose: the book and its log are read by somebody who says why" }
-        return if (open && who.login == null && who.party == null) BookAnswer.Served(serve()) else decided(entranceId, who, purpose, kind, on, action, serve)
+        if (!(open && kind in LISTS && who.login == null && who.party == null)) return decided(entranceId, who, purpose, kind, on, action, serve)
+        if (entrances.existsById(entranceId)) {
+            aggregates.insert(
+                BookAccessRow(UUID.randomUUID(), entranceId, null, purpose, kind.name, on, clock.instant().truncatedTo(ChronoUnit.MICROS), BookAccessOutcome.OPEN.name, action.governedBy),
+            )
+        }
+        return BookAnswer.Served(serve())
     }
 
     /**
@@ -170,7 +182,10 @@ class BookAccessService(
     }
 
     private companion object {
-        /** What may be read under a standing purpose, and stays open with sign-in off — never the book itself, nor its log. */
-        val STANDING = setOf(BookAccessKind.OWNERS_LIST, BookAccessKind.OVERDUE_LIST, BookAccessKind.RETENTION)
+        /** What is given with sign-in switched off: the two names lists, and nothing else. */
+        val LISTS = setOf(BookAccessKind.OWNERS_LIST, BookAccessKind.OVERDUE_LIST)
+
+        /** What is done under a standing purpose — never the book itself, nor its log. */
+        val STANDING = LISTS + BookAccessKind.RETENTION
     }
 }
