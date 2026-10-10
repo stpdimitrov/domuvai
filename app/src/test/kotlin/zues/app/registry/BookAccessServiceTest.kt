@@ -129,18 +129,35 @@ class BookAccessServiceTest {
     }
 
     @Test
-    fun `PM-BOOK-007 nothing is served and nothing written without a purpose and a registered entrance, whoever asks`() {
-        for (who in listOf(manager, ownerA)) {
-            assertThatThrownBy { service.read(entranceId, on, who, " ") }.isInstanceOf(BookAccessRefused::class.java)
-            assertThatThrownBy { service.read(entranceId, on, who, "о".repeat(PURPOSE_MAX + 1)) }.isInstanceOf(BookAccessRefused::class.java)
-            assertThatThrownBy { service.read(UUID.randomUUID(), on, who, "годишен отчет") }.isInstanceOf(NoSuchElementException::class.java)
-            assertThatThrownBy { service.export(entranceId, who, "") }.isInstanceOf(BookAccessRefused::class.java)
-        }
+    fun `PM-BOOK-007 nothing is served and nothing written for a reader who may read and does not say why, or names an entrance nobody registered`() {
+        assertThatThrownBy { service.read(entranceId, on, manager, " ") }.isInstanceOf(BookAccessRefused::class.java)
+        assertThatThrownBy { service.read(entranceId, on, manager, "о".repeat(PURPOSE_MAX + 1)) }.isInstanceOf(BookAccessRefused::class.java)
+        assertThatThrownBy { service.export(entranceId, manager, "") }.isInstanceOf(BookAccessRefused::class.java)
+        whenever(entrances.existsById(entranceId)).thenReturn(false)                              // a mandate in an entrance that is gone
+        assertThatThrownBy { service.read(entranceId, on, manager, "годишен отчет") }.isInstanceOf(NoSuchElementException::class.java)
+        whenever(entrances.existsById(entranceId)).thenReturn(true)
         assertThat(written).isEmpty()
         verify(book, never()).forEntrance(any(), any())
         verify(log, never()).findByEntranceIdOrderByAtAscIdAsc(any())
         service.read(entranceId, on, manager, " " + "о".repeat(PURPOSE_MAX) + " ")                 // the longest purpose, once trimmed
         assertThat(written.single().purpose).hasSize(PURPOSE_MAX)
+    }
+
+    @Test
+    fun `PM-BOOK-006 a refused reader learns nothing else — the answer is the same refusal with no purpose, one too long, or an entrance nobody registered`() {
+        val unregistered = UUID.randomUUID()
+        assertThat(service.read(entranceId, on, ownerA, " ")).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
+        assertThat(service.read(entranceId, on, ownerA, "о".repeat(PURPOSE_MAX + 50))).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
+        assertThat(service.export(entranceId, ownerA, "")).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
+        assertThat(service.read(unregistered, on, ownerA, "проверка")).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
+        assertThat(service.read(unregistered, on, manager, "проверка")).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))   // the manager of another entrance
+        assertThat(service.read(unregistered, on, Asking(null, null), "")).isEqualTo(BookAnswer.Refused("PM-BOOK-006"))
+        // … and each refusal is entered wherever there is an entrance to enter it under, with what purpose there was
+        assertThat(written.map { it.entranceId }).containsOnly(entranceId)
+        assertThat(written.map { it.outcome }).containsOnly("REFUSED")
+        assertThat(written.map { it.purpose }).containsExactly(NO_PURPOSE_GIVEN, "о".repeat(PURPOSE_MAX), NO_PURPOSE_GIVEN)
+        verify(book, never()).forEntrance(any(), any())
+        verify(log, never()).findByEntranceIdOrderByAtAscIdAsc(any())
     }
 
     @Test
@@ -156,7 +173,7 @@ class BookAccessServiceTest {
         assertThat(exported.map { it.outcome }).containsExactly("SERVED", "REFUSED", "SERVED")
         assertThat(exported.map { it.actorName }).containsExactly("Мария Иванова", null, "Мария Иванова")
         assertThat(exported[1].ruleId).isEqualTo("PM-BOOK-006")
-        assertThat(exported[1].loginSubject).isEqualTo("untied")
+        assertThat(exported[1].loginIssuer to exported[1].loginSubject).isEqualTo("https://id.example.test/realms/domuvai" to "untied")
         assertThat(exported.last().purpose).isEqualTo("проверка на КЗЛД")
         assertThat(exported.last().bookDate).isNull()
         assertThat(written.single().kind).isEqualTo("LOG_EXPORT")

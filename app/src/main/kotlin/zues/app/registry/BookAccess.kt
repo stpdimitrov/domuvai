@@ -51,7 +51,7 @@ interface BookAccessRepository : Repository<BookAccessRow, UUID> {
     fun findByEntranceIdOrderByAtAscIdAsc(entranceId: UUID): List<BookAccessRow>
 }
 
-/** A read off the record — no purpose, or one too long to be a purpose: a 400, no entry and no book. */
+/** A read off the record by someone who may read — no purpose, or one too long to be a purpose: a 400, no entry and no book. */
 class BookAccessRefused(message: String) : RuntimeException(message)
 
 /** What a reader gets: the thing asked for, or the rule that refuses them. A refusal is an answer, not a failure — its entry is kept. */
@@ -62,6 +62,9 @@ sealed interface BookAnswer<out T> {
 
 /** A purpose is a line, not a document: the table refuses a longer one too. */
 const val PURPOSE_MAX = 500
+
+/** What the entry of a refusal says where the refused reader gave no purpose: the table keeps no blank one. */
+const val NO_PURPOSE_GIVEN = "—"
 
 /** An entry as exported: the actor by name beside the id, so the log reads without a second lookup. */
 data class BookAccessView(
@@ -74,6 +77,7 @@ data class BookAccessView(
     val at: Instant,
     val outcome: String,
     val ruleId: String?,
+    val loginIssuer: String?,
     val loginSubject: String?,
 )
 
@@ -106,25 +110,34 @@ class BookAccessService(
         decided(entranceId, who, purpose, BookAccessKind.LOG_EXPORT, null) {
             val rows = log.findByEntranceIdOrderByAtAscIdAsc(entranceId)
             val names = parties.findAllById(rows.mapNotNull { it.actor }.toSet()).associate { it.id to it.fullName }
-            rows.map { BookAccessView(it.id, it.actor, names[it.actor], it.purpose, it.kind, it.bookDate, it.at, it.outcome, it.ruleId, it.loginSubject) }
+            rows.map { BookAccessView(it.id, it.actor, names[it.actor], it.purpose, it.kind, it.bookDate, it.at, it.outcome, it.ruleId, it.loginIssuer, it.loginSubject) }
         }
 
-    /** The decision, then its entry, then — only if allowed — what was asked for. */
+    /**
+     * The decision first, then its entry, then — only if allowed — what was asked for. A reader the policy refuses
+     * learns nothing else: not whether the entrance is registered, nor what was wrong with the request. The refusal is
+     * entered wherever there is an entrance to enter it under.
+     */
     private fun <T> decided(entranceId: UUID, who: Asking, purpose: String, kind: BookAccessKind, bookDate: LocalDate?, serve: () -> T): BookAnswer<T> {
-        if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
-        val why = purpose.trim()
-        if (why.isEmpty()) throw BookAccessRefused("a purpose is required to read the book (PM-BOOK-007)")
-        if (why.length > PURPOSE_MAX) throw BookAccessRefused("a purpose is at most $PURPOSE_MAX characters (PM-BOOK-007)")
         val now = clock.instant()
         val decision = policy.decide(who, Action.READ_BOOK, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(now)))
         // A served read is a party's: an allowance to a login tied to no party would have nobody to put on the record.
         val served = decision.allowed && who.party != null
-        aggregates.insert(
-            BookAccessRow(
-                UUID.randomUUID(), entranceId, who.party, why, kind.name, bookDate, now.truncatedTo(ChronoUnit.MICROS),
-                (if (served) BookAccessOutcome.SERVED else BookAccessOutcome.REFUSED).name, decision.ruleId, who.login?.issuer, who.login?.subject,
-            ),
-        )
+        val registered = entrances.existsById(entranceId)
+        val why = purpose.trim()
+        if (served) {
+            if (!registered) throw NoSuchElementException("no entrance $entranceId")
+            if (why.isEmpty()) throw BookAccessRefused("a purpose is required to read the book (PM-BOOK-007)")
+            if (why.length > PURPOSE_MAX) throw BookAccessRefused("a purpose is at most $PURPOSE_MAX characters (PM-BOOK-007)")
+        }
+        if (registered) {
+            aggregates.insert(
+                BookAccessRow(
+                    UUID.randomUUID(), entranceId, who.party, why.take(PURPOSE_MAX).ifEmpty { NO_PURPOSE_GIVEN }, kind.name, bookDate, now.truncatedTo(ChronoUnit.MICROS),
+                    (if (served) BookAccessOutcome.SERVED else BookAccessOutcome.REFUSED).name, decision.ruleId, who.login?.issuer, who.login?.subject,
+                ),
+            )
+        }
         return if (served) BookAnswer.Served(serve()) else BookAnswer.Refused(decision.ruleId)
     }
 }

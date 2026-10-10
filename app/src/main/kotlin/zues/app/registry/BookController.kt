@@ -37,15 +37,15 @@ class BookController(
     fun book(
         @PathVariable entranceId: UUID,
         @RequestParam(required = false) on: String?,
-        @RequestParam purpose: String,
+        @RequestParam(required = false) purpose: String?,
         signedIn: JwtAuthenticationToken?,
     ): CondominiumBook =
-        served(access.read(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())), who.of(signedIn), purpose))
+        served(access.read(entranceId, on?.let { LocalDate.parse(it) } ?: LocalDate.parse(toSofiaDate(clock.instant())), who.of(signedIn), purpose.orEmpty()))
 
     /** Who read the book, or was refused it, why and when (PM-BOOK-007) — the entrance's entries, oldest first. This export is an entry too. */
     @GetMapping("/access-log")
-    fun accessLog(@PathVariable entranceId: UUID, @RequestParam purpose: String, signedIn: JwtAuthenticationToken?): List<BookAccessView> =
-        served(access.export(entranceId, who.of(signedIn), purpose))
+    fun accessLog(@PathVariable entranceId: UUID, @RequestParam(required = false) purpose: String?, signedIn: JwtAuthenticationToken?): List<BookAccessView> =
+        served(access.export(entranceId, who.of(signedIn), purpose.orEmpty()))
 
     /** The refusal leaves the service as an answer, so its entry is kept; it becomes a 403 only here. */
     private fun <T> served(answer: BookAnswer<T>): T = when (answer) {
@@ -73,7 +73,7 @@ class BookController(
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onForbidden(e: BookReadForbidden): Map<String, String> = mapOf("error" to "the book is read by the manager, the board and the controller of this entrance", "rule" to e.ruleId)
 
-    /** No purpose, or one too long → 400: the book is not served off the record. */
+    /** No purpose, or one too long, from a reader who may read → 400: the book is not served off the record. */
     @ExceptionHandler(BookAccessRefused::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onRefused(e: BookAccessRefused): Map<String, String> = mapOf("error" to (e.message ?: "the book is read on the record"))

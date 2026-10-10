@@ -20,6 +20,7 @@ import zues.app.assembly.AssemblyService
 import zues.app.assembly.NoticeService
 import zues.app.assembly.ProxyService
 import zues.app.identity_org.Logins
+import zues.app.identity_org.WhoAsks
 import zues.app.intake.ImportService
 import zues.app.money.ArrearsService
 import zues.app.money.ChargeRunService
@@ -68,6 +69,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var proxies: ProxyService
     @MockitoBean lateinit var imports: ImportService
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var whoAsks: WhoAsks
     @MockitoBean lateinit var headcount: HeadcountCheckService
     @MockitoBean lateinit var bookAccess: BookAccessService
     @MockitoBean lateinit var arrears: ArrearsService
