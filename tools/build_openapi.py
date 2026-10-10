@@ -45,9 +45,9 @@ RUNNING = {
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end'):
    ('Record or correct the day an animal left the unit', ['PM-BOOK-005', 'PM-BOOK-008']),
  ('get', '/api/registry/entrances/{entranceId}/book'):
-   ('Read the Book of the Condominium as of a date — the read names who and why, and is logged', ['PM-BOOK-001', 'PM-BOOK-002', 'PM-BOOK-007']),
+   ('Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)', ['PM-BOOK-001', 'PM-BOOK-002', 'PM-BOOK-006', 'PM-BOOK-007']),
  ('get', '/api/registry/entrances/{entranceId}/book/access-log'):
-   ("Export who read the entrance's book, why and when — oldest first; the export is logged too", ['PM-BOOK-007']),
+   ("Export who read the entrance's book or was refused it, why and when — oldest first; read by whoever may read the book, and logged too", ['PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/entrances/{entranceId}/book/retention'):
    ("Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible",
     ['PM-BOOK-010']),

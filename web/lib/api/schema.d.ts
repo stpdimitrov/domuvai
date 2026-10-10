@@ -107,6 +107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/identity/logins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tie a login of the api's own issuer to a registered party — only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403. On the record, refusals too */
+        post: operations["post_identity_logins"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/identity/logins/untie": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Untie a login — only the deployment's administrator; an issuer may be named to clear what a changed issuer URL left. On the record, refusals too */
+        post: operations["post_identity_logins_untie"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/identity/me": {
         parameters: {
             query?: never;
@@ -576,7 +610,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the Book of the Condominium as of a date — the read names who and why, and is logged */
+        /** Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403) */
         get: operations["get_registry_entrances_entranceId_book"];
         put?: never;
         post?: never;
@@ -593,7 +627,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export who read the entrance's book, why and when — oldest first; the export is logged too */
+        /** Export who read the entrance's book or was refused it, why and when — oldest first; read by whoever may read the book, and logged too */
         get: operations["get_registry_entrances_entranceId_book_access_log"];
         put?: never;
         post?: never;
@@ -880,8 +914,8 @@ export interface components {
         };
         BookAccessView: {
             /** Format: uuid */
-            actor: string;
-            actorName: string;
+            actor?: string;
+            actorName?: string;
             /** Format: date-time */
             at: string;
             /** Format: date */
@@ -889,7 +923,11 @@ export interface components {
             /** Format: uuid */
             id: string;
             kind: string;
+            loginIssuer?: string;
+            loginSubject?: string;
+            outcome: string;
             purpose: string;
+            ruleId?: string;
         };
         BookNonUse: {
             /** Format: date */
@@ -1279,6 +1317,17 @@ export interface components {
             catalogueVersion: string;
             engineVersion: string;
         };
+        LoginTied: {
+            issuer: string;
+            /** Format: uuid */
+            partyId: string;
+            subject: string;
+        };
+        LoginUntied: {
+            /** Format: uuid */
+            partyId?: string;
+            untied: boolean;
+        };
         MajorityView: {
             comparison: string;
             denominator: string;
@@ -1550,6 +1599,11 @@ export interface components {
             /** Format: int64 */
             totalMinor?: number;
         };
+        TieLogin: {
+            /** Format: uuid */
+            partyId?: string;
+            subject?: string;
+        };
         TitleAssignedResponse: {
             /** Format: uuid */
             titleId: string;
@@ -1619,6 +1673,10 @@ export interface components {
         };
         UnitsCreatedResponse: {
             unitIds: string[];
+        };
+        UntieLogin: {
+            issuer?: string;
+            subject?: string;
         };
         WhoIsAsking: {
             /** Format: uuid */
@@ -2077,6 +2135,120 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_identity_logins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TieLogin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginTied"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_identity_logins_untie: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UntieLogin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginUntied"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3527,10 +3699,9 @@ export interface operations {
     };
     get_registry_entrances_entranceId_book: {
         parameters: {
-            query: {
+            query?: {
                 on?: string;
-                actor: string;
-                purpose: string;
+                purpose?: string;
             };
             header?: never;
             path: {
@@ -3560,6 +3731,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3575,9 +3757,8 @@ export interface operations {
     };
     get_registry_entrances_entranceId_book_access_log: {
         parameters: {
-            query: {
-                actor: string;
-                purpose: string;
+            query?: {
+                purpose?: string;
             };
             header?: never;
             path: {
@@ -3598,6 +3779,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3736,6 +3928,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
