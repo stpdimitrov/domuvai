@@ -818,6 +818,18 @@
         ],
         "type": "object"
       },
+      "EndMandate": {
+        "properties": {
+          "on": {
+            "format": "date",
+            "type": "string"
+          },
+          "protocolRef": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "EndStayRequest": {
         "properties": {
           "on": {
@@ -1597,6 +1609,43 @@
         ],
         "type": "object"
       },
+      "MandateEnded": {
+        "properties": {
+          "mandateId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "on": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mandateId",
+          "on"
+        ],
+        "type": "object"
+      },
+      "MandateRecorded": {
+        "properties": {
+          "mandateId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "succeeded": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "mandateId",
+          "succeeded"
+        ],
+        "type": "object"
+      },
       "ManualEntry": {
         "properties": {
           "designation": {
@@ -2094,6 +2143,29 @@
           "quantity",
           "unitId"
         ],
+        "type": "object"
+      },
+      "RecordMandate": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "protocolRef": {
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "date",
+            "type": "string"
+          },
+          "validTo": {
+            "format": "date",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "RecordPaymentRequest": {
@@ -3469,6 +3541,215 @@
         "x-rules": [
           "PM-GA-004",
           "PM-GA-006"
+        ]
+      }
+    },
+    "/api/identity/entrances/{entranceId}/mandates": {
+      "post": {
+        "operationId": "post_identity_entrances_entranceId_mandates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordMandate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MandateRecorded"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too",
+        "tags": [
+          "identity"
+        ],
+        "x-rules": [
+          "PM-GOV-004",
+          "PM-SEC-001",
+          "PM-SEC-004",
+          "PM-SEC-011"
+        ]
+      }
+    },
+    "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end": {
+      "post": {
+        "operationId": "post_identity_entrances_entranceId_mandates_mandateId_end",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "mandateId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndMandate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MandateEnded"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record the day a mandate ended — once; only the deployment's administrator. On the record, refusals too",
+        "tags": [
+          "identity"
+        ],
+        "x-rules": [
+          "PM-GOV-004",
+          "PM-SEC-001",
+          "PM-SEC-004",
+          "PM-SEC-011"
         ]
       }
     },

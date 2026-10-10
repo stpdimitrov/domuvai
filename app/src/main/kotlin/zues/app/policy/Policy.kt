@@ -15,6 +15,7 @@ data class Asking(val login: Login?, val party: UUID?)
 
 /** What is asked for, each with the rule that governs it — the rule a refusal cites. */
 enum class Action(val governedBy: String) {
+    // An action is asked of a kind of resource; [Policy.ADMINISTERED] says which, for the administrator's.
     /** the whole Book of the Condominium of an entrance */
     READ_BOOK("PM-BOOK-006"),
 
@@ -23,6 +24,9 @@ enum class Action(val governedBy: String) {
 
     /** tying a login to a party, or untying it: saying who a signed-in person is */
     TIE_LOGIN("PM-SEC-001"),
+
+    /** recording a mandate of an entrance, or the day it ended: saying who its manager, board, controller or cashier is */
+    RECORD_MANDATE("PM-SEC-001"),
 }
 
 /**
@@ -89,7 +93,7 @@ class Policy(private val sources: List<RoleSource>) {
         val held = resource.entranceId?.let { rolesOf(who, it, asAt) }.orEmpty()
         val permit = MATRIX.firstOrNull { line ->
             line.action == action &&
-                (if (line.role == Role.SYS_ADMIN) resource is Resource.Deployment && administers(who, asAt) else held.any { carries(it, line, resource) })
+                (if (line.role == Role.SYS_ADMIN) ADMINISTERED[action]?.isInstance(resource) == true && administers(who, asAt) else held.any { carries(it, line, resource) })
         } ?: return Decision(false, action.governedBy, null, MATRIX_VERSION)
         return Decision(true, permit.ruleId, permit.role, MATRIX_VERSION)
     }
@@ -101,12 +105,22 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 2
+        const val MATRIX_VERSION = 3
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
-         * own data — nobody else. Who a login is: the deployment's administrator — and nobody else.
+         * own data — nobody else. Who a login is, and who holds an entrance's offices: the deployment's administrator —
+         * and nobody else.
          */
+        /**
+         * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
+         * and on no other: a login is the deployment's, a mandate an entrance's.
+         */
+        val ADMINISTERED: Map<Action, Class<out Resource>> = mapOf(
+            Action.TIE_LOGIN to Resource.Deployment::class.java,
+            Action.RECORD_MANDATE to Resource.OfEntrance::class.java,
+        )
+
         val MATRIX: List<Permit> = listOf(
             Permit(Action.READ_BOOK, Role.BM, "PM-BOOK-006"),
             Permit(Action.READ_BOOK, Role.MB, "PM-BOOK-006"),
@@ -116,6 +130,7 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.READ_UNIT_BOOK_DATA, Role.CTL, "PM-BOOK-006"),
             Permit(Action.READ_UNIT_BOOK_DATA, Role.OWN, "PM-BOOK-006", ownUnitOnly = true),
             Permit(Action.TIE_LOGIN, Role.SYS_ADMIN, "PM-SEC-001"),
+            Permit(Action.RECORD_MANDATE, Role.SYS_ADMIN, "PM-SEC-001"),
         )
     }
 }
