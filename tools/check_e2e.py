@@ -27,7 +27,9 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 10. WEB-22 (PM-SYS-010): every screen under the console's layout has one footer, with the catalogue and engine
     versions the API serves.
 
-11. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
+11. WEB-23 (PM-BOOK-003, PM-BOOK-012): the compliance screen shows each entrance's overdue declarations and the month's
+    headcount check as the API gives them, says so where no run was issued, and nothing of the design's sample.
+12. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
     httpOnly cookie and no token; every screen above is then read signed in, from an api that is closed; the console
     names the person, with the login the api read from the web's bearer; sign-out ends the session at the web and at
     the issuer.
@@ -76,6 +78,8 @@ CALLS = {
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}),
     ("GET", "/api/money/entrances/{entranceId}/fund"): lambda e: (f"/api/money/entrances/{e}/fund", None),
     ("GET", "/api/money/entrances/{entranceId}/operating-account"): lambda e: (f"/api/money/entrances/{e}/operating-account", None),
+    ("GET", "/api/money/entrances/{entranceId}/charge-runs/{period}/headcount"): lambda e: (
+        f"/api/money/entrances/{e}/charge-runs/2026-09/headcount", None),
     ("GET", "/api/money/entrances/{entranceId}/journal"): lambda e: (
         f"/api/money/entrances/{e}/journal?from=2026-09-01&to=2026-09-30", None),
     ("GET", "/api/money/entrances/{entranceId}/fund/handover-statements"): lambda e: (
@@ -624,6 +628,76 @@ def response_schema(method, path, status):
     return {**as_defs(schema), "$defs": as_defs(defs)}
 
 
+def compliance_screen(api, web, entrance):
+    """
+    WEB-23 — `/compliance` shows, entrance by entrance, what the API serves and nothing of the design's sample: who is
+    past the registry's due date to declare for the book (PM-BOOK-003) and the month's headcount check (PM-BOOK-012).
+    Every figure is taken from the API here, never typed: the page must show the same. An entrance with no run issued
+    for the month is said to have none — never shown as one with nothing to report. This check writes: it enters one
+    person in the seeded entrance's book, so that there is a difference to read.
+    """
+    failures, date = [], lambda iso: ".".join(reversed(iso.split("-")))
+    plural = lambda n, one, many: f"{n} {one if n == 1 else many}"
+    status, page = fetch(web, "/compliance?period=2026-09")
+    text = visible_text(page)
+    failures += [] if status == 200 else [f"/compliance: HTTP {status}"]
+    sample = ["чл. 19", "Армеец", "Агенция", "КЗЛД", "ПД-0142", "22-0034512", "62 действащи", "204118736", "62 входа под управление", "Армеец", "СОА26", "КЗЛД-26", "Остават 83 дни", "20260628153412"]
+    failures += [f"/compliance: still shows the design's sample ({word!r})" for word in sample if word in text]
+
+    status, raw = fetch(api, f"/api/registry/entrances/{entrance}/book/declarations/overdue")
+    overdue = json.loads(raw) if status == 200 else None
+    if not overdue:
+        failures.append(f"/compliance: the API lists no overdue declaration for the seeded entrance (HTTP {status}) — nothing to read off the page")
+    roles = {"OWN": "собственик", "USR": "ползвател"}
+    rows = [f"{d['designation']} {d['partyName']} {roles.get(d['titleRole'], d['titleRole'].lower())} {date(d['acquiredOn'])} {date(d['dueOn'])}" for d in overdue or []]
+    failures += [f"/compliance: does not show the overdue declaration {row!r}" for row in rows if row not in text]
+    group = f"ул. Шипка 14, вх. Б {plural(len(rows), 'просрочена декларация', 'просрочени декларации')}"
+    failures += [] if group in text else [f"/compliance: does not show {group!r}"]
+
+    # PM-BOOK-012 — the report lists the units that differ, so the check makes one differ, as a manager would: through
+    # the public API it enters a child in the book of the first unit for a date the September run had already billed.
+    # (Each run of this check enters one more; the figures below are the API's, whatever they have become.)
+    def headcount():
+        status, raw = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/2026-09/headcount")
+        return json.loads(raw) if status == 200 else None
+    check = headcount()
+    if not check:
+        failures.append("/compliance: the API gives no headcount check for the seeded run of 2026-09")
+    else:
+        if not check["mismatches"] and "Начислените лица са лицата по книга." not in text.split("Сверка на книгата", 1)[-1]:
+            failures.append("/compliance: a check with no difference is not said to have none")
+        status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units")
+        unit = sorted(json.loads(raw), key=lambda u: u["designation"])[0]["id"] if status == 200 else None
+        status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units/{unit}/household",
+                            {"members": [{"isChildUnder6": True, "validFrom": "2026-08-01"}]})
+        check = headcount() if status in (200, 201) else None
+        if not check or not check["mismatches"]:
+            failures.append(f"/compliance: a person entered in the book for a date already billed (HTTP {status}) makes no difference the API reports — no row to read")
+        else:
+            text = visible_text(fetch(web, "/compliance?period=2026-09")[1])
+            checks = text.split("Сверка на книгата", 1)[-1]
+            head = (f"ул. Шипка 14, вх. Б сравнени {plural(check['unitsCompared'], 'обект', 'обекта')} към {date(check['legalDate'])} · "
+                    f"{plural(len(check['mismatches']), 'разминаване', 'разминавания')}")
+            failures += [] if head in checks else [f"/compliance: does not show {head!r}"]
+            words = {"COUNT_DIFFERS": "броят се различава", "NOT_IN_BOOK": "начислен, а вече не е обект на входа по книга", "NOT_BILLED": "обект по книга, а не е начислен"}
+            persons = lambda all_, under6: "—" if all_ is None else f"{all_} · {under6} под 6 г."
+            for m in check["mismatches"]:
+                row = (f"{m['designation']} {words.get(m['difference'], m['difference'])} {persons(m.get('billedOccupants'), m.get('billedChildrenUnder6'))} "
+                       f"{persons(m.get('declaredOccupants'), m.get('declaredChildrenUnder6'))}")
+                failures += [] if row in checks else [f"/compliance: does not show the unit that differs as the API reports it: {row!r}"]
+    # the seed's second entrance has no run at all, and no entrance has one for a month long past: said, not shown as clean
+    none = f"{BUSINESS_LABEL} няма издадено начисление за месеца"
+    failures += [] if none in text else [f"/compliance: does not show {none!r}"]
+    past = visible_text(fetch(web, "/compliance?period=2020-01")[1])
+    if past.count("няма издадено начисление за месеца") != 2 or "сравнени" in past or "януари 2020" not in past:
+        failures.append("/compliance?period=2020-01: a month with no run is not said to have none for both entrances")
+    links = [f'href="/compliance?period=2026-08"', f'href="/compliance?period=2026-10"', f'href="/entrance?entrance={entrance}"']
+    failures += [f"/compliance: no link {link}" for link in links if link not in page.replace("&amp;", "&")]
+    print(f"{'ok ' if not failures else 'BAD'} /compliance  {len(rows)} overdue declarations, and a unit made to differ shown as the API reports it; "
+          f"no run said as none; no sample left")
+    return failures
+
+
 def visible_text(page):
     page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
     page = re.sub(r"<(script|style)\b.*?</\1>", " ", page, flags=re.S)
@@ -707,6 +781,7 @@ def main():
 
     failures += charges_multiple(api, web)
     failures += entrance_screen(api, web, entrance)
+    failures += compliance_screen(api, web, entrance)
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
     status, raw = fetch(api, "/api/law/version")
@@ -721,7 +796,7 @@ def main():
     print(f"{'ok ' if served and not bare else 'BAD'} PM-SYS-010 the footer  {len(under) - len(bare)}/{len(under)} screens show {footer!r}")
 
     # WEB-21 — a parameter given twice arrives as a list: every live screen answers it, none fails on it
-    twice = ["/debts?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?show=owing&show=fund",
+    twice = ["/compliance?period=2026-09&period=2026-08", "/debts?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?asOf=2026-09-30&asOf=2026-10-20", "/portfolio?show=owing&show=fund",
              f"/entrance?entrance={entrance}&entrance={entrance}", f"/entrance/fund?entrance={entrance}&entrance={entrance}",
              f"/entrance/charges?entrance={entrance}&entrance={entrance}", f"/entrance/fund?entrance={entrance}&period=2026-09&period=2026-08",
              f"/entrance/fund?entrance={entrance}&account=fund&account=cash", f"/entrance/fund?entrance={entrance}&status=paid&status=committed",
