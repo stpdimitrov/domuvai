@@ -823,6 +823,9 @@
           "on": {
             "format": "date",
             "type": "string"
+          },
+          "protocolRef": {
+            "type": "string"
           }
         },
         "type": "object"

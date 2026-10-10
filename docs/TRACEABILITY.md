@@ -52,7 +52,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GOV-001` | — | — |  |
 | `PM-GOV-002` | — | — |  |
 | `PM-GOV-003` | — | — |  |
-| `PM-GOV-004` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationIT.kt:125` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:121` |  |
+| `PM-GOV-004` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationIT.kt:125` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:129` |  |
 | `PM-GOV-005` | — | — |  |
 | `PM-GOV-006` | — | — |  |
 | `PM-GOV-007` | — | — |  |
