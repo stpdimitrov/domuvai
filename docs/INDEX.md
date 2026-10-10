@@ -30,7 +30,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | ADR | Decision | Status |
 |---|---|---|
 | [001](adr/ADR-001-rules-mechanism.md) | Dated data + pure functions, no rules engine | **Accepted** |
-| [002](adr/ADR-002-authorization.md) | One policy module, RLS as independent backstop | **Accepted** |
+| [002](adr/ADR-002-authorization.md) | One policy module, RLS as independent backstop · amended 2026-10-10: roles are derived from titles and mandates, the administrator is named in configuration, the matrix is versioned (AUTH-04) — **RLS not built yet** | **Accepted** |
 | [003](adr/ADR-003-deployment-topology.md) | Three deployables, fourteen modules, CI-enforced boundaries · amended 2026-09-14 (JVM enforcement) | **Accepted** |
 | [004](adr/ADR-004-shared-facilities.md) | A shared facility is a cost-sharing agreement, not a tenant | Proposed — counsel |
 | [005](adr/ADR-005-entrance-as-isolation-unit.md) | The entrance is the isolation unit; the account belongs to it | **Accepted** |
