@@ -2570,3 +2570,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/assembly/Petition.kt`, `app/src/main/kotlin/zues/app/registry/Holdings.kt`, this entry's "For counsel".
 
 ---
+
+## WEB-24 · 2026-10-10 · web — a refusal is said as a refusal on every live screen; the sidebars' sample names go (PM-BOOK-006)
+
+**Shipped** — one wording, in one place (`web/lib/refusal.ts`), for an answer the api did not give: the backend's silence; a 403 as "you may not read this", led by the rule the api names (it reads the book's separate `rule` field too); a 401 as a sign-in that was not accepted; anything else as it came. `/portfolio`, `/debts`, `/entrance`, `/entrance/charges`, `/entrance/fund` and `/compliance` all use it, for the list of entrances and for each answer of each entrance. Each answer fails alone: where the registry refuses an entrance's owners (`/debts`, `/entrance/charges`) the amounts — money's — stay and the names are said to be refused; where it refuses the overdue declarations (`/entrance`, `/compliance`) the screen says so. `/entrance/charges` used to drop a refused owners list silently. No refused answer turns into a figure: no 0% of ideal parts, no "0 overdue" when no entrance was read, and the portfolio's fund cell keeps the api's words. The web decides nothing about who may read (PM-BOOK-006 is the api's) and hides nothing it was served. The sidebars lose the design's "recently opened" addresses and its sample user and firm — nothing is put in their place; the entrance sidebar's link to `/compliance` now leads there.
+
+**Verified** — 27 web tests (`npm test`), four for the wording, one named for PM-BOOK-006. On this machine, a production build behind a stand-in that answers 403 for the two names lists with the registry's own body: `/debts` and `/entrance/charges` show every amount and "Нямате право да четете собствениците на входа: PM-BOOK-006: …"; `/entrance` and `/compliance` say the declarations were refused, and `/compliance` shows no count for them; the headcount check and the accounts beside them are still shown. With the api closed and no session, all six screens say the sign-in was not accepted. `tools/check_e2e.py` passes on the open chain, counts the new words as error states the seeded screens must not show, and fails on any of the sample names on any console screen. Gates green.
+
+**Review** — fresh context, seven points. Taken: the portfolio's fund cell dropped a refusal's words and status; one silent answer was reported for another; a refused units list made the charges footer read 0,0000%; with every entrance refused `/compliance` read "0 overdue" — now no figure; a 403 with empty words rendered a dangling colon and the api's rule id was dropped — the wording now takes only real text and leads with the rule; the sample-name check reads each page once and fails on one that does not load.
+
+**Decisions** — mine, stated on #179: the narrow fund cell says the short word and carries the api's words as its title · a refusal's rule id is shown to the person — it is the reason, and names no one.
+
+**Open** — **no real 403 has answered these screens yet**: the registry's guard (#178) had not merged; when it does, CI's `ivan` and the check's client hold mandates, so CI will still see no refusal — a login *without* a role in the e2e job is what would exercise this · the pages' states have no unit tests (the web has no component test runner); the wording has · two pages still keep a local helper to recognise the api's "no account" 404 by its words · `/assembly` is still the design's sample · #175 stands.
+
+**Read first next time** — `web/lib/refusal.ts`, `web/README.md` (the paragraph on answers not given), #178.
+
+---
