@@ -98,8 +98,11 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
           <span className="meta">
             {view.kind === "ok" && (
               <>
-                {count(late, "просрочена декларация", "просрочени декларации")} към днес
-                {unreadLate > 0 && <span style={FAILED}> (без {count(unreadLate, "непрочетен вход", "непрочетени входа")})</span>} ·{" "}
+                {/* a figure only where something was read: with every entrance refused there is none, not a zero */}
+                {unreadLate === rows.length
+                  ? <span style={FAILED}>просрочените декларации не са прочетени</span>
+                  : <>{count(late, "просрочена декларация", "просрочени декларации")} към днес</>}
+                {unreadLate > 0 && unreadLate < rows.length && <span style={FAILED}> (без {count(unreadLate, "непрочетен вход", "непрочетени входа")})</span>} ·{" "}
                 {count(differing, "разминаване", "разминавания")} за {monthName(period)}
                 {unreadChecks > 0 && <span style={FAILED}> (без {count(unreadChecks, "непрочетен вход", "непрочетени входа")})</span>} ·{" "}
                 {count(rows.length, "вход", "входа")}
@@ -188,8 +191,8 @@ function Declarations({ rows, late, unread }: { rows: Row[]; late: number; unrea
         <div className="cp-od pf-foot">
           <div>Общо</div>
           <div style={{ ...DIM, fontWeight: 400 }}>
-            {count(late, "просрочена декларация", "просрочени декларации")}
-            {unread > 0 && <span style={FAILED}> · без {count(unread, "непрочетен вход", "непрочетени входа")}</span>}
+            {unread === rows.length ? "—" : count(late, "просрочена декларация", "просрочени декларации")}
+            {unread > 0 && <span style={FAILED}> · {unread === rows.length ? "нито един вход не е прочетен" : `без ${count(unread, "непрочетен вход", "непрочетени входа")}`}</span>}
           </div>
           <div /><div /><div />
         </div>

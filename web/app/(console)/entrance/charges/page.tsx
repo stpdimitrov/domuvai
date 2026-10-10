@@ -179,7 +179,8 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
 
 function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>; period: string; multiple: Multiple }) {
   const { run, ideal, owners, namesFailed } = view;
-  const idealSum = run.charges.reduce((total, c) => total + (ideal.get(c.unitId) ?? 0), 0);
+  // No ideal parts read (the units were refused): no sum of them either — a dash, never 0%.
+  const idealSum = ideal.size === 0 ? "—" : pct(run.charges.reduce((total, c) => total + (ideal.get(c.unitId) ?? 0), 0));
   const totals = ["MANAGEMENT", "MAINTENANCE", "REPAIR_FUND"].map((s) => run.charges.reduce((t, c) => t + sum(stream(c, s)), 0));
 
   return (
@@ -244,7 +245,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
           <div className="num">{run.charges.reduce((t, c) => t + c.chargeablePersons, 0)}</div>
           <div />
           <div />
-          <div className="num">{pct(idealSum)}</div>
+          <div className="num">{idealSum}</div>
           <div className="num">{eur(totals[0])}</div>
           <div className="num">{eur(totals[1])}</div>
           <div className="num" style={DIM}>—</div>
@@ -257,7 +258,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
         <div>
           <div style={{ font: "400 12px/1.5 'IBM Plex Sans'", color: "#5C605E" }}>
             Изчислено от API: {run.charges.length} обекта · сумата на идеалните части е{" "}
-            <span style={{ color: "#14584A", fontWeight: 500 }}>{pct(idealSum)}</span> · посочете сума, за да видите как е изведена
+            <span style={{ color: "#14584A", fontWeight: 500 }}>{idealSum}</span> · посочете сума, за да видите как е изведена
           </div>
           <div style={{ font: "400 11.5px/1.4 'IBM Plex Mono', monospace", color: "#6B6F6C" }}>
             Преглед — нищо не е записано. Издаването изисква решение на ОС, не демо базис.

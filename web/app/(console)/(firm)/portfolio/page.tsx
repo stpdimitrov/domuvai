@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Портфейл — Етаж" };
 
 type Entrance = Schemas["EntranceView"];
 
-type Fund = { kind: "ok"; view: Schemas["FundView"] } | { kind: "none" } | { kind: "failed" };
+type Fund = { kind: "ok"; view: Schemas["FundView"] } | { kind: "none" } | { kind: "failed"; refused: boolean; message: string };
 
 type Row =
   | { entrance: Entrance; kind: "ok"; units: number; arrears: Schemas["EntranceArrears"]; fund: Fund }
@@ -39,16 +39,16 @@ async function load(asOf: string): Promise<Loaded> {
       reach(() => api.GET("/api/money/entrances/{entranceId}/arrears", { params: { path, query: { asOf } } })),
       reach(() => api.GET("/api/money/entrances/{entranceId}/fund", { params: { path } })),
     ]);
-    if (!units || !arrears) return { entrance, kind: "failed", message: "Бекендът не подаде входа." };
-    if (!units.data) return { entrance, kind: "failed", message: unansweredBy(units, "обектите на входа") };
-    if (!arrears.data) return { entrance, kind: "failed", message: unansweredBy(arrears, "задълженията на входа") };
+    if (!units?.data) return { entrance, kind: "failed", message: unansweredBy(units, "обектите на входа") };
+    if (!arrears?.data) return { entrance, kind: "failed", message: unansweredBy(arrears, "задълженията на входа") };
     return {
       entrance,
       kind: "ok",
       units: units.data.length,
       arrears: arrears.data,
       // 404: the entrance has no repair fund account yet — a fact about it, not a failure
-      fund: fund?.data ? { kind: "ok", view: fund.data } : fund?.response.status === 404 ? { kind: "none" } : { kind: "failed" },
+      fund: fund?.data ? { kind: "ok", view: fund.data } : fund?.response.status === 404 ? { kind: "none" }
+        : { kind: "failed", refused: fund?.response.status === 403, message: unansweredBy(fund, "фонда на входа") },
     };
   });
   return { kind: "ok", asOf, rows };
@@ -201,8 +201,9 @@ function Portfolio({ view, show, dated }: { view: Extract<Loaded, { kind: "ok" }
                     <div className={`num${r.fund.view.availableMinor < 0 ? " late" : ""}`}>{eur(r.fund.view.availableMinor)}</div>
                   </>
                 ) : (
-                  <div className="num" style={{ ...(r.fund.kind === "failed" ? FAILED : DIM), gridColumn: "span 2" }}>
-                    {r.fund.kind === "none" ? "няма сметка" : "фондът не се зареди"}
+                  // two narrow columns: the short word here, the API's own words on the cell
+                  <div className="num" style={{ ...(r.fund.kind === "failed" ? FAILED : DIM), gridColumn: "span 2" }} title={r.fund.kind === "failed" ? r.fund.message : undefined}>
+                    {r.fund.kind === "none" ? "няма сметка" : r.fund.refused ? "нямате право за фонда" : "фондът не се зареди"}
                   </div>
                 )}
                 <div className="num" style={DIM}>—</div>

@@ -8,7 +8,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 const FIRM: { label: string; href: string; due?: string }[] = [
   { label: "Портфейл", href: "/portfolio" },
   { label: "Задължения", href: "/debts" },
-  { label: "Съответствие на фирмата", href: "#" },
+  { label: "Съответствие на фирмата", href: "/compliance" },
 ];
 
 const ENTRANCE: { label: string; href: string; due?: string }[] = [

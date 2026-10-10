@@ -25,3 +25,17 @@ test("no answer is the backend's silence; any other refusal is shown as it came"
   }
   assert.deepEqual(refused(answer(409, "already issued")), { status: 409, message: "already issued" });
 });
+
+test("the rule the API names apart from its words leads them; a body with no words leaves the status to stand in", () => {
+  const body = (error: unknown) => ({ response: { status: 403 }, error });
+  // the book's own 403, as the registry sends it
+  assert.equal(
+    unansweredBy(body({ error: "the book is read by the manager, the board and the controller of this entrance", rule: "PM-BOOK-006" }), "книгата"),
+    "Нямате право да четете книгата: PM-BOOK-006: the book is read by the manager, the board and the controller of this entrance",
+  );
+  assert.equal(refused(body({ error: "PM-BOOK-006 says no", rule: "PM-BOOK-006" })).message, "PM-BOOK-006 says no");      // named once is enough
+  assert.equal(refused(body({ rule: "PM-BOOK-006" })).message, "PM-BOOK-006");
+  for (const empty of [undefined, null, "", "text", 7, {}, { error: "" }, { error: "   " }, { error: {} }, { error: 7 }, { error: null }, { error: ["x"] }]) {
+    assert.equal(refused(body(empty)).message, "HTTP 403", JSON.stringify(empty));
+  }
+});

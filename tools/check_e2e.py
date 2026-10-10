@@ -180,7 +180,7 @@ SCREENS = {
 }
 # The words of every error state the live screens have. None may appear for the seeded entrance.
 ERRORS = [
-    "Бекендът не отговаря", "Бекендът не подаде", "API отказа", "Нямате право", "Входът ви не беше приет", "не е регистриран", "Няма регистриран вход",
+    "Бекендът не отговаря", "Бекендът не подаде", "API отказа", "Нямате право", "нямате право", "Входът ви не беше приет", "не е прочетен", "не са прочетени", "не е регистриран", "Няма регистриран вход",
     "няма регистрирана сметка на фонд", "няма регистрирана оперативна сметка", "не се заредиха", "не се зареди ",
     "незаредени", "незареден", "версията не е достъпна",
 ]
@@ -797,7 +797,9 @@ def main():
 
     # WEB-24 — no console screen carries the design's sample person, firm or "recently opened" addresses any more
     names = ["Мария Петрова", "Домоуправител Про", "Последно отваряни", "Витоша 102", "Младост 3"]
-    named = [(url, name) for url in under for name in names if name in visible_text(fetch(web, url)[1])]
+    pages = {url: fetch(web, url) for url in under}
+    failures += [f"{url}: HTTP {status} — not read for sample names" for url, (status, _) in pages.items() if status != 200]
+    named = [(url, name) for url, (_, page) in pages.items() for name in names if name in visible_text(page)]
     failures += [f"{url}: still shows the design's sample ({name!r})" for url, name in named]
     print(f"{'ok ' if not named else 'BAD'} the sidebars  {len(under)} screens carry none of the design's sample names")
 

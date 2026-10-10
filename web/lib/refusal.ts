@@ -6,11 +6,19 @@
  */
 export type Refused = { status: number; message: string };
 
-/** The API's refusal, from an answer that carries no data. */
-export const refused = (answer: { error?: { error?: string }; response: { status: number } }): Refused => ({
-  status: answer.response.status,
-  message: answer.error?.error ?? `HTTP ${answer.response.status}`,
-});
+type Answer = { error?: unknown; response: { status: number } };
+const words = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+
+/**
+ * The API's refusal, from an answer that carries no data: its own words, led by the rule it names when it names one
+ * apart from them (`rule`, as the book's 403 does). A body with no words leaves the status to stand in.
+ */
+export const refused = (answer: Answer): Refused => {
+  const body = typeof answer.error === "object" && answer.error !== null ? (answer.error as { error?: unknown; rule?: unknown }) : {};
+  const [said, rule] = [words(body.error), words(body.rule)];
+  const message = said && rule && !said.includes(rule) ? `${rule}: ${said}` : said || rule || `HTTP ${answer.response.status}`;
+  return { status: answer.response.status, message };
+};
 
 /** [what] is named in the accusative, definite: „собствениците на входа“, „списъка на входовете“. */
 export function unanswered(by: Refused | null, what: string): string {
@@ -21,5 +29,5 @@ export function unanswered(by: Refused | null, what: string): string {
 }
 
 /** The same, straight from a call: `null` when the backend did not answer at all. */
-export const unansweredBy = (answer: { error?: { error?: string }; response: { status: number } } | null | undefined, what: string): string =>
+export const unansweredBy = (answer: Answer | null | undefined, what: string): string =>
   unanswered(answer ? refused(answer) : null, what);
