@@ -229,8 +229,17 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   built — those columns show `—`, and the two buttons stay disabled. **It names debtors and their debts, so it
   must never be reachable by the public** (PM-DEBT-011) — served only to a person who is signed in (see
   [Who the console is served to](#who-the-console-is-served-to)), and see TODO before launch.
-- **`/compliance`** — the firm's regulatory standing (screen 07 Съответствие): register / insurance /
-  management-contract status cards, and a filings-and-declarations table.
+- **`/compliance`** — what the firm must keep in order (screen 07 Съответствие) — **live as far as the API goes**
+  (WEB-23): for every entrance, who is past the registry's due date to declare for the book (PM-BOOK-003 — unit,
+  name, role, the day the title began, the registry's own due date; the page computes no deadline) and one month's
+  headcount check (PM-BOOK-012 — how many units money compared, and each unit whose billed persons are not the
+  persons the book declares). `?period=YYYY-MM` (default: this month, Europe/Sofia), with links to the months
+  beside it. The API cannot list the months that have a run, so the month is asked for: an entrance with no run
+  issued for it is said to have none, never shown as clean. Each answer fails alone; a refusal is shown as one, in
+  the API's own words — a 403 as "you may not read this" — and every total says which entrances it leaves out. The
+  design's registration, insurance and contract cards and its filings table are not served by the API: they say
+  "not kept in the system yet", and every sample figure is gone. The e2e check enters one person in the seeded book
+  to have a difference to read.
 - **`/entrance`** — a single entrance (screen 02) — **live** (WEB-20): `?entrance=<id>` (default: the first
   by name), its units by kind and its management form; in the calendar panel, who is past the deadline to
   declare for the book, with the registry's own due date (`GET …/book/declarations/overdue`, names only) —

@@ -872,6 +872,39 @@
   padding: 0 16px;
   min-width: 1080px;
 }
+/* /compliance: the overdue declarations, and the month's headcount check (WEB-23) */
+.cp-od {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 128px 104px 104px;
+  column-gap: 14px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 720px;
+}
+.cp-hc {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 168px 168px;
+  column-gap: 14px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 720px;
+}
+/* two tables on one screen: each as tall as its rows, and the screen scrolls — not each table inside itself */
+.pf-card.cp-card {
+  flex: none;
+  overflow-x: auto;
+}
+a.chip {
+  display: inline-block;
+  text-decoration: none;
+}
+.dt-group a {
+  color: inherit;
+  text-decoration: none;
+}
+.dt-group a:hover {
+  text-decoration: underline;
+}
 .co-card {
   background: #ffffff;
   border: 1px solid #deddd9;
