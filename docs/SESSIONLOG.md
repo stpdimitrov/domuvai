@@ -2482,3 +2482,19 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `app/src/main/kotlin/zues/app/registry/BookAccess.kt`, `BookController.kt`, `TitleRoles.kt`, #164.
 
 ---
+
+## S-G2-01p · 2026-10-10 · registry — the port for who holds what on a date (PM-ORG-004, PM-ORG-005, PM-ORG-011, PM-BOOK-011)
+
+**Did** — `registry` publishes a second port beside `Units`: `Holdings`. `inForce(entrance, on)` answers the titles in force on the date asked — party, unit, owner or user, share, and the ideal parts that share stands for (the unit's parts × the share, an exact decimal), with whether the unit's parts were declared or derived. `overOwnedUnits(entrance, on)` names the units whose ownership shares that day sum to more than the whole. `residents(entrance, on)` answers the household members in residence who are tied to a party, with the book's one age fact. Read-only: no endpoint, no migration, nothing in `assembly`.
+
+**Rules covered** — PM-ORG-004 · PM-ORG-005 · PM-ORG-011 · PM-BOOK-011 — each already had a named test; these are the same rules proved on the read other modules will consume.
+
+**Tests added** — `HoldingsAdapterTest` (6), `HoldingsPersistenceIT` (2; run on this machine's Postgres 16 from a scratch copy, none skipped). Seven mutants killed: the day of sale given to the seller · a title counted before it begins · a co-owner given the whole unit's parts · a wholly owned unit named as over-owned · a user's share counted as ownership · a departed resident answered · a derived weight passed as declared.
+
+**Decisions** — mine, stated on #168: ideal parts cross the boundary as exact decimal strings, like `Units` · owners and users are reported apart and the port decides nothing about who votes · "prevent double counting" is served by naming an over-owned unit, so a consumer can refuse it — the book still lets one be written · the port carries ids and numbers only: no name, no identity number, no designation.
+
+**Open** — **whether a household member is an adult cannot be answered**: the book records no date of birth, only "child under six" — PM-GA-009's "adult household member" needs a fact the book does not hold (an owner decision: record adulthood, or take it on the registrar's word) · a household member registered through the API has no party, so only imported households appear as residents · the book accepts titles that over-own a unit; refusing them at write time is a slice of its own · ownership shares that fall short of the whole (thirds as 0.333333) leave part of a unit's weight with nobody · the port is an in-process read: what a person may be shown stays the policy's (PM-BOOK-006) · `OwnershipService.votingWeights` computes the same sums and could now be served by the port · next for `assembly`: S-G2-01d (PM-GA-003 through this port), the owner and user checks for the posting act and proxies, and S-G2-02's quorum.
+
+**Read first next time** — `app/src/main/kotlin/zues/app/registry/Holdings.kt`, `Units.kt` beside it, the S-G2-01c entry above.
+
+---
