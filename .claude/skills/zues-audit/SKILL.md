@@ -1,6 +1,6 @@
 ---
 name: zues-audit
-description: "Audit an implementation against the ЗУЕС rule catalogue — read-only. Reports each rule IMPLEMENTED / PARTIAL / MISSING with file:line evidence, and checks the standing constraints (banned words, legal numbers only in @zues/law, module boundaries, unconfirmed numbers). Never edits — a fix is a separate slice. Use to verify a module or a set of rules, and run it with fresh context, separate from the session that wrote the code."
+description: "Audit an implementation against the ЗУЕС rule catalogue — read-only. Reports each rule IMPLEMENTED / PARTIAL / MISSING with file:line evidence, and checks the standing constraints (banned words, legal numbers only in the law module, module boundaries, unconfirmed numbers). Never edits — a fix is a separate slice. Use to verify a module or a set of rules, and run it with fresh context, separate from the session that wrote the code."
 ---
 
 # Read-only audit
@@ -32,7 +32,7 @@ Name the file and line for every verdict. "Counting is not checking" — do not 
 
 ## 4. Standing constraints — check every one
 
-- **No legal number outside `@zues/law`.** A statutory threshold, deadline, majority or multiplier written as a literal anywhere else is a finding, even if a test passes.
+- **No legal number outside the `law` module (`zues.law`).** A statutory threshold, deadline, majority or multiplier written as a literal anywhere else is a finding, even if a test passes.
 - **Unconfirmed numbers** (`verified: false`) are config lookups + `TODO(legal): PM-XXX-000`, never invented literals.
 - **Banned words** in identifiers: `tenant`, bare `user` as a domain term, `fee`/`balance` as stored columns, `building` as the tenant key.
 - **Module boundaries** (ADR-003): no import between modules except through a published API; no cross-module database access; cross-module reactions go through outbox events.

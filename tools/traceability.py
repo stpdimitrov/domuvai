@@ -11,7 +11,8 @@ OUT = ROOT/'docs/TRACEABILITY.md'
 # generated report differ between machines — which fails the docs-in-sync gate
 # for no real reason.
 SRC = sorted(p for p in ROOT.rglob('*.kt')
-             if 'build' not in p.parts and 'node_modules' not in p.parts)
+             if 'build' not in p.parts and 'node_modules' not in p.parts
+             and '.claude' not in p.relative_to(ROOT).parts)   # other sessions' worktrees are not this checkout
 
 RULE_RE = re.compile(r'PM-[A-Z]+-\d{3}')
 TEST_RE = re.compile(r"fun\s+`(PM-[A-Z]+-\d{3}[^`]*)`")

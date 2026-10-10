@@ -13,7 +13,7 @@ All behaviour is governed by `docs/RULES.md` (machine-readable mirror `docs/rule
 - Every function or handler implementing a rule carries `// Rule: PM-XXX-000`.
 - Every rule with an Acceptance column gets a test named after its ID:
   `` fun `PM-GA-013 reconvened assembly is valid at 26% of ideal parts`() `` (JUnit 5, backtick name).
-- **A legal number exists in exactly one place** — `@zues/law`, as dated configuration. The engine resolves the value in force on the relevant **legal date** (PM-SYS-002), never `Date.now()`. (ADR-001)
+- **A legal number exists in exactly one place** — the `law` module (`zues.law`), as dated configuration. The engine resolves the value in force on the relevant **legal date** (PM-SYS-002), never `Date.now()`. (ADR-001)
 - Every stored charge, decision or compliance task carries `basis`, `basis_hash`, `law_version` **and `engine_version`**. (ADR-001 amendment)
 - Money is integer minor units in EUR (PM-FEE-016). No floats. Pre-2026 BGN records keep the original amount, the 1.95583 rate and the converted value. (ADR-006)
 - Ideal parts are exact decimals summing to 100% per entrance. No floats. (ADR-006)
@@ -66,7 +66,7 @@ Context drift across sessions is the main risk. Conversation context is never sh
 
 ### Boot, in order
 
-1. `CLAUDE.md` · 2. `docs/INDEX.md` · 3. `docs/SESSIONLOG.md` (**last** entry only — the log appends, so the newest entry is at the end) · 4. `docs/DEVBRIEF.md` · 5. `docs/RULES.md` for **this slice only** · 6. `docs/adr/` · 7. `git log --oneline -10`, current branch, failing tests · 8. `python3 tools/lanes.py` — who holds which lane right now, and each free lane's next slice
+1. `CLAUDE.md` · 2. `docs/INDEX.md` · 3. the session log — the **newest** file in `docs/sessionlog/` only (names sort by time; `ls docs/sessionlog | tail -1`). `docs/SESSIONLOG.md` is the archive of every entry before 2026-10-10 · 4. `docs/DEVBRIEF.md` · 5. `docs/RULES.md` for **this slice only** · 6. `docs/adr/` · 7. `git log --oneline -10`, current branch, failing tests · 8. `python3 tools/lanes.py` — who holds which lane right now, and each free lane's next slice
 
 If a boot document is missing, say so and stop. Do not reconstruct context from the conversation.
 
@@ -95,7 +95,7 @@ One module per slice. Max ~400 lines of reviewable diff. If it will not fit, spl
 - No rule ID in code that is absent from `rules.json`
 - No banned word in an identifier
 - No unverified rule's number as a literal — config lookup + `TODO(legal): PM-XXX-000`
-- **No legal number anywhere outside `@zues/law`**
+- **No legal number anywhere outside the `law` module (`zues.law`)**
 - No calendar date read off a clock except through `toSofiaDate` (PM-SYS-004)
 - No cross-module database access; no import between modules except through a module's published API (Spring Modulith package boundary; ADR-003)
 - Counts and lists in docs are generated, never typed
@@ -106,7 +106,7 @@ Review the diff against the rule texts as if someone else wrote it. Re-reading y
 
 ### Close
 
-Append to `docs/SESSIONLOG.md` and commit it with the slice. Never edit an earlier entry.
+Add the slice's entry as a new file in `docs/sessionlog/` and commit it with the slice. Never edit an earlier entry.
 
 ## Working in parallel (multiple developers)
 
@@ -117,7 +117,7 @@ Up to three developers build here at once, each in their own Claude Code session
 - **Bring `main` in before you push or update a PR:** `git fetch && git merge origin/main`, so conflicts surface in your session where you can resolve them, not at merge time. Never rebase a pushed branch or force-push it.
 - **Generated docs are regenerated, never hand-merged** — `docs/TRACEABILITY.md`, `docs/TESTPLAN.md`, `docs/FUNCTIONAL.md`, `docs/api/openapi.json`, `docs/events/*`. On a conflict, take `origin/main`'s version and re-run the generators (the gate pack does this), then commit. Hand-merging them corrupts the structure.
 - **Schema changes go in a NEW migration file** — `V<yyyyMMddHHmm>__short_desc.sql`, never an edit to an applied migration. Stamp it with the **real UTC minute** it was written — `date -u +%Y%m%d%H%M` — never a round placeholder: two developers who both pick `…1200` collide, and Flyway will not start. `V1__init.sql` is the baseline; one file per change, so two developers' schema work never touches the same file. The schema gate reads every `V*.sql` (both `CREATE TABLE` and `ALTER TABLE … ADD COLUMN`) and fails on a duplicate or malformed version.
-- **`docs/SESSIONLOG.md` is append-only and union-merges** (`.gitattributes`): add your slice's entry at the end, never edit an earlier one — two appends concatenate instead of conflicting. **GitHub ignores the union driver**, so the second of two PRs to merge shows a conflict there: its author merges `origin/main` in and rebuilds the file as main's copy with their entry appended last — the union driver can leave two entries sharing one `---` — then pushes, without force.
+- **The session log is one file per entry** — `docs/sessionlog/<yyyyMMddHHmm>-<slice id>.md`, stamped with the real UTC minute (`date -u +%Y%m%d%H%M`), never an edit to an earlier one. Two sessions' entries are two files, so they never conflict — on GitHub either. `docs/SESSIONLOG.md` is the archive of the entries before 2026-10-10 and takes no new one.
 - **A problem found in another lane is an issue, not a fix**: `gh issue create --label lane:<lane>` with no assignee. Unassigned, it is a finding the lane map counts — not a claim. Push to someone else's branch only by agreement: merge `main` into it (no force push) and tell them to pull.
 
 Full protocol and the work split: `docs/WORKING.md`.
