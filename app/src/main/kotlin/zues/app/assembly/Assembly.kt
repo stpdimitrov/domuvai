@@ -28,6 +28,8 @@ data class Assembly(
     val noticePostingId: UUID? = null,
     /** When the date, hour, place or agenda last changed; a notice posted before it stated something else (PM-GA-006). */
     val noticeContentChangedAt: Instant? = null,
+    /** Convened by the owners on this petition (Rule: PM-GA-003); what unlocked it is its [PetitionUnlock]. */
+    val petitionId: UUID? = null,
 )
 
 /** Who may convene: the management board, the manager, the control board or controller. Rule: PM-GA-002 */
@@ -54,6 +56,8 @@ interface AssemblyRepository : ListCrudRepository<Assembly, UUID> {
     /** The assembly, its row locked until the transaction ends — so two items never take one ordinal. */
     @Query("SELECT * FROM assembly.assembly WHERE id = :id AND entrance_id = :entranceId FOR UPDATE")
     fun lock(id: UUID, entranceId: UUID): Assembly?
+
+    fun findByPetitionId(petitionId: UUID): Assembly?
 }
 
 interface AgendaItemRepository : ListCrudRepository<AgendaItem, UUID> {
