@@ -95,6 +95,12 @@ private val CONSTANTS: List<Constant> = listOf(
         todoLegal = "Confirm the maximum number of owners one person may represent (RULES.md §7, question 2), and whether " +
             "it counts owners, units or authorisations.",
     ),
+    // PM-GA-003 — the share of ideal parts whose owners may demand an assembly, in percent. Unconfirmed.
+    Constant(
+        "GA_PETITION_MIN_PCT", "20", "2009-01-01", "чл. 12 ЗУЕС", false, rule = "PM-GA-003",
+        todoLegal = "Confirm the share; the period after which an unmet demand lets the owners convene (the catalogue " +
+            "gives none); and whose ideal parts count for a unit with both an owner and a holder of a right of use.",
+    ),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */

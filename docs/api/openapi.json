@@ -694,6 +694,42 @@
         ],
         "type": "object"
       },
+      "ConveneOnPetition": {
+        "properties": {
+          "convenedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "demandUnmet": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "place": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "urgencyReason": {
+            "type": "string"
+          },
+          "urgent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "convenedBy",
+          "demandUnmet",
+          "mode",
+          "place",
+          "scheduledAt",
+          "urgent"
+        ],
+        "type": "object"
+      },
       "DeclarationFiled": {
         "properties": {
           "filedOn": {
@@ -1832,6 +1868,22 @@
         ],
         "type": "object"
       },
+      "OpenPetitionRequest": {
+        "properties": {
+          "openedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "openedBy",
+          "subject"
+        ],
+        "type": "object"
+      },
       "OperatingAccountView": {
         "properties": {
           "balanceMinor": {
@@ -1998,6 +2050,108 @@
           "unallocatedMinor",
           "unitId",
           "valueDate"
+        ],
+        "type": "object"
+      },
+      "PetitionConvened": {
+        "properties": {
+          "assemblyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "convenedAs": {
+            "type": "string"
+          },
+          "heldPct": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "thresholdPct": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "assemblyId",
+          "convenedAs",
+          "heldPct",
+          "status",
+          "thresholdPct"
+        ],
+        "type": "object"
+      },
+      "PetitionView": {
+        "properties": {
+          "assemblyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "cannotWeigh": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "derivedParts": {
+            "type": "boolean"
+          },
+          "heldPct": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "openedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "openedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "signatories": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "thresholdPct": {
+            "type": "string"
+          },
+          "thresholdSource": {
+            "type": "string"
+          },
+          "thresholdVerified": {
+            "type": "boolean"
+          },
+          "unlocked": {
+            "type": "boolean"
+          },
+          "weighedOn": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cannotWeigh",
+          "derivedParts",
+          "heldPct",
+          "id",
+          "openedAt",
+          "openedBy",
+          "signatories",
+          "subject",
+          "thresholdPct",
+          "thresholdSource",
+          "thresholdVerified",
+          "unlocked",
+          "weighedOn"
         ],
         "type": "object"
       },
@@ -2426,6 +2580,18 @@
         "required": [
           "reason",
           "revertedBy"
+        ],
+        "type": "object"
+      },
+      "SignPetitionRequest": {
+        "properties": {
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "partyId"
         ],
         "type": "object"
       },
@@ -3541,6 +3707,361 @@
         "x-rules": [
           "PM-GA-004",
           "PM-GA-006"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/petitions": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_petitions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenPetitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetitionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Open a petition to convene an assembly — by an owner, who signs it",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-003"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/petitions/{petitionId}": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_petitions_petitionId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "petitionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetitionView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-003",
+          "PM-ORG-005",
+          "PM-ORG-011"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_petitions_petitionId_assembly",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "petitionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConveneOnPetition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetitionConvened"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "The owners convene on their petition — once, by a signatory, when it is unlocked and the demand was not met",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-003"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_petitions_petitionId_signatures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "petitionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignPetitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetitionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Sign a petition — an owner in the entrance, once",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-003"
         ]
       }
     },
