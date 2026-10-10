@@ -19,6 +19,13 @@ npm test         # the web's own tests — Node's test runner, no package (lib/*
 Live screens call `api` from this Next.js server (never from the browser), at `API_URL`
 (default `http://localhost:8080`). With the backend down, a live screen says so instead of failing.
 
+**An answer the API did not give is said as what it is** (WEB-24, `lib/refusal.ts` — one wording for every screen):
+the backend's silence; a **403** as "you may not read this", led by the rule the API names; a **401** as a sign-in
+that was not accepted; anything else as it came. Who may read what is the API's decision (PM-BOOK-006) — the web
+makes none and hides nothing it was served. Each answer fails alone: where the registry refuses an entrance's owners
+or its overdue declarations and money still serves the amounts, the amounts are shown and the names are said to be
+refused — never a dash that reads as "no owner", a zero, or "nothing overdue".
+
 ### Against the real API and a database
 
 The whole chain on one machine — Postgres 16, the API (JDK 21), the demo entrance seeded through the API (and a

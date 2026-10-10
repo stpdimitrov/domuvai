@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthName, reach, shiftPeriod as shift, thisPeriod, type EntranceAt } from "@/lib/console";
+import { unanswered, unansweredBy } from "@/lib/refusal";
 
 export const metadata: Metadata = { title: "Начисления — Етаж" };
 
@@ -28,7 +29,7 @@ const describe = (l: Schemas["TariffLineRequest"]) =>
 const pct = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 4, maximumFractionDigits: 6 }) + "%";
 
 type Loaded =
-  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string> }
+  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string>; namesFailed?: string }
   | Exclude<EntranceAt, { kind: "ok" }>
   | { kind: "refused"; entrance: Schemas["EntranceView"]; message: string; aboutMultiple: boolean };
 
@@ -50,7 +51,7 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
   if (at.kind !== "ok") return at;
   const { entrance } = at;
   if (given && multiple == null) {
-    return { kind: "refused", entrance, aboutMultiple: true, message: `кратността „${given}“ не е цяло число.` };
+    return { kind: "refused", entrance, aboutMultiple: true, message: `API отказа изчислението: кратността „${given}“ не е цяло число.` };
   }
 
   const path = { entranceId: entrance.id };
@@ -66,7 +67,7 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
   const [run, units, owners] = fetched;
   if (!run.data) {
     const message = run.error?.error ?? `HTTP ${run.response.status}`;
-    return { kind: "refused", entrance, message, aboutMultiple: message.includes("PM-FEE-010") };   // the API names the rule it refuses on
+    return { kind: "refused", entrance, message: unansweredBy(run, "изчислението"), aboutMultiple: message.includes("PM-FEE-010") };   // the API names the rule it refuses on
   }
 
   const names = new Map<string, string[]>();
@@ -79,6 +80,11 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     run: run.data,
     ideal: new Map((units.data ?? []).map((u) => [u.id, u.idealPartsPct])),
     owners: new Map([...names].map(([unit, list]) => [unit, list.sort((a, b) => a.localeCompare(b, "bg")).join(", ")])),   // the API lists them in no fixed order
+    // The amounts are money's and stay; what the registry did not give is said to be refused, never left as a dash.
+    namesFailed: [
+      !units.data && unansweredBy(units, "обектите на входа"),
+      !owners.data && unansweredBy(owners, "собствениците на входа"),
+    ].filter(Boolean).join(" ") || undefined,
   };
 }
 
@@ -146,12 +152,12 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
+            {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
             {view.kind === "refused" && (
               <>
-                API отказа изчислението: {view.message}
+                {view.message}
                 {view.aboutMultiple && (
                   <>
                     <div style={{ marginTop: 8, color: "#5C605E" }}>
@@ -172,8 +178,9 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
 }
 
 function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>; period: string; multiple: Multiple }) {
-  const { run, ideal, owners } = view;
-  const idealSum = run.charges.reduce((total, c) => total + (ideal.get(c.unitId) ?? 0), 0);
+  const { run, ideal, owners, namesFailed } = view;
+  // No ideal parts read (the units were refused): no sum of them either — a dash, never 0%.
+  const idealSum = ideal.size === 0 ? "—" : pct(run.charges.reduce((total, c) => total + (ideal.get(c.unitId) ?? 0), 0));
   const totals = ["MANAGEMENT", "MAINTENANCE", "REPAIR_FUND"].map((s) => run.charges.reduce((t, c) => t + sum(stream(c, s)), 0));
 
   return (
@@ -212,6 +219,9 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
           ))}
         </div>
 
+        {namesFailed && (
+          <div className="ch-grid ch-row"><div style={{ color: "#8E2318", gridColumn: "1 / -1" }}>{namesFailed} Сумите са от API.</div></div>
+        )}
         {run.charges.map((c) => (
           <div key={c.unitId} className="ch-grid ch-row">
             <div style={{ fontWeight: 500 }}>{c.designation}</div>
@@ -235,7 +245,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
           <div className="num">{run.charges.reduce((t, c) => t + c.chargeablePersons, 0)}</div>
           <div />
           <div />
-          <div className="num">{pct(idealSum)}</div>
+          <div className="num">{idealSum}</div>
           <div className="num">{eur(totals[0])}</div>
           <div className="num">{eur(totals[1])}</div>
           <div className="num" style={DIM}>—</div>
@@ -248,7 +258,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
         <div>
           <div style={{ font: "400 12px/1.5 'IBM Plex Sans'", color: "#5C605E" }}>
             Изчислено от API: {run.charges.length} обекта · сумата на идеалните части е{" "}
-            <span style={{ color: "#14584A", fontWeight: 500 }}>{pct(idealSum)}</span> · посочете сума, за да видите как е изведена
+            <span style={{ color: "#14584A", fontWeight: 500 }}>{idealSum}</span> · посочете сума, за да видите как е изведена
           </div>
           <div style={{ font: "400 11.5px/1.4 'IBM Plex Mono', monospace", color: "#6B6F6C" }}>
             Преглед — нищо не е записано. Издаването изисква решение на ОС, не демо базис.

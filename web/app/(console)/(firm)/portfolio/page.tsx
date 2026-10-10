@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entrances, eur, inTurn, isDay, reach } from "@/lib/console";
+import { unanswered, unansweredBy } from "@/lib/refusal";
 
 export const metadata: Metadata = { title: "Портфейл — Етаж" };
 
 type Entrance = Schemas["EntranceView"];
 
-type Fund = { kind: "ok"; view: Schemas["FundView"] } | { kind: "none" } | { kind: "failed" };
+type Fund = { kind: "ok"; view: Schemas["FundView"] } | { kind: "none" } | { kind: "failed"; refused: boolean; message: string };
 
 type Row =
   | { entrance: Entrance; kind: "ok"; units: number; arrears: Schemas["EntranceArrears"]; fund: Fund }
@@ -16,10 +17,9 @@ type Row =
 type Loaded =
   | { kind: "ok"; asOf: string; rows: Row[] }
   | { kind: "down" }
-  | { kind: "unlisted"; message: string }
+  | { kind: "unlisted"; status: number; message: string }
   | { kind: "none" };
 
-const refusal = (r: { error?: { error?: string }; response: Response }) => r.error?.error ?? `HTTP ${r.response.status}`;
 
 /**
  * One screen, one server-side aggregation (ADR-011): every entrance with its units, what it owes as of a date
@@ -39,16 +39,16 @@ async function load(asOf: string): Promise<Loaded> {
       reach(() => api.GET("/api/money/entrances/{entranceId}/arrears", { params: { path, query: { asOf } } })),
       reach(() => api.GET("/api/money/entrances/{entranceId}/fund", { params: { path } })),
     ]);
-    if (!units || !arrears) return { entrance, kind: "failed", message: "Бекендът не подаде входа." };
-    if (!units.data) return { entrance, kind: "failed", message: `API отказа обектите на входа: ${refusal(units)}` };
-    if (!arrears.data) return { entrance, kind: "failed", message: `API отказа задълженията на входа: ${refusal(arrears)}` };
+    if (!units?.data) return { entrance, kind: "failed", message: unansweredBy(units, "обектите на входа") };
+    if (!arrears?.data) return { entrance, kind: "failed", message: unansweredBy(arrears, "задълженията на входа") };
     return {
       entrance,
       kind: "ok",
       units: units.data.length,
       arrears: arrears.data,
       // 404: the entrance has no repair fund account yet — a fact about it, not a failure
-      fund: fund?.data ? { kind: "ok", view: fund.data } : fund?.response.status === 404 ? { kind: "none" } : { kind: "failed" },
+      fund: fund?.data ? { kind: "ok", view: fund.data } : fund?.response.status === 404 ? { kind: "none" }
+        : { kind: "failed", refused: fund?.response.status === 403, message: unansweredBy(fund, "фонда на входа") },
     };
   });
   return { kind: "ok", asOf, rows };
@@ -107,7 +107,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
+            {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
           </div>
         </div>
@@ -201,8 +201,9 @@ function Portfolio({ view, show, dated }: { view: Extract<Loaded, { kind: "ok" }
                     <div className={`num${r.fund.view.availableMinor < 0 ? " late" : ""}`}>{eur(r.fund.view.availableMinor)}</div>
                   </>
                 ) : (
-                  <div className="num" style={{ ...(r.fund.kind === "failed" ? FAILED : DIM), gridColumn: "span 2" }}>
-                    {r.fund.kind === "none" ? "няма сметка" : "фондът не се зареди"}
+                  // two narrow columns: the short word here, the API's own words on the cell
+                  <div className="num" style={{ ...(r.fund.kind === "failed" ? FAILED : DIM), gridColumn: "span 2" }} title={r.fund.kind === "failed" ? r.fund.message : undefined}>
+                    {r.fund.kind === "none" ? "няма сметка" : r.fund.refused ? "нямате право за фонда" : "фондът не се зареди"}
                   </div>
                 )}
                 <div className="num" style={DIM}>—</div>
