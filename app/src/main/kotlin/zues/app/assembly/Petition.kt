@@ -28,6 +28,27 @@ data class Petition(@Id val id: UUID, val entranceId: UUID, val openedBy: UUID, 
 @Table("petition_signature")
 data class PetitionSignature(@Id val id: UUID, val entranceId: UUID, val petitionId: UUID, val partyId: UUID, val signedAt: Instant)
 
+/**
+ * What unlocked a petition, kept as it was on the day the owners convened on it: the share its signatories
+ * owned, the threshold — which dated constant, and whether counsel had confirmed it — the convenor's statement
+ * that the demand was not met, and the versions that computed it (PM-LAW-002). One per petition; never rewritten.
+ */
+@Table("petition_unlock")
+data class PetitionUnlock(
+    @Id val petitionId: UUID,
+    val entranceId: UUID,
+    val convenedBy: UUID,
+    val demandUnmetNote: String,
+    val weighedOn: LocalDate,
+    val heldPct: BigDecimal,
+    val thresholdPct: BigDecimal,
+    val thresholdConstant: String,
+    val thresholdVerified: Boolean,
+    val lawVersion: String,
+    val engineVersion: String,
+    val recordedAt: Instant,
+)
+
 interface PetitionRepository : ListCrudRepository<Petition, UUID> {
     /** The petition, its row locked until the transaction ends — signing and convening on it take turns. */
     @Query("SELECT * FROM assembly.petition WHERE id = :id AND entrance_id = :entranceId FOR UPDATE")
@@ -121,7 +142,7 @@ class PetitionService(
     // Rule: PM-GA-003
     // TODO(legal): PM-GA-003 — the period after which an unmet demand lets the owners convene
     @Transactional
-    fun convene(entranceId: UUID, petitionId: UUID, request: ConveneOnPetition): Assembly {
+    fun convene(entranceId: UUID, petitionId: UUID, request: ConveneOnPetition): Pair<Assembly, PetitionUnlock> {
         val petition = petitions.lock(petitionId, entranceId) ?: throw NoSuchElementException("no petition $petitionId in entrance $entranceId")
         check(assemblies.findByPetitionId(petition.id) == null) { "an assembly is already convened on this petition" }
         require(request.demandUnmet.isNotBlank()) { "the owners convene only when their demand was not met: say how it was made and that it was not (PM-GA-003)" }
@@ -136,15 +157,17 @@ class PetitionService(
                     "${weight.thresholdPct.percent()}% are needed (${weight.thresholdSource}) — PM-GA-003",
             )
         }
+        val unlock = aggregates.insert(
+            PetitionUnlock(
+                petitionId = petition.id, entranceId = entranceId, convenedBy = request.convenedBy, demandUnmetNote = request.demandUnmet.trim(),
+                weighedOn = weight.on, heldPct = weight.heldPct, thresholdPct = weight.thresholdPct,
+                thresholdConstant = weight.thresholdConstant, thresholdVerified = weight.thresholdVerified,
+                lawVersion = CATALOGUE_VERSION, engineVersion = ENGINE_VERSION, recordedAt = clock.instant(),
+            ),
+        )
+        // a meeting the notice period forbids, or an unknown mode, fails here and takes the unlock record with it
         val convene = Convene(request.convenedBy, OWNERS, request.scheduledAt, request.place, request.mode, request.urgent, request.urgencyReason)
-        return convening.conveneByOwners(entranceId, convene) {
-            it.copy(
-                petitionId = petition.id, demandUnmetNote = request.demandUnmet.trim(), petitionHeldPct = weight.heldPct,
-                petitionThresholdPct = weight.thresholdPct, petitionWeighedOn = weight.on,
-                petitionThresholdConstant = weight.thresholdConstant, petitionThresholdVerified = weight.thresholdVerified,
-                lawVersion = CATALOGUE_VERSION, engineVersion = ENGINE_VERSION,
-            )
-        }
+        return convening.conveneByOwners(entranceId, convene) { it.copy(petitionId = petition.id) } to unlock
     }
 
     /**

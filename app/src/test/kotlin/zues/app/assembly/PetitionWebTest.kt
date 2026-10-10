@@ -73,10 +73,11 @@ class PetitionWebTest {
     fun `PM-GA-003 convening on an unlocked petition answers the owners' draft with what unlocked it`() {
         val request = ConveneOnPetition(owner, Instant.parse("2026-11-20T16:00:00Z"), "фоайето", "IN_PERSON", "не е свикано")
         whenever(petitions.convene(entranceId, petition.id, request)).thenReturn(
-            Assembly(
-                UUID.randomUUID(), entranceId, owner, "OWNERS", request.scheduledAt, "фоайето", "IN_PERSON", "DRAFT", false, null,
-                petitionId = petition.id, demandUnmetNote = "не е свикано", petitionHeldPct = BigDecimal("21.75"), petitionThresholdPct = BigDecimal("20"),
-            ),
+            Assembly(UUID.randomUUID(), entranceId, owner, "OWNERS", request.scheduledAt, "фоайето", "IN_PERSON", "DRAFT", false, null, petitionId = petition.id) to
+                PetitionUnlock(
+                    petition.id, entranceId, owner, "не е свикано", LocalDate.parse("2026-10-09"), BigDecimal("21.7500000000"), BigDecimal("20"),
+                    "GA_PETITION_MIN_PCT@2009-01-01", false, "1.3", "0.3.0", at,
+                ),
         )
         mvc.perform(
             post("$base/${petition.id}/assembly").contentType(MediaType.APPLICATION_JSON)

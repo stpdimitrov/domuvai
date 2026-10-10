@@ -73,12 +73,12 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-GA-001` | — | — |  |
-| `PM-GA-002` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:77` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:14` |  |
-| `PM-GA-003` | `app/src/test/kotlin/zues/app/assembly/PetitionPersistenceIT.kt:87` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:33` | ⚠ |
+| `PM-GA-002` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:77` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:12` |  |
+| `PM-GA-003` | `app/src/test/kotlin/zues/app/assembly/PetitionPersistenceIT.kt:87` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:31` | ⚠ |
 | `PM-GA-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:223` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:140` |  |
-| `PM-GA-005` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:15` | ⚠ |
+| `PM-GA-005` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:13` | ⚠ |
 | `PM-GA-006` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:193` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:117` |  |
-| `PM-GA-007` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:141` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:50` | ⚠ |
+| `PM-GA-007` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:141` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:40` | ⚠ |
 | `PM-GA-008` | — | — |  |
 | `PM-GA-009` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:90` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:17` |  |
 | `PM-GA-010` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:126` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:70` | ⚠ |
@@ -106,7 +106,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-VOTE-001` | — | — |  |
 | `PM-VOTE-002` | — | — |  |
 | `PM-VOTE-003` | — | — |  |
-| `PM-VOTE-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:130` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:53` | ⚠ |
+| `PM-VOTE-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:130` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:43` | ⚠ |
 | `PM-VOTE-005` | — | — |  |
 | `PM-VOTE-006` | — | — |  |
 | `PM-VOTE-007` | — | — |  |

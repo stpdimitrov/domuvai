@@ -4,9 +4,7 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
-import java.math.BigDecimal
 import java.time.Instant
-import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -30,16 +28,8 @@ data class Assembly(
     val noticePostingId: UUID? = null,
     /** When the date, hour, place or agenda last changed; a notice posted before it stated something else (PM-GA-006). */
     val noticeContentChangedAt: Instant? = null,
-    /** Convened by the owners on this petition (Rule: PM-GA-003) — with what unlocked it, kept as it was that day. */
+    /** Convened by the owners on this petition (Rule: PM-GA-003); what unlocked it is its [PetitionUnlock]. */
     val petitionId: UUID? = null,
-    val demandUnmetNote: String? = null,
-    val petitionHeldPct: BigDecimal? = null,
-    val petitionThresholdPct: BigDecimal? = null,
-    val petitionWeighedOn: LocalDate? = null,
-    val petitionThresholdConstant: String? = null,
-    val petitionThresholdVerified: Boolean? = null,
-    val lawVersion: String? = null,
-    val engineVersion: String? = null,
 )
 
 /** Who may convene: the management board, the manager, the control board or controller. Rule: PM-GA-002 */

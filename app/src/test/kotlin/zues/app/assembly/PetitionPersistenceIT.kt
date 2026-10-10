@@ -106,39 +106,45 @@ class PetitionPersistenceIT {
 
         val convened = created("$base/$id/assembly", meeting(second))
         assertThat(convened.get("convenedAs").asText()).isEqualTo("OWNERS")
-        val row = jdbc.queryForMap("SELECT * FROM assembly.assembly WHERE id = ?::uuid", convened.get("assemblyId").asText())
+        val assemblyId = convened.get("assemblyId").asText()
+        val row = jdbc.queryForMap("SELECT * FROM assembly.assembly WHERE id = ?::uuid", assemblyId)
         assertThat(row["petition_id"].toString()).isEqualTo(id)
         assertThat(row["convened_by"]).isEqualTo(second)
-        assertThat(row["petition_held_pct"] as java.math.BigDecimal).isEqualByComparingTo("20")
-        assertThat(row["petition_threshold_pct"] as java.math.BigDecimal).isEqualByComparingTo("20")
-        assertThat(listOf(row["law_version"], row["engine_version"])).doesNotContainNull()
-        assertThat(row["demand_unmet_note"] as String).startsWith("Искането е връчено")
-        assertThat(json.readTree(mvc.perform(get("$base/$id")).andReturn().response.contentAsString).get("assemblyId").asText())
-            .isEqualTo(convened.get("assemblyId").asText())
+        val unlock = jdbc.queryForMap("SELECT * FROM assembly.petition_unlock WHERE petition_id = ?::uuid", id)
+        assertThat(unlock["held_pct"] as java.math.BigDecimal).isEqualByComparingTo("20")
+        assertThat(unlock["threshold_pct"] as java.math.BigDecimal).isEqualByComparingTo("20")
+        assertThat(unlock["threshold_constant"] as String).startsWith("GA_PETITION_MIN_PCT@")
+        assertThat(unlock["threshold_verified"]).isEqualTo(false)
+        assertThat(listOf(unlock["law_version"], unlock["engine_version"])).doesNotContainNull()
+        assertThat(unlock["demand_unmet_note"] as String).startsWith("Искането е връчено")
+        assertThat(json.readTree(mvc.perform(get("$base/$id")).andReturn().response.contentAsString).get("assemblyId").asText()).isEqualTo(assemblyId)
 
         // once: no second assembly on the petition, by the service or by hand; and no signature after it
         mvc.perform(post("$base/$id/assembly").contentType(MediaType.APPLICATION_JSON).content(meeting(first))).andExpect(status().isConflict)
         mvc.perform(post("$base/$id/signatures").contentType(MediaType.APPLICATION_JSON).content("""{"partyId":"$third"}""")).andExpect(status().isConflict)
-        val copy = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, notice_content_changed_at, " +
-            "petition_id, demand_unmet_note, petition_held_pct, petition_threshold_pct, petition_weighed_on, law_version, engine_version, " +
-            "petition_threshold_constant, petition_threshold_verified) " +
-            "SELECT gen_random_uuid(), entrance_id, convened_by, %s, place, scheduled_at, mode, status, notice_content_changed_at, " +
-            "%s, %s, %s, petition_threshold_pct, petition_weighed_on, law_version, engine_version, petition_threshold_constant, petition_threshold_verified " +
-            "FROM assembly.assembly WHERE petition_id = '$id'"
-        fun refused(convenedAs: String, petition: String, note: String, held: String, constraint: String) =
-            assertThatThrownBy { jdbc.update(copy.format(convenedAs, petition, note, held)) }
+        val copy = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, notice_content_changed_at, petition_id) " +
+            "SELECT gen_random_uuid(), %s, convened_by, %s, place, scheduled_at, mode, status, notice_content_changed_at, %s FROM assembly.assembly WHERE id = '$assemblyId'"
+        fun refused(entrance: String, convenedAs: String, petition: String, constraint: String) =
+            assertThatThrownBy { jdbc.update(copy.format(entrance, convenedAs, petition)) }
                 .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
-        refused("convened_as", "petition_id", "demand_unmet_note", "petition_held_pct", "assembly_one_per_petition")
-        refused("'OWNERS'", "NULL", "NULL", "NULL", "assembly_owners_convene_on_petition")              // the owners, on no petition
-        val another = created(base, """{"openedBy":"$third","subject":"Друго"}""").get("id").asText()
-        refused("'BM'", "'$another'", "demand_unmet_note", "petition_held_pct", "assembly_owners_convene_on_petition")   // an office, on a petition
-        refused("'OWNERS'", "'$another'", "'  '", "petition_held_pct", "assembly_owners_convene_on_petition")            // no statement
-        refused("'OWNERS'", "'$another'", "demand_unmet_note", "19.99", "assembly_owners_convene_on_petition")           // below its own threshold
-        val elsewhere = entrance().let { other -> owned(other).first().first.let { created("/api/assembly/entrances/$other/petitions", """{"openedBy":"$it","subject":"Чуждо"}""").get("id").asText() } }
-        refused("'OWNERS'", "'$elsewhere'", "demand_unmet_note", "petition_held_pct", "assembly_petition_is_its_entrances")   // another entrance's petition
-        assertThat(jdbc.update(copy.format("'OWNERS'", "'$another'", "demand_unmet_note", "petition_held_pct"))).isEqualTo(1)   // the control: the table checks the record's shape, not the weighing
-        assertThat(row["petition_threshold_constant"] as String).startsWith("GA_PETITION_MIN_PCT@")
-        assertThat(row["petition_threshold_verified"]).isEqualTo(false)
+        refused("entrance_id", "convened_as", "petition_id", "assembly_one_per_petition")
+        refused("entrance_id", "'OWNERS'", "NULL", "assembly_owners_convene_on_petition")               // the owners, on no petition
+        refused("entrance_id", "'BM'", "petition_id", "assembly_owners_convene_on_petition")            // an office, on a petition
+        val another = created(base, """{"openedBy":"$third","subject":"Друго"}""").get("id").asText()    // 30%: open, never convened on
+        refused("entrance_id", "'OWNERS'", "'$another'", "assembly_on_an_unlocked_petition")            // a petition nothing unlocked
+        assertThat(jdbc.update(copy.format("entrance_id", "'BM'", "NULL"))).isEqualTo(1)                // the control: an ordinary copy goes in
+
+        // the unlock record: at or above its own threshold, of its own entrance's petition, and not rewritten
+        val record = "INSERT INTO assembly.petition_unlock SELECT %s, %s, convened_by, demand_unmet_note, weighed_on, %s, threshold_pct, threshold_constant, " +
+            "threshold_verified, law_version, engine_version, recorded_at FROM assembly.petition_unlock WHERE petition_id = '$id'"
+        assertThatThrownBy { jdbc.update(record.format("'$another'", "entrance_id", "19.99")) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("petition_unlock_at_threshold")
+        assertThatThrownBy { jdbc.update(record.format("'$another'", "'${entrance()}'", "held_pct")) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("petition_unlock_petition_id_entrance_id_fkey")
+        jdbc.update("UPDATE assembly.petition_unlock SET held_pct = 99 WHERE petition_id = ?::uuid", id)
+        jdbc.update("DELETE FROM assembly.petition_unlock WHERE petition_id = ?::uuid", id)
+        assertThat(jdbc.queryForObject("SELECT held_pct FROM assembly.petition_unlock WHERE petition_id = ?::uuid", java.math.BigDecimal::class.java, id))
+            .isEqualByComparingTo("20")
 
         // what was signed is not rewritten under its signatures
         jdbc.update("UPDATE assembly.petition SET subject = 'Друго' WHERE id = ?::uuid", id)
@@ -173,6 +179,6 @@ class PetitionPersistenceIT {
         val refusal = mvc.perform(post("$base/$id/assembly").contentType(MediaType.APPLICATION_JSON).content(meeting(third)))
             .andExpect(status().isConflict).andReturn().response.contentAsString
         assertThat(json.readTree(refusal).get("error").asText()).contains("cannot be weighed").contains(thirdUnit.toString())
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.assembly WHERE petition_id = ?::uuid", Int::class.java, id)).isZero()
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.petition_unlock WHERE petition_id = ?::uuid", Int::class.java, id)).isZero()
     }
 }

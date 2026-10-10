@@ -64,8 +64,8 @@ class PetitionController(private val petitions: PetitionService) {
     @PostMapping("/{petitionId}/assembly")
     @ResponseStatus(HttpStatus.CREATED)
     fun convene(@PathVariable entranceId: UUID, @PathVariable petitionId: UUID, @RequestBody request: ConveneOnPetition): PetitionConvened =
-        petitions.convene(entranceId, petitionId, request).let {
-            PetitionConvened(it.id, it.status, it.convenedAs, it.petitionHeldPct!!.percent(), it.petitionThresholdPct!!.percent())
+        petitions.convene(entranceId, petitionId, request).let { (assembly, unlock) ->
+            PetitionConvened(assembly.id, assembly.status, assembly.convenedAs, unlock.heldPct.percent(), unlock.thresholdPct.percent())
         }
 
     private fun view(read: PetitionRead) = read.weight.let { w ->

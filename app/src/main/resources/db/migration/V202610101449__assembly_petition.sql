@@ -32,29 +32,36 @@ END $$;
 CREATE TRIGGER petition_signature_no_truncate BEFORE TRUNCATE ON assembly.petition_signature
   FOR EACH STATEMENT EXECUTE FUNCTION assembly.petition_signature_keeps_its_rows();
 
--- Rule: PM-GA-003 — owners convene on their petition: the assembly points at it, once, and keeps what
--- unlocked it — the share held, the threshold, the day, and the versions that computed it — with the
--- convenor's statement that the demand was not met.
+-- Rule: PM-GA-003 — what unlocked a petition, kept as it was that day: the share its signatories owned, the
+-- threshold with the dated constant it was and whether counsel had confirmed it, the convenor's statement that
+-- the demand was not met, and the catalogue and engine versions that computed it (PM-LAW-002). One per petition.
+CREATE TABLE assembly.petition_unlock (
+  petition_id         uuid PRIMARY KEY,
+  entrance_id         uuid NOT NULL,
+  convened_by         uuid NOT NULL REFERENCES registry.party(id),
+  demand_unmet_note   text NOT NULL CHECK (demand_unmet_note ~ '\S'),
+  weighed_on          date NOT NULL,
+  held_pct            numeric(14,10) NOT NULL,
+  threshold_pct       numeric(14,10) NOT NULL,
+  threshold_constant  text NOT NULL,
+  threshold_verified  boolean NOT NULL,
+  law_version         text NOT NULL,
+  engine_version      text NOT NULL,
+  recorded_at         timestamptz NOT NULL,
+  FOREIGN KEY (petition_id, entrance_id) REFERENCES assembly.petition (id, entrance_id),
+  UNIQUE (petition_id, entrance_id),
+  CONSTRAINT petition_unlock_at_threshold CHECK (held_pct >= threshold_pct)
+);
+CREATE RULE petition_unlock_no_update AS ON UPDATE TO assembly.petition_unlock DO INSTEAD NOTHING;
+CREATE RULE petition_unlock_no_delete AS ON DELETE TO assembly.petition_unlock DO INSTEAD NOTHING;
+
+-- The owners' assembly points at the unlock record of a petition of its own entrance, once.
 ALTER TABLE assembly.assembly ADD COLUMN petition_id uuid;
-ALTER TABLE assembly.assembly ADD CONSTRAINT assembly_petition_is_its_entrances
-  FOREIGN KEY (petition_id, entrance_id) REFERENCES assembly.petition (id, entrance_id);
-ALTER TABLE assembly.assembly ADD COLUMN demand_unmet_note text;
-ALTER TABLE assembly.assembly ADD COLUMN petition_held_pct numeric(14,10);
-ALTER TABLE assembly.assembly ADD COLUMN petition_threshold_pct numeric(14,10);
--- which dated constant the threshold was, and whether counsel had confirmed it that day
-ALTER TABLE assembly.assembly ADD COLUMN petition_threshold_constant text;
-ALTER TABLE assembly.assembly ADD COLUMN petition_threshold_verified boolean;
-ALTER TABLE assembly.assembly ADD COLUMN petition_weighed_on date;
-ALTER TABLE assembly.assembly ADD COLUMN law_version text;
-ALTER TABLE assembly.assembly ADD COLUMN engine_version text;
+ALTER TABLE assembly.assembly ADD CONSTRAINT assembly_on_an_unlocked_petition
+  FOREIGN KEY (petition_id, entrance_id) REFERENCES assembly.petition_unlock (petition_id, entrance_id);
 ALTER TABLE assembly.assembly ADD CONSTRAINT assembly_one_per_petition UNIQUE (petition_id);
 -- Rule: PM-GA-002 — the offices that convene; and, on a petition only, the owners.
 ALTER TABLE assembly.assembly DROP CONSTRAINT assembly_convened_as_check;
 ALTER TABLE assembly.assembly ADD CONSTRAINT assembly_convened_as_check CHECK (convened_as IN ('MB','BM','CTL','OWNERS'));
-ALTER TABLE assembly.assembly ADD CONSTRAINT assembly_owners_convene_on_petition CHECK (
-  (convened_as = 'OWNERS') = (petition_id IS NOT NULL)
-  AND (petition_id IS NULL) = (demand_unmet_note IS NULL)
-  AND (demand_unmet_note IS NULL OR demand_unmet_note ~ '\S')
-  AND (petition_id IS NULL OR (petition_held_pct IS NOT NULL AND petition_threshold_pct IS NOT NULL AND petition_weighed_on IS NOT NULL
-       AND petition_threshold_constant IS NOT NULL AND petition_threshold_verified IS NOT NULL AND law_version IS NOT NULL AND engine_version IS NOT NULL AND petition_held_pct >= petition_threshold_pct))
-);
+ALTER TABLE assembly.assembly ADD CONSTRAINT assembly_owners_convene_on_petition
+  CHECK ((convened_as = 'OWNERS') = (petition_id IS NOT NULL));

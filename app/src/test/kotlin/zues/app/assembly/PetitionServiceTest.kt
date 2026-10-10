@@ -50,12 +50,14 @@ class PetitionServiceTest {
     private val petitionsStored = mutableListOf<Petition>()
     private val signed = mutableListOf<PetitionSignature>()
     private val convened = mutableListOf<Assembly>()
+    private val unlocks = mutableListOf<PetitionUnlock>()
     private val aggregates: JdbcAggregateTemplate = mock {
         on { insert(any<Any>()) } doAnswer {
             when (val row = it.arguments[0]) {
                 is Petition -> petitionsStored += row
                 is PetitionSignature -> signed += row
                 is Assembly -> convened += row
+                is PetitionUnlock -> unlocks += row
             }
             it.arguments[0]
         }
@@ -111,18 +113,20 @@ class PetitionServiceTest {
         assertThat(reached.unlocked).isTrue()                                        // "at least": exactly the threshold unlocks
         assertThat(service.read(entranceId, petition.id).signatories).containsExactly(a, b, c)
 
-        val assembly = service.convene(entranceId, petition.id, meeting(b))
+        val (assembly, unlock) = service.convene(entranceId, petition.id, meeting(b))
         assertThat(assembly.status).isEqualTo("DRAFT")
         assertThat(assembly.convenedAs).isEqualTo("OWNERS")
         assertThat(assembly.convenedBy).isEqualTo(b)
         assertThat(assembly.petitionId).isEqualTo(petition.id)
-        assertThat(assembly.demandUnmetNote).startsWith("Искането е връчено")
-        assertThat(assembly.petitionHeldPct).isEqualByComparingTo("20")
-        assertThat(assembly.petitionThresholdPct).isEqualByComparingTo("20")
-        assertThat(assembly.petitionWeighedOn).isEqualTo(today)
-        assertThat(listOf(assembly.lawVersion, assembly.engineVersion)).containsExactly(CATALOGUE_VERSION, ENGINE_VERSION)
-        assertThat(assembly.petitionThresholdConstant).isEqualTo("GA_PETITION_MIN_PCT@${threshold.inForceFrom}")
-        assertThat(assembly.petitionThresholdVerified).isFalse()                     // convened on a number counsel had not confirmed
+        assertThat(unlock.petitionId).isEqualTo(petition.id)
+        assertThat(unlock.convenedBy).isEqualTo(b)
+        assertThat(unlock.demandUnmetNote).startsWith("Искането е връчено")
+        assertThat(unlock.heldPct).isEqualByComparingTo("20")
+        assertThat(unlock.thresholdPct).isEqualByComparingTo("20")
+        assertThat(unlock.weighedOn).isEqualTo(today)
+        assertThat(listOf(unlock.lawVersion, unlock.engineVersion)).containsExactly(CATALOGUE_VERSION, ENGINE_VERSION)
+        assertThat(unlock.thresholdConstant).isEqualTo("GA_PETITION_MIN_PCT@${threshold.inForceFrom}")
+        assertThat(unlock.thresholdVerified).isFalse()                               // convened on a number counsel had not confirmed
         assertThat(service.read(entranceId, petition.id).assemblyId).isEqualTo(assembly.id)
     }
 
@@ -139,6 +143,7 @@ class PetitionServiceTest {
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("not met")
         }
         assertThat(convened).isEmpty()
+        assertThat(unlocks).isEmpty()
 
         service.convene(entranceId, petition.id, meeting(a))
         assertThatThrownBy { service.convene(entranceId, petition.id, meeting(b)) }.isInstanceOf(IllegalStateException::class.java)   // once
@@ -189,7 +194,7 @@ class PetitionServiceTest {
         assertThat(service.read(entranceId, petition.id).weight.unlocked).isTrue()   // 25% without the seller
         assertThatThrownBy { service.convene(entranceId, petition.id, meeting(sold)) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("no longer owns")
-        assertThat(service.convene(entranceId, petition.id, meeting(a)).convenedBy).isEqualTo(a)
+        assertThat(service.convene(entranceId, petition.id, meeting(a)).first.convenedBy).isEqualTo(a)
     }
 
     @Test
