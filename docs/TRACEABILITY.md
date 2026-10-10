@@ -5,9 +5,9 @@
 | | Count | Share |
 |---|---|---|
 | Rules in catalogue | **233** | 100% |
-| Referenced in code (`// Rule:`) | 66 | 28% |
-| **Proved by a test named after the rule** | **67** | **29%** |
-| No implementation and no test | 165 | 71% |
+| Referenced in code (`// Rule:`) | 67 | 29% |
+| **Proved by a test named after the rule** | **68** | **29%** |
+| No implementation and no test | 164 | 70% |
 
 A rule is *covered* only when a test is named after its ID. A `// Rule:` comment with no test is a claim, not evidence.
 
@@ -37,7 +37,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-003` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:90` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:10` |  |
 | `PM-BOOK-004` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:90` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:11` |  |
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
-| `PM-BOOK-006` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:68` | `app/src/main/kotlin/zues/app/policy/Policy.kt:67` |  |
+| `PM-BOOK-006` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:70` | `app/src/main/kotlin/zues/app/policy/Policy.kt:86` |  |
 | `PM-BOOK-007` | `app/src/test/kotlin/zues/app/registry/BookAccessServiceTest.kt:79` | `app/src/main/kotlin/zues/app/registry/BookAccess.kt:21` |  |
 | `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:336` |  |
 | `PM-BOOK-009` | — | — |  |
@@ -253,14 +253,14 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-DOC-008` | — | — |  |
 | `PM-DOC-009` | — | — |  |
 
-## SEC — Access control & privacy  ·  2/12 covered
+## SEC — Access control & privacy  ·  3/12 covered
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-SEC-001` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:39` | `app/src/main/kotlin/zues/app/policy/Policy.kt:7` |  |
+| `PM-SEC-001` | `app/src/test/kotlin/zues/app/identity_org/LoginAdministrationIT.kt:70` | `app/src/main/kotlin/zues/app/identity_org/Administrators.kt:13` |  |
 | `PM-SEC-002` | — | — |  |
 | `PM-SEC-003` | — | — |  |
-| `PM-SEC-004` | — | — |  |
+| `PM-SEC-004` | `app/src/test/kotlin/zues/app/identity_org/LoginAdministrationIT.kt:116` | `app/src/main/kotlin/zues/app/identity_org/LoginAdministration.kt:32` |  |
 | `PM-SEC-005` | — | — |  |
 | `PM-SEC-006` | — | — |  |
 | `PM-SEC-007` | — | — |  |

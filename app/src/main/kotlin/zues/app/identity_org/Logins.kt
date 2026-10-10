@@ -43,6 +43,12 @@ class Logins(private val jdbc: JdbcClient) {
         if (tied == 0) throw LoginAlreadyTied("this login is already tied to a party, or the party to another login of this issuer")
     }
 
+    /** Unties a login, answering the party it was tied to — or null when it was tied to none. */
+    @Transactional
+    fun untie(issuer: String, subject: String): UUID? =
+        jdbc.sql("DELETE FROM identity_org.login WHERE issuer = ? AND subject = ? RETURNING party_id")
+            .params(issuer, subject).query(UUID::class.java).optional().orElse(null)
+
     private companion object {
         const val FOREIGN_KEY_VIOLATION = "23503"
     }

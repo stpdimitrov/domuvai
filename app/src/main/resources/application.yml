@@ -36,6 +36,10 @@ domuvai:
     issuer-uri: ${DOMUVAI_AUTH_ISSUER:}
     audience: ${DOMUVAI_AUTH_AUDIENCE:}
     mode: ${DOMUVAI_AUTH:}
+    # The deployment's administrators (PM-SEC-001): subjects of the issuer above — the token's `sub`, an id the issuer
+    # gives and never a username — comma-separated. They tie logins to
+    # parties and do nothing else; nobody becomes one through the api. Naming any with no issuer stops the application.
+    admins: ${DOMUVAI_AUTH_ADMINS:}
 
 management:
   endpoints:
