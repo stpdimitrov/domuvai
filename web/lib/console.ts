@@ -14,13 +14,13 @@ export async function reach<T>(call: () => Promise<T>): Promise<T | null> {
 export type Entrances =
   | { kind: "ok"; entrances: Schemas["EntranceView"][] }
   | { kind: "down" }
-  | { kind: "unlisted"; message: string };      // the API refused the list of entrances
+  | { kind: "unlisted"; status: number; message: string };      // the API refused the list of entrances — a 403 is not a 500
 
 /** Every registered entrance, by name — the API lists them in no fixed order, and an order must not change between two loads. */
 export async function entrances(): Promise<Entrances> {
   const listed = await reach(() => api.GET("/api/registry/entrances"));
   if (!listed) return { kind: "down" };
-  if (!listed.data) return { kind: "unlisted", message: listed.error?.error ?? `HTTP ${listed.response.status}` };
+  if (!listed.data) return { kind: "unlisted", status: listed.response.status, message: listed.error?.error ?? `HTTP ${listed.response.status}` };
   return {
     kind: "ok",
     entrances: [...listed.data].sort((a, b) => a.label.localeCompare(b.label, "bg", { numeric: true }) || a.id.localeCompare(b.id)),

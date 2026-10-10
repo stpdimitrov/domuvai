@@ -21,7 +21,7 @@ type Row = { entrance: Entrance; overdue: Part<Overdue[]>; headcount: Part<Headc
 type Loaded =
   | { kind: "ok"; rows: Row[] }
   | { kind: "down" }
-  | { kind: "unlisted"; message: string }
+  | { kind: "unlisted"; status: number; message: string }
   | { kind: "none" };
 
 type Answer<T> = { data?: T; error?: { error?: string }; response: Response } | null;
@@ -80,12 +80,8 @@ const DIM = { color: "#6B6F6C" };
 const FAILED = { color: "#8E2318" };
 const HEADING = { font: "500 10px/1 'IBM Plex Sans'", letterSpacing: ".14em", textTransform: "uppercase" as const, color: "#6B6F6C" };
 
-// What the design draws and the API does not serve: said as not kept, never filled in.
-const NOT_KEPT = [
-  { title: "Вписване в публичния регистър", basis: "Регистър на професионалните домоуправители" },
-  { title: "Застраховка „Професионална отговорност“", basis: "Полица и срок на валидност" },
-  { title: "Договори за управление", basis: "Мандати по чл. 19, ал. 5 ЗУЕС" },
-];
+// What the design draws and the API does not serve: its headings, said as not kept — nothing filled in, no basis cited.
+const NOT_KEPT = ["Вписване в публичния регистър", "Застраховка „Професионална отговорност“", "Договори за управление"];
 
 export default async function CompliancePage({ searchParams }: { searchParams: Promise<{ period?: string | string[] }> }) {
   const query = await searchParams;
@@ -96,7 +92,9 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
   const rows = view.kind === "ok" ? view.rows : [];
   const late = rows.reduce((n, r) => n + (r.overdue.kind === "ok" ? r.overdue.data.length : 0), 0);
   const differing = rows.reduce((n, r) => n + (r.headcount.kind === "ok" ? r.headcount.data.mismatches.length : 0), 0);
-  const unread = rows.filter((r) => r.overdue.kind !== "ok" || (r.headcount.kind !== "ok" && r.headcount.kind !== "none")).length;
+  // A total counts what was answered. Where an entrance's answer did not come, every total beside it says so.
+  const unreadLate = rows.filter((r) => r.overdue.kind !== "ok").length;
+  const unreadChecks = rows.filter((r) => r.headcount.kind !== "ok" && r.headcount.kind !== "none").length;
 
   return (
     <>
@@ -107,22 +105,25 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
           <span className="meta">
             {view.kind === "ok" && (
               <>
-                {count(late, "просрочена декларация", "просрочени декларации")} · {count(differing, "разминаване", "разминавания")} за {monthName(period)} ·{" "}
+                {count(late, "просрочена декларация", "просрочени декларации")} към днес
+                {unreadLate > 0 && <span style={FAILED}> (без {count(unreadLate, "непрочетен вход", "непрочетени входа")})</span>} ·{" "}
+                {count(differing, "разминаване", "разминавания")} за {monthName(period)}
+                {unreadChecks > 0 && <span style={FAILED}> (без {count(unreadChecks, "непрочетен вход", "непрочетени входа")})</span>} ·{" "}
                 {count(rows.length, "вход", "входа")}
-                {unread > 0 && <span style={FAILED}> · {count(unread, "вход с непрочетени данни", "входа с непрочетени данни")}</span>}
               </>
             )}
           </span>
         </div>
-        {view.kind === "ok" && late > 0 && <span className="badge crit">{count(late, "просрочена декларация", "просрочени декларации")}</span>}
+        {view.kind === "ok" && late > 0 && (
+          <span className="badge crit">{unreadLate > 0 ? "поне " : ""}{count(late, "просрочена декларация", "просрочени декларации")}</span>
+        )}
       </div>
 
       <div style={{ padding: "20px 24px 0", display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 16 }}>
-        {NOT_KEPT.map((c) => (
-          <div key={c.title} className="co-card">
-            <div className="kicker">{c.title}</div>
+        {NOT_KEPT.map((title) => (
+          <div key={title} className="co-card">
+            <div className="kicker">{title}</div>
             <div className="serif" style={DIM}>Още не се води в системата</div>
-            <div className="sub">{c.basis}</div>
           </div>
         ))}
       </div>
@@ -131,21 +132,21 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
+            {view.kind === "unlisted" && unanswered({ kind: "refused", status: view.status, message: view.message }, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
           </div>
         </div>
       ) : (
         <>
-          <Declarations rows={rows} late={late} />
-          <HeadcountChecks rows={rows} period={period} differing={differing} />
+          <Declarations rows={rows} late={late} unread={unreadLate} />
+          <HeadcountChecks rows={rows} period={period} differing={differing} unread={unreadChecks} />
         </>
       )}
 
       <div style={{ margin: "20px 24px 24px", font: "400 12px/1.6 'IBM Plex Sans'", ...DIM }}>
         <span style={HEADING}>Подадени отчети и декларации</span>
         <div style={{ marginTop: 8 }}>
-          Отчетите и декларациите на фирмата пред общината, Агенцията по вписванията и КЗЛД още не се водят в системата.
+          Отчетите и декларациите на фирмата още не се водят в системата.
         </div>
       </div>
     </>
@@ -153,7 +154,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
 }
 
 /** Rule: PM-BOOK-003 — who is past the registry's due date to declare for the book, entrance by entrance. */
-function Declarations({ rows, late }: { rows: Row[]; late: number }) {
+function Declarations({ rows, late, unread }: { rows: Row[]; late: number; unread: number }) {
   return (
     <>
       <div style={{ margin: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -193,7 +194,10 @@ function Declarations({ rows, late }: { rows: Row[]; late: number }) {
         ))}
         <div className="cp-od pf-foot">
           <div>Общо</div>
-          <div style={{ ...DIM, fontWeight: 400 }}>{count(late, "просрочена декларация", "просрочени декларации")}</div>
+          <div style={{ ...DIM, fontWeight: 400 }}>
+            {count(late, "просрочена декларация", "просрочени декларации")}
+            {unread > 0 && <span style={FAILED}> · без {count(unread, "непрочетен вход", "непрочетени входа")}</span>}
+          </div>
           <div /><div /><div />
         </div>
       </div>
@@ -202,17 +206,19 @@ function Declarations({ rows, late }: { rows: Row[]; late: number }) {
 }
 
 /** Rule: PM-BOOK-012 — the month's exception report: the units whose billed persons are not the persons the book declares. */
-function HeadcountChecks({ rows, period, differing }: { rows: Row[]; period: string; differing: number }) {
+function HeadcountChecks({ rows, period, differing, unread }: { rows: Row[]; period: string; differing: number; unread: number }) {
   const issued = rows.filter((r) => r.headcount.kind === "ok").length;
+  const none = rows.filter((r) => r.headcount.kind === "none").length;
+  const [before, after] = [shiftPeriod(period, -1), shiftPeriod(period, 1)];
   return (
     <>
       <div style={{ margin: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={HEADING}>Сверка на книгата с начисленията · {monthName(period)}</span>
-        <div style={{ display: "flex", gap: 6 }}>
-          <Link href={`/compliance?period=${shiftPeriod(period, -1)}`} className="chip">← {monthName(shiftPeriod(period, -1))}</Link>
-          <span className="chip active">{monthName(period)}</span>
-          <Link href={`/compliance?period=${shiftPeriod(period, 1)}`} className="chip">{monthName(shiftPeriod(period, 1))} →</Link>
-        </div>
+        <nav aria-label="Месец на сверката" style={{ display: "flex", gap: 6 }}>
+          {isPeriod(before) && <Link href={`/compliance?period=${before}`} className="chip">← {monthName(before)}</Link>}
+          <span className="chip active" aria-current="page">{monthName(period)}</span>
+          {isPeriod(after) && <Link href={`/compliance?period=${after}`} className="chip">{monthName(after)} →</Link>}
+        </nav>
       </div>
       <div className="pf-card cp-card" style={{ margin: "12px 24px 0" }}>
         <div className="cp-hc pf-head">
@@ -256,7 +262,8 @@ function HeadcountChecks({ rows, period, differing }: { rows: Row[]; period: str
         <div className="cp-hc pf-foot">
           <div>Общо</div>
           <div style={{ ...DIM, fontWeight: 400 }}>
-            {count(differing, "разминаване", "разминавания")} · {count(issued, "вход с начисление", "входа с начисление")} от {rows.length}
+            {count(differing, "разминаване", "разминавания")} · {count(issued, "вход с начисление", "входа с начисление")} · {none} без начисление за месеца
+            {unread > 0 && <span style={FAILED}> · {count(unread, "непрочетен вход", "непрочетени входа")}</span>}
           </div>
           <div /><div />
         </div>

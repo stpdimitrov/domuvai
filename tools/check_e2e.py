@@ -633,14 +633,15 @@ def compliance_screen(api, web, entrance):
     WEB-23 — `/compliance` shows, entrance by entrance, what the API serves and nothing of the design's sample: who is
     past the registry's due date to declare for the book (PM-BOOK-003) and the month's headcount check (PM-BOOK-012).
     Every figure is taken from the API here, never typed: the page must show the same. An entrance with no run issued
-    for the month is said to have none — never shown as one with nothing to report.
+    for the month is said to have none — never shown as one with nothing to report. This check writes: it enters one
+    person in the seeded entrance's book, so that there is a difference to read.
     """
     failures, date = [], lambda iso: ".".join(reversed(iso.split("-")))
     plural = lambda n, one, many: f"{n} {one if n == 1 else many}"
     status, page = fetch(web, "/compliance?period=2026-09")
     text = visible_text(page)
     failures += [] if status == 200 else [f"/compliance: HTTP {status}"]
-    sample = ["ПД-0142", "22-0034512", "62 действащи", "204118736", "62 входа под управление", "Армеец", "СОА26", "КЗЛД-26", "Остават 83 дни", "20260628153412"]
+    sample = ["чл. 19", "Армеец", "Агенция", "КЗЛД", "ПД-0142", "22-0034512", "62 действащи", "204118736", "62 входа под управление", "Армеец", "СОА26", "КЗЛД-26", "Остават 83 дни", "20260628153412"]
     failures += [f"/compliance: still shows the design's sample ({word!r})" for word in sample if word in text]
 
     status, raw = fetch(api, f"/api/registry/entrances/{entrance}/book/declarations/overdue")
@@ -648,24 +649,42 @@ def compliance_screen(api, web, entrance):
     if not overdue:
         failures.append(f"/compliance: the API lists no overdue declaration for the seeded entrance (HTTP {status}) — nothing to read off the page")
     roles = {"OWN": "собственик", "USR": "ползвател"}
-    rows = [f"{d['designation']} {d['partyName']} {roles[d['titleRole']]} {date(d['acquiredOn'])} {date(d['dueOn'])}" for d in overdue or []]
+    rows = [f"{d['designation']} {d['partyName']} {roles.get(d['titleRole'], d['titleRole'].lower())} {date(d['acquiredOn'])} {date(d['dueOn'])}" for d in overdue or []]
     failures += [f"/compliance: does not show the overdue declaration {row!r}" for row in rows if row not in text]
     group = f"ул. Шипка 14, вх. Б {plural(len(rows), 'просрочена декларация', 'просрочени декларации')}"
     failures += [] if group in text else [f"/compliance: does not show {group!r}"]
 
-    status, raw = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/2026-09/headcount")
-    check = json.loads(raw) if status == 200 else None
+    # PM-BOOK-012 — the report lists the units that differ, so the check makes one differ, as a manager would: through
+    # the public API it enters a child in the book of the first unit for a date the September run had already billed.
+    # (Each run of this check enters one more; the figures below are the API's, whatever they have become.)
+    def headcount():
+        status, raw = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/2026-09/headcount")
+        return json.loads(raw) if status == 200 else None
+    check = headcount()
     if not check:
-        failures.append(f"/compliance: the API gives no headcount check for the seeded run of 2026-09 (HTTP {status})")
+        failures.append("/compliance: the API gives no headcount check for the seeded run of 2026-09")
     else:
-        head = (f"ул. Шипка 14, вх. Б сравнени {plural(check['unitsCompared'], 'обект', 'обекта')} към {date(check['legalDate'])} · "
-                f"{plural(len(check['mismatches']), 'разминаване', 'разминавания')}")
-        failures += [] if head in text else [f"/compliance: does not show {head!r}"]
-        for m in check["mismatches"]:
-            if m["designation"] not in text.split(head, 1)[-1]:
-                failures.append(f"/compliance: does not show the unit that differs, {m['designation']}")
-        if not check["mismatches"] and "Начислените лица са лицата по книга." not in text:
+        if not check["mismatches"] and "Начислените лица са лицата по книга." not in text.split("Сверка на книгата", 1)[-1]:
             failures.append("/compliance: a check with no difference is not said to have none")
+        status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units")
+        unit = sorted(json.loads(raw), key=lambda u: u["designation"])[0]["id"] if status == 200 else None
+        status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units/{unit}/household",
+                            {"members": [{"isChildUnder6": True, "validFrom": "2026-08-01"}]})
+        check = headcount() if status in (200, 201) else None
+        if not check or not check["mismatches"]:
+            failures.append(f"/compliance: a person entered in the book for a date already billed (HTTP {status}) makes no difference the API reports — no row to read")
+        else:
+            text = visible_text(fetch(web, "/compliance?period=2026-09")[1])
+            checks = text.split("Сверка на книгата", 1)[-1]
+            head = (f"ул. Шипка 14, вх. Б сравнени {plural(check['unitsCompared'], 'обект', 'обекта')} към {date(check['legalDate'])} · "
+                    f"{plural(len(check['mismatches']), 'разминаване', 'разминавания')}")
+            failures += [] if head in checks else [f"/compliance: does not show {head!r}"]
+            words = {"COUNT_DIFFERS": "броят се различава", "NOT_IN_BOOK": "начислен, а вече не е обект на входа по книга", "NOT_BILLED": "обект по книга, а не е начислен"}
+            persons = lambda all_, under6: "—" if all_ is None else f"{all_} · {under6} под 6 г."
+            for m in check["mismatches"]:
+                row = (f"{m['designation']} {words.get(m['difference'], m['difference'])} {persons(m.get('billedOccupants'), m.get('billedChildrenUnder6'))} "
+                       f"{persons(m.get('declaredOccupants'), m.get('declaredChildrenUnder6'))}")
+                failures += [] if row in checks else [f"/compliance: does not show the unit that differs as the API reports it: {row!r}"]
     # the seed's second entrance has no run at all, and no entrance has one for a month long past: said, not shown as clean
     none = f"{BUSINESS_LABEL} няма издадено начисление за месеца"
     failures += [] if none in text else [f"/compliance: does not show {none!r}"]
@@ -674,7 +693,7 @@ def compliance_screen(api, web, entrance):
         failures.append("/compliance?period=2020-01: a month with no run is not said to have none for both entrances")
     links = [f'href="/compliance?period=2026-08"', f'href="/compliance?period=2026-10"', f'href="/entrance?entrance={entrance}"']
     failures += [f"/compliance: no link {link}" for link in links if link not in page.replace("&amp;", "&")]
-    print(f"{'ok ' if not failures else 'BAD'} /compliance  {len(rows)} overdue declarations and the headcount check of 2026-09 as the API gives them; "
+    print(f"{'ok ' if not failures else 'BAD'} /compliance  {len(rows)} overdue declarations, and a unit made to differ shown as the API reports it; "
           f"no run said as none; no sample left")
     return failures
 

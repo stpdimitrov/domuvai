@@ -236,8 +236,10 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   persons the book declares). `?period=YYYY-MM` (default: this month, Europe/Sofia), with links to the months
   beside it. The API cannot list the months that have a run, so the month is asked for: an entrance with no run
   issued for it is said to have none, never shown as clean. Each answer fails alone; a refusal is shown as one, in
-  the API's own words — a 403 as "you may not read this". The design's registration, insurance and contract cards
-  and its filings table are not served by the API: they say "not kept in the system yet", and every sample figure is gone.
+  the API's own words — a 403 as "you may not read this" — and every total says which entrances it leaves out. The
+  design's registration, insurance and contract cards and its filings table are not served by the API: they say
+  "not kept in the system yet", and every sample figure is gone. The e2e check enters one person in the seeded book
+  to have a difference to read.
 - **`/entrance`** — a single entrance (screen 02) — **live** (WEB-20): `?entrance=<id>` (default: the first
   by name), its units by kind and its management form; in the calendar panel, who is past the deadline to
   declare for the book, with the registry's own due date (`GET …/book/declarations/overdue`, names only) —
