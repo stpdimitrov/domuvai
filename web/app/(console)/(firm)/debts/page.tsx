@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entrances, eur, inTurn, isDay, reach } from "@/lib/console";
+import { unanswered, unansweredBy } from "@/lib/refusal";
 
 export const metadata: Metadata = { title: "Задължения — Етаж" };
 
@@ -14,10 +15,9 @@ type Group =
 type Loaded =
   | { kind: "ok"; asOf: string; groups: Group[]; entranceCount: number }
   | { kind: "down" }
-  | { kind: "unlisted"; message: string }
+  | { kind: "unlisted"; status: number; message: string }
   | { kind: "none" };
 
-const refusal = (r: { error?: { error?: string }; response: Response }) => r.error?.error ?? `HTTP ${r.response.status}`;
 
 /**
  * One screen, one server-side aggregation (ADR-011): every entrance's arrears as of a date (PM-DEBT-001, PM-DEBT-002 —
@@ -33,8 +33,7 @@ async function load(asOf: string): Promise<Loaded> {
   const groups = await inTurn(listed.entrances, async (entrance): Promise<Group | null> => {
     const path = { entranceId: entrance.id };
     const arrears = await reach(() => api.GET("/api/money/entrances/{entranceId}/arrears", { params: { path, query: { asOf } } }));
-    if (!arrears) return { entrance, kind: "failed", message: "Бекендът не подаде задълженията на входа." };
-    if (!arrears.data) return { entrance, kind: "failed", message: `API отказа задълженията на входа: ${refusal(arrears)}` };
+    if (!arrears?.data) return { entrance, kind: "failed", message: unansweredBy(arrears, "задълженията на входа") };
     if (arrears.data.units.length === 0) return null;
 
     const [units, owners] = await Promise.all([
@@ -51,7 +50,11 @@ async function load(asOf: string): Promise<Loaded> {
       arrears: arrears.data,
       units: new Map((units?.data ?? []).map((u) => [u.id, u.designation])),
       owners: new Map([...names].map(([unit, list]) => [unit, list.sort((a, b) => a.localeCompare(b, "bg")).join(", ")])),
-      namesFailed: units?.data && owners?.data ? undefined : "Обектите или собствениците не се заредиха — сумите са от API.",
+      // The amounts are money's and stay; a name the registry did not give is said to be refused, never left as a dash.
+      namesFailed: [
+        !units?.data && unansweredBy(units, "обектите на входа"),
+        !owners?.data && unansweredBy(owners, "собствениците на входа"),
+      ].filter(Boolean).join(" ") || undefined,
     };
   });
   return { kind: "ok", asOf, groups: groups.filter((g): g is Group => g !== null), entranceCount: listed.entrances.length };
@@ -120,7 +123,7 @@ export default async function DebtsPage({ searchParams }: { searchParams: Promis
         <div style={{ padding: "16px 24px" }}>
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
-            {view.kind === "unlisted" && <>API отказа списъка на входовете: {view.message}</>}
+            {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
           </div>
         </div>
@@ -183,7 +186,7 @@ function Debts({ view, listed, owing, failed }: { view: Extract<Loaded, { kind: 
               <div className="dt-grid pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{g.message}</div></div>
             )}
             {g.kind === "ok" && g.namesFailed && (
-              <div className="dt-grid pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{g.namesFailed}</div></div>
+              <div className="dt-grid pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{g.namesFailed} Сумите са от API.</div></div>
             )}
             {g.kind === "ok" && g.arrears.units.map((u) => (
               <div key={u.unitId} className="dt-grid pf-row">

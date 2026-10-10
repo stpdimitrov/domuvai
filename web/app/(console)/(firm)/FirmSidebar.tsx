@@ -16,8 +16,6 @@ const NAV: { label: string; href: string; count?: string; due?: string }[] = [
   { label: "Екип", href: "#" },
 ];
 
-const RECENT = ["ул. Шипка 14, вх. Б", "бул. Витоша 102, вх. А", "ж.к. Младост 3, бл. 318, вх. 2"];
-
 export default function FirmSidebar() {
   const pathname = usePathname();
 
@@ -43,22 +41,6 @@ export default function FirmSidebar() {
           </Link>
         );
       })}
-
-      <div className="sidebar-section">Последно отваряни</div>
-      {RECENT.map((addr) => (
-        <a key={addr} href="#" className="recent">
-          {addr}
-        </a>
-      ))}
-
-      <div className="sidebar-user">
-        <div className="avatar">МП</div>
-        <div className="who">
-          Мария Петрова
-          <br />
-          <span className="firm">Домоуправител Про ООД</span>
-        </div>
-      </div>
     </aside>
   );
 }
