@@ -81,8 +81,8 @@ class PetitionServiceTest {
 
     private fun unitOf(party: UUID) = book.first { it.party == party }.unit
 
-    private fun meeting(by: UUID, demandUnmet: String = "Искането е връчено на управителя на 1 септември; събрание не е свикано.") =
-        ConveneOnPetition(by, Instant.parse("2026-11-20T16:00:00Z"), "фоайето на вх. А", "IN_PERSON", demandUnmet)
+    private fun meeting(demandUnmet: String = "Искането е връчено на управителя на 1 септември; събрание не е свикано.") =
+        ConveneOnPetition(Instant.parse("2026-11-20T16:00:00Z"), "фоайето на вх. А", "IN_PERSON", demandUnmet)
 
     private val threshold = constantOn("GA_PETITION_MIN_PCT", "2026-10-10")
 
@@ -98,7 +98,7 @@ class PetitionServiceTest {
         fun weight() = service.read(entranceId, petition.id).weight
         assertThat(weight().heldPct).isEqualByComparingTo("8.5")                     // who opens it signs it
         assertThat(weight().unlocked).isFalse()
-        assertThatThrownBy { service.convene(entranceId, petition.id, meeting(a)) }
+        assertThatThrownBy { service.convene(entranceId, petition.id, a, meeting()) }
             .isInstanceOf(PetitionLocked::class.java).hasMessageContaining("8.5%").hasMessageContaining("20%").hasMessageContaining("чл. 12 ЗУЕС")
 
         service.sign(entranceId, petition.id, b)
@@ -113,7 +113,7 @@ class PetitionServiceTest {
         assertThat(reached.unlocked).isTrue()                                        // "at least": exactly the threshold unlocks
         assertThat(service.read(entranceId, petition.id).signatories).containsExactly(a, b, c)
 
-        val (assembly, unlock) = service.convene(entranceId, petition.id, meeting(b))
+        val (assembly, unlock) = service.convene(entranceId, petition.id, b, meeting())
         assertThat(assembly.status).isEqualTo("DRAFT")
         assertThat(assembly.convenedAs).isEqualTo("OWNERS")
         assertThat(assembly.convenedBy).isEqualTo(b)
@@ -136,17 +136,17 @@ class PetitionServiceTest {
         val outsider = owner("30")
         val petition = service.open(entranceId, a, "Ремонт на покрива").also { service.sign(entranceId, it.id, b) }
 
-        assertThatThrownBy { service.convene(entranceId, petition.id, meeting(outsider)) }           // owns more than both, signed nothing
+        assertThatThrownBy { service.convene(entranceId, petition.id, outsider, meeting()) }           // owns more than both, signed nothing
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("signatories")
         for (blank in listOf("", "   ")) {
-            assertThatThrownBy { service.convene(entranceId, petition.id, meeting(a, demandUnmet = blank)) }
+            assertThatThrownBy { service.convene(entranceId, petition.id, a, meeting(demandUnmet = blank)) }
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("not met")
         }
         assertThat(convened).isEmpty()
         assertThat(unlocks).isEmpty()
 
-        service.convene(entranceId, petition.id, meeting(a))
-        assertThatThrownBy { service.convene(entranceId, petition.id, meeting(b)) }.isInstanceOf(IllegalStateException::class.java)   // once
+        service.convene(entranceId, petition.id, a, meeting())
+        assertThatThrownBy { service.convene(entranceId, petition.id, b, meeting()) }.isInstanceOf(IllegalStateException::class.java)   // once
         assertThatThrownBy { service.sign(entranceId, petition.id, outsider) }.isInstanceOf(IllegalStateException::class.java)        // and it is closed
         assertThat(convened).hasSize(1)
     }
@@ -179,7 +179,7 @@ class PetitionServiceTest {
         val weight = service.read(entranceId, petition.id).weight                    // read on the 10th
         assertThat(weight.heldPct).isEqualByComparingTo("12")
         assertThat(weight.unlocked).isFalse()
-        assertThatThrownBy { service.convene(entranceId, petition.id, meeting(staying)) }.isInstanceOf(PetitionLocked::class.java)
+        assertThatThrownBy { service.convene(entranceId, petition.id, staying, meeting()) }.isInstanceOf(PetitionLocked::class.java)
     }
 
     @Test
@@ -192,9 +192,9 @@ class PetitionServiceTest {
         onThe9th.sign(entranceId, petition.id, b)
 
         assertThat(service.read(entranceId, petition.id).weight.unlocked).isTrue()   // 25% without the seller
-        assertThatThrownBy { service.convene(entranceId, petition.id, meeting(sold)) }
+        assertThatThrownBy { service.convene(entranceId, petition.id, sold, meeting()) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("no longer owns")
-        assertThat(service.convene(entranceId, petition.id, meeting(a)).first.convenedBy).isEqualTo(a)
+        assertThat(service.convene(entranceId, petition.id, a, meeting()).first.convenedBy).isEqualTo(a)
     }
 
     @Test
@@ -227,7 +227,7 @@ class PetitionServiceTest {
         assertThat(weight.unlocked).isFalse()
         assertThat(weight.cannotWeigh).singleElement().asString()
             .contains(unitOf(shared).toString()).contains("holder of a right of use").contains("TODO(legal): PM-GA-003")
-        assertThatThrownBy { service.convene(entranceId, petition.id, meeting(plain)) }
+        assertThatThrownBy { service.convene(entranceId, petition.id, plain, meeting()) }
             .isInstanceOf(PetitionLocked::class.java).hasMessageContaining("cannot be weighed").hasMessageContaining(unitOf(shared).toString())
         assertThat(convened).isEmpty()
     }
@@ -277,6 +277,6 @@ class PetitionServiceTest {
         val elsewhere = UUID.randomUUID()
         assertThatThrownBy { service.read(elsewhere, petition.id) }.isInstanceOf(NoSuchElementException::class.java)
         assertThatThrownBy { service.sign(elsewhere, petition.id, a) }.isInstanceOf(NoSuchElementException::class.java)
-        assertThatThrownBy { service.convene(elsewhere, petition.id, meeting(a)) }.isInstanceOf(NoSuchElementException::class.java)
+        assertThatThrownBy { service.convene(elsewhere, petition.id, a, meeting()) }.isInstanceOf(NoSuchElementException::class.java)
     }
 }

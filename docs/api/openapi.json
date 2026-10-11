@@ -696,10 +696,6 @@
       },
       "ConveneOnPetition": {
         "properties": {
-          "convenedBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "demandUnmet": {
             "type": "string"
           },
@@ -721,7 +717,6 @@
           }
         },
         "required": [
-          "convenedBy",
           "demandUnmet",
           "mode",
           "place",
@@ -1870,16 +1865,11 @@
       },
       "OpenPetitionRequest": {
         "properties": {
-          "openedBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "subject": {
             "type": "string"
           }
         },
         "required": [
-          "openedBy",
           "subject"
         ],
         "type": "object"
@@ -2580,18 +2570,6 @@
         "required": [
           "reason",
           "revertedBy"
-        ],
-        "type": "object"
-      },
-      "SignPetitionRequest": {
-        "properties": {
-          "partyId": {
-            "format": "uuid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "partyId"
         ],
         "type": "object"
       },
@@ -3758,6 +3736,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3785,12 +3776,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "Open a petition to convene an assembly — by an owner, who signs it",
+        "summary": "Open a petition to convene an assembly — by the signed-in owner, who signs it; anybody else is a 403",
         "tags": [
           "assembly"
         ],
         "x-rules": [
-          "PM-GA-003"
+          "PM-GA-003",
+          "PM-SEC-001"
         ]
       }
     },
@@ -3840,6 +3832,19 @@
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -3936,6 +3941,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3963,12 +3981,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "The owners convene on their petition — once, by a signatory, when it is unlocked and the demand was not met",
+        "summary": "The owners convene on their petition — once, by the signed-in signatory, when it is unlocked and the demand was not met",
         "tags": [
           "assembly"
         ],
         "x-rules": [
-          "PM-GA-003"
+          "PM-GA-003",
+          "PM-SEC-001"
         ]
       }
     },
@@ -3995,16 +4014,6 @@
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SignPetitionRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "201": {
             "content": {
@@ -4028,6 +4037,19 @@
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -4056,12 +4078,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "Sign a petition — an owner in the entrance, once",
+        "summary": "Sign a petition — the signed-in owner, for themselves, once; anybody else is a 403",
         "tags": [
           "assembly"
         ],
         "x-rules": [
-          "PM-GA-003"
+          "PM-GA-003",
+          "PM-SEC-001"
         ]
       }
     },

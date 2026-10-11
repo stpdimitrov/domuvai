@@ -116,7 +116,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Open a petition to convene an assembly — by an owner, who signs it */
+        /** Open a petition to convene an assembly — by the signed-in owner, who signs it; anybody else is a 403 */
         post: operations["post_assembly_entrances_entranceId_petitions"];
         delete?: never;
         options?: never;
@@ -150,7 +150,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** The owners convene on their petition — once, by a signatory, when it is unlocked and the demand was not met */
+        /** The owners convene on their petition — once, by the signed-in signatory, when it is unlocked and the demand was not met */
         post: operations["post_assembly_entrances_entranceId_petitions_petitionId_assembly"];
         delete?: never;
         options?: never;
@@ -167,7 +167,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign a petition — an owner in the entrance, once */
+        /** Sign a petition — the signed-in owner, for themselves, once; anybody else is a 403 */
         post: operations["post_assembly_entrances_entranceId_petitions_petitionId_signatures"];
         delete?: never;
         options?: never;
@@ -1152,8 +1152,6 @@ export interface components {
             urgent: boolean;
         };
         ConveneOnPetition: {
-            /** Format: uuid */
-            convenedBy: string;
             demandUnmet: string;
             mode: string;
             place: string;
@@ -1520,8 +1518,6 @@ export interface components {
             overdueDays: number;
         };
         OpenPetitionRequest: {
-            /** Format: uuid */
-            openedBy: string;
             subject: string;
         };
         OperatingAccountView: {
@@ -1724,10 +1720,6 @@ export interface components {
             reason: string;
             /** Format: uuid */
             revertedBy: string;
-        };
-        SignPetitionRequest: {
-            /** Format: uuid */
-            partyId: string;
         };
         StatementLine: {
             allocationKey: string;
@@ -2358,6 +2350,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2405,6 +2408,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2474,6 +2488,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2508,11 +2533,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignPetitionRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Created */
             201: {
@@ -2525,6 +2546,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

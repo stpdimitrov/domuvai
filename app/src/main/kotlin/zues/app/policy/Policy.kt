@@ -30,6 +30,12 @@ enum class Action(val governedBy: String) {
 
     /** recording a mandate of an entrance, or the day it ended: saying who its manager, board, controller or cashier is */
     RECORD_MANDATE("PM-SEC-001"),
+
+    /** signing the owners' petition to convene an assembly — opening one signs it. A signature is never withdrawn */
+    SIGN_PETITION("PM-GA-003"),
+
+    /** convening the owners' assembly on their petition, when the demand was not met */
+    CONVENE_ON_PETITION("PM-GA-003"),
 }
 
 /**
@@ -108,13 +114,14 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 4
+        const val MATRIX_VERSION = 5
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
          * own data — nobody else. Anonymising it: the manager and the board, who keep it — the controller reads and
          * does not write (PM-GOV-008). Who a login is, and who holds an entrance's offices: the deployment's administrator —
-         * and nobody else.
+         * and nobody else. The owners' petition: an owner of the entrance on the day, signing for themselves — not a
+         * holder of use, not an office as such (PM-GA-003).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -137,6 +144,8 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.ANONYMISE_BOOK, Role.MB, "PM-BOOK-010"),
             Permit(Action.TIE_LOGIN, Role.SYS_ADMIN, "PM-SEC-001"),
             Permit(Action.RECORD_MANDATE, Role.SYS_ADMIN, "PM-SEC-001"),
+            Permit(Action.SIGN_PETITION, Role.OWN, "PM-GA-003"),
+            Permit(Action.CONVENE_ON_PETITION, Role.OWN, "PM-GA-003"),
         )
     }
 }

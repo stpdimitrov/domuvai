@@ -37,11 +37,11 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-BOOK-003` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:91` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:10` |  |
 | `PM-BOOK-004` | `app/src/test/kotlin/zues/app/registry/BookPersistenceIT.kt:91` | `app/src/main/kotlin/zues/app/registry/BookDeclaration.kt:11` |  |
 | `PM-BOOK-005` | `app/src/test/kotlin/zues/app/intake/ImportServiceTest.kt:181` | `app/src/main/kotlin/zues/app/registry/Animal.kt:11` |  |
-| `PM-BOOK-006` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:75` | `app/src/main/kotlin/zues/app/policy/Policy.kt:93` |  |
+| `PM-BOOK-006` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:94` | `app/src/main/kotlin/zues/app/policy/Policy.kt:99` |  |
 | `PM-BOOK-007` | `app/src/test/kotlin/zues/app/registry/BookAccessServiceTest.kt:79` | `app/src/main/kotlin/zues/app/registry/BookAccess.kt:22` |  |
 | `PM-BOOK-008` | `app/src/test/kotlin/zues/app/registry/BookRetentionPersistenceIT.kt:72` | `app/src/main/kotlin/zues/app/registry/RegistryService.kt:336` |  |
 | `PM-BOOK-009` | — | — |  |
-| `PM-BOOK-010` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:246` | `app/src/main/kotlin/zues/app/registry/BookLists.kt:16` |  |
+| `PM-BOOK-010` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:265` | `app/src/main/kotlin/zues/app/registry/BookLists.kt:16` |  |
 | `PM-BOOK-011` | `app/src/test/kotlin/zues/app/intake/FeeSheetTest.kt:47` | `app/src/main/kotlin/zues/app/intake/FeeSheet.kt:83` |  |
 | `PM-BOOK-012` | `app/src/test/kotlin/zues/app/money/HeadcountCheckTest.kt:53` | `app/src/main/kotlin/zues/app/money/HeadcountCheck.kt:17` |  |
 
@@ -56,7 +56,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GOV-005` | — | — |  |
 | `PM-GOV-006` | — | — |  |
 | `PM-GOV-007` | — | — |  |
-| `PM-GOV-008` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:236` | — |  |
+| `PM-GOV-008` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:255` | — |  |
 | `PM-GOV-009` | — | — |  |
 | `PM-GOV-010` | — | — |  |
 | `PM-GOV-011` | — | — |  |
@@ -74,7 +74,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 |---|---|---|---|
 | `PM-GA-001` | — | — |  |
 | `PM-GA-002` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:77` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:12` |  |
-| `PM-GA-003` | `app/src/test/kotlin/zues/app/assembly/PetitionPersistenceIT.kt:87` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:31` | ⚠ |
+| `PM-GA-003` | `app/src/test/kotlin/zues/app/assembly/PetitionPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:31` | ⚠ |
 | `PM-GA-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:223` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:140` |  |
 | `PM-GA-005` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:105` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:13` | ⚠ |
 | `PM-GA-006` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:193` | `app/src/main/kotlin/zues/app/assembly/AssemblyService.kt:117` |  |
@@ -257,7 +257,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-SEC-001` | `app/src/test/kotlin/zues/app/identity_org/LoginAdministrationIT.kt:70` | `app/src/main/kotlin/zues/app/identity_org/Administrators.kt:13` |  |
+| `PM-SEC-001` | `app/src/test/kotlin/zues/app/assembly/ActingTest.kt:48` | `app/src/main/kotlin/zues/app/assembly/Acting.kt:26` |  |
 | `PM-SEC-002` | — | — |  |
 | `PM-SEC-003` | — | — |  |
 | `PM-SEC-004` | `app/src/test/kotlin/zues/app/identity_org/LoginAdministrationIT.kt:116` | `app/src/main/kotlin/zues/app/identity_org/LoginAdministration.kt:32` |  |
