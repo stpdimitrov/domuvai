@@ -26,7 +26,16 @@ data class Petition(@Id val id: UUID, val entranceId: UUID, val openedBy: UUID, 
 
 /** One owner's signature under a petition. Append-only. */
 @Table("petition_signature")
-data class PetitionSignature(@Id val id: UUID, val entranceId: UUID, val petitionId: UUID, val partyId: UUID, val signedAt: Instant)
+data class PetitionSignature(
+    @Id val id: UUID,
+    val entranceId: UUID,
+    val petitionId: UUID,
+    val partyId: UUID,
+    val signedAt: Instant,
+    /** The sign-in that signed, as tied to [partyId] at that moment (PM-SEC-001). */
+    val loginIssuer: String,
+    val loginSubject: String,
+)
 
 /**
  * What unlocked a petition, kept as it was on the day the owners convened on it: the share its signatories
@@ -47,6 +56,9 @@ data class PetitionUnlock(
     val lawVersion: String,
     val engineVersion: String,
     val recordedAt: Instant,
+    /** The sign-in that convened, as tied to [convenedBy] at that moment (PM-SEC-001). */
+    val loginIssuer: String,
+    val loginSubject: String,
 )
 
 interface PetitionRepository : ListCrudRepository<Petition, UUID> {
@@ -80,9 +92,8 @@ data class PetitionWeight(
     val unlocked: Boolean get() = cannotWeigh.isEmpty() && heldPct >= thresholdPct
 }
 
-/** What a signatory states when the owners convene on their petition. */
+/** What a signatory states when the owners convene on their petition. Who convenes is the sign-in's party, never stated. */
 data class ConveneOnPetition(
-    val convenedBy: UUID,
     val scheduledAt: Instant,
     val place: String,
     val mode: String,
@@ -106,24 +117,27 @@ class PetitionService(
 ) {
     // Rule: PM-GA-003
     @Transactional
-    fun open(entranceId: UUID, openedBy: UUID, subject: String): Petition {
+    fun open(entranceId: UUID, by: Actor, subject: String): Petition {
         require(subject.isNotBlank()) { "a petition says what the assembly is demanded for" }
-        requireOwner(entranceId, openedBy)
+        requireOwner(entranceId, by.party)
         val now = clock.instant()
-        val petition = aggregates.insert(Petition(UUID.randomUUID(), entranceId, openedBy, subject.trim(), now))
-        aggregates.insert(PetitionSignature(UUID.randomUUID(), entranceId, petition.id, openedBy, now))   // who opens it signs it
+        val petition = aggregates.insert(Petition(UUID.randomUUID(), entranceId, by.party, subject.trim(), now))
+        aggregates.insert(signature(petition, by, now))                             // who opens it signs it
         return petition
     }
 
     // Rule: PM-GA-003
     @Transactional
-    fun sign(entranceId: UUID, petitionId: UUID, partyId: UUID) {
+    fun sign(entranceId: UUID, petitionId: UUID, by: Actor) {
         val petition = petitions.lock(petitionId, entranceId) ?: throw NoSuchElementException("no petition $petitionId in entrance $entranceId")
         check(assemblies.findByPetitionId(petition.id) == null) { "an assembly is already convened on this petition" }
-        check(signatures.findByPetitionIdOrderBySignedAt(petitionId).none { it.partyId == partyId }) { "this owner has already signed the petition" }
-        requireOwner(entranceId, partyId)
-        aggregates.insert(PetitionSignature(UUID.randomUUID(), entranceId, petitionId, partyId, clock.instant()))
+        check(signatures.findByPetitionIdOrderBySignedAt(petitionId).none { it.partyId == by.party }) { "this owner has already signed the petition" }
+        requireOwner(entranceId, by.party)
+        aggregates.insert(signature(petition, by, clock.instant()))
     }
+
+    private fun signature(petition: Petition, by: Actor, at: Instant) =
+        PetitionSignature(UUID.randomUUID(), petition.entranceId, petition.id, by.party, at, by.loginIssuer, by.loginSubject)
 
     /** The petition, who signed it, what it weighs today in Sofia, and the assembly convened on it if any. */
     @Transactional(readOnly = true)
@@ -142,14 +156,14 @@ class PetitionService(
     // Rule: PM-GA-003
     // TODO(legal): PM-GA-003 — the period after which an unmet demand lets the owners convene
     @Transactional
-    fun convene(entranceId: UUID, petitionId: UUID, request: ConveneOnPetition): Pair<Assembly, PetitionUnlock> {
+    fun convene(entranceId: UUID, petitionId: UUID, by: Actor, request: ConveneOnPetition): Pair<Assembly, PetitionUnlock> {
         val petition = petitions.lock(petitionId, entranceId) ?: throw NoSuchElementException("no petition $petitionId in entrance $entranceId")
         check(assemblies.findByPetitionId(petition.id) == null) { "an assembly is already convened on this petition" }
         require(request.demandUnmet.isNotBlank()) { "the owners convene only when their demand was not met: say how it was made and that it was not (PM-GA-003)" }
         val signed = signatures.findByPetitionIdOrderBySignedAt(petitionId).map { it.partyId }.toSet()
-        require(request.convenedBy in signed) { "the owners' assembly is convened by one of the petition's signatories (PM-GA-003)" }
+        require(by.party in signed) { "the owners' assembly is convened by one of the petition's signatories (PM-GA-003)" }
         val weight = weigh(entranceId, signed, today())
-        require(request.convenedBy in weight.owners) { "the convening signatory no longer owns in the entrance (PM-GA-003)" }
+        require(by.party in weight.owners) { "the convening signatory no longer owns in the entrance (PM-GA-003)" }
         if (weight.cannotWeigh.isNotEmpty()) throw PetitionLocked("the petition cannot be weighed: " + weight.cannotWeigh.joinToString("; "))
         if (!weight.unlocked) {
             throw PetitionLocked(
@@ -159,14 +173,15 @@ class PetitionService(
         }
         val unlock = aggregates.insert(
             PetitionUnlock(
-                petitionId = petition.id, entranceId = entranceId, convenedBy = request.convenedBy, demandUnmetNote = request.demandUnmet.trim(),
+                petitionId = petition.id, entranceId = entranceId, convenedBy = by.party, demandUnmetNote = request.demandUnmet.trim(),
                 weighedOn = weight.on, heldPct = weight.heldPct, thresholdPct = weight.thresholdPct,
                 thresholdConstant = weight.thresholdConstant, thresholdVerified = weight.thresholdVerified,
                 lawVersion = CATALOGUE_VERSION, engineVersion = ENGINE_VERSION, recordedAt = clock.instant(),
+                loginIssuer = by.loginIssuer, loginSubject = by.loginSubject,
             ),
         )
         // a meeting the notice period forbids, or an unknown mode, fails here and takes the unlock record with it
-        val convene = Convene(request.convenedBy, OWNERS, request.scheduledAt, request.place, request.mode, request.urgent, request.urgencyReason)
+        val convene = Convene(by.party, OWNERS, request.scheduledAt, request.place, request.mode, request.urgent, request.urgencyReason)
         return convening.conveneByOwners(entranceId, convene) { it.copy(petitionId = petition.id) } to unlock
     }
 
