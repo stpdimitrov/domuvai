@@ -81,14 +81,14 @@ RUNNING = {
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
    ('List the proxies registered for an assembly', ['PM-GA-009']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions'):
-   ('Open a petition to convene an assembly — by an owner, who signs it', ['PM-GA-003']),
+   ('Open a petition to convene an assembly — by the signed-in owner, who signs it; anybody else is a 403', ['PM-GA-003', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures'):
-   ('Sign a petition — an owner in the entrance, once', ['PM-GA-003']),
+   ('Sign a petition — the signed-in owner, for themselves, once; anybody else is a 403', ['PM-GA-003', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}'):
    ("Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed",
     ['PM-GA-003', 'PM-ORG-005', 'PM-ORG-011']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly'):
-   ('The owners convene on their petition — once, by a signatory, when it is unlocked and the demand was not met', ['PM-GA-003']),
+   ('The owners convene on their petition — once, by the signed-in signatory, when it is unlocked and the demand was not met', ['PM-GA-003', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity
