@@ -11,8 +11,14 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import zues.law.constantOn
+import zues.app.registry.HeldOn
+import zues.app.registry.Holding
+import zues.app.registry.Holdings
+import zues.app.registry.Resident
+import zues.app.registry.TitleRole
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.UUID
 
@@ -49,19 +55,32 @@ class NoticeServiceTest {
         on { save(any<Assembly>()) } doAnswer { (it.arguments[0] as Assembly).also { saved -> stored = saved } }
     }
     private val agenda: AgendaItemRepository = mock { on { findByAssemblyIdOrderByOrdinal(any()) } doAnswer { items.toList() } }
+    private val by = Actor(convenor, "https://id.example.test/realms/domuvai", "login-convenor")
+
+    /** The registry's port, as the test says it: who owns in the entrance, and from which day. */
+    private val owners = mutableMapOf(owner to LocalDate.parse("2026-01-01"))
+    private val book = object : Holdings {
+        override fun inForce(entranceId: UUID, on: LocalDate, role: TitleRole) = HeldOn(
+            if (role == TitleRole.OWN) owners.filterValues { !on.isBefore(it) }.keys.map { Holding(it, UUID.randomUUID(), "OWN", "1", "10", "10", "DECLARED") } else emptyList(),
+            emptyList(),
+        )
+        override fun residents(entranceId: UUID, on: LocalDate): List<Resident> = emptyList()
+    }
+
     private val convening = AssemblyService(aggregates, assemblies, agenda, LawMajorities(), clock)
-    private val notices = NoticeService(aggregates, assemblies, agenda, clock)
+    private val notices = NoticeService(aggregates, assemblies, agenda, book, clock)
 
     private fun convened(meets: String, urgent: Boolean = false, withItem: Boolean = true): Assembly {
         val assembly = convening.convene(
             entranceId, Convene(convenor, "BM", Instant.parse(meets), "фоайето на вх. А", "IN_PERSON", urgent, if (urgent) "спукана тръба" else null),
+            by,
         )
         if (withItem) convening.addAgendaItem(entranceId, assembly.id, "Отчет на управителя", "GENERAL")
         return assembly
     }
 
     private fun post(assembly: Assembly, postedAt: String, coSignatory: UUID = owner, hash: String = photo) =
-        notices.recordPosting(entranceId, assembly.id, Instant.parse(postedAt), coSignatory, hash)
+        notices.recordPosting(entranceId, assembly.id, by, Instant.parse(postedAt), coSignatory, hash)
 
     @Test
     fun `PM-GA-004 scheduling an assembly 6 days out is blocked, and 7 days out is allowed`() {
@@ -81,15 +100,15 @@ class NoticeServiceTest {
         val lateOnThe8th = Clock.fixed(Instant.parse("2026-10-08T21:30:00Z"), ZoneOffset.UTC)          // 00:30 on the 9th in Sofia
         val service = AssemblyService(aggregates, assemblies, agenda, LawMajorities(), lateOnThe8th)
         fun meeting(at: String) = Convene(convenor, "BM", Instant.parse(at), "фоайето", "IN_PERSON")
-        assertThatThrownBy { service.convene(entranceId, meeting("2026-10-15T10:00:00Z")) }             // 7 days from the 8th, 6 from the 9th
+        assertThatThrownBy { service.convene(entranceId, meeting("2026-10-15T10:00:00Z"), by) }             // 7 days from the 8th, 6 from the 9th
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-004")
-        assertThat(service.convene(entranceId, meeting("2026-10-16T10:00:00Z")).status).isEqualTo("DRAFT")
+        assertThat(service.convene(entranceId, meeting("2026-10-16T10:00:00Z"), by).status).isEqualTo("DRAFT")
     }
 
     @Test
     fun `PM-GA-004 a posting act 6 days before the meeting is refused, and 7 days before records the act with its photograph`() {
         val assembly = convened("2026-10-20T16:00:00Z")
-        assertThatThrownBy { notices.recordPosting(entranceId, assembly.id, now.plusSeconds(1), owner, photo) }
+        assertThatThrownBy { notices.recordPosting(entranceId, assembly.id, by, now.plusSeconds(1), owner, photo) }
             .isInstanceOf(IllegalArgumentException::class.java)                      // a posting still to come is not an act
         stored = stored!!.copy(scheduledAt = Instant.parse("2026-10-15T16:00:00Z")) // as if the meeting were 6 days from the posting
         assertThatThrownBy { post(assembly, "2026-10-09T09:00:00Z") }
@@ -141,7 +160,7 @@ class NoticeServiceTest {
     }
 
     @Test
-    fun `PM-GA-007 an assembly is a draft until the posting act is recorded, signed by the convenor and one other person`() {
+    fun `PM-GA-007 an assembly is a draft until the posting act is recorded, signed by the convenor and one owner`() {
         val assembly = convened("2026-10-20T16:00:00Z")
         assertThat(stored!!.status).isEqualTo("DRAFT")
         assertThat(stored!!.noticePostedAt).isNull()
@@ -150,8 +169,21 @@ class NoticeServiceTest {
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-007")
         assertThat(stored!!.status).isEqualTo("DRAFT")
 
+        // "one owner": a stranger, and somebody who becomes an owner only tomorrow, do not co-sign
+        assertThatThrownBy { post(assembly, "2026-10-09T09:00:00Z", coSignatory = UUID.randomUUID()) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-007")
+        val buyer = UUID.randomUUID().also { owners[it] = LocalDate.parse("2026-10-10") }
+        assertThatThrownBy { post(assembly, "2026-10-09T09:00:00Z", coSignatory = buyer) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("owner in the entrance on the day of posting")
+        // and the act is the convenor's own: nobody else records it, whoever they are
+        assertThatThrownBy { notices.recordPosting(entranceId, assembly.id, Actor(owner, "https://id.example.test/realms/domuvai", "login-owner"), now, buyer, photo) }
+            .isInstanceOf(ActRefused::class.java)
+        assertThat(stored!!.status).isEqualTo("DRAFT")
+        assertThat(acts).isEmpty()
+
         val act = post(assembly, "2026-10-09T09:00:00Z")
         assertThat(act.convenorPartyId).isEqualTo(convenor)                          // from the assembly, not from the caller
+        assertThat(act.loginSubject).isEqualTo("login-convenor")                     // the sign-in that recorded it
         assertThat(act.coSignatoryPartyId).isEqualTo(owner)
         assertThat(stored!!.status).isEqualTo("NOTICED")
 
@@ -190,17 +222,17 @@ class NoticeServiceTest {
 
         // the new clock: the meeting is on the 20th, so a notice posted on the 14th is 6 days — too late; the first act does not count
         val laterClock = Clock.fixed(Instant.parse("2026-10-14T09:00:00Z"), ZoneOffset.UTC)
-        val later = NoticeService(aggregates, assemblies, agenda, laterClock)
-        assertThatThrownBy { later.recordPosting(entranceId, assembly.id, Instant.parse("2026-10-14T08:00:00Z"), owner, photo) }
+        val later = NoticeService(aggregates, assemblies, agenda, book, laterClock)
+        assertThatThrownBy { later.recordPosting(entranceId, assembly.id, by, Instant.parse("2026-10-14T08:00:00Z"), owner, photo) }
             .isInstanceOf(NoticeTooLate::class.java)
         assertThat(stored!!.status).isEqualTo("DRAFT")
 
         // moved to the 21st, the new notice is in time, and its act states the agenda with the added item
         AssemblyService(aggregates, assemblies, agenda, LawMajorities(), laterClock)
             .reschedule(entranceId, assembly.id, Instant.parse("2026-10-21T16:00:00Z"), "фоайето на вх. А")
-        assertThatThrownBy { later.recordPosting(entranceId, assembly.id, Instant.parse("2026-10-14T08:00:00Z"), owner, photo) }
+        assertThatThrownBy { later.recordPosting(entranceId, assembly.id, by, Instant.parse("2026-10-14T08:00:00Z"), owner, photo) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-006")     // posted before the meeting was moved
-        val second = later.recordPosting(entranceId, assembly.id, Instant.parse("2026-10-14T09:00:00Z"), owner, photo)
+        val second = later.recordPosting(entranceId, assembly.id, by, Instant.parse("2026-10-14T09:00:00Z"), owner, photo)
         assertThat(second.statedAgenda).isEqualTo("1. Отчет на управителя\n2. Ремонт на покрива")
         assertThat(stored!!.status).isEqualTo("NOTICED")
         assertThat(acts).hasSize(2)                                                  // the voided notice keeps its act

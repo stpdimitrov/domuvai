@@ -182,7 +182,7 @@ class PetitionService(
         )
         // a meeting the notice period forbids, or an unknown mode, fails here and takes the unlock record with it
         val convene = Convene(by.party, OWNERS, request.scheduledAt, request.place, request.mode, request.urgent, request.urgencyReason)
-        return convening.conveneByOwners(entranceId, convene) { it.copy(petitionId = petition.id) } to unlock
+        return convening.conveneByOwners(entranceId, convene, by) { it.copy(petitionId = petition.id) } to unlock
     }
 
     /**

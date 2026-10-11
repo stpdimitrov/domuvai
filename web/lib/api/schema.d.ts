@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification; a date no notice could be in time for is blocked */
+        /** Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked */
         post: operations["post_assembly_entrances_entranceId_assemblies"];
         delete?: never;
         options?: never;
@@ -47,7 +47,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Put an item on the agenda, bound to the majority the law has in force for its type — cited with its rule and source; after posting it voids the notice */
+        /** Put an item on the agenda, bound to the majority the law has in force for its type — by whoever runs the assembly; after posting it voids the notice */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda"];
         delete?: never;
         options?: never;
@@ -64,7 +64,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record the posting act with its photograph — the only way an assembly becomes NOTICED; refused when posted too close to the meeting */
+        /** Record the posting act with its photograph — by the convenor signed in, co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_notice_posting"];
         delete?: never;
         options?: never;
@@ -99,7 +99,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move the meeting — blocked when no notice could be in time; a posted notice is void and the assembly a draft again */
+        /** Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_schedule"];
         delete?: never;
         options?: never;
@@ -1140,10 +1140,8 @@ export interface components {
             /** Format: int64 */
             priceMinor: number;
         };
-        Convene: {
-            convenedAs: string;
-            /** Format: uuid */
-            convenedBy: string;
+        ConveneOnPetition: {
+            demandUnmet: string;
             mode: string;
             place: string;
             /** Format: date-time */
@@ -1151,8 +1149,8 @@ export interface components {
             urgencyReason?: string;
             urgent: boolean;
         };
-        ConveneOnPetition: {
-            demandUnmet: string;
+        ConveneRequest: {
+            convenedAs: string;
             mode: string;
             place: string;
             /** Format: date-time */
@@ -1872,7 +1870,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Convene"];
+                "application/json": components["schemas"]["ConveneRequest"];
             };
         };
         responses: {
@@ -1887,6 +1885,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1954,6 +1963,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2034,6 +2054,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2096,6 +2127,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2271,6 +2313,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

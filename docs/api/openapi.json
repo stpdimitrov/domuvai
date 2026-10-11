@@ -658,42 +658,6 @@
         ],
         "type": "object"
       },
-      "Convene": {
-        "properties": {
-          "convenedAs": {
-            "type": "string"
-          },
-          "convenedBy": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "mode": {
-            "type": "string"
-          },
-          "place": {
-            "type": "string"
-          },
-          "scheduledAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "urgencyReason": {
-            "type": "string"
-          },
-          "urgent": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "convenedAs",
-          "convenedBy",
-          "mode",
-          "place",
-          "scheduledAt",
-          "urgent"
-        ],
-        "type": "object"
-      },
       "ConveneOnPetition": {
         "properties": {
           "demandUnmet": {
@@ -718,6 +682,37 @@
         },
         "required": [
           "demandUnmet",
+          "mode",
+          "place",
+          "scheduledAt",
+          "urgent"
+        ],
+        "type": "object"
+      },
+      "ConveneRequest": {
+        "properties": {
+          "convenedAs": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "place": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "urgencyReason": {
+            "type": "string"
+          },
+          "urgent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "convenedAs",
           "mode",
           "place",
           "scheduledAt",
@@ -3026,7 +3021,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Convene"
+                "$ref": "#/components/schemas/ConveneRequest"
               }
             }
           },
@@ -3055,6 +3050,19 @@
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -3096,14 +3104,15 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification; a date no notice could be in time for is blocked",
+        "summary": "Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-002",
           "PM-GA-004",
-          "PM-GA-005"
+          "PM-GA-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -3153,6 +3162,19 @@
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -3261,6 +3283,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3301,13 +3336,14 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — cited with its rule and source; after posting it voids the notice",
+        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — by whoever runs the assembly; after posting it voids the notice",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-VOTE-004",
-          "PM-GA-006"
+          "PM-GA-006",
+          "PM-SEC-001"
         ]
       }
     },
@@ -3368,6 +3404,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3408,7 +3457,7 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Record the posting act with its photograph — the only way an assembly becomes NOTICED; refused when posted too close to the meeting",
+        "summary": "Record the posting act with its photograph — by the convenor signed in, co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting",
         "tags": [
           "assembly"
         ],
@@ -3417,7 +3466,8 @@
           "PM-GA-005",
           "PM-GA-006",
           "PM-GA-007",
-          "PM-SYS-013"
+          "PM-SYS-013",
+          "PM-SEC-001"
         ]
       }
     },
@@ -3638,6 +3688,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3678,13 +3741,14 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Move the meeting — blocked when no notice could be in time; a posted notice is void and the assembly a draft again",
+        "summary": "Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-004",
-          "PM-GA-006"
+          "PM-GA-006",
+          "PM-SEC-001"
         ]
       }
     },

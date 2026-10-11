@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.assembly.Acting
+import zues.app.assembly.AssemblyActs
 import zues.app.assembly.AssemblyService
 import zues.app.assembly.NoticeService
 import zues.app.assembly.PetitionService
@@ -70,6 +71,7 @@ class OpenApiContractTest {
     @Autowired lateinit var mvc: MockMvc
 
     @MockitoBean lateinit var acting: Acting
+    @MockitoBean lateinit var assemblyActs: AssemblyActs
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var petitions: PetitionService

@@ -147,8 +147,9 @@ class PetitionPersistenceIT {
         // once: no second assembly on the petition, by the service or by hand; and no signature after it
         asked(ana, "$base/$id/assembly", meeting).andExpect(status().isConflict)
         asked(vera, "$base/$id/signatures").andExpect(status().isConflict)
-        val copy = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, notice_content_changed_at, petition_id) " +
-            "SELECT gen_random_uuid(), %s, convened_by, %s, place, scheduled_at, mode, status, notice_content_changed_at, %s FROM assembly.assembly WHERE id = '$assemblyId'"
+        val copy = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, notice_content_changed_at, petition_id, " +
+            "convened_login_issuer, convened_login_subject) " +
+            "SELECT gen_random_uuid(), %s, convened_by, %s, place, scheduled_at, mode, status, notice_content_changed_at, %s, convened_login_issuer, convened_login_subject FROM assembly.assembly WHERE id = '$assemblyId'"
         fun refused(entrance: String, convenedAs: String, petition: String, constraint: String) =
             assertThatThrownBy { jdbc.update(copy.format(entrance, convenedAs, petition)) }
                 .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)

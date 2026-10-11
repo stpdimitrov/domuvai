@@ -15,9 +15,11 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
+import zues.app.identity_org.Logins
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
@@ -66,6 +68,42 @@ class ProxyPersistenceIT {
 
     private fun party() = UUID.fromString(created("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
 
+    @Autowired lateinit var logins: Logins
+    private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
+
+    /** Whose requests these are: every request below carries this login's token, until another person is signed in. */
+    private var signedInAs: String? = null
+
+    private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
+
+    /** A party with a login of its own, tied to it. */
+    private fun person(): UUID = party().also { logins.tie(realm, "login-$it", it) }
+
+    private fun <T> signedIn(party: UUID?, act: () -> T): T {
+        val before = signedInAs
+        signedInAs = party?.let { "login-$it" }
+        try { return act() } finally { signedInAs = before }
+    }
+
+    /** The entrance's manager, with the mandate in force — and signed in from here on. */
+    private fun manager(entranceId: UUID, body: String = "BM", from: Int = -30, to: Int = 300): UUID = person().also {
+        jdbc.update(
+            "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)",
+            entranceId, body, it, from, to,
+        )
+        signedInAs = "login-$it"
+    }
+
+    /** An owner of a unit of the entrance since the start of last year — the whole entrance, the first time it is asked for. */
+    private fun owner(entranceId: UUID): UUID = person().also {
+        val existing = jdbc.queryForList("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)
+        val unit = existing.firstOrNull() ?: UUID.fromString(
+            created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
+                .get("unitIds")[0].asText(),
+        )
+        created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"${if (existing.isEmpty()) "0.5" else "0.25"}","validFrom":"2025-01-01"}""")
+    }
+
     /** A month from now: far enough for any notice period, whenever this runs. */
     private val meets: Instant = Instant.now().plus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS)
 
@@ -77,7 +115,7 @@ class ProxyPersistenceIT {
 
     private fun assembly(entranceId: UUID): String {
         val base = "/api/assembly/entrances/$entranceId/assemblies"
-        val id = created(base, convening(party())).get("id").asText()
+        val id = created(base, convening(manager(entranceId))).get("id").asText()
         created("$base/$id/agenda", """{"text":"Отчет","itemType":"GENERAL"}""")
         created("$base/$id/agenda", """{"text":"Ремонт на покрива","itemType":"GENERAL"}""")
         return "$base/$id/proxies"

@@ -122,7 +122,8 @@ class PetitionServiceTest {
         assertThat(assembly.petitionId).isEqualTo(petition.id)
         assertThat(unlock.petitionId).isEqualTo(petition.id)
         assertThat(unlock.convenedBy).isEqualTo(b)
-        assertThat(unlock.loginSubject).isEqualTo("login-$b")                         // the sign-in that convened, on the record
+        assertThat(unlock.loginSubject).isEqualTo("login-$b")
+        assertThat(assembly.convenedLoginSubject).isEqualTo("login-$b")                         // the sign-in that convened, on the record
         assertThat(signed.map { it.partyId to it.loginSubject }).containsExactly(a to "login-$a", b to "login-$b", c to "login-$c")
         assertThat(unlock.demandUnmetNote).startsWith("Искането е връчено")
         assertThat(unlock.heldPct).isEqualByComparingTo("20")
@@ -275,7 +276,7 @@ class PetitionServiceTest {
     @Test
     fun `PM-GA-002 the owners' capacity cannot be claimed through the ordinary convene, and a petition of another entrance is not found`() {
         val a = owner("25")
-        assertThatThrownBy { convening.convene(entranceId, Convene(a, "OWNERS", Instant.parse("2026-11-20T16:00:00Z"), "фоайето", "IN_PERSON")) }
+        assertThatThrownBy { convening.convene(entranceId, Convene(a, "OWNERS", Instant.parse("2026-11-20T16:00:00Z"), "фоайето", "IN_PERSON"), actor(a)) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-002")
         val petition = service.open(entranceId, actor(a), "Ремонт на покрива")
         val elsewhere = UUID.randomUUID()

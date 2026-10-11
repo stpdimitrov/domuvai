@@ -15,9 +15,11 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
+import zues.app.identity_org.Logins
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
@@ -64,6 +66,42 @@ class AssemblyPersistenceIT {
 
     private fun party() = UUID.fromString(created("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
 
+    @Autowired lateinit var logins: Logins
+    private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
+
+    /** Whose requests these are: every request below carries this login's token, until another person is signed in. */
+    private var signedInAs: String? = null
+
+    private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
+
+    /** A party with a login of its own, tied to it. */
+    private fun person(): UUID = party().also { logins.tie(realm, "login-$it", it) }
+
+    private fun <T> signedIn(party: UUID?, act: () -> T): T {
+        val before = signedInAs
+        signedInAs = party?.let { "login-$it" }
+        try { return act() } finally { signedInAs = before }
+    }
+
+    /** The entrance's manager, with the mandate in force — and signed in from here on. */
+    private fun manager(entranceId: UUID, body: String = "BM", from: Int = -30, to: Int = 300): UUID = person().also {
+        jdbc.update(
+            "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)",
+            entranceId, body, it, from, to,
+        )
+        signedInAs = "login-$it"
+    }
+
+    /** An owner of a unit of the entrance since the start of last year — the whole entrance, the first time it is asked for. */
+    private fun owner(entranceId: UUID): UUID = person().also {
+        val existing = jdbc.queryForList("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)
+        val unit = existing.firstOrNull() ?: UUID.fromString(
+            created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
+                .get("unitIds")[0].asText(),
+        )
+        created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"${if (existing.isEmpty()) "0.5" else "0.25"}","validFrom":"2025-01-01"}""")
+    }
+
     /** A month from now: far enough for any notice period, whenever this runs. */
     private val meets: Instant = Instant.now().plus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS)
 
@@ -76,7 +114,7 @@ class AssemblyPersistenceIT {
     @Test
     fun `PM-GA-002 a convened assembly is a draft that reads back with its convenor, capacity and agenda in order`() {
         val entranceId = entrance()
-        val convenor = party()
+        val convenor = manager(entranceId)
         val base = "/api/assembly/entrances/$entranceId/assemblies"
         val id = created(base, convening(convenor)).get("id").asText()
 
@@ -94,17 +132,17 @@ class AssemblyPersistenceIT {
         assertThat(read.get("agenda").map { it.get("text").asText() }).containsExactly("Отчет на управителя", "Избор на управител")
         assertThat(read.get("agenda")[0].get("majorityRuleId").asText()).isEqualTo(first.get("majority").get("id").asText())
 
-        // another entrance does not see it; an unregistered entrance is a 404 and an unregistered convenor a 400, not a 500
+        // another entrance does not see it; the convenor is the one signed in
         mvc.perform(get("/api/assembly/entrances/${entrance()}/assemblies/$id")).andExpect(status().isNotFound)
+        // the manager of this entrance is nobody in another, registered or not
         mvc.perform(post("/api/assembly/entrances/${UUID.randomUUID()}/assemblies").contentType(MediaType.APPLICATION_JSON).content(convening(convenor)))
-            .andExpect(status().isNotFound)
-        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(convening(UUID.randomUUID()))).andExpect(status().isBadRequest)
+            .andExpect(status().isForbidden)
     }
 
     @Test
     fun `PM-GA-005 the justification of an urgent assembly is stored, and the database refuses urgency without one`() {
         val entranceId = entrance()
-        val convenor = party()
+        val convenor = manager(entranceId)
         val base = "/api/assembly/entrances/$entranceId/assemblies"
         val id = created(base, convening(convenor, """"urgent":true,"urgencyReason":"спукана тръба в мазето"""")).get("id").asText()
         assertThat(jdbc.queryForObject("SELECT urgency_reason FROM assembly.assembly WHERE id = ?::uuid", String::class.java, id))
@@ -112,8 +150,8 @@ class AssemblyPersistenceIT {
 
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(convening(convenor, """"urgent":true"""))).andExpect(status().isBadRequest)
 
-        val insert = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, urgent, urgency_reason) " +
-            "VALUES (gen_random_uuid(), ?, ?, ?, 'фоайето', now(), 'IN_PERSON', 'DRAFT', ?, ?)"
+        val insert = "INSERT INTO assembly.assembly(id, entrance_id, convened_by, convened_as, place, scheduled_at, mode, status, urgent, urgency_reason, " +
+            "convened_login_issuer, convened_login_subject) VALUES (gen_random_uuid(), ?, ?, ?, 'фоайето', now(), 'IN_PERSON', 'DRAFT', ?, ?, 'issuer', 'subject')"
         assertThat(jdbc.update(insert, entranceId, convenor, "BM", true, "теч")).isEqualTo(1)          // the control: this insert is a good one
         for ((urgent, reason) in listOf(true to null, true to "   ", true to "\t\n", false to "бързаме", false to "")) {
             assertThatThrownBy { jdbc.update(insert, entranceId, convenor, "BM", urgent, reason) }
@@ -130,7 +168,7 @@ class AssemblyPersistenceIT {
     fun `PM-VOTE-004 an item typed COMMON_PART_USE_RIGHT is refused while no threshold is confirmed, and nothing is stored`() {
         val entranceId = entrance()
         val base = "/api/assembly/entrances/$entranceId/assemblies"
-        val id = created(base, convening(party())).get("id").asText()
+        val id = created(base, convening(manager(entranceId))).get("id").asText()
         mvc.perform(
             post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Покривът под наем","itemType":"COMMON_PART_USE_RIGHT"}"""),
         ).andExpect(status().isUnprocessableEntity)
@@ -140,8 +178,8 @@ class AssemblyPersistenceIT {
     @Test
     fun `PM-GA-007 the posting act makes the assembly NOTICED, and the database refuses NOTICED without one`() {
         val entranceId = entrance()
-        val convenor = party()
-        val owner = party()
+        val convenor = manager(entranceId)
+        val owner = owner(entranceId)
         val base = "/api/assembly/entrances/$entranceId/assemblies"
         val id = created(base, convening(convenor)).get("id").asText()
         created("$base/$id/agenda", """{"text":"Отчет на управителя","itemType":"GENERAL"}""")
@@ -183,7 +221,7 @@ class AssemblyPersistenceIT {
         assertThatThrownBy {
             jdbc.update(
                 "INSERT INTO assembly.notice_posting SELECT gen_random_uuid(), entrance_id, assembly_id, posted_at, convenor_party_id, convenor_party_id, " +
-                    "photo_hash, stated_scheduled_at, stated_place, stated_agenda, recorded_at FROM assembly.notice_posting WHERE assembly_id = ?::uuid",
+                    "photo_hash, stated_scheduled_at, stated_place, stated_agenda, recorded_at, login_issuer, login_subject FROM assembly.notice_posting WHERE assembly_id = ?::uuid",
                 id,
             )
         }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("notice_posting_two_signatories")
@@ -192,8 +230,8 @@ class AssemblyPersistenceIT {
     @Test
     fun `PM-GA-006 an agenda item added after posting returns the assembly to DRAFT, and the next act states the new agenda`() {
         val entranceId = entrance()
-        val convenor = party()
-        val owner = party()
+        val convenor = manager(entranceId)
+        val owner = owner(entranceId)
         val base = "/api/assembly/entrances/$entranceId/assemblies"
         val id = created(base, convening(convenor)).get("id").asText()
         fun posting(at: Instant = Instant.now()) = """{"postedAt":"$at","coSignatoryPartyId":"$owner","photoHash":"${"3f".repeat(32)}"}"""
@@ -222,7 +260,7 @@ class AssemblyPersistenceIT {
     @Test
     fun `PM-GA-004 an assembly cannot be scheduled, or moved, closer than the notice period`() {
         val entranceId = entrance()
-        val convenor = party()
+        val convenor = manager(entranceId)
         val base = "/api/assembly/entrances/$entranceId/assemblies"
         val tooSoon = Instant.now().plus(3, ChronoUnit.DAYS)
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(convening(convenor, at = tooSoon))).andExpect(status().isBadRequest)
@@ -230,5 +268,84 @@ class AssemblyPersistenceIT {
         mvc.perform(post("$base/$id/schedule").contentType(MediaType.APPLICATION_JSON).content("""{"scheduledAt":"$tooSoon","place":"двора"}"""))
             .andExpect(status().isBadRequest)
         assertThat(read(base, id).get("scheduledAt").asText()).isEqualTo(meets.toString())
+    }
+
+    @Test
+    fun `PM-GA-002 PM-GA-007 what the audit could do is refused - a convenor named in the body, an agenda item voiding a notice, a former owner co-signing - and the record names the sign-in`() {
+        val entranceId = entrance()
+        val base = "/api/assembly/entrances/$entranceId/assemblies"
+        val manager = manager(entranceId)
+        val owner = owner(entranceId)
+        val stranger = person()
+        val formerManager = person().also {
+            jdbc.update(
+                "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to, succeeded_at) " +
+                    "VALUES (gen_random_uuid(), ?, 'BM', ?, current_date - 800, current_date - 100, current_date - 100)",
+                entranceId, it,
+            )
+        }
+        val cashier = person().also {
+            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CSH', ?, current_date - 30, current_date + 300)", entranceId, it)
+        }
+
+        // 1 · nobody convenes by naming the manager: not a login tied to no party, a stranger, an owner, the cashier, a former manager, nor nobody at all
+        val asTheManager = convening(manager)
+        for (who in listOf(stranger, owner, cashier, formerManager)) {
+            signedIn(who) { mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(asTheManager)).andExpect(status().isForbidden) }
+        }
+        signedInAs = "login-tied-to-nobody-${UUID.randomUUID()}"
+        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(asTheManager)).andExpect(status().isForbidden)
+        signedIn(null) { mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(asTheManager)).andExpect(status().isForbidden) }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.assembly WHERE entrance_id = ?", Int::class.java, entranceId)).isZero()
+        // … and the manager does not convene as the controller they are not
+        signedIn(manager) {
+            mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(asTheManager.replace(""""convenedAs":"BM"""", """"convenedAs":"CTL""""))).andExpect(status().isForbidden)
+        }
+
+        // the manager convenes, and the row names them and their sign-in — whatever the body said
+        val id = signedIn(manager) { created(base, convening(stranger)).get("id").asText() }
+        val row = jdbc.queryForMap("SELECT convened_by, convened_as, convened_login_issuer, convened_login_subject FROM assembly.assembly WHERE id = ?::uuid", id)
+        assertThat(row).containsEntry("convened_by", manager).containsEntry("convened_as", "BM")
+            .containsEntry("convened_login_issuer", realm).containsEntry("convened_login_subject", "login-$manager")
+        signedIn(manager) { created("$base/$id/agenda", """{"text":"Отчет","itemType":"GENERAL"}""") }
+
+        // 2 · finding 3: a former owner does not co-sign, nor does somebody who is no owner; an owner does
+        val formerOwner = person().also {
+            jdbc.update(
+                "INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) " +
+                    "SELECT gen_random_uuid(), entrance_id, unit_id, ?, 'OWN', 0.25, current_date - 400, current_date - 1 FROM registry.title WHERE party_id = ?",
+                it, owner,
+            )
+        }
+        fun posting(coSignatory: UUID) = """{"postedAt":"${Instant.now()}","coSignatoryPartyId":"$coSignatory","photoHash":"${"3f".repeat(32)}"}"""
+        signedIn(manager) {
+            mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(formerOwner))).andExpect(status().isBadRequest)
+            mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(stranger))).andExpect(status().isBadRequest)
+        }
+        // the act is the convenor's: not an owner's to record, and not another office's
+        val controller = person().also {
+            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)", entranceId, it)
+        }
+        for (who in listOf(owner, controller)) {
+            signedIn(who) { mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(owner))).andExpect(status().isForbidden) }
+        }
+        assertThat(read(base, id).get("status").asText()).isEqualTo("DRAFT")
+        signedIn(manager) { created("$base/$id/notice-posting", posting(owner)) }
+        assertThat(jdbc.queryForMap("SELECT login_issuer, login_subject FROM assembly.notice_posting WHERE assembly_id = ?::uuid", id))
+            .containsEntry("login_issuer", realm).containsEntry("login_subject", "login-$manager")
+
+        // 3 · a NOTICED assembly keeps its notice: nobody but an office holder touches its agenda or its date
+        for (who in listOf(stranger, owner, cashier, formerManager, null)) {
+            signedIn(who) {
+                mvc.perform(post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Подправена точка","itemType":"GENERAL"}""")).andExpect(status().isForbidden)
+                mvc.perform(post("$base/$id/schedule").contentType(MediaType.APPLICATION_JSON).content("""{"scheduledAt":"${meets.plusSeconds(3600)}","place":"другаде"}"""))
+                    .andExpect(status().isForbidden)
+            }
+        }
+        val after = read(base, id)
+        assertThat(after.get("status").asText()).isEqualTo("NOTICED")
+        assertThat(after.get("agenda")).hasSize(1)
+        // the controller, an office holder today, carries on what the manager convened — and that does void the notice
+        assertThat(signedIn(controller) { created("$base/$id/agenda", """{"text":"Избор на касиер","itemType":"GENERAL"}""") }.get("noticeVoided").asBoolean()).isTrue()
     }
 }
