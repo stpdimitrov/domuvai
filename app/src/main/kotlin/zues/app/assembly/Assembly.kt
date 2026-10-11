@@ -30,6 +30,9 @@ data class Assembly(
     val noticeContentChangedAt: Instant? = null,
     /** Convened by the owners on this petition (Rule: PM-GA-003); what unlocked it is its [PetitionUnlock]. */
     val petitionId: UUID? = null,
+    /** The sign-in that convened, as tied to [convenedBy] at that moment (PM-SEC-001). */
+    val convenedLoginIssuer: String? = null,
+    val convenedLoginSubject: String? = null,
 )
 
 /** Who may convene: the management board, the manager, the control board or controller. Rule: PM-GA-002 */

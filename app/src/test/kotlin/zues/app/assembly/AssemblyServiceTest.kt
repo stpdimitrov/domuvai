@@ -33,18 +33,19 @@ class AssemblyServiceTest {
 
     private val entranceId = UUID.randomUUID()
     private val convenor = UUID.randomUUID()
+    private val by = Actor(convenor, "https://id.example.test/realms/domuvai", "login-convenor")
 
     private fun convening(convenedAs: String = "BM", urgent: Boolean = false, reason: String? = null) =
         Convene(convenor, convenedAs, Instant.parse("2026-11-20T17:00:00Z"), "фоайето на вх. А", "IN_PERSON", urgent, reason)
 
-    private fun draft(): Assembly = service().convene(entranceId, convening()).also {
+    private fun draft(): Assembly = service().convene(entranceId, convening(), by).also {
         whenever(assemblies.lock(it.id, entranceId)).thenReturn(it)
     }
 
     @Test
     fun `PM-GA-002 the management board, the manager and the control board may convene, and the capacity is stored`() {
         for (office in listOf("MB", "BM", "CTL")) {
-            val assembly = service().convene(entranceId, convening(convenedAs = office))
+            val assembly = service().convene(entranceId, convening(convenedAs = office), by)
             assertThat(assembly.convenedAs).isEqualTo(office)
             assertThat(assembly.convenedBy).isEqualTo(convenor)
             assertThat(assembly.status).isEqualTo("DRAFT")
@@ -54,7 +55,7 @@ class AssemblyServiceTest {
     @Test
     fun `PM-GA-002 no other capacity may convene - a cashier, a management company, an owner alone`() {
         for (other in listOf("CSH", "PMC", "OWN", "")) {
-            assertThatThrownBy { service().convene(entranceId, convening(convenedAs = other)) }
+            assertThatThrownBy { service().convene(entranceId, convening(convenedAs = other), by) }
                 .isInstanceOf(IllegalArgumentException::class.java)
         }
         verify(aggregates, never()).insert(any<Any>())
@@ -62,7 +63,7 @@ class AssemblyServiceTest {
 
     @Test
     fun `PM-GA-005 an urgent assembly stores its justification`() {
-        val assembly = service().convene(entranceId, convening(urgent = true, reason = "  спукана тръба в мазето  "))
+        val assembly = service().convene(entranceId, convening(urgent = true, reason = "  спукана тръба в мазето  "), by)
         assertThat(assembly.urgent).isTrue()
         assertThat(assembly.urgencyReason).isEqualTo("спукана тръба в мазето")
     }
@@ -70,10 +71,10 @@ class AssemblyServiceTest {
     @Test
     fun `PM-GA-005 the urgent flag without a justification is refused, and so is a justification without the flag`() {
         for (reason in listOf(null, "", "   ")) {
-            assertThatThrownBy { service().convene(entranceId, convening(urgent = true, reason = reason)) }
+            assertThatThrownBy { service().convene(entranceId, convening(urgent = true, reason = reason), by) }
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-005")
         }
-        assertThatThrownBy { service().convene(entranceId, convening(urgent = false, reason = "бързаме")) }
+        assertThatThrownBy { service().convene(entranceId, convening(urgent = false, reason = "бързаме"), by) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-005")
         verify(aggregates, never()).insert(any<Any>())
     }
@@ -114,7 +115,7 @@ class AssemblyServiceTest {
             "COMMON_PART_USE_RIGHT", "88.5", Comparison.AT_LEAST, Denominator.TOTAL, "2026-11-21", "чл. 17 ЗУЕС", false, "PM-VOTE-004",
         )
         val lateEvening = Convene(convenor, "BM", Instant.parse("2026-11-20T22:30:00Z"), "фоайето", "IN_PERSON")   // 00:30 on the 21st in Sofia
-        val assembly = service().convene(entranceId, lateEvening).also { whenever(assemblies.lock(it.id, entranceId)).thenReturn(it) }
+        val assembly = service().convene(entranceId, lateEvening, by).also { whenever(assemblies.lock(it.id, entranceId)).thenReturn(it) }
         val (item, _) = service { type, on -> majorityRuleOn(type, on, listOf(fromThe21st)) }
             .addAgendaItem(entranceId, assembly.id, "Отдаване на покрива под наем", "COMMON_PART_USE_RIGHT")
         assertThat(item.majorityRuleId).isEqualTo("COMMON_PART_USE_RIGHT@2026-11-21")

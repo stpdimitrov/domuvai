@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            5 to listOf(
+            6 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -53,6 +53,9 @@ class PolicyTest {
                 "RECORD_MANDATE SYS_ADMIN PM-SEC-001",
                 "SIGN_PETITION OWN PM-GA-003",
                 "CONVENE_ON_PETITION OWN PM-GA-003",
+                "CONVENE_ASSEMBLY BM PM-GA-002",
+                "CONVENE_ASSEMBLY MB PM-GA-002",
+                "CONVENE_ASSEMBLY CTL PM-GA-002",
             ),
         )
         assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance"))
@@ -71,6 +74,23 @@ class PolicyTest {
             assertThat(decision.role).isEqualTo(if (named) role else null)
             assertThat(decision.matrixVersion).isEqualTo(Policy.MATRIX_VERSION)
         }
+    }
+
+    @Test
+    fun `PM-GA-002 an assembly is convened by the board, the manager and the controller while the mandate is in force — and by no cashier, firm, owner or administrator`() {
+        val convening = Resource.OfEntrance(entrance)
+        for (office in listOf(Role.BM, Role.MB, Role.CTL)) {
+            assertThat(policy.decide(holder(office), Action.CONVENE_ASSEMBLY, convening, day)).isEqualTo(Decision(true, "PM-GA-002", office, Policy.MATRIX_VERSION))
+        }
+        for (other in Role.entries - setOf(Role.BM, Role.MB, Role.CTL)) {
+            assertThat(policy.decide(holder(other), Action.CONVENE_ASSEMBLY, convening, day).allowed).describedAs("$other").isFalse()
+        }
+        val former = person().also { holds(it, Role.BM, from = day.minusYears(2), until = day) }                // the mandate ended today
+        assertThat(policy.decide(former, Action.CONVENE_ASSEMBLY, convening, day.minusDays(1)).allowed).isTrue()
+        assertThat(policy.decide(former, Action.CONVENE_ASSEMBLY, convening, day)).isEqualTo(Decision(false, "PM-GA-002", null, Policy.MATRIX_VERSION))
+        val nextDoor = person().also { holds(it, Role.BM, at = UUID.randomUUID()) }                             // the manager of another entrance
+        assertThat(policy.decide(nextDoor, Action.CONVENE_ASSEMBLY, convening, day).allowed).isFalse()
+        assertThat(policy.decide(Asking(null, null), Action.CONVENE_ASSEMBLY, convening, day).allowed).isFalse()
     }
 
     @Test

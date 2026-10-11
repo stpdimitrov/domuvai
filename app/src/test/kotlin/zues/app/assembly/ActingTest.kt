@@ -72,4 +72,41 @@ class ActingTest {
         val generous = Acting(Policy(listOf(RoleSource { _, entranceId, _ -> setOf(Held(Role.OWN, entranceId)) })), Clock.systemUTC())
         assertThatThrownBy { generous.actor(Asking(Login(issuer, "login-of-nobody"), null), Action.SIGN_PETITION, entrance) }.isInstanceOf(ActRefused::class.java)
     }
+
+    @Test
+    fun `PM-GA-002 the office stated is one the party holds in the entrance today - not another office, not yesterday's, not next door's`() {
+        val manager = person(Role.BM)
+        assertThat(acting.officeHolder(manager, entrance, Role.BM)).isEqualTo(Actor(manager.party!!, issuer, manager.login!!.subject))
+        for (other in listOf(Role.MB, Role.CTL)) {
+            assertThatThrownBy { acting.officeHolder(manager, entrance, other) }.isInstanceOf(ActRefused::class.java).extracting { (it as ActRefused).ruleId }.isEqualTo("PM-GA-002")
+        }
+        fun refusedAs(who: Asking, office: Role = Role.BM) = assertThatThrownBy { acting.officeHolder(who, entrance, office) }.isInstanceOf(ActRefused::class.java)
+        refusedAs(person(Role.BM, until = "2026-10-10"))                              // the mandate ended on the 10th: not the manager today in Sofia
+        refusedAs(person(Role.BM, at = UUID.randomUUID()))
+        refusedAs(person(Role.OWN))
+        refusedAs(person(Role.CSH), Role.CSH)                                        // an office that convenes nothing, though held
+        val managerAndCashier = person(Role.BM).also { roles += Dated(it.party!!, entrance, Role.CSH, LocalDate.parse("2026-01-01"), null) }
+        refusedAs(managerAndCashier, Role.CSH)                                       // … even by somebody who may convene as something else
+        val managerAndOwner = person(Role.BM).also { roles += Dated(it.party!!, entrance, Role.OWN, LocalDate.parse("2026-01-01"), null) }
+        refusedAs(managerAndOwner, Role.OWN)
+        refusedAs(Asking(null, null)).extracting { (it as ActRefused).ruleId }.isEqualTo("PM-SEC-001")
+        // somebody holding two offices convenes in either, and only in those
+        val both = person(Role.BM).also { roles += Dated(it.party!!, entrance, Role.CTL, LocalDate.parse("2026-01-01"), null) }
+        assertThat(acting.officeHolder(both, entrance, Role.CTL).party).isEqualTo(both.party)
+        refusedAs(both, Role.MB)
+    }
+
+    @Test
+    fun `PM-SEC-001 of several actions the answer says which this party may do, and refuses under the first one's rule when none`() {
+        val manager = person(Role.BM)
+        val owner = person(Role.OWN)
+        fun asked(who: Asking) = acting.allowedAny(who, entrance, Action.CONVENE_ASSEMBLY, Action.CONVENE_ON_PETITION)
+        assertThat(asked(manager).actions).containsExactly(Action.CONVENE_ASSEMBLY)
+        assertThat(asked(owner).actions).containsExactly(Action.CONVENE_ON_PETITION)
+        assertThat(asked(owner).actor.party).isEqualTo(owner.party)
+        val ownerAndManager = person(Role.BM).also { roles += Dated(it.party!!, entrance, Role.OWN, LocalDate.parse("2026-01-01"), null) }
+        assertThat(asked(ownerAndManager).actions).containsExactlyInAnyOrder(Action.CONVENE_ASSEMBLY, Action.CONVENE_ON_PETITION)
+        assertThatThrownBy { asked(person(Role.CSH)) }.isInstanceOf(ActRefused::class.java).extracting { (it as ActRefused).ruleId }.isEqualTo("PM-GA-002")
+        assertThatThrownBy { asked(Asking(Login(issuer, "login-of-nobody"), null)) }.isInstanceOf(ActRefused::class.java).extracting { (it as ActRefused).ruleId }.isEqualTo("PM-SEC-001")
+    }
 }

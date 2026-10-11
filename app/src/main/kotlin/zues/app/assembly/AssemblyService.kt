@@ -15,7 +15,7 @@ import java.time.Clock
 import java.time.Instant
 import java.util.UUID
 
-/** What a convenor states when convening. */
+/** Convening, as the service takes it: who convenes is the sign-in's party, put here by the guard, never read from a request. */
 data class Convene(
     val convenedBy: UUID,
     val convenedAs: String,
@@ -70,10 +70,10 @@ class AssemblyService(
     // Rule: PM-GA-002
     // Rule: PM-GA-005
     @Transactional
-    fun convene(entranceId: UUID, request: Convene): Assembly {
+    fun convene(entranceId: UUID, request: Convene, by: Actor): Assembly {
         val office = ConvenorOffice.entries.firstOrNull { it.name == request.convenedAs }     // any other capacity may not convene
             ?: throw IllegalArgumentException("an assembly is convened as MB, BM or CTL (PM-GA-002), not as \"${request.convenedAs}\"")
-        return draft(entranceId, request.copy(convenedAs = office.name)) { it }
+        return draft(entranceId, request.copy(convenedAs = office.name), by) { it }
     }
 
     /**
@@ -82,10 +82,12 @@ class AssemblyService(
      */
     // Rule: PM-GA-003
     @Transactional
-    fun conveneByOwners(entranceId: UUID, request: Convene, onPetition: (Assembly) -> Assembly): Assembly =
-        draft(entranceId, request.copy(convenedAs = OWNERS), onPetition)
+    fun conveneByOwners(entranceId: UUID, request: Convene, by: Actor, onPetition: (Assembly) -> Assembly): Assembly =
+        draft(entranceId, request.copy(convenedAs = OWNERS), by, onPetition)
 
-    private fun draft(entranceId: UUID, request: Convene, complete: (Assembly) -> Assembly): Assembly {
+    /** The draft is the convenor's: [by] is who convenes, and the sign-in behind them goes on the record with them. */
+    private fun draft(entranceId: UUID, request: Convene, by: Actor, complete: (Assembly) -> Assembly): Assembly {
+        require(by.party == request.convenedBy) { "an assembly is convened by the one who convenes it" }
         val mode = MeetingMode.entries.firstOrNull { it.name == request.mode } ?: throw IllegalArgumentException("unknown mode \"${request.mode}\"")
         require(request.place.isNotBlank()) { "the place of the assembly is required" }
         val reason = request.urgencyReason?.trim()?.ifEmpty { null }
@@ -96,6 +98,7 @@ class AssemblyService(
             id = UUID.randomUUID(), entranceId = entranceId, convenedBy = request.convenedBy, convenedAs = request.convenedAs,
             scheduledAt = request.scheduledAt, place = request.place.trim(), mode = mode.name,
             status = AssemblyStatus.DRAFT.name, urgent = request.urgent, urgencyReason = reason, noticeContentChangedAt = clock.instant(),
+            convenedLoginIssuer = by.loginIssuer, convenedLoginSubject = by.loginSubject,
         )
         try {
             return aggregates.insert(complete(assembly))

@@ -64,17 +64,17 @@ RUNNING = {
    ("The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  # ---- assembly
  ('post', '/api/assembly/entrances/{entranceId}/assemblies'):
-   ('Convene a general assembly as a draft — by the management board, the manager or the control board; urgency is recorded with its justification; a date no notice could be in time for is blocked',
-    ['PM-GA-002', 'PM-GA-004', 'PM-GA-005']),
+   ('Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked',
+    ['PM-GA-002', 'PM-GA-004', 'PM-GA-005', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda'):
-   ('Put an item on the agenda, bound to the majority the law has in force for its type — cited with its rule and source; after posting it voids the notice',
-    ['PM-VOTE-004', 'PM-GA-006']),
+   ('Put an item on the agenda, bound to the majority the law has in force for its type — by whoever runs the assembly; after posting it voids the notice',
+    ['PM-VOTE-004', 'PM-GA-006', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule'):
-   ('Move the meeting — blocked when no notice could be in time; a posted notice is void and the assembly a draft again',
-    ['PM-GA-004', 'PM-GA-006']),
+   ('Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again',
+    ['PM-GA-004', 'PM-GA-006', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting'):
-   ('Record the posting act with its photograph — the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
-    ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013']),
+   ('Record the posting act with its photograph — by the convenor signed in, co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
+    ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
    ('Register a proxy for an assembly — principal, agent, scope and form; refused past the limit one person may represent, with the limit shown',
     ['PM-GA-009', 'PM-GA-010']),
