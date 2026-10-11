@@ -72,4 +72,14 @@ class LawTest {
         assertTrue(unverified().map { it.code }.contains("CASHIER_TERM_YEARS"))
         assertTrue(constantOn("CASHIER_TERM_YEARS", "2026-10-11").rule == null)
     }
+
+    @Test
+    fun `PM-GOV-004 the election reminder is 60 days before a term ends — the catalogue's own figure, not the statute's, and not confirmed`() {
+        val c = constantOn("MANDATE_ELECTION_REMINDER_DAYS", "2026-10-11")
+        assertEquals("60", c.value)
+        assertEquals("PM-GOV-004", c.rule)
+        assertFalse(c.verified)
+        assertNotNull(c.todoLegal)
+        assertTrue(unverified().map { it.code }.contains("MANDATE_ELECTION_REMINDER_DAYS"))
+    }
 }

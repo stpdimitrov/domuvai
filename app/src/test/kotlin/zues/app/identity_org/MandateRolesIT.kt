@@ -45,6 +45,7 @@ class MandateRolesIT {
     }
 
     @Autowired lateinit var roles: MandateRoles
+    @Autowired lateinit var standing: MandateStanding
     @Autowired lateinit var policy: Policy
     @Autowired lateinit var jdbc: JdbcTemplate
 
@@ -84,6 +85,15 @@ class MandateRolesIT {
         assertThat(roles.holdersOn(block, day("2025-01-01"))).containsExactlyInAnyOrder(mariaManager, RoleHolder(elena, Role.CSH, cashier))
         assertThat(roles.holdersOn(block, day("2026-05-09"))).containsExactlyInAnyOrder(mariaManager, RoleHolder(elena, Role.CSH, cashier))
         assertThat(roles.holdersOn(block, day("2026-05-10"))).isEmpty()                       // the board that follows her has no member on record
+
+        // PM-GOV-004 — and how each stands: Ivan in term, then acting past it until Maria; the read and the roles agree on who is in force
+        fun standing(on: String) = standing.of(block, day(on)).associate { it.partyId to it.standing }
+        assertThat(standing("2023-06-01")[ivan]).isEqualTo(Standing(StandingKind.IN_TERM, until = day("2024-05-10")))          // his successor is on record
+        assertThat(standing("2024-04-01")[ivan]).isEqualTo(Standing(StandingKind.EXPIRED_ACTING, electBy = day("2024-03-01"), actingSince = day("2024-03-01"), until = day("2024-05-10")))
+        assertThat(standing("2024-05-10")[ivan]).isNull()
+        assertThat(standing("2024-05-10")[petar]).isEqualTo(Standing(StandingKind.IN_TERM))
+        for (on in listOf("2022-02-28", "2023-06-01", "2024-04-01", "2024-05-10", "2025-01-01", "2026-05-09", "2026-05-10"))
+            assertThat(this.standing.of(block, day(on)).map { it.mandateId }).describedAs(on).containsExactlyInAnyOrderElementsOf(roles.holdersOn(block, day(on)).map { it.mandateId })
 
         assertThat(roles.held(Asking(null, ivan), block, day("2024-04-01"))).containsExactly(Held(Role.BM, block))
         assertThat(roles.held(Asking(null, ivan), block, day("2024-05-10"))).isEmpty()
