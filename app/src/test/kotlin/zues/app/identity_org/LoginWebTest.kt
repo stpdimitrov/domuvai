@@ -109,6 +109,19 @@ class LoginWebTest {
     }
 
     @Test
+    fun `PM-SEC-001 the administrator's own token is refused once the api's record ties that login to a party — it is somebody in the book now`() {
+        // The tie was made by a path that does not ask (the service's own unguarded tie, or SQL). The token is the
+        // administrator's, correctly signed; the resolver finds the party; the same request that was allowed is a 403.
+        tie(token(issuer, "operator")).andExpect(status().isOk)
+        whenever(logins.partyOf(REALM, "operator")).thenReturn(UUID.randomUUID())
+        tie(token(issuer, "operator"), """{"subject":"login-b","partyId":"$ivan"}""").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+        tie(token(issuer, "operator"), """{"subject":"login-ivan"}""", "/api/identity/logins/untie").andExpect(status().isForbidden)
+        verify(logins, never()).tie(eq(REALM), eq("login-b"), any())
+        verify(logins, never()).untie(any(), any())
+        verify(acts).record(eq("TIE_REFUSED"), eq(REALM), eq("login-b"), eq(ivan), any(), eq("PM-SEC-001"))
+    }
+
+    @Test
     fun `with no token, or one this api does not accept, nothing is asked at all — a 401`() {
         val stranger = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
         tie(null).andExpect(status().isUnauthorized)

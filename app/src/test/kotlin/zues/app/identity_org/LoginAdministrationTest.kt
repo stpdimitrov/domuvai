@@ -57,7 +57,9 @@ class LoginAdministrationTest {
         assertThat(administration.tie(operator, "login-ivan", ivan)).isEqualTo(LoginAnswer.Done(LoginTied(ISSUER, "login-ivan", ivan)))
         verify(logins).tie(ISSUER, "login-ivan", ivan)
         verify(acts).record("TIED", ISSUER, "login-ivan", ivan, operator, "PM-SEC-001")
-        assertThat(administration.tie(Asking(Login(ISSUER, "second-operator"), UUID.randomUUID()), "login-b", ivan)).isInstanceOf(LoginAnswer.Done::class.java)
+        assertThat(administration.tie(Asking(Login(ISSUER, "second-operator"), null), "login-b", ivan)).isInstanceOf(LoginAnswer.Done::class.java)
+        // … and a named login that carries a party is not an administrator: it is somebody in the book (AUD-03)
+        assertThat(administration.tie(Asking(Login(ISSUER, "second-operator"), UUID.randomUUID()), "login-c", ivan)).isEqualTo(LoginAnswer.Refused("PM-SEC-001"))
     }
 
     @Test
