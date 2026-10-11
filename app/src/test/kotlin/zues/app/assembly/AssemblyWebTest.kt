@@ -12,6 +12,7 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
+import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -118,8 +119,10 @@ class AssemblyWebTest {
     private fun convening(convenedAs: String, convenedBy: UUID? = null) =
         """{${convenedBy?.let { "\"convenedBy\":\"$it\"," }.orEmpty()}"convenedAs":"$convenedAs","scheduledAt":"$at","place":"фоайето","mode":"IN_PERSON","urgent":true,"urgencyReason":"спукана тръба"}"""
 
-    private fun draft(convenedBy: UUID, convenedAs: String) =
-        Assembly(UUID.randomUUID(), entranceId, convenedBy, convenedAs, at, "фоайето", "IN_PERSON", "DRAFT", true, "спукана тръба")
+    private fun draft(convenedBy: UUID, convenedAs: String) = Assembly(
+        UUID.randomUUID(), entranceId, convenedBy, convenedAs, at, "фоайето", "IN_PERSON", "DRAFT", true, "спукана тръба",
+        convenedLoginIssuer = ISSUER, convenedLoginSubject = "login-of-the-convenor",
+    )
 
     private fun stored(assembly: Assembly) = assembly.also { whenever(repository.findById(it.id)).thenReturn(Optional.of(it)) }
 
@@ -155,7 +158,7 @@ class AssemblyWebTest {
     }
 
     @Test
-    fun `PM-SEC-001 the agenda and the date of an office-convened assembly are run by whoever holds an office today, and by nobody else`() {
+    fun `PM-GA-002 an assembly is run by the one who convened it, while they hold the office they convened in - no other office, owner or stranger touches its agenda or date`() {
         val assembly = stored(draft(manager, "BM"))
         val majority = MajorityRule("GENERAL", "50", Comparison.MORE_THAN, Denominator.REPRESENTED, "2009-01-01", "чл. 17 ЗУЕС", true, "PM-VOTE-002")
         val item = AgendaItem(UUID.randomUUID(), entranceId, assembly.id, 1, "Отчет", "GENERAL", majority.id)
@@ -165,25 +168,36 @@ class AssemblyWebTest {
         val agenda = """{"text":"Отчет","itemType":"GENERAL"}"""
         val move = """{"scheduledAt":"$at","place":"двора"}"""
 
-        // the controller carries on what the manager convened
-        mvc.perform(post("$base/${assembly.id}/agenda").by("login-controller").content(agenda))
-            .andExpect(status().isCreated).andExpect(jsonPath("$.noticeVoided").value(true)).andExpect(jsonPath("$.majority.source").value("чл. 17 ЗУЕС"))
-        mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content(move)).andExpect(status().isOk)
-
-        for (subject in listOf("login-owner", "login-cashier", "login-stranger", "login-tied-to-nobody")) {
+        // the controller holds an office too — and cannot void the notice of what the manager convened
+        for (subject in listOf("login-controller", "login-owner", "login-cashier", "login-stranger", "login-tied-to-nobody")) {
             mvc.perform(post("$base/${assembly.id}/agenda").by(subject).content(agenda)).andExpect(status().isForbidden)
             mvc.perform(post("$base/${assembly.id}/schedule").by(subject).content(move)).andExpect(status().isForbidden)
         }
-        verify(assemblies).addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL")      // once: the controller's
+        verifyNoInteractions(assemblies)
+
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-manager").content(agenda))
+            .andExpect(status().isCreated).andExpect(jsonPath("$.noticeVoided").value(true)).andExpect(jsonPath("$.majority.source").value("чл. 17 ЗУЕС"))
+        mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content(move)).andExpect(status().isOk)
+
+        // the convenor who has left the office, or holds another one now, no longer runs it
+        held[manager] = setOf(Role.CTL)
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-manager").content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-002"))
+        held[manager] = emptySet()
+        mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content(move)).andExpect(status().isForbidden)
+        mvc.perform(post("$base/${assembly.id}/notice-posting").by("login-manager").content("""{"postedAt":"$at","coSignatoryPartyId":"$owner","photoHash":"${"ab".repeat(32)}"}"""))
+            .andExpect(status().isForbidden)
+        verify(assemblies).addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL")      // once: the manager's, while the manager
         verify(assemblies).reschedule(entranceId, assembly.id, at, "двора")
+        verifyNoInteractions(notices)
     }
 
     @Test
-    fun `PM-GA-003 an assembly the owners convened is run by the owner who convened it - not another owner, and not an office`() {
+    fun `PM-GA-003 an assembly the owners convened is run by the owner who convened it while they own - not another owner, an office, or an owner who is also the manager`() {
         val assembly = stored(draft(owner, "OWNERS"))
         person("login-other-owner", Role.OWN)
+        person("login-owner-and-manager", Role.OWN, Role.BM)
         val agenda = """{"text":"Ремонт на покрива","itemType":"GENERAL"}"""
-        for (subject in listOf("login-other-owner", "login-manager", "login-controller")) {
+        for (subject in listOf("login-other-owner", "login-owner-and-manager", "login-manager", "login-controller")) {
             mvc.perform(post("$base/${assembly.id}/agenda").by(subject).content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-003"))
         }
         verify(assemblies, never()).addAgendaItem(any(), any(), any(), any())
@@ -191,6 +205,17 @@ class AssemblyWebTest {
         whenever(assemblies.addAgendaItem(entranceId, assembly.id, "Ремонт на покрива", "GENERAL"))
             .thenReturn(AgendaItemBound(AgendaItem(UUID.randomUUID(), entranceId, assembly.id, 1, "Ремонт на покрива", "GENERAL", majority.id), majority, false))
         mvc.perform(post("$base/${assembly.id}/agenda").by("login-owner").content(agenda)).andExpect(status().isCreated)
+        // sold: the convening owner is an owner no more, and runs it no more
+        held[owner] = emptySet()
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-owner").content(agenda)).andExpect(status().isForbidden)
+        verify(assemblies).addAgendaItem(entranceId, assembly.id, "Ремонт на покрива", "GENERAL")      // the one time
+    }
+
+    @Test
+    fun `an assembly convened before a convening named its sign-in is not carried on - a 409, not a failed write`() {
+        val old = stored(draft(manager, "BM").copy(convenedLoginIssuer = null, convenedLoginSubject = null))
+        mvc.perform(post("$base/${old.id}/agenda").by("login-manager").content("""{"text":"Отчет","itemType":"GENERAL"}""")).andExpect(status().isConflict)
+        verifyNoInteractions(assemblies)
     }
 
     @Test
@@ -209,13 +234,12 @@ class AssemblyWebTest {
             .andExpect(jsonPath("$.coSignatoryPartyId").value(coSignatory.toString()))
             .andExpect(jsonPath("$.photoHash").value(photo))
             .andExpect(jsonPath("$.statedAgenda").value("1. Отчет"))
-        for (subject in listOf("login-owner", "login-stranger", "login-tied-to-nobody")) {
+        // nobody records it for the convenor: not another office, an owner, a stranger — refused by the guard itself, before the service
+        for (subject in listOf("login-controller", "login-owner", "login-stranger", "login-tied-to-nobody")) {
             mvc.perform(post("$base/${assembly.id}/notice-posting").by(subject).content(body)).andExpect(status().isForbidden)
         }
         verify(notices).recordPosting(entranceId, assembly.id, actor(manager, "login-manager"), posted, coSignatory, photo)
-        // the service's own refusal — the act is the convenor's signature — reaches the caller as a 403 too
-        whenever(notices.recordPosting(eq(entranceId), eq(assembly.id), eq(actor(controller, "login-controller")), any(), any(), any())).thenThrow(ActRefused("PM-GA-007"))
-        mvc.perform(post("$base/${assembly.id}/notice-posting").by("login-controller").content(body)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-007"))
+        verifyNoMoreInteractions(notices)
     }
 
     @Test

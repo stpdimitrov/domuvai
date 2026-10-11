@@ -334,8 +334,8 @@ class AssemblyPersistenceIT {
         assertThat(jdbc.queryForMap("SELECT login_issuer, login_subject FROM assembly.notice_posting WHERE assembly_id = ?::uuid", id))
             .containsEntry("login_issuer", realm).containsEntry("login_subject", "login-$manager")
 
-        // 3 · a NOTICED assembly keeps its notice: nobody but an office holder touches its agenda or its date
-        for (who in listOf(stranger, owner, cashier, formerManager, null)) {
+        // 3 · a NOTICED assembly keeps its notice: nobody but its convenor touches its agenda or its date — not even another office
+        for (who in listOf(stranger, owner, cashier, formerManager, controller, null)) {
             signedIn(who) {
                 mvc.perform(post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Подправена точка","itemType":"GENERAL"}""")).andExpect(status().isForbidden)
                 mvc.perform(post("$base/$id/schedule").contentType(MediaType.APPLICATION_JSON).content("""{"scheduledAt":"${meets.plusSeconds(3600)}","place":"другаде"}"""))
@@ -345,7 +345,13 @@ class AssemblyPersistenceIT {
         val after = read(base, id)
         assertThat(after.get("status").asText()).isEqualTo("NOTICED")
         assertThat(after.get("agenda")).hasSize(1)
-        // the controller, an office holder today, carries on what the manager convened — and that does void the notice
-        assertThat(signedIn(controller) { created("$base/$id/agenda", """{"text":"Избор на касиер","itemType":"GENERAL"}""") }.get("noticeVoided").asBoolean()).isTrue()
+        // the convenor adds an item, and that does void the notice; once their mandate has ended they run it no more
+        assertThat(signedIn(manager) { created("$base/$id/agenda", """{"text":"Избор на касиер","itemType":"GENERAL"}""") }.get("noticeVoided").asBoolean()).isTrue()
+        jdbc.update("UPDATE identity_org.management_mandate SET succeeded_at = current_date WHERE party_id = ?", manager)       // a successor took office today
+        signedIn(manager) {
+            mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(owner))).andExpect(status().isForbidden)
+            mvc.perform(post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Още една","itemType":"GENERAL"}""")).andExpect(status().isForbidden)
+        }
+        assertThat(read(base, id).get("status").asText()).isEqualTo("DRAFT")
     }
 }

@@ -56,7 +56,9 @@ class Acting(private val policy: Policy, private val clock: Clock) {
     // Rule: PM-GA-002
     fun officeHolder(who: Asking, entranceId: UUID, office: Role): Actor {
         val actor = actor(who, Action.CONVENE_ASSEMBLY, entranceId)
-        if (policy.rolesOf(who, entranceId, today()).none { it.role == office }) throw ActRefused(Action.CONVENE_ASSEMBLY.governedBy)
+        // which roles are offices that convene is the matrix's to say, here as everywhere
+        val convenes = Policy.MATRIX.any { it.action == Action.CONVENE_ASSEMBLY && it.role == office }
+        if (!convenes || policy.rolesOf(who, entranceId, today()).none { it.role == office }) throw ActRefused(Action.CONVENE_ASSEMBLY.governedBy)
         return actor
     }
 

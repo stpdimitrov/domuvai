@@ -85,6 +85,10 @@ class ActingTest {
         refusedAs(person(Role.BM, at = UUID.randomUUID()))
         refusedAs(person(Role.OWN))
         refusedAs(person(Role.CSH), Role.CSH)                                        // an office that convenes nothing, though held
+        val managerAndCashier = person(Role.BM).also { roles += Dated(it.party!!, entrance, Role.CSH, LocalDate.parse("2026-01-01"), null) }
+        refusedAs(managerAndCashier, Role.CSH)                                       // … even by somebody who may convene as something else
+        val managerAndOwner = person(Role.BM).also { roles += Dated(it.party!!, entrance, Role.OWN, LocalDate.parse("2026-01-01"), null) }
+        refusedAs(managerAndOwner, Role.OWN)
         refusedAs(Asking(null, null)).extracting { (it as ActRefused).ruleId }.isEqualTo("PM-SEC-001")
         // somebody holding two offices convenes in either, and only in those
         val both = person(Role.BM).also { roles += Dated(it.party!!, entrance, Role.CTL, LocalDate.parse("2026-01-01"), null) }

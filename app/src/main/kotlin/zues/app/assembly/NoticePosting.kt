@@ -73,7 +73,8 @@ class NoticeService(
             "the date, hour, place or agenda changed after $postedAt: a notice posted then did not state this assembly (PM-GA-006)"
         }
         require(coSignatoryPartyId != assembly.convenedBy) { "the posting act is signed by the convenor and one other person (PM-GA-007)" }
-        // TODO(legal): PM-GA-007 — the catalogue says "one owner"; whether a holder of use or an occupant may co-sign is unconfirmed
+        // TODO(legal): PM-GA-007 — the catalogue says "one owner"; whether a holder of use or an occupant may co-sign is unconfirmed,
+        // and so is whether "the convenor" of a board's assembly is the member who convened or the board
         val ownersThatDay = holdings.inForce(entranceId, LocalDate.parse(toSofiaDate(postedAt)), TitleRole.OWN).holdings.map { it.partyId }
         require(coSignatoryPartyId in ownersThatDay) { "the posting act is co-signed by an owner in the entrance on the day of posting (PM-GA-007)" }
         require(SHA256_HEX.matches(photoHash)) { "the photograph of the posted notice is given by its SHA-256, in lower-case hex (PM-GA-004)" }

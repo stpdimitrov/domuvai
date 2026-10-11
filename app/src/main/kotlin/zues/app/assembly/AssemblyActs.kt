@@ -23,10 +23,12 @@ data class ConveneRequest(
  * they may is the policy's to say today, before anything is looked up — a caller the policy allows nothing learns
  * nothing, not even whether the assembly exists.
  *
- * An assembly convened in an office is run — its agenda, its date and place — by whoever holds an office of the
- * entrance today: offices change hands, and the successor carries on. An assembly the owners convened on their
- * petition is run by the owner who convened it, while they still own. The posting act is the convenor's own signature
- * in either case (Rule: PM-GA-007): nobody records it for them.
+ * An assembly is run — its agenda, its date and place, its posting act — by the one who convened it, in person, while
+ * they still hold what they convened in: the same office, or ownership for an assembly the owners convened on their
+ * petition. Nobody else touches it: another office could otherwise void its notice for ever, and no rule in the
+ * catalogue says who else may alter a convened assembly. Whether a successor in the same office carries it on is the
+ * owner's to decide; until then a successor convenes anew. The posting act is the convenor's own signature (Rule:
+ * PM-GA-007).
  */
 @Service
 class AssemblyActs(
@@ -71,18 +73,24 @@ class AssemblyActs(
 
     /**
      * Who is running this assembly, or [ActRefused]. The policy is asked first, about the entrance in the path; only
-     * somebody it allows something reaches the assembly, and then it must be theirs to run.
+     * somebody it allows something reaches the assembly, and then it must be theirs: they convened it, and they still
+     * hold what they convened it in.
      */
     private fun running(who: Asking, entranceId: UUID, assemblyId: UUID): Actor {
         val allowed = acting.allowedAny(who, entranceId, Action.CONVENE_ASSEMBLY, Action.CONVENE_ON_PETITION)
         val assembly = assemblies.findById(assemblyId).filter { it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no assembly $assemblyId in entrance $entranceId") }
-        val theirs = if (assembly.convenedAs == OWNERS) {
-            Action.CONVENE_ON_PETITION in allowed.actions && allowed.actor.party == assembly.convenedBy
-        } else {
-            Action.CONVENE_ASSEMBLY in allowed.actions
+        val rule = if (assembly.convenedAs == OWNERS) Action.CONVENE_ON_PETITION.governedBy else Action.CONVENE_ASSEMBLY.governedBy
+        if (allowed.actor.party != assembly.convenedBy) throw ActRefused(rule)
+        when (assembly.convenedAs) {
+            OWNERS -> if (Action.CONVENE_ON_PETITION !in allowed.actions) throw ActRefused(rule)
+            in OFFICES -> acting.officeHolder(who, entranceId, Role.valueOf(assembly.convenedAs))      // the office they convened in, still theirs
+            else -> throw ActRefused(rule)                                                             // a capacity this code does not know runs nothing
         }
-        if (!theirs) throw ActRefused(if (assembly.convenedAs == OWNERS) Action.CONVENE_ON_PETITION.governedBy else Action.CONVENE_ASSEMBLY.governedBy)
+        // An assembly from before a convening named its sign-in has nobody accountable behind it: it is not carried on.
+        check(assembly.convenedLoginIssuer != null && assembly.convenedLoginSubject != null) {
+            "this assembly was convened before a convening recorded who signed in; convene it anew"
+        }
         return allowed.actor
     }
 

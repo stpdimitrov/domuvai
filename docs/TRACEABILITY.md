@@ -74,10 +74,10 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 |---|---|---|---|
 | `PM-GA-001` | — | — |  |
 | `PM-GA-002` | `app/src/test/kotlin/zues/app/assembly/ActingTest.kt:77` | `app/src/main/kotlin/zues/app/assembly/Acting.kt:53` |  |
-| `PM-GA-003` | `app/src/test/kotlin/zues/app/assembly/AssemblyWebTest.kt:182` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:31` | ⚠ |
-| `PM-GA-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:261` | `app/src/main/kotlin/zues/app/assembly/AssemblyActs.kt:60` |  |
+| `PM-GA-003` | `app/src/test/kotlin/zues/app/assembly/AssemblyWebTest.kt:195` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:31` | ⚠ |
+| `PM-GA-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:261` | `app/src/main/kotlin/zues/app/assembly/AssemblyActs.kt:62` |  |
 | `PM-GA-005` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:143` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:13` | ⚠ |
-| `PM-GA-006` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:231` | `app/src/main/kotlin/zues/app/assembly/AssemblyActs.kt:52` |  |
+| `PM-GA-006` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:231` | `app/src/main/kotlin/zues/app/assembly/AssemblyActs.kt:54` |  |
 | `PM-GA-007` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:179` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:43` | ⚠ |
 | `PM-GA-008` | — | — |  |
 | `PM-GA-009` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:128` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:17` |  |
