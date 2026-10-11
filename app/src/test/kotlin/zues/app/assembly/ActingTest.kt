@@ -42,16 +42,17 @@ class ActingTest {
     }
 
     private fun refused(who: Asking, action: Action = Action.SIGN_PETITION) =
-        assertThatThrownBy { acting.party(who, action, entrance) }.isInstanceOf(ActRefused::class.java).extracting { (it as ActRefused).ruleId }
+        assertThatThrownBy { acting.actor(who, action, entrance) }.isInstanceOf(ActRefused::class.java).extracting { (it as ActRefused).ruleId }
 
     @Test
     fun `PM-SEC-001 the one who acts is the sign-in's party, when the policy allows it today in Sofia`() {
         val owner = person(Role.OWN)
-        assertThat(acting.party(owner, Action.SIGN_PETITION, entrance)).isEqualTo(owner.party)
-        assertThat(acting.party(owner, Action.CONVENE_ON_PETITION, entrance)).isEqualTo(owner.party)
+        val actor = Actor(owner.party!!, issuer, owner.login!!.subject)             // the party, and the sign-in behind it
+        assertThat(acting.actor(owner, Action.SIGN_PETITION, entrance)).isEqualTo(actor)
+        assertThat(acting.actor(owner, Action.CONVENE_ON_PETITION, entrance)).isEqualTo(actor)
 
         refused(person(Role.OWN, until = "2026-10-10")).isEqualTo("PM-GA-003")       // sold on the 10th: not an owner today in Sofia
-        assertThat(acting.party(person(Role.OWN, from = "2026-10-10"), Action.SIGN_PETITION, entrance)).isNotNull()   // bought today in Sofia
+        assertThat(acting.actor(person(Role.OWN, from = "2026-10-10"), Action.SIGN_PETITION, entrance)).isNotNull()   // bought today in Sofia
     }
 
     @Test
@@ -62,12 +63,13 @@ class ActingTest {
     }
 
     @Test
-    fun `PM-SEC-001 a login tied to no party, and nobody at all with sign-in switched off, act on nothing`() {
-        refused(Asking(Login(issuer, "login-of-nobody"), null)).isEqualTo("PM-GA-003")
-        refused(Asking(null, null)).isEqualTo("PM-GA-003")
-        refused(Asking(null, null), Action.CONVENE_ON_PETITION).isEqualTo("PM-GA-003")
+    fun `PM-SEC-001 a login tied to no party, a party with no sign-in, and nobody at all with sign-in switched off, act on nothing`() {
+        refused(Asking(Login(issuer, "login-of-nobody"), null)).isEqualTo("PM-SEC-001")
+        refused(Asking(null, null)).isEqualTo("PM-SEC-001")
+        refused(Asking(null, null), Action.CONVENE_ON_PETITION).isEqualTo("PM-SEC-001")
+        refused(Asking(null, person(Role.OWN).party)).isEqualTo("PM-SEC-001")        // an owner's party with no sign-in behind it
         // even a source that would answer for a login with no party: an act is a party's
         val generous = Acting(Policy(listOf(RoleSource { _, entranceId, _ -> setOf(Held(Role.OWN, entranceId)) })), Clock.systemUTC())
-        assertThatThrownBy { generous.party(Asking(Login(issuer, "login-of-nobody"), null), Action.SIGN_PETITION, entrance) }.isInstanceOf(ActRefused::class.java)
+        assertThatThrownBy { generous.actor(Asking(Login(issuer, "login-of-nobody"), null), Action.SIGN_PETITION, entrance) }.isInstanceOf(ActRefused::class.java)
     }
 }

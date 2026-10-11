@@ -59,7 +59,7 @@ class PetitionSignInOffWebTest {
             post("$base/$id/signatures").content("""{"partyId":"$anyone"}"""),
             post("$base/$id/assembly").content("""{"convenedBy":"$anyone","scheduledAt":"2026-11-20T16:00:00Z","place":"фоайето","mode":"IN_PERSON","demandUnmet":"не е свикано"}"""),
         )) {
-            mvc.perform(request.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-003"))
+            mvc.perform(request.contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
         }
 
         val petition = Petition(id, entranceId, anyone, "Ремонт на покрива", Instant.parse("2026-10-09T09:00:00Z"))

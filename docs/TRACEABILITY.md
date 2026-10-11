@@ -257,7 +257,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
-| `PM-SEC-001` | `app/src/test/kotlin/zues/app/assembly/ActingTest.kt:48` | `app/src/main/kotlin/zues/app/assembly/Acting.kt:26` |  |
+| `PM-SEC-001` | `app/src/test/kotlin/zues/app/assembly/ActingTest.kt:48` | `app/src/main/kotlin/zues/app/assembly/Acting.kt:32` |  |
 | `PM-SEC-002` | — | — |  |
 | `PM-SEC-003` | — | — |  |
 | `PM-SEC-004` | `app/src/test/kotlin/zues/app/identity_org/LoginAdministrationIT.kt:116` | `app/src/main/kotlin/zues/app/identity_org/LoginAdministration.kt:32` |  |

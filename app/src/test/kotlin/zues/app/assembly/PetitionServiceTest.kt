@@ -84,6 +84,8 @@ class PetitionServiceTest {
     private fun meeting(demandUnmet: String = "Искането е връчено на управителя на 1 септември; събрание не е свикано.") =
         ConveneOnPetition(Instant.parse("2026-11-20T16:00:00Z"), "фоайето на вх. А", "IN_PERSON", demandUnmet)
 
+    private fun actor(party: UUID) = Actor(party, "https://id.example.test/realms/domuvai", "login-$party")
+
     private val threshold = constantOn("GA_PETITION_MIN_PCT", "2026-10-10")
 
     @Test
@@ -93,19 +95,19 @@ class PetitionServiceTest {
         val (a, b, c) = listOf(owner("8.5"), owner("7.25"), owner("4.25"))           // 8.5 → 15.75 → 20 exactly
         owner("80")                                                                  // the rest of the entrance, not signing
 
-        val petition = service.open(entranceId, a, "  Ремонт на покрива  ")
+        val petition = service.open(entranceId, actor(a), "  Ремонт на покрива  ")
         assertThat(petition.subject).isEqualTo("Ремонт на покрива")
         fun weight() = service.read(entranceId, petition.id).weight
         assertThat(weight().heldPct).isEqualByComparingTo("8.5")                     // who opens it signs it
         assertThat(weight().unlocked).isFalse()
-        assertThatThrownBy { service.convene(entranceId, petition.id, a, meeting()) }
+        assertThatThrownBy { service.convene(entranceId, petition.id, actor(a), meeting()) }
             .isInstanceOf(PetitionLocked::class.java).hasMessageContaining("8.5%").hasMessageContaining("20%").hasMessageContaining("чл. 12 ЗУЕС")
 
-        service.sign(entranceId, petition.id, b)
+        service.sign(entranceId, petition.id, actor(b))
         assertThat(weight().heldPct).isEqualByComparingTo("15.75")
         assertThat(weight().unlocked).isFalse()                                      // 15.75 is not 20
 
-        service.sign(entranceId, petition.id, c)
+        service.sign(entranceId, petition.id, actor(c))
         val reached = weight()
         assertThat(reached.heldPct).isEqualByComparingTo("20")
         assertThat(reached.thresholdPct).isEqualByComparingTo(threshold.value)
@@ -113,13 +115,15 @@ class PetitionServiceTest {
         assertThat(reached.unlocked).isTrue()                                        // "at least": exactly the threshold unlocks
         assertThat(service.read(entranceId, petition.id).signatories).containsExactly(a, b, c)
 
-        val (assembly, unlock) = service.convene(entranceId, petition.id, b, meeting())
+        val (assembly, unlock) = service.convene(entranceId, petition.id, actor(b), meeting())
         assertThat(assembly.status).isEqualTo("DRAFT")
         assertThat(assembly.convenedAs).isEqualTo("OWNERS")
         assertThat(assembly.convenedBy).isEqualTo(b)
         assertThat(assembly.petitionId).isEqualTo(petition.id)
         assertThat(unlock.petitionId).isEqualTo(petition.id)
         assertThat(unlock.convenedBy).isEqualTo(b)
+        assertThat(unlock.loginSubject).isEqualTo("login-$b")                         // the sign-in that convened, on the record
+        assertThat(signed.map { it.partyId to it.loginSubject }).containsExactly(a to "login-$a", b to "login-$b", c to "login-$c")
         assertThat(unlock.demandUnmetNote).startsWith("Искането е връчено")
         assertThat(unlock.heldPct).isEqualByComparingTo("20")
         assertThat(unlock.thresholdPct).isEqualByComparingTo("20")
@@ -134,20 +138,20 @@ class PetitionServiceTest {
     fun `PM-GA-003 a petition unlocks one assembly, convened by a signatory who says the demand was not met`() {
         val (a, b) = listOf(owner("15"), owner("10"))
         val outsider = owner("30")
-        val petition = service.open(entranceId, a, "Ремонт на покрива").also { service.sign(entranceId, it.id, b) }
+        val petition = service.open(entranceId, actor(a), "Ремонт на покрива").also { service.sign(entranceId, it.id, actor(b)) }
 
-        assertThatThrownBy { service.convene(entranceId, petition.id, outsider, meeting()) }           // owns more than both, signed nothing
+        assertThatThrownBy { service.convene(entranceId, petition.id, actor(outsider), meeting()) }           // owns more than both, signed nothing
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("signatories")
         for (blank in listOf("", "   ")) {
-            assertThatThrownBy { service.convene(entranceId, petition.id, a, meeting(demandUnmet = blank)) }
+            assertThatThrownBy { service.convene(entranceId, petition.id, actor(a), meeting(demandUnmet = blank)) }
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("not met")
         }
         assertThat(convened).isEmpty()
         assertThat(unlocks).isEmpty()
 
-        service.convene(entranceId, petition.id, a, meeting())
-        assertThatThrownBy { service.convene(entranceId, petition.id, b, meeting()) }.isInstanceOf(IllegalStateException::class.java)   // once
-        assertThatThrownBy { service.sign(entranceId, petition.id, outsider) }.isInstanceOf(IllegalStateException::class.java)        // and it is closed
+        service.convene(entranceId, petition.id, actor(a), meeting())
+        assertThatThrownBy { service.convene(entranceId, petition.id, actor(b), meeting()) }.isInstanceOf(IllegalStateException::class.java)   // once
+        assertThatThrownBy { service.sign(entranceId, petition.id, actor(outsider)) }.isInstanceOf(IllegalStateException::class.java)        // and it is closed
         assertThat(convened).hasSize(1)
     }
 
@@ -155,12 +159,12 @@ class PetitionServiceTest {
     fun `PM-GA-003 only an owner in the entrance signs, once - a holder of use, a stranger and a second signature are refused`() {
         val a = owner("25")
         val holderOfUse = owner("25", role = TitleRole.USR)
-        val petition = service.open(entranceId, a, "Ремонт на покрива")
-        assertThatThrownBy { service.sign(entranceId, petition.id, holderOfUse) }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-003")
-        assertThatThrownBy { service.sign(entranceId, petition.id, UUID.randomUUID()) }.isInstanceOf(IllegalArgumentException::class.java)
-        assertThatThrownBy { service.sign(entranceId, petition.id, a) }.isInstanceOf(IllegalStateException::class.java)
-        assertThatThrownBy { service.open(entranceId, holderOfUse, "Друго") }.isInstanceOf(IllegalArgumentException::class.java)
-        assertThatThrownBy { service.open(entranceId, a, "  ") }.isInstanceOf(IllegalArgumentException::class.java)
+        val petition = service.open(entranceId, actor(a), "Ремонт на покрива")
+        assertThatThrownBy { service.sign(entranceId, petition.id, actor(holderOfUse)) }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-003")
+        assertThatThrownBy { service.sign(entranceId, petition.id, actor(UUID.randomUUID())) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { service.sign(entranceId, petition.id, actor(a)) }.isInstanceOf(IllegalStateException::class.java)
+        assertThatThrownBy { service.open(entranceId, actor(holderOfUse), "Друго") }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { service.open(entranceId, actor(a), "  ") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThat(signed.map { it.partyId }).containsExactly(a)
         assertThat(service.read(entranceId, petition.id).weight.heldPct).isEqualByComparingTo("25")   // refused signatures weigh nothing
     }
@@ -172,14 +176,14 @@ class PetitionServiceTest {
         val signedOnThe9th = PetitionService(
             aggregates, petitions, signatures, assemblies, convening, holdings, Clock.fixed(Instant.parse("2026-10-09T09:00:00Z"), ZoneOffset.UTC),
         )
-        val petition = signedOnThe9th.open(entranceId, staying, "Ремонт на покрива")
-        signedOnThe9th.sign(entranceId, petition.id, selling)
+        val petition = signedOnThe9th.open(entranceId, actor(staying), "Ремонт на покрива")
+        signedOnThe9th.sign(entranceId, petition.id, actor(selling))
         assertThat(signedOnThe9th.read(entranceId, petition.id).weight.unlocked).isTrue()             // 22% on the 9th
 
         val weight = service.read(entranceId, petition.id).weight                    // read on the 10th
         assertThat(weight.heldPct).isEqualByComparingTo("12")
         assertThat(weight.unlocked).isFalse()
-        assertThatThrownBy { service.convene(entranceId, petition.id, staying, meeting()) }.isInstanceOf(PetitionLocked::class.java)
+        assertThatThrownBy { service.convene(entranceId, petition.id, actor(staying), meeting()) }.isInstanceOf(PetitionLocked::class.java)
     }
 
     @Test
@@ -187,14 +191,14 @@ class PetitionServiceTest {
         val (a, b) = listOf(owner("15"), owner("10"))
         val sold = owner("5", to = "2026-10-10")
         val onThe9th = PetitionService(aggregates, petitions, signatures, assemblies, convening, holdings, Clock.fixed(Instant.parse("2026-10-09T09:00:00Z"), ZoneOffset.UTC))
-        val petition = onThe9th.open(entranceId, sold, "Ремонт на покрива")
-        onThe9th.sign(entranceId, petition.id, a)
-        onThe9th.sign(entranceId, petition.id, b)
+        val petition = onThe9th.open(entranceId, actor(sold), "Ремонт на покрива")
+        onThe9th.sign(entranceId, petition.id, actor(a))
+        onThe9th.sign(entranceId, petition.id, actor(b))
 
         assertThat(service.read(entranceId, petition.id).weight.unlocked).isTrue()   // 25% without the seller
-        assertThatThrownBy { service.convene(entranceId, petition.id, sold, meeting()) }
+        assertThatThrownBy { service.convene(entranceId, petition.id, actor(sold), meeting()) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("no longer owns")
-        assertThat(service.convene(entranceId, petition.id, a, meeting()).first.convenedBy).isEqualTo(a)
+        assertThat(service.convene(entranceId, petition.id, actor(a), meeting()).first.convenedBy).isEqualTo(a)
     }
 
     @Test
@@ -202,13 +206,13 @@ class PetitionServiceTest {
         val unit = UUID.randomUUID()
         val (half, otherHalf) = listOf(owner("12.5", unit = unit, share = "0.5"), owner("12.5", unit = unit, share = "0.5"))
         val whole = owner("14")
-        val petition = service.open(entranceId, half, "Ремонт на покрива")
+        val petition = service.open(entranceId, actor(half), "Ремонт на покрива")
         fun weight() = service.read(entranceId, petition.id).weight
         assertThat(weight().heldPct).isEqualByComparingTo("6.25")                    // half of 12.5, never 12.5
-        service.sign(entranceId, petition.id, whole)
+        service.sign(entranceId, petition.id, actor(whole))
         assertThat(weight().heldPct).isEqualByComparingTo("20.25")
         assertThat(weight().unlocked).isTrue()
-        service.sign(entranceId, petition.id, otherHalf)
+        service.sign(entranceId, petition.id, actor(otherHalf))
         assertThat(weight().heldPct).isEqualByComparingTo("26.5")                    // the two halves together are the unit, once
     }
 
@@ -216,8 +220,8 @@ class PetitionServiceTest {
     fun `PM-GA-003 a unit with both an owner and a holder of use is not weighed - the petition says why and does not unlock`() {
         val plain = owner("30")
         val shared = owner("25")
-        val petition = service.open(entranceId, plain, "Ремонт на покрива")
-        service.sign(entranceId, petition.id, shared)
+        val petition = service.open(entranceId, actor(plain), "Ремонт на покрива")
+        service.sign(entranceId, petition.id, actor(shared))
         assertThat(service.read(entranceId, petition.id).weight.heldPct).isEqualByComparingTo("55")
         assertThat(service.read(entranceId, petition.id).weight.unlocked).isTrue()   // owners only: weighed in full
 
@@ -227,7 +231,7 @@ class PetitionServiceTest {
         assertThat(weight.unlocked).isFalse()
         assertThat(weight.cannotWeigh).singleElement().asString()
             .contains(unitOf(shared).toString()).contains("holder of a right of use").contains("TODO(legal): PM-GA-003")
-        assertThatThrownBy { service.convene(entranceId, petition.id, plain, meeting()) }
+        assertThatThrownBy { service.convene(entranceId, petition.id, actor(plain), meeting()) }
             .isInstanceOf(PetitionLocked::class.java).hasMessageContaining("cannot be weighed").hasMessageContaining(unitOf(shared).toString())
         assertThat(convened).isEmpty()
     }
@@ -238,7 +242,7 @@ class PetitionServiceTest {
         val other = owner("25")
         owner("25", role = TitleRole.USR, unit = unitOf(other), to = "2026-10-11")   // a right of use that ends tomorrow
         val later = owner("10", role = TitleRole.USR, unit = unitOf(signing), from = "2026-12-01")   // and one that has not begun
-        val petition = service.open(entranceId, signing, "Ремонт на покрива")
+        val petition = service.open(entranceId, actor(signing), "Ремонт на покрива")
         val weight = service.read(entranceId, petition.id).weight
         assertThat(weight.heldPct).isEqualByComparingTo("25")                        // the signatory's own unit is plain today
         assertThat(weight.cannotWeigh).singleElement().asString().contains(unitOf(other).toString())
@@ -254,7 +258,7 @@ class PetitionServiceTest {
     fun `PM-GA-003 a signatory's unit owned for more than the whole is not weighed, and a derived weight is flagged`() {
         val doubled = owner("30")
         overHeld += unitOf(doubled)
-        val petition = service.open(entranceId, doubled, "Ремонт на покрива")
+        val petition = service.open(entranceId, actor(doubled), "Ремонт на покрива")
         val weight = service.read(entranceId, petition.id).weight
         assertThat(weight.unlocked).isFalse()
         assertThat(weight.cannotWeigh).singleElement().asString().contains("PM-ORG-005")
@@ -262,7 +266,7 @@ class PetitionServiceTest {
 
         overHeld.clear()
         val fromArea = owner("5", derived = true)
-        service.sign(entranceId, petition.id, fromArea)
+        service.sign(entranceId, petition.id, actor(fromArea))
         val warned = service.read(entranceId, petition.id).weight
         assertThat(warned.unlocked).isTrue()
         assertThat(warned.derivedParts).isTrue()
@@ -273,10 +277,10 @@ class PetitionServiceTest {
         val a = owner("25")
         assertThatThrownBy { convening.convene(entranceId, Convene(a, "OWNERS", Instant.parse("2026-11-20T16:00:00Z"), "фоайето", "IN_PERSON")) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-002")
-        val petition = service.open(entranceId, a, "Ремонт на покрива")
+        val petition = service.open(entranceId, actor(a), "Ремонт на покрива")
         val elsewhere = UUID.randomUUID()
         assertThatThrownBy { service.read(elsewhere, petition.id) }.isInstanceOf(NoSuchElementException::class.java)
-        assertThatThrownBy { service.sign(elsewhere, petition.id, a) }.isInstanceOf(NoSuchElementException::class.java)
-        assertThatThrownBy { service.convene(elsewhere, petition.id, a, meeting()) }.isInstanceOf(NoSuchElementException::class.java)
+        assertThatThrownBy { service.sign(elsewhere, petition.id, actor(a)) }.isInstanceOf(NoSuchElementException::class.java)
+        assertThatThrownBy { service.convene(elsewhere, petition.id, actor(a), meeting()) }.isInstanceOf(NoSuchElementException::class.java)
     }
 }

@@ -120,8 +120,9 @@ class Policy(private val sources: List<RoleSource>) {
          * The book: the management board or the manager, the control board or the controller, and the owner for their
          * own data — nobody else. Anonymising it: the manager and the board, who keep it — the controller reads and
          * does not write (PM-GOV-008). Who a login is, and who holds an entrance's offices: the deployment's administrator —
-         * and nobody else. The owners' petition: an owner of the entrance on the day, signing for themselves — not a
-         * holder of use, not an office as such (PM-GA-003).
+         * and nobody else. The owners' petition: an owner of the entrance on the day, signing for themselves, and no
+         * office as such (PM-GA-003). A holder of a right of use is not among them pending counsel: whether they may
+         * demand an assembly is the same open question as whose ideal parts count.
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -144,6 +145,7 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.ANONYMISE_BOOK, Role.MB, "PM-BOOK-010"),
             Permit(Action.TIE_LOGIN, Role.SYS_ADMIN, "PM-SEC-001"),
             Permit(Action.RECORD_MANDATE, Role.SYS_ADMIN, "PM-SEC-001"),
+            // TODO(legal): PM-GA-003 — whether a holder of a right of use may demand an assembly (the two lines below)
             Permit(Action.SIGN_PETITION, Role.OWN, "PM-GA-003"),
             Permit(Action.CONVENE_ON_PETITION, Role.OWN, "PM-GA-003"),
         )

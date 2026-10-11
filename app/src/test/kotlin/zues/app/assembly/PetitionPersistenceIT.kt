@@ -141,6 +141,7 @@ class PetitionPersistenceIT {
         assertThat(unlock["threshold_verified"]).isEqualTo(false)
         assertThat(listOf(unlock["law_version"], unlock["engine_version"])).doesNotContainNull()
         assertThat(unlock["demand_unmet_note"] as String).startsWith("Искането е връчено")
+        assertThat(listOf(unlock["login_issuer"], unlock["login_subject"])).containsExactly(realm, boris)
         assertThat(json.readTree(mvc.perform(get("$base/$id")).andReturn().response.contentAsString).get("assemblyId").asText()).isEqualTo(assemblyId)
 
         // once: no second assembly on the petition, by the service or by hand; and no signature after it
@@ -160,7 +161,7 @@ class PetitionPersistenceIT {
 
         // the unlock record: at or above its own threshold, of its own entrance's petition, and not rewritten
         val record = "INSERT INTO assembly.petition_unlock SELECT %s, %s, convened_by, demand_unmet_note, weighed_on, %s, threshold_pct, threshold_constant, " +
-            "threshold_verified, law_version, engine_version, recorded_at FROM assembly.petition_unlock WHERE petition_id = '$id'"
+            "threshold_verified, law_version, engine_version, recorded_at, login_issuer, login_subject FROM assembly.petition_unlock WHERE petition_id = '$id'"
         assertThatThrownBy { jdbc.update(record.format("'$another'", "entrance_id", "19.99")) }
             .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("petition_unlock_at_threshold")
         assertThatThrownBy { jdbc.update(record.format("'$another'", "'${entrance()}'", "held_pct")) }
@@ -205,8 +206,12 @@ class PetitionPersistenceIT {
             )
         }
         asked(loginOf(manager), "$base/$id/signatures").andExpect(status().isForbidden)
-        val nextDoor = owned(entrance()).first().first
-        asked(loginOf(nextDoor), "$base/$id/signatures").andExpect(status().isForbidden)
+        val elsewhere = entrance()
+        val nextDoor = loginOf(owned(elsewhere).first().first)
+        asked(nextDoor, "$base/$id/signatures").andExpect(status().isForbidden)
+        // … and through their own entrance's path, where they are an owner, this petition is not there to sign or convene on
+        asked(nextDoor, "/api/assembly/entrances/$elsewhere/petitions/$id/signatures").andExpect(status().isNotFound)
+        asked(nextDoor, "/api/assembly/entrances/$elsewhere/petitions/$id/assembly", meeting).andExpect(status().isNotFound)
         // a former owner: the title ended yesterday
         val former = party().also {
             jdbc.update(
@@ -221,6 +226,15 @@ class PetitionPersistenceIT {
 
         assertThat(jdbc.queryForList("SELECT party_id FROM assembly.petition_signature WHERE petition_id = ?::uuid", UUID::class.java, id)).containsExactly(first)
         assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.petition WHERE entrance_id = ?", Int::class.java, entranceId)).isEqualTo(1)
+        // the signature names the sign-in that made it, and the table takes none that does not
+        assertThat(jdbc.queryForMap("SELECT login_issuer, login_subject FROM assembly.petition_signature WHERE petition_id = ?::uuid", id))
+            .containsEntry("login_issuer", realm).containsEntry("login_subject", "login-$first")
+        assertThatThrownBy {
+            jdbc.update(
+                "INSERT INTO assembly.petition_signature (id, entrance_id, petition_id, party_id, signed_at) VALUES (gen_random_uuid(), ?, ?::uuid, ?, now())",
+                entranceId, id, second,
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("petition_signature_names_its_login")
     }
 
     @Test

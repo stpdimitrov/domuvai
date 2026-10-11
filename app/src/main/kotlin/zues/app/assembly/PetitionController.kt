@@ -46,7 +46,8 @@ data class PetitionConvened(val assemblyId: UUID, val status: String, val conven
 /**
  * The owners' petition to convene a general assembly, and convening on it (PM-GA-003). Who opens, signs and convenes
  * is the party the sign-in is tied to — never a field of the request — and only an owner of the entrance on the day
- * may (PM-SEC-001): anybody else is a 403 naming the rule, told nothing more. A person signs for themselves only.
+ * may (PM-SEC-001): anybody else is a 403 naming the rule, told nothing of the petition. A person signs for themselves
+ * only. A body that cannot be read is a 400 for anyone — it is read before anybody is asked who they are.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/petitions")
@@ -57,7 +58,7 @@ class PetitionController(private val petitions: PetitionService, private val who
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun open(@PathVariable entranceId: UUID, @RequestBody request: OpenPetitionRequest, signedIn: JwtAuthenticationToken?): PetitionView {
-        val owner = acting.party(who.of(signedIn), Action.SIGN_PETITION, entranceId)
+        val owner = acting.actor(who.of(signedIn), Action.SIGN_PETITION, entranceId)
         return view(petitions.read(entranceId, petitions.open(entranceId, owner, request.subject).id))
     }
 
@@ -66,7 +67,7 @@ class PetitionController(private val petitions: PetitionService, private val who
     @PostMapping("/{petitionId}/signatures")
     @ResponseStatus(HttpStatus.CREATED)
     fun sign(@PathVariable entranceId: UUID, @PathVariable petitionId: UUID, signedIn: JwtAuthenticationToken?): PetitionView {
-        petitions.sign(entranceId, petitionId, acting.party(who.of(signedIn), Action.SIGN_PETITION, entranceId))
+        petitions.sign(entranceId, petitionId, acting.actor(who.of(signedIn), Action.SIGN_PETITION, entranceId))
         return view(petitions.read(entranceId, petitionId))
     }
 
@@ -80,7 +81,7 @@ class PetitionController(private val petitions: PetitionService, private val who
     fun convene(
         @PathVariable entranceId: UUID, @PathVariable petitionId: UUID, @RequestBody request: ConveneOnPetition, signedIn: JwtAuthenticationToken?,
     ): PetitionConvened =
-        petitions.convene(entranceId, petitionId, acting.party(who.of(signedIn), Action.CONVENE_ON_PETITION, entranceId), request).let { (assembly, unlock) ->
+        petitions.convene(entranceId, petitionId, acting.actor(who.of(signedIn), Action.CONVENE_ON_PETITION, entranceId), request).let { (assembly, unlock) ->
             PetitionConvened(assembly.id, assembly.status, assembly.convenedAs, unlock.heldPct.percent(), unlock.thresholdPct.percent())
         }
 

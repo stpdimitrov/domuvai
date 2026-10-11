@@ -101,7 +101,7 @@ class PetitionWebTest {
         ).apply { sign(RSASSASigner(issuer.private)) }.serialize(),
     )
 
-    private fun json(body: String) = MediaType.APPLICATION_JSON to body
+    private fun actor(party: UUID, subject: String) = Actor(party, ISSUER, subject)
 
     private fun petition(openedBy: UUID) = Petition(UUID.randomUUID(), entranceId, openedBy, "Ремонт на покрива", at)
 
@@ -121,7 +121,7 @@ class PetitionWebTest {
         val ana = person("login-ana", owner = true)
         val boris = person("login-boris", owner = true)
         val opened = petition(ana)
-        whenever(petitions.open(entranceId, ana, "Ремонт на покрива")).thenReturn(opened)
+        whenever(petitions.open(entranceId, actor(ana, "login-ana"), "Ремонт на покрива")).thenReturn(opened)
         whenever(petitions.read(entranceId, opened.id)).thenReturn(weighed(opened, "8.5"))
 
         // Ana opens, and tries to open as Boris: the service is handed Ana
@@ -133,15 +133,15 @@ class PetitionWebTest {
             .andExpect(jsonPath("$.thresholdSource").value("чл. 12 ЗУЕС"))
             .andExpect(jsonPath("$.thresholdVerified").value(false))
             .andExpect(jsonPath("$.unlocked").value(false))
-        verify(petitions).open(entranceId, ana, "Ремонт на покрива")
+        verify(petitions).open(entranceId, actor(ana, "login-ana"), "Ремонт на покрива")
 
         // Ana signs "as Boris": the signature is Ana's own
         mvc.perform(post("$base/${opened.id}/signatures").by("login-ana").contentType(MediaType.APPLICATION_JSON).content("""{"partyId":"$boris"}"""))
             .andExpect(status().isCreated)
-        verify(petitions).sign(entranceId, opened.id, ana)
+        verify(petitions).sign(entranceId, opened.id, actor(ana, "login-ana"))
         // Boris signs with no body at all
         mvc.perform(post("$base/${opened.id}/signatures").by("login-boris")).andExpect(status().isCreated)
-        verify(petitions).sign(entranceId, opened.id, boris)
+        verify(petitions).sign(entranceId, opened.id, actor(boris, "login-boris"))
     }
 
     @Test
@@ -150,11 +150,11 @@ class PetitionWebTest {
         val boris = person("login-boris-2", owner = true)
         val opened = petition(ana)
         val request = ConveneOnPetition(Instant.parse("2026-11-20T16:00:00Z"), "фоайето", "IN_PERSON", "не е свикано")
-        whenever(petitions.convene(entranceId, opened.id, ana, request)).thenReturn(
+        whenever(petitions.convene(entranceId, opened.id, actor(ana, "login-ana-2"), request)).thenReturn(
             Assembly(UUID.randomUUID(), entranceId, ana, "OWNERS", request.scheduledAt, "фоайето", "IN_PERSON", "DRAFT", false, null, petitionId = opened.id) to
                 PetitionUnlock(
                     opened.id, entranceId, ana, "не е свикано", LocalDate.parse("2026-10-09"), BigDecimal("21.7500000000"), BigDecimal("20"),
-                    "GA_PETITION_MIN_PCT@2009-01-01", false, "1.3", "0.3.0", at,
+                    "GA_PETITION_MIN_PCT@2009-01-01", false, "1.3", "0.3.0", at, ISSUER, "login-ana-2",
                 ),
         )
         mvc.perform(post("$base/${opened.id}/assembly").by("login-ana-2").contentType(MediaType.APPLICATION_JSON).content("""{"convenedBy":"$boris",$meeting}"""))
@@ -163,7 +163,7 @@ class PetitionWebTest {
             .andExpect(jsonPath("$.status").value("DRAFT"))
             .andExpect(jsonPath("$.heldPct").value("21.75"))
             .andExpect(jsonPath("$.thresholdPct").value("20"))
-        verify(petitions).convene(entranceId, opened.id, ana, request)
+        verify(petitions).convene(entranceId, opened.id, actor(ana, "login-ana-2"), request)
     }
 
     @Test
@@ -179,7 +179,7 @@ class PetitionWebTest {
             )) {
                 mvc.perform(request.by(subject).contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isForbidden)
-                    .andExpect(jsonPath("$.rule").value("PM-GA-003"))
+                    .andExpect(jsonPath("$.rule").value(if (subject == "login-tied-to-nobody") "PM-SEC-001" else "PM-GA-003"))
             }
         }
         // an owner of this entrance is nobody in another
@@ -201,7 +201,7 @@ class PetitionWebTest {
             .andExpect(jsonPath("$.unlocked").value(false))
             .andExpect(jsonPath("$.cannotWeigh[0]").value(why))
 
-        whenever(petitions.convene(eq(entranceId), eq(opened.id), eq(ana), any())).thenThrow(PetitionLocked("the petition cannot be weighed: $why"))
+        whenever(petitions.convene(eq(entranceId), eq(opened.id), eq(actor(ana, "login-ana-4")), any())).thenThrow(PetitionLocked("the petition cannot be weighed: $why"))
         mvc.perform(post("$base/${opened.id}/assembly").by("login-ana-4").contentType(MediaType.APPLICATION_JSON).content("{$meeting}"))
             .andExpect(status().isConflict).andExpect(jsonPath("$.error").value("the petition cannot be weighed: $why"))
     }
@@ -210,7 +210,7 @@ class PetitionWebTest {
     fun `no token is a 401, a missing petition a 404, and a signature the service refuses a 400`() {
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content("""{"subject":"Ремонт на покрива"}""")).andExpect(status().isUnauthorized)
         val ana = person("login-ana-5", owner = true)
-        whenever(petitions.sign(any(), any(), eq(ana))).thenThrow(IllegalArgumentException("only an owner"))
+        whenever(petitions.sign(any(), any(), eq(actor(ana, "login-ana-5")))).thenThrow(IllegalArgumentException("only an owner"))
         mvc.perform(post("$base/${UUID.randomUUID()}/signatures").by("login-ana-5")).andExpect(status().isBadRequest)
         whenever(petitions.read(any(), any())).thenThrow(NoSuchElementException("no petition"))
         mvc.perform(get("$base/${UUID.randomUUID()}").by("login-ana-5")).andExpect(status().isNotFound)
