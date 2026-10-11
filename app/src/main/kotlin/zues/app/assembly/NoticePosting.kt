@@ -58,21 +58,23 @@ class NoticeService(
     private val holdings: Holdings,
     private val clock: Clock,
 ) {
+    /**
+     * [by] signs the act as the convenor: whoever runs the assembly that day — the one who convened it or, the owner's
+     * decision of 2026-10-11, their successor in the same office. Who that may be is [AssemblyActs]' to say.
+     */
     // Rule: PM-GA-007
     // Rule: PM-GA-004
     // Rule: PM-GA-006
     @Transactional
     fun recordPosting(entranceId: UUID, assemblyId: UUID, by: Actor, postedAt: Instant, coSignatoryPartyId: UUID, photoHash: String): NoticePosting {
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
-        // the act is the convenor's signature: nobody records it for them
-        if (by.party != assembly.convenedBy) throw ActRefused("PM-GA-007")
         check(assembly.status == AssemblyStatus.DRAFT.name) { "the notice of this assembly is already posted; it is ${assembly.status}" }
         val now = clock.instant()
         require(!postedAt.isAfter(now)) { "a posting act records a posting that has happened, not one to come" }
         require(assembly.noticeContentChangedAt?.let { !postedAt.isBefore(it) } ?: true) {
             "the date, hour, place or agenda changed after $postedAt: a notice posted then did not state this assembly (PM-GA-006)"
         }
-        require(coSignatoryPartyId != assembly.convenedBy) { "the posting act is signed by the convenor and one other person (PM-GA-007)" }
+        require(coSignatoryPartyId != by.party) { "the posting act is signed by the convenor and one other person (PM-GA-007)" }
         // TODO(legal): PM-GA-007 — the catalogue says "one owner"; whether a holder of use or an occupant may co-sign is unconfirmed,
         // and so is whether "the convenor" of a board's assembly is the member who convened or the board
         val ownersThatDay = holdings.inForce(entranceId, LocalDate.parse(toSofiaDate(postedAt)), TitleRole.OWN).holdings.map { it.partyId }
@@ -84,7 +86,7 @@ class NoticeService(
 
         val act = NoticePosting(
             id = UUID.randomUUID(), entranceId = entranceId, assemblyId = assemblyId, postedAt = postedAt,
-            convenorPartyId = assembly.convenedBy, coSignatoryPartyId = coSignatoryPartyId, photoHash = photoHash,
+            convenorPartyId = by.party, coSignatoryPartyId = coSignatoryPartyId, photoHash = photoHash,
             statedScheduledAt = assembly.scheduledAt, statedPlace = assembly.place,
             statedAgenda = items.joinToString("\n") { "${it.ordinal}. ${it.text}" }, recordedAt = now,
             loginIssuer = by.loginIssuer, loginSubject = by.loginSubject,

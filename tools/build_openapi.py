@@ -67,16 +67,16 @@ RUNNING = {
    ('Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked',
     ['PM-GA-002', 'PM-GA-004', 'PM-GA-005', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda'):
-   ('Put an item on the agenda, bound to the majority the law has in force for its type — by whoever runs the assembly; after posting it voids the notice',
+   ('Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice',
     ['PM-VOTE-004', 'PM-GA-006', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule'):
    ('Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again',
     ['PM-GA-004', 'PM-GA-006', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting'):
-   ('Record the posting act with its photograph — by the convenor signed in, co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
+   ('Record the posting act with its photograph — signed by whoever runs the assembly (the convenor, or their successor in the office), co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
     ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
-   ('Appoint one\'s own proxy for an assembly — the signed-in owner or holder of use is the principal; agent, scope and form; refused past the limit one person may represent, with the limit shown',
+   ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown',
     ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
    ('List the proxies registered for an assembly', ['PM-GA-009']),

@@ -23,12 +23,11 @@ data class ConveneRequest(
  * they may is the policy's to say today, before anything is looked up — a caller the policy allows nothing learns
  * nothing, not even whether the assembly exists.
  *
- * An assembly is run — its agenda, its date and place, its posting act — by the one who convened it, in person, while
- * they still hold what they convened in: the same office, or ownership for an assembly the owners convened on their
- * petition. Nobody else touches it: another office could otherwise void its notice for ever, and no rule in the
- * catalogue says who else may alter a convened assembly. Whether a successor in the same office carries it on is the
- * owner's to decide; until then a successor convenes anew. The posting act is the convenor's own signature (Rule:
- * PM-GA-007).
+ * An assembly convened in an office is run — its agenda, its date and place, its posting act — by that office (the
+ * owner's decision of 2026-10-11): by the convenor while they hold the office they convened in, and once they no longer
+ * do, by whoever holds that same office in the entrance today — their successor. Another office never touches it:
+ * it could otherwise void the notice for ever. An assembly the owners convened on their petition stays with the owner
+ * who convened it, while they own. Whoever runs an assembly may also record a written proxy they were handed.
  */
 @Service
 class AssemblyActs(
@@ -36,6 +35,7 @@ class AssemblyActs(
     private val assemblies: AssemblyRepository,
     private val convening: AssemblyService,
     private val notices: NoticeService,
+    private val proxies: ProxyService,
 ) {
     // Rule: PM-GA-002
     // Rule: PM-SEC-001
@@ -72,19 +72,49 @@ class AssemblyActs(
         notices.recordPosting(entranceId, assemblyId, running(who, entranceId, assemblyId), postedAt, coSignatoryPartyId, photoHash)
 
     /**
-     * Who is running this assembly, or [ActRefused]. The policy is asked first, about the entrance in the path; only
-     * somebody it allows something reaches the assembly, and then it must be theirs: they convened it, and they still
-     * hold what they convened it in.
+     * A proxy (the owner's decision of 2026-10-11): appointed by the principal signed in, for themselves; or recorded
+     * by whoever runs the assembly, for the principal a written authorisation names, with that document's SHA-256.
+     * Nobody else names a principal. The checks on who the principal and the agent are apply to both ways.
      */
+    // Rule: PM-GA-009
+    // Rule: PM-SEC-001
+    @Transactional
+    fun registerProxy(who: Asking, entranceId: UUID, assemblyId: UUID, request: AppointProxyRequest): Proxy {
+        val named = request.principalPartyId
+        if (named == null || named == who.party) {
+            val principal = acting.actor(who, Action.APPOINT_PROXY, entranceId)
+            require(request.authorisationHash == null) { "a proxy appointed in person carries no document: the sign-in is the appointment" }
+            return proxies.register(entranceId, assemblyId, command(principal.party, request), principal, authorisationHash = null)
+        }
+        val recorder = running(who, entranceId, assemblyId)
+        val document = request.authorisationHash
+            ?: throw IllegalArgumentException("a proxy recorded for somebody else is a written authorisation: its SHA-256 is required (PM-GA-009)")
+        return proxies.register(entranceId, assemblyId, command(named, request), recorder, document)
+    }
+
+    private fun command(principal: UUID, request: AppointProxyRequest) =
+        RegisterProxy(principal, request.agentPartyId, request.agentKind, request.scope, request.items, request.form)
+
+    /**
+     * Who is running this assembly, or [ActRefused]. The policy is asked first, about the entrance in the path; only
+     * somebody it allows something reaches the assembly, and then it must be theirs to run: they hold today the office
+     * it was convened in, and the convenor no longer does — or they are the convenor.
+     */
+    // Rule: PM-GA-002
     private fun running(who: Asking, entranceId: UUID, assemblyId: UUID): Actor {
         val allowed = acting.allowedAny(who, entranceId, Action.CONVENE_ASSEMBLY, Action.CONVENE_ON_PETITION)
         val assembly = assemblies.findById(assemblyId).filter { it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no assembly $assemblyId in entrance $entranceId") }
         val rule = if (assembly.convenedAs == OWNERS) Action.CONVENE_ON_PETITION.governedBy else Action.CONVENE_ASSEMBLY.governedBy
-        if (allowed.actor.party != assembly.convenedBy) throw ActRefused(rule)
+        val convenor = allowed.actor.party == assembly.convenedBy
         when (assembly.convenedAs) {
-            OWNERS -> if (Action.CONVENE_ON_PETITION !in allowed.actions) throw ActRefused(rule)
-            in OFFICES -> acting.officeHolder(who, entranceId, Role.valueOf(assembly.convenedAs))      // the office they convened in, still theirs
+            OWNERS -> if (!convenor || Action.CONVENE_ON_PETITION !in allowed.actions) throw ActRefused(rule)
+            in OFFICES -> {
+                val office = Role.valueOf(assembly.convenedAs)
+                acting.officeHolder(who, entranceId, office)                                           // the office it was convened in, theirs today
+                // while the convenor holds that office the assembly is theirs alone; a successor carries it on only after
+                if (!convenor && acting.holdsToday(assembly.convenedBy, entranceId, office)) throw ActRefused(rule)
+            }
             else -> throw ActRefused(rule)                                                             // a capacity this code does not know runs nothing
         }
         // An assembly from before a convening named its sign-in has nobody accountable behind it: it is not carried on.

@@ -38,6 +38,10 @@ data class Proxy(
      */
     val loginIssuer: String?,
     val loginSubject: String?,
+    /** Who registered it: the principal, or whoever ran the assembly and was handed a written authorisation. */
+    val recordedBy: UUID?,
+    /** The SHA-256 of that written authorisation; none when the principal appointed in person. */
+    val authorisationHash: String?,
 )
 
 /** Who may be a proxy: an adult household member, another owner, or a third party. Rule: PM-GA-009 */
@@ -79,8 +83,15 @@ class ProxyService(
     // Rule: PM-GA-009
     // Rule: PM-GA-010
     @Transactional
-    fun register(entranceId: UUID, assemblyId: UUID, request: RegisterProxy, by: Actor): Proxy {
-        require(by.party == request.principalPartyId) { "a proxy is appointed by the one it represents" }
+    fun register(entranceId: UUID, assemblyId: UUID, request: RegisterProxy, by: Actor, authorisationHash: String?): Proxy {
+        // appointed in person, or recorded from a document: never a principal named with nothing behind the naming
+        if (by.party == request.principalPartyId) {
+            require(authorisationHash == null) { "a proxy appointed in person carries no document" }
+        } else {
+            require(authorisationHash != null && SHA256.matches(authorisationHash)) {
+                "a proxy is appointed by the one it represents, or recorded from their written authorisation, given by its SHA-256 in lower-case hex (PM-GA-009)"
+            }
+        }
         val kind = named<AgentKind>(request.agentKind, "kind of representative")
         val scope = named<ProxyScope>(request.scope, "scope")
         val form = named<AuthorisationForm>(request.form, "form of authorisation")
@@ -115,7 +126,7 @@ class ProxyService(
         }
         val proxy = Proxy(
             UUID.randomUUID(), entranceId, assemblyId, request.principalPartyId, request.agentPartyId, kind.name,
-            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(), by.loginIssuer, by.loginSubject,
+            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(), by.loginIssuer, by.loginSubject, by.party, authorisationHash,
         )
         try {
             return aggregates.insert(proxy)
@@ -166,5 +177,7 @@ class ProxyService(
         enumValues<E>().firstOrNull { it.name == value }
             ?: throw IllegalArgumentException("unknown $what \"$value\" — one of ${enumValues<E>().joinToString { it.name }}")
 }
+
+private val SHA256 = Regex("^[0-9a-f]{64}$")
 
 private val PROXIES_OPEN = setOf(AssemblyStatus.DRAFT.name, AssemblyStatus.NOTICED.name)

@@ -29,7 +29,7 @@ import java.util.UUID
  * nobody is represented — even under a source of roles that would make anybody an owner; the list is still read.
  */
 @WebMvcTest(ProxyController::class)
-@Import(WhoAsks::class, Acting::class, Policy::class, ProxySignInOffWebTest.Generous::class)
+@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class, ProxySignInOffWebTest.Generous::class)
 class ProxySignInOffWebTest {
 
     class Generous {
@@ -39,6 +39,9 @@ class ProxySignInOffWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var proxies: ProxyService
+    @MockitoBean lateinit var assemblies: AssemblyService
+    @MockitoBean lateinit var notices: NoticeService
+    @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
 
     @Test
@@ -46,6 +49,8 @@ class ProxySignInOffWebTest {
         val base = "/api/assembly/entrances/${UUID.randomUUID()}/assemblies/${UUID.randomUUID()}/proxies"
         val body = """{"principalPartyId":"${UUID.randomUUID()}","agentPartyId":"${UUID.randomUUID()}","agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"}"""
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden)
+        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(body.replace("{", """{"authorisationHash":"${"5d".repeat(32)}",""")))
+            .andExpect(status().isForbidden)                                          // nor recorded from a document, by nobody
         whenever(proxies.forAssembly(any(), any())).thenReturn(emptyList())
         mvc.perform(get(base)).andExpect(status().isOk)
         verify(proxies).forAssembly(any(), any())

@@ -175,14 +175,11 @@ class NoticeServiceTest {
         val buyer = UUID.randomUUID().also { owners[it] = LocalDate.parse("2026-10-10") }
         assertThatThrownBy { post(assembly, "2026-10-09T09:00:00Z", coSignatory = buyer) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("owner in the entrance on the day of posting")
-        // and the act is the convenor's own: nobody else records it, whoever they are
-        assertThatThrownBy { notices.recordPosting(entranceId, assembly.id, Actor(owner, "https://id.example.test/realms/domuvai", "login-owner"), now, buyer, photo) }
-            .isInstanceOf(ActRefused::class.java)
         assertThat(stored!!.status).isEqualTo("DRAFT")
         assertThat(acts).isEmpty()
 
         val act = post(assembly, "2026-10-09T09:00:00Z")
-        assertThat(act.convenorPartyId).isEqualTo(convenor)                          // from the assembly, not from the caller
+        assertThat(act.convenorPartyId).isEqualTo(convenor)                          // whoever signed as the convenor — here, the one who convened
         assertThat(act.loginSubject).isEqualTo("login-convenor")                     // the sign-in that recorded it
         assertThat(act.coSignatoryPartyId).isEqualTo(owner)
         assertThat(stored!!.status).isEqualTo("NOTICED")
@@ -254,5 +251,18 @@ class NoticeServiceTest {
 
         assertThatThrownBy { convening.reschedule(entranceId, assembly.id, Instant.parse("2026-10-15T16:00:00Z"), "двора") }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-004")
+    }
+
+    @Test
+    fun `PM-GA-007 a successor in the office signs the act as the convenor - it names them and their sign-in, and they do not co-sign with themselves`() {
+        val assembly = convened("2026-10-20T16:00:00Z")
+        val successor = Actor(UUID.randomUUID(), "https://id.example.test/realms/domuvai", "login-successor")
+        assertThatThrownBy { notices.recordPosting(entranceId, assembly.id, successor, now, successor.party, photo) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-007")
+        val act = notices.recordPosting(entranceId, assembly.id, successor, now, owner, photo)
+        assertThat(act.convenorPartyId).isEqualTo(successor.party)
+        assertThat(act.loginSubject).isEqualTo("login-successor")
+        assertThat(stored!!.status).isEqualTo("NOTICED")
+        assertThat(stored!!.convenedBy).isEqualTo(convenor)                           // who convened does not change
     }
 }

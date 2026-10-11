@@ -70,7 +70,7 @@ class ProxyServiceTest {
     private fun proxy(
         principal: UUID = owner(), by: UUID = agent, kind: String = "OWNER", scope: String = "WHOLE_AGENDA",
         items: List<Int> = emptyList(), form: String = "WRITTEN",
-    ) = service.register(entranceId, assembly.id, RegisterProxy(principal, by, kind, scope, items, form), actor(principal))
+    ) = service.register(entranceId, assembly.id, RegisterProxy(principal, by, kind, scope, items, form), actor(principal), null)
 
     @Test
     fun `PM-GA-009 a proxy registration captures principal, agent, scope and form`() {
@@ -147,11 +147,11 @@ class ProxyServiceTest {
         val principal = owner()
         val elsewhere = UUID.randomUUID()
         whenever(assemblies.lock(any(), any())).thenReturn(assembly.copy(entranceId = elsewhere))
-        assertThatThrownBy { service.register(elsewhere, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal)) }
+        assertThatThrownBy { service.register(elsewhere, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
         whenever(assemblies.lock(any(), any())).thenReturn(assembly)
-        assertThatThrownBy { tomorrow.register(entranceId, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal)) }
+        assertThatThrownBy { tomorrow.register(entranceId, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         assertThat(registered).isEmpty()
     }
@@ -166,10 +166,37 @@ class ProxyServiceTest {
     }
 
     @Test
-    fun `PM-GA-009 a proxy is appointed by the one it represents - the service takes no principal but the one acting`() {
+    fun `PM-GA-009 a proxy is appointed in person, or recorded from a written authorisation with its SHA-256 - never a principal named with nothing behind it`() {
         val principal = owner()
-        assertThatThrownBy { service.register(entranceId, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(owner())) }
-            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("appointed by the one it represents")
+        val recorder = actor(UUID.randomUUID())
+        val command = RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN")
+        val document = "5d".repeat(32)
+        for (missing in listOf(null, "", "authorisation.pdf", "5D".repeat(32))) {
+            assertThatThrownBy { service.register(entranceId, assembly.id, command, recorder, missing) }
+                .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
+        }
+        assertThatThrownBy { service.register(entranceId, assembly.id, command, actor(principal), document) }     // in person: no document
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(registered).isEmpty()
+
+        val recorded = service.register(entranceId, assembly.id, command, recorder, document)
+        assertThat(recorded.principalPartyId).isEqualTo(principal)
+        assertThat(recorded.recordedBy).isEqualTo(recorder.party)
+        assertThat(recorded.authorisationHash).isEqualTo(document)
+        assertThat(recorded.loginSubject).isEqualTo("login-${recorder.party}")       // the recorder's sign-in, not the principal's
+        val inPerson = proxy()
+        assertThat(inPerson.recordedBy).isEqualTo(inPerson.principalPartyId)
+        assertThat(inPerson.authorisationHash).isNull()
+    }
+
+    @Test
+    fun `PM-GA-009 a recorded proxy is held to the same book - the principal named must hold a title, and the agent be who the kind says`() {
+        val recorder = actor(UUID.randomUUID())
+        val document = "5d".repeat(32)
+        fun recorded(principal: UUID, by: UUID, kind: String) =
+            service.register(entranceId, assembly.id, RegisterProxy(principal, by, kind, "WHOLE_AGENDA", emptyList(), "WRITTEN"), recorder, document)
+        assertThatThrownBy { recorded(UUID.randomUUID(), agent, "OWNER") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
+        assertThatThrownBy { recorded(owner(), UUID.randomUUID(), "OWNER") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("owns nothing")
         assertThat(registered).isEmpty()
     }
 
@@ -230,7 +257,7 @@ class ProxyServiceTest {
         current = assembly
         // through another entrance's path the assembly is not there: nothing is registered, nothing is listed
         val elsewhere = UUID.randomUUID()
-        assertThatThrownBy { owner().let { p -> service.register(elsewhere, assembly.id, RegisterProxy(p, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(p)) } }
+        assertThatThrownBy { owner().let { p -> service.register(elsewhere, assembly.id, RegisterProxy(p, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(p), null) } }
             .isInstanceOf(NoSuchElementException::class.java)
         proxy()
         assertThatThrownBy { service.forAssembly(elsewhere, assembly.id) }.isInstanceOf(NoSuchElementException::class.java)

@@ -82,6 +82,7 @@ class AssemblyWebTest {
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var notices: NoticeService
+    @MockitoBean lateinit var proxies: ProxyService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
 
@@ -179,6 +180,10 @@ class AssemblyWebTest {
             .andExpect(status().isCreated).andExpect(jsonPath("$.noticeVoided").value(true)).andExpect(jsonPath("$.majority.source").value("чл. 17 ЗУЕС"))
         mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content(move)).andExpect(status().isOk)
 
+        // another manager, while the convenor still holds the office, does not run it either
+        person("login-second-manager", Role.BM)
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-second-manager").content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-002"))
+
         // the convenor who has left the office, or holds another one now, no longer runs it
         held[manager] = setOf(Role.CTL)
         mvc.perform(post("$base/${assembly.id}/agenda").by("login-manager").content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-002"))
@@ -189,6 +194,39 @@ class AssemblyWebTest {
         verify(assemblies).addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL")      // once: the manager's, while the manager
         verify(assemblies).reschedule(entranceId, assembly.id, at, "двора")
         verifyNoInteractions(notices)
+    }
+
+    @Test
+    fun `PM-GA-002 PM-GA-007 once the convenor has left the office their successor in it runs the assembly and signs the posting act - and no other office does`() {
+        val assembly = stored(draft(manager, "BM"))
+        val successor = person("login-successor", Role.BM)
+        val agenda = """{"text":"Отчет","itemType":"GENERAL"}"""
+        val posted = Instant.parse("2026-10-09T08:00:00Z")
+        val photo = "ab".repeat(32)
+        val posting = """{"postedAt":"$posted","coSignatoryPartyId":"$owner","photoHash":"$photo"}"""
+        // while the manager who convened holds the office, the newcomer waits
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-successor").content(agenda)).andExpect(status().isForbidden)
+        mvc.perform(post("$base/${assembly.id}/notice-posting").by("login-successor").content(posting)).andExpect(status().isForbidden)
+        verifyNoInteractions(assemblies, notices)
+
+        held[manager] = emptySet()                                                    // the convenor's mandate has ended
+        val majority = MajorityRule("GENERAL", "50", Comparison.MORE_THAN, Denominator.REPRESENTED, "2009-01-01", "чл. 17 ЗУЕС", true, "PM-VOTE-002")
+        whenever(assemblies.addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL"))
+            .thenReturn(AgendaItemBound(AgendaItem(UUID.randomUUID(), entranceId, assembly.id, 1, "Отчет", "GENERAL", majority.id), majority, false))
+        whenever(notices.recordPosting(entranceId, assembly.id, actor(successor, "login-successor"), posted, owner, photo)).thenReturn(
+            NoticePosting(UUID.randomUUID(), entranceId, assembly.id, posted, successor, owner, photo, at, "фоайето", "1. Отчет", posted, ISSUER, "login-successor"),
+        )
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-successor").content(agenda)).andExpect(status().isCreated)
+        mvc.perform(post("$base/${assembly.id}/notice-posting").by("login-successor").content(posting))
+            .andExpect(status().isCreated).andExpect(jsonPath("$.convenorPartyId").value(successor.toString()))
+        // the controller is an office, and not this one; the former manager is nobody now
+        for (subject in listOf("login-controller", "login-manager", "login-owner")) {
+            mvc.perform(post("$base/${assembly.id}/agenda").by(subject).content(agenda)).andExpect(status().isForbidden)
+            mvc.perform(post("$base/${assembly.id}/notice-posting").by(subject).content(posting)).andExpect(status().isForbidden)
+        }
+        verify(assemblies).addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL")
+        verify(notices).recordPosting(entranceId, assembly.id, actor(successor, "login-successor"), posted, owner, photo)
+        verifyNoMoreInteractions(notices)
     }
 
     @Test

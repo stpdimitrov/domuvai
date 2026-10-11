@@ -353,5 +353,15 @@ class AssemblyPersistenceIT {
             mvc.perform(post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Още една","itemType":"GENERAL"}""")).andExpect(status().isForbidden)
         }
         assertThat(read(base, id).get("status").asText()).isEqualTo("DRAFT")
+
+        // 4 · the owner's decision: the successor in the same office carries it on and signs the posting act; the controller still does not
+        val successor = manager(entranceId, from = 0, to = 300)
+        signedIn(controller) { mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(owner))).andExpect(status().isForbidden) }
+        val act = signedIn(successor) { created("$base/$id/notice-posting", posting(owner)) }
+        assertThat(act.get("convenorPartyId").asText()).isEqualTo(successor.toString())
+        assertThat(read(base, id).get("status").asText()).isEqualTo("NOTICED")
+        assertThat(jdbc.queryForObject("SELECT convened_by FROM assembly.assembly WHERE id = ?::uuid", UUID::class.java, id)).isEqualTo(manager)   // who convened does not change
+        assertThat(jdbc.queryForList("SELECT login_subject FROM assembly.notice_posting WHERE assembly_id = ?::uuid ORDER BY recorded_at", String::class.java, id))
+            .containsExactly("login-$manager", "login-$successor")
     }
 }
