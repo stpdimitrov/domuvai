@@ -19,7 +19,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | 07 | [UIPROMPTS.md](UIPROMPTS.md) | Design prompts, mobile and desktop |
 | 08 | [MODULE-TEMPLATE.md](MODULE-TEMPLATE.md) | The extraction-ready module shape every slice follows (Kotlin · Spring Modulith) |
 | — | [RULES.md](RULES.md) · [rules.json](rules.json) | The requirements source. 233 rules |
-| — | [TRACEABILITY.md](TRACEABILITY.md) | Rule → test → implementation. Generated |
+| — | `TRACEABILITY.md` | Rule → test → implementation. Generated locally, not committed: `python3 tools/traceability.py` writes `docs/TRACEABILITY.md` |
 | — | [TESTPLAN.md](TESTPLAN.md) | The remaining rules as ranked slices. Generated |
 | — | [api/openapi.json](api/openapi.json) | The HTTP contract. **Generated from the running code** (ADR-013), each operation citing its rules; validated as OpenAPI 3.1 |
 | — | [sessionlog/](sessionlog/) | Boot here every session — the **newest** file only (names sort by time) |
