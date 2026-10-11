@@ -1,6 +1,5 @@
 package zues.app.identity_org
 
-import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.policy.Asking
@@ -27,25 +26,40 @@ data class Mandate(
     val executive: Boolean get() = body in EXECUTIVE
 
     /**
+     * Whether this mandate takes [earlier]'s place — the one reading of "a successor is elected" (Rule: PM-GOV-004),
+     * asked by the side that records a mandate and by the side that reads who holds an office. A later manager succeeds
+     * every earlier executive mandate of the entrance. A later board member succeeds an earlier manager, and an earlier
+     * board member only when it begins on or after the day that member's term ends — `validTo`, the first day outside
+     * it: a board is several seats, and a member elected while another's term runs succeeds nobody (the owner's
+     * decision, 2026-10-11). A firm's mandate counts as a board member's does. A successor that has itself ended, or
+     * names no party, is a successor still: the office passed on the day it began.
+     */
+    // Rule: PM-GOV-004
+    fun succeeds(earlier: Mandate): Boolean =
+        entranceId == earlier.entranceId && executive && earlier.executive && validFrom.isAfter(earlier.validFrom) &&
+            (body == MANAGER || earlier.body == MANAGER || !validFrom.isBefore(earlier.validTo))
+
+    /**
      * Whether the mandate counts on [date], given every mandate of its entrance. It runs from `validFrom` up to and not
      * including `validTo`, and never from the day `succeededAt` records. The manager and the board continue past
-     * `validTo` until a successor (Rule: PM-GOV-004) — the day recorded, or failing that the day a later executive
-     * mandate of the entrance starts, so a successor nobody stamped still ends the predecessor's stay. The controller
-     * and the cashier do not continue: the rule names the board and the manager only.
+     * `validTo` until a successor (Rule: PM-GOV-004) — the day recorded, or failing that the first day of a mandate
+     * that [succeeds] this one, so a successor nobody stamped still ends the predecessor's stay. With no successor
+     * they continue: an expired member keeps the office until a successor or an end is recorded. The controller and
+     * the cashier do not continue: the rule names the board and the manager only.
      */
     // Rule: PM-GOV-004
     fun inForceOn(date: LocalDate, ofTheEntrance: List<Mandate>): Boolean {
         if (date.isBefore(validFrom)) return false
         if (succeededAt != null && !date.isBefore(succeededAt)) return false
         if (date.isBefore(validTo)) return true
-        return role in CONTINUING &&
-            ofTheEntrance.none { it.entranceId == entranceId && it.executive && it.validFrom.isAfter(validFrom) && !it.validFrom.isAfter(date) }
+        return role in CONTINUING && ofTheEntrance.none { it.succeeds(this) && !it.validFrom.isAfter(date) }
     }
 
     private companion object {
         val OFFICES = mapOf("BM" to Role.BM, "MB" to Role.MB, "CTL" to Role.CTL, "CSH" to Role.CSH)
         val CONTINUING = setOf(Role.BM, Role.MB)
         val EXECUTIVE = setOf("BM", "MB", "PMC")
+        const val MANAGER = "BM"
     }
 }
 
@@ -58,32 +72,20 @@ data class RoleHolder(val partyId: UUID, val role: Role, val mandateId: UUID)
  * past date is an ordinary question (Rule: PM-SEC-011).
  */
 @Service
-class MandateRoles(private val jdbc: JdbcClient) : RoleSource {
+class MandateRoles(private val mandates: MandateStore) : RoleSource {
 
     // Rule: PM-SEC-011
     @Transactional(readOnly = true)
     override fun held(who: Asking, entranceId: UUID, asAt: LocalDate): Set<Held> {
         val party = who.party ?: return emptySet()
-        val all = mandatesOf(entranceId)
+        val all = mandates.ofEntrance(entranceId)
         return all.filter { it.partyId == party && it.inForceOn(asAt, all) }.mapNotNullTo(mutableSetOf()) { m -> m.role?.let { Held(it, m.entranceId) } }
     }
 
     /** Rule: PM-SEC-011 — who held which role in the entrance on that date. */
     @Transactional(readOnly = true)
     fun holdersOn(entranceId: UUID, asAt: LocalDate): Set<RoleHolder> {
-        val all = mandatesOf(entranceId)
+        val all = mandates.ofEntrance(entranceId)
         return all.filter { it.inForceOn(asAt, all) }.mapNotNullTo(mutableSetOf()) { m -> m.role?.let { role -> m.partyId?.let { RoleHolder(it, role, m.id) } } }
     }
-
-    /** Every mandate of the entrance, past ones among them: which count on a date is [Mandate.inForceOn]'s to say, in one place — and a successor is found among them. */
-    private fun mandatesOf(entranceId: UUID): List<Mandate> =
-        jdbc.sql("SELECT id, entrance_id, body, party_id, valid_from, valid_to, succeeded_at FROM identity_org.management_mandate WHERE entrance_id = ?")
-            .param(entranceId)
-            .query { rs, _ ->
-                Mandate(
-                    rs.getObject("id", UUID::class.java), rs.getObject("entrance_id", UUID::class.java), rs.getString("body"), rs.getObject("party_id", UUID::class.java),
-                    rs.getObject("valid_from", LocalDate::class.java), rs.getObject("valid_to", LocalDate::class.java),
-                    rs.getObject("succeeded_at", LocalDate::class.java),
-                )
-            }.list()
 }

@@ -59,7 +59,6 @@ class MandateAdministrationTest {
         verify(store).add(done.mandateId, entrance, "CTL", maria, from, to, "Протокол № 3 от 10.05.2026")
         verify(acts).record(MandateAct("RECORDED", entrance, operator.login!!, "PM-SEC-001", done.mandateId, "CTL", maria, from, to, protocolRef = "Протокол № 3 от 10.05.2026"))
         assertThat(done.succeeded).isEmpty()
-        verify(store, never()).open(any(), any(), any(), any())                                    // a controller succeeds nobody
         verify(store, never()).end(any(), any())
     }
 
@@ -86,39 +85,93 @@ class MandateAdministrationTest {
         verify(acts).record(argThat { act == "RECORD_REFUSED" && body == "BM" + "x".repeat(62) })   // kept as a short line of ordinary characters
     }
 
+    /** A mandate of the test's entrance as the table would hold it, open unless [ended]. */
+    private fun held(body: String, begins: String, runsTo: String, ended: String? = null, at: UUID = entrance) =
+        Mandate(UUID.randomUUID(), at, body, UUID.randomUUID(), LocalDate.parse(begins), LocalDate.parse(runsTo), ended?.let { LocalDate.parse(it) })
+
     @Test
     fun `PM-GOV-004 a new manager ends every open executive mandate before it, on its first day — each end on the record as the successor's doing`() {
-        val oldManager = UUID.randomUUID()
-        val oldBoardMember = UUID.randomUUID()
-        val endedMeanwhile = UUID.randomUUID()
-        whenever(store.open(entrance, listOf("BM", "MB"), from, false)).thenReturn(listOf(oldManager, oldBoardMember, endedMeanwhile))
-        whenever(store.end(oldManager, from)).thenReturn(true)
-        whenever(store.end(oldBoardMember, from)).thenReturn(true)
-        whenever(store.end(endedMeanwhile, from)).thenReturn(false)                                // somebody ended it first: not ended twice
+        val oldManager = held("BM", "2024-05-10", "2026-05-10")
+        val sittingMember = held("MB", "2025-05-10", "2027-05-10")                                // within its own dates: a sole manager replaces the board all the same
+        val endedMeanwhile = held("MB", "2025-06-01", "2027-06-01")
+        val alreadyEnded = held("BM", "2022-05-10", "2024-05-10", ended = "2024-05-10")
+        val controller = held("CTL", "2025-05-10", "2027-05-10")
+        val nextDoor = held("BM", "2024-05-10", "2026-05-10", at = UUID.randomUUID())
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(alreadyEnded, oldManager, sittingMember, endedMeanwhile, controller, nextDoor))
+        whenever(store.end(oldManager.id, from)).thenReturn(true)
+        whenever(store.end(sittingMember.id, from)).thenReturn(true)
+        whenever(store.end(endedMeanwhile.id, from)).thenReturn(false)                             // somebody ended it first: not ended twice
         val done = (administration.record(operator, entrance, aMandate("BM")) as MandateAnswer.Done).value
-        assertThat(done.succeeded).containsExactly(oldManager, oldBoardMember)
+        assertThat(done.succeeded).containsExactly(oldManager.id, sittingMember.id)
         inOrder(store, acts) {
             verify(store).add(eq(done.mandateId), eq(entrance), eq("BM"), eq(maria), eq(from), eq(to), any())
             verify(acts).record(argThat { act == "RECORDED" && mandateId == done.mandateId })
-            verify(store).open(entrance, listOf("BM", "MB"), from, false)
+            verify(store).ofEntrance(entrance)
         }
-        verify(acts).record(MandateAct("ENDED", entrance, operator.login!!, "PM-GOV-004", oldManager, onDay = from, succeededBy = done.mandateId))
-        verify(acts).record(MandateAct("ENDED", entrance, operator.login!!, "PM-GOV-004", oldBoardMember, onDay = from, succeededBy = done.mandateId))
-        verify(acts, never()).record(argThat { mandateId == endedMeanwhile })
+        verify(acts).record(MandateAct("ENDED", entrance, operator.login!!, "PM-GOV-004", oldManager.id, onDay = from, succeededBy = done.mandateId))
+        verify(acts).record(MandateAct("ENDED", entrance, operator.login!!, "PM-GOV-004", sittingMember.id, onDay = from, succeededBy = done.mandateId))
+        verify(acts, never()).record(argThat { mandateId == endedMeanwhile.id })
+        for (untouched in listOf(alreadyEnded, controller, nextDoor)) verify(store, never()).end(eq(untouched.id), any())
+    }
+
+    @Test
+    fun `PM-GOV-004 recording a manager ends no firm's mandate — that is not this api's to end, in term or out of it`() {
+        val firmInTerm = held("PMC", "2025-05-10", "2027-05-10")
+        val firmRanOut = held("PMC", "2023-01-01", "2025-01-01")
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(firmRanOut, firmInTerm))
+        for (office in listOf("BM", "MB")) assertThat((administration.record(operator, entrance, aMandate(office)) as MandateAnswer.Done).value.succeeded).isEmpty()
+        verify(store, never()).end(any(), any())
     }
 
     @Test
     fun `PM-GOV-004 a new board member ends an earlier manager, and board members whose dates have run out — never a fellow member still in term`() {
-        val oldManager = UUID.randomUUID()
-        val ranOut = UUID.randomUUID()
-        whenever(store.open(entrance, listOf("BM"), from, false)).thenReturn(listOf(oldManager))
-        whenever(store.open(entrance, listOf("MB"), from, true)).thenReturn(listOf(ranOut))
+        // the new member's first day is 2026-05-10
+        val oldManager = held("BM", "2024-01-01", "2026-01-01")
+        val ranOut = held("MB", "2024-05-10", "2026-05-10")                                       // runs up to the new member's first day, and not into it
+        val inTerm = held("MB", "2025-03-01", "2027-03-01")
+        val aDayLeft = held("MB", "2024-05-11", "2026-05-11")
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(oldManager, ranOut, aDayLeft, inTerm))
         whenever(store.end(any(), eq(from))).thenReturn(true)
         val done = (administration.record(operator, entrance, aMandate("MB")) as MandateAnswer.Done).value
-        assertThat(done.succeeded).containsExactly(oldManager, ranOut)
-        verify(store, never()).open(entrance, listOf("MB"), from, false)                           // board members in term are not asked for
-        verify(store, never()).open(eq(entrance), eq(listOf("BM", "MB")), any(), any())
+        assertThat(done.succeeded).containsExactly(oldManager.id, ranOut.id)
+        for (fellow in listOf(inTerm, aDayLeft)) verify(store, never()).end(eq(fellow.id), any())
         for (office in listOf("CTL", "CSH")) assertThat((administration.record(operator, entrance, aMandate(office)) as MandateAnswer.Done).value.succeeded).isEmpty()
+    }
+
+    @Test
+    fun `PM-GOV-004 the recording side and the reading side read 'successor' alike — on every day, a mandate the recorder ended and one it left alone hold exactly when the reader says`() {
+        // An earlier mandate E (2024-01-01 → 2026-01-01) and a later one L recorded after it, for every pair of offices
+        // and a spread of first days around E's last. Two rows of the table are then read on every day that matters:
+        //  · as recorded — E stamped with L's first day where the recorder ended it;
+        //  · as if nobody had stamped anything — the reader finding the successor by itself.
+        // Past E's own dates the two agree on every day: the recorder ends exactly what the reader would. Within E's
+        // dates only the stamp ends it — that is the one difference, and it is the recorder's alone.
+        val begins = LocalDate.parse("2024-01-01")
+        val runsTo = LocalDate.parse("2026-01-01")
+        var endedInTerm = 0; var endedPastTerm = 0; var leftAlone = 0
+        for (earlierBody in listOf("BM", "MB", "CTL", "PMC")) for (laterBody in listOf("BM", "MB", "CTL")) for (gap in listOf(-300L, -1L, 0L, 1L, 90L)) {
+            val unstamped = Mandate(UUID.randomUUID(), entrance, earlierBody, UUID.randomUUID(), begins, runsTo, null)
+            val laterFrom = runsTo.plusDays(gap)
+            org.mockito.Mockito.reset(store)
+            whenever(store.ofEntrance(entrance)).thenReturn(listOf(unstamped))
+            whenever(store.end(unstamped.id, laterFrom)).thenReturn(true)
+            val done = (administration.record(operator, entrance, RecordMandate(laterBody, maria, laterFrom, laterFrom.plusYears(1), "Протокол")) as MandateAnswer.Done).value
+            val later = Mandate(done.mandateId, entrance, laterBody, maria, laterFrom, laterFrom.plusYears(1), null)
+            val ended = unstamped.id in done.succeeded
+            val stamped = if (ended) unstamped.copy(succeededAt = laterFrom) else unstamped
+            val case = "$earlierBody then $laterBody, ${gap}d from the earlier one's last day"
+            // the recorder ends only a manager or a board member, and exactly the ones the one reading names
+            assertThat(ended).describedAs(case).isEqualTo(earlierBody in listOf("BM", "MB") && later.succeeds(unstamped))
+            for (day in listOf(laterFrom.minusDays(1), laterFrom, runsTo.minusDays(1), runsTo, maxOf(runsTo, laterFrom).plusDays(1), runsTo.plusYears(3))) {
+                val asRecorded = stamped.inForceOn(day, listOf(stamped, later))
+                val byTheReaderAlone = unstamped.inForceOn(day, listOf(unstamped, later))
+                if (!day.isBefore(runsTo)) assertThat(asRecorded).describedAs("$case, on $day").isEqualTo(byTheReaderAlone)
+                else assertThat(byTheReaderAlone).describedAs("$case, on $day: within its dates only a recorded end ends it").isTrue()
+                if (ended && !day.isBefore(laterFrom)) assertThat(asRecorded).describedAs("$case, on $day").isFalse()
+            }
+            if (ended && laterFrom.isBefore(runsTo)) endedInTerm++ else if (ended) endedPastTerm++ else leftAlone++
+        }
+        assertThat(listOf(endedInTerm, endedPastTerm, leftAlone)).allMatch { it > 0 }             // every kind of case was drawn
     }
 
     @Test
