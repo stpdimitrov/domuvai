@@ -167,8 +167,12 @@ class MandateAdministrationIT {
         assertThat(jdbc.queryForMap("SELECT mandate_id, on_day, succeeded_by, by_subject, rule_id FROM identity_org.mandate_act WHERE entrance_id = ? AND act = 'ENDED'", block).values)
             .containsExactly(first, java.sql.Date.valueOf(took), second, "operator-m", "PM-GOV-004")
 
-        // What the table will not take, said to the administrator: a mandate longer than a mandate may be, a party or an entrance nobody registered.
-        mvc.perform(json(mandates, aMandate("CTL", petar, today, today.plusYears(2).plusDays(1))).by("operator-m")).andExpect(status().isBadRequest).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("PM-GOV-004")))
+        // What cannot be recorded, said to the administrator: a mandate longer than the law's term on its first day, a party or an entrance nobody registered.
+        val term = zues.law.numberOn("CONTROL_TERM_YEARS", today.toString()).toLong()
+        mvc.perform(json(mandates, aMandate("CTL", petar, today, today.plusYears(term).plusDays(1))).by("operator-m")).andExpect(status().isBadRequest).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("PM-GOV-007")))
+        // The figure is the law module's alone: the table carries no check of a mandate's length any more.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_constraint WHERE conrelid = 'identity_org.management_mandate'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) ILIKE '%interval%'", Long::class.java)).isEqualTo(0)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_constraint WHERE conrelid = 'identity_org.management_mandate'::regclass AND conname = 'management_mandate_check'", Long::class.java)).isEqualTo(1)
         mvc.perform(json(mandates, aMandate("CTL", UUID.randomUUID(), today, today.plusYears(1))).by("operator-m")).andExpect(status().isBadRequest)
         mvc.perform(json("/api/identity/entrances/${UUID.randomUUID()}/mandates", aMandate("CTL", petar, today, today.plusYears(1))).by("operator-m")).andExpect(status().isNotFound)
         assertThat(jdbc.queryForObject("SELECT count(*) FROM identity_org.management_mandate WHERE entrance_id = ?", Long::class.java, block)).isEqualTo(2)

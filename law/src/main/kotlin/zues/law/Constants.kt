@@ -95,6 +95,18 @@ private val CONSTANTS: List<Constant> = listOf(
         todoLegal = "Confirm the maximum number of owners one person may represent (RULES.md §7, question 2), and whether " +
             "it counts owners, units or authorisations.",
     ),
+    // PM-GOV-004 — the management board's and the manager's mandate runs no longer than this, in years. The statute
+    // states the figure, so it is confirmed.
+    Constant("MANDATE_TERM_YEARS", "2", "2009-01-01", "чл. 19, чл. 21 ЗУЕС", true, rule = "PM-GOV-004"),
+    // PM-GOV-007 — the control board, or the single controller, is elected for a term of this many years.
+    Constant("CONTROL_TERM_YEARS", "2", "2009-01-01", "чл. 24 ЗУЕС", true, rule = "PM-GOV-007"),
+    // The cashier's term. The catalogue names none: no rule gives the cashier a term of office. The schema capped every
+    // mandate alike before the cap moved here (AUD-01), so the cashier keeps that cap until counsel says. Unconfirmed.
+    Constant(
+        "CASHIER_TERM_YEARS", "2", "2009-01-01", "no statutory source — the schema's former cap on every mandate, kept pending counsel", false,
+        todoLegal = "Confirm whether the cashier has a term of office at all, and its length — the catalogue gives the " +
+            "board and the manager one (PM-GOV-004) and the controller one (PM-GOV-007), and the cashier none.",
+    ),
     // PM-GA-003 — the share of ideal parts whose owners may demand an assembly, in percent. Unconfirmed.
     Constant(
         "GA_PETITION_MIN_PCT", "20", "2009-01-01", "чл. 12 ЗУЕС", false, rule = "PM-GA-003",
