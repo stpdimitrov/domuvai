@@ -52,10 +52,10 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GOV-001` | — | — |  |
 | `PM-GOV-002` | — | — |  |
 | `PM-GOV-003` | — | — |  |
-| `PM-GOV-004` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationIT.kt:125` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:133` |  |
+| `PM-GOV-004` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationIT.kt:125` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:141` |  |
 | `PM-GOV-005` | — | — |  |
 | `PM-GOV-006` | — | — |  |
-| `PM-GOV-007` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationTest.kt:150` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:196` |  |
+| `PM-GOV-007` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationTest.kt:203` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:207` |  |
 | `PM-GOV-008` | `app/src/test/kotlin/zues/app/policy/PolicyTest.kt:275` | — |  |
 | `PM-GOV-009` | — | — |  |
 | `PM-GOV-010` | — | — |  |
@@ -267,7 +267,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-SEC-008` | — | — |  |
 | `PM-SEC-009` | — | — | ⚠ |
 | `PM-SEC-010` | — | — |  |
-| `PM-SEC-011` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationTest.kt:177` | `app/src/main/kotlin/zues/app/identity_org/MandateRoles.kt:58` |  |
+| `PM-SEC-011` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationTest.kt:230` | `app/src/main/kotlin/zues/app/identity_org/MandateRoles.kt:72` |  |
 | `PM-SEC-012` | — | — |  |
 
 ## SYS — Cross-cutting system rules  ·  6/15 covered
@@ -275,7 +275,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | Rule | Test | Implementation | Unverified |
 |---|---|---|---|
 | `PM-SYS-001` | `law/src/test/kotlin/zues/law/LawTest.kt:22` | — |  |
-| `PM-SYS-002` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationTest.kt:167` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:196` |  |
+| `PM-SYS-002` | `app/src/test/kotlin/zues/app/identity_org/MandateAdministrationTest.kt:220` | `app/src/main/kotlin/zues/app/identity_org/MandateAdministration.kt:207` |  |
 | `PM-SYS-003` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:16` | `kernel/src/main/kotlin/zues/kernel/Language.kt:4` |  |
 | `PM-SYS-004` | `app/src/test/kotlin/zues/app/assembly/AssemblyServiceTest.kt:113` | `kernel/src/main/kotlin/zues/kernel/Time.kt:10` |  |
 | `PM-SYS-005` | `kernel/src/test/kotlin/zues/kernel/SysTimeTest.kt:48` | `kernel/src/main/kotlin/zues/kernel/Time.kt:31` | ⚠ |

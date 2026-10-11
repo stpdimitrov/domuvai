@@ -93,6 +93,61 @@ class MandateTest {
         assertThat(incumbent.inForceOn(to, listOf(incumbent, early))).isFalse()                // and it does not continue past its end
     }
 
+    private fun day(iso: String) = LocalDate.parse(iso)
+
+    @Test
+    fun `PM-GOV-004 a board member whose dates ran out keeps the office though a colleague was by-elected meanwhile — nobody was elected to succeed them`() {
+        // The audit's case: A serves 2024-01-01 → 2026-01-01; B is by-elected 2025-03-01 → 2027-03-01.
+        val a = mandate("MB", from = day("2024-01-01"), to = day("2026-01-01"))
+        val b = mandate("MB", from = day("2025-03-01"), to = day("2027-03-01"))
+        val board = listOf(a, b)
+        assertThat(b.succeeds(a)).isFalse()
+        for (date in listOf("2025-12-31", "2026-01-01", "2026-06-01", "2027-02-28", "2030-01-01")) assertThat(a.inForceOn(day(date), board)).describedAs(date).isTrue()
+        // … until somebody is: a member elected on A's own last day or after it, a sole manager, or an end recorded.
+        for (successor in listOf(mandate("MB", from = day("2026-01-01"), to = day("2028-01-01")), mandate("MB", from = day("2026-04-01"), to = day("2028-04-01")), mandate("BM", from = day("2026-04-01"), to = day("2028-04-01")))) {
+            assertThat(successor.succeeds(a)).isTrue()
+            assertThat(a.inForceOn(successor.validFrom.minusDays(1), board + successor)).isTrue()
+            assertThat(a.inForceOn(successor.validFrom, board + successor)).isFalse()
+        }
+        assertThat(a.copy(succeededAt = day("2026-02-01")).inForceOn(day("2026-02-01"), board)).isFalse()
+        // a member elected the day before A's last day began inside A's term, and succeeds nobody
+        assertThat(mandate("MB", from = day("2025-12-31"), to = day("2027-12-31")).succeeds(a)).isFalse()
+    }
+
+    @Test
+    fun `PM-GOV-004 who succeeds whom, office by office — a manager anybody before, a board member a manager and a member whose dates ran out`() {
+        val earlierFrom = day("2024-01-01"); val earlierTo = day("2026-01-01")
+        fun earlier(body: String) = mandate(body, from = earlierFrom, to = earlierTo)
+        fun later(body: String, begins: String, at: UUID = block) = mandate(body, from = day(begins), to = day(begins).plusYears(1), at = at)
+        // within the earlier one's term · on its last day · after it
+        val expected = mapOf(
+            ("BM" to "BM") to listOf(true, true, true), ("MB" to "BM") to listOf(true, true, true), ("BM" to "MB") to listOf(true, true, true),
+            ("MB" to "MB") to listOf(false, true, true), ("MB" to "PMC") to listOf(false, true, true), ("BM" to "PMC") to listOf(true, true, true),
+        )
+        for ((pair, answers) in expected) for ((begins, answer) in listOf("2025-03-01", "2026-01-01", "2026-03-01").zip(answers))
+            assertThat(later(pair.second, begins).succeeds(earlier(pair.first))).describedAs("${pair.first} then ${pair.second} from $begins").isEqualTo(answer)
+        // two members elected the same day succeed neither each other; a firm's own mandate is ended by a manager like any other
+        assertThat(later("MB", "2024-01-01").succeeds(earlier("MB"))).isFalse()
+        assertThat(later("BM", "2025-03-01").succeeds(earlier("PMC"))).isTrue()
+        assertThat(later("MB", "2025-03-01").succeeds(earlier("PMC"))).isFalse()
+        // a successor that has itself ended since, or names no party, is a successor still: the office passed the day it began
+        val incumbent = earlier("MB")
+        val cameAndWent = later("BM", "2026-03-01").copy(succeededAt = day("2026-03-01"))
+        val nobodyNamed = later("BM", "2026-03-01").copy(partyId = null)
+        for (successor in listOf(cameAndWent, nobodyNamed)) {
+            assertThat(successor.succeeds(incumbent)).isTrue()
+            assertThat(incumbent.inForceOn(day("2026-03-01"), listOf(incumbent, successor))).isFalse()
+        }
+        // never: the same day or before, another entrance, an office that is not executive on either side
+        assertThat(later("BM", "2024-01-01").succeeds(earlier("BM"))).isFalse()
+        assertThat(later("BM", "2023-01-01").succeeds(earlier("BM"))).isFalse()
+        assertThat(later("BM", "2026-03-01", at = UUID.randomUUID()).succeeds(earlier("BM"))).isFalse()
+        for (office in listOf("CTL", "CSH")) {
+            assertThat(later(office, "2026-03-01").succeeds(earlier("BM"))).isFalse()
+            assertThat(later("BM", "2026-03-01").succeeds(earlier(office))).isFalse()
+        }
+    }
+
     @Test
     fun `an office is its role, and the firm's own mandate is nobody's role`() {
         assertThat(listOf("BM", "MB", "CTL", "CSH").map { mandate(it).role }).containsExactly(Role.BM, Role.MB, Role.CTL, Role.CSH)

@@ -83,7 +83,7 @@ class MandateWebTest {
     @Test
     fun `PM-SEC-001 the administrator records a mandate and its end, and is told what was done`() {
         val old = UUID.randomUUID()
-        whenever(store.open(entrance, listOf("BM", "MB"), LocalDate.parse("2026-05-10"), false)).thenReturn(listOf(old))
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(Mandate(old, entrance, "BM", UUID.randomUUID(), LocalDate.parse("2024-05-10"), LocalDate.parse("2026-05-10"), null)))
         whenever(store.end(old, LocalDate.parse("2026-05-10"))).thenReturn(true)
         send(bearer(issuer, "operator")).andExpect(status().isOk).andExpect(jsonPath("$.mandateId").isNotEmpty).andExpect(jsonPath("$.succeeded[0]").value(old.toString()))
         verify(store).add(any(), org.mockito.kotlin.eq(entrance), org.mockito.kotlin.eq("BM"), org.mockito.kotlin.eq(maria), any(), any(), org.mockito.kotlin.eq("Протокол № 3"))

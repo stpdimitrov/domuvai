@@ -435,6 +435,9 @@ The repo's `CLAUDE.md` holds the working agreement. It is the single place those
 8. Treatment of arrears on transfer of ownership — which obligations follow the unit and which follow the person.
 9. Whether an entrance may lawfully adopt a per-unit key for maintenance costs, and with what majority.
 10. Retention periods mandated for condominium documents versus GDPR minimisation.
+11. PM-GOV-004 — "the incumbent continues in office until a successor is elected": for a management **board**, which later election succeeds which member? The statute speaks of the body; the system holds one mandate per member and no seats. As built (the owner's decision, 2026-10-11): a member past term is succeeded by a later sole manager, by a member whose mandate begins on or after the day that member's term ends (the first day outside it), or by a recorded end — a by-election during the term succeeds nobody. Not decided by the owner, and built as the nearest reading: a firm's mandate (delegation to a professional manager) succeeds a manager always and a board member as another member would; a successor that has itself since ended is a successor still. Accepted risk: an expired member keeps the office, and with it the book, until a successor or an end is recorded.
+12. Whether the control board continues in office past its term as the management board does (чл. 24), and whether PM-GOV-007's "elected for a 2-year term" is a maximum or the term itself. As built: it does not continue; the figure is a maximum.
+13. Whether the cashier has a term of office at all, and its length. As built: the same cap as the board's, from a constant marked unconfirmed (`CASHIER_TERM_YEARS`).
 
 ---
 
