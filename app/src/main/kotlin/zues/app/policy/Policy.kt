@@ -39,6 +39,9 @@ enum class Action(val governedBy: String) {
 
     /** convening a general assembly in an office, and what belongs to convening it: its agenda, its date and place, its notice */
     CONVENE_ASSEMBLY("PM-GA-002"),
+
+    /** appointing one's own proxy for an assembly */
+    APPOINT_PROXY("PM-GA-009"),
 }
 
 /**
@@ -117,7 +120,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 6
+        const val MATRIX_VERSION = 7
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -126,7 +129,8 @@ class Policy(private val sources: List<RoleSource>) {
          * and nobody else. The owners' petition: an owner of the entrance on the day, signing for themselves, and no
          * office as such (PM-GA-003). A holder of a right of use is not among them pending counsel: whether they may
          * demand an assembly is the same open question as whose ideal parts count. Convening in an office: the board,
-         * the manager, the control board or controller — and no cashier, firm or owner as such (PM-GA-002).
+         * the manager, the control board or controller — and no cashier, firm or owner as such (PM-GA-002). A proxy:
+         * an owner or a holder of use appoints their own, and nobody appoints one for them (PM-GA-009).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -155,6 +159,8 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.CONVENE_ASSEMBLY, Role.BM, "PM-GA-002"),
             Permit(Action.CONVENE_ASSEMBLY, Role.MB, "PM-GA-002"),
             Permit(Action.CONVENE_ASSEMBLY, Role.CTL, "PM-GA-002"),
+            Permit(Action.APPOINT_PROXY, Role.OWN, "PM-GA-009"),
+            Permit(Action.APPOINT_PROXY, Role.USR, "PM-GA-009"),
         )
     }
 }
