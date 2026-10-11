@@ -22,7 +22,9 @@ run "11/11 catalogue version"   python3 tools/check_catalogue_version.py
 
 # Only GENERATED paths belong here. A hand-written document changing is normal;
 # flagging it would make this gate noise, and noise gets switched off.
-GENERATED=(docs/FUNCTIONAL.md docs/TRACEABILITY.md docs/TESTPLAN.md docs/events docs/api)
+# docs/TRACEABILITY.md is generated and NOT committed (.gitignore): every slice that adds a test changes it, so
+# committed it conflicted between any two open PRs. Gate 4 still runs its generator, which fails on an unknown rule ID.
+GENERATED=(docs/FUNCTIONAL.md docs/TESTPLAN.md docs/events docs/api)
 printf '\n\033[1m▸ generated files must be committed\033[0m\n'
 if ! git diff --quiet -- "${GENERATED[@]}"; then
   echo "  ✗ a generated document is out of sync with its generator — commit the regenerated result:"
