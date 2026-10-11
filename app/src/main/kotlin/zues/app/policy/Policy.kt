@@ -36,6 +36,9 @@ enum class Action(val governedBy: String) {
 
     /** convening the owners' assembly on their petition, when the demand was not met */
     CONVENE_ON_PETITION("PM-GA-003"),
+
+    /** convening a general assembly in an office, and what belongs to convening it: its agenda, its date and place, its notice */
+    CONVENE_ASSEMBLY("PM-GA-002"),
 }
 
 /**
@@ -114,7 +117,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 5
+        const val MATRIX_VERSION = 6
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -122,7 +125,8 @@ class Policy(private val sources: List<RoleSource>) {
          * does not write (PM-GOV-008). Who a login is, and who holds an entrance's offices: the deployment's administrator —
          * and nobody else. The owners' petition: an owner of the entrance on the day, signing for themselves, and no
          * office as such (PM-GA-003). A holder of a right of use is not among them pending counsel: whether they may
-         * demand an assembly is the same open question as whose ideal parts count.
+         * demand an assembly is the same open question as whose ideal parts count. Convening in an office: the board,
+         * the manager, the control board or controller — and no cashier, firm or owner as such (PM-GA-002).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -148,6 +152,9 @@ class Policy(private val sources: List<RoleSource>) {
             // TODO(legal): PM-GA-003 — whether a holder of a right of use may demand an assembly (the two lines below)
             Permit(Action.SIGN_PETITION, Role.OWN, "PM-GA-003"),
             Permit(Action.CONVENE_ON_PETITION, Role.OWN, "PM-GA-003"),
+            Permit(Action.CONVENE_ASSEMBLY, Role.BM, "PM-GA-002"),
+            Permit(Action.CONVENE_ASSEMBLY, Role.MB, "PM-GA-002"),
+            Permit(Action.CONVENE_ASSEMBLY, Role.CTL, "PM-GA-002"),
         )
     }
 }
