@@ -140,6 +140,38 @@
         ],
         "type": "object"
       },
+      "AppointProxyRequest": {
+        "properties": {
+          "agentKind": {
+            "type": "string"
+          },
+          "agentPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "form": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentKind",
+          "agentPartyId",
+          "form",
+          "items",
+          "scope"
+        ],
+        "type": "object"
+      },
       "AssemblyView": {
         "properties": {
           "agenda": {
@@ -2463,43 +2495,6 @@
         ],
         "type": "object"
       },
-      "RegisterProxy": {
-        "properties": {
-          "agentKind": {
-            "type": "string"
-          },
-          "agentPartyId": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "form": {
-            "type": "string"
-          },
-          "items": {
-            "items": {
-              "format": "int32",
-              "type": "integer"
-            },
-            "type": "array"
-          },
-          "principalPartyId": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "scope": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "agentKind",
-          "agentPartyId",
-          "form",
-          "items",
-          "principalPartyId",
-          "scope"
-        ],
-        "type": "object"
-      },
       "RegisterUnitsRequest": {
         "properties": {
           "units": {
@@ -3518,6 +3513,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3573,7 +3578,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterProxy"
+                "$ref": "#/components/schemas/AppointProxyRequest"
               }
             }
           },
@@ -3600,6 +3605,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyRefused"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3621,13 +3636,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register a proxy for an assembly — principal, agent, scope and form; refused past the limit one person may represent, with the limit shown",
+        "summary": "Appoint one's own proxy for an assembly — the signed-in owner or holder of use is the principal; agent, scope and form; refused past the limit one person may represent, with the limit shown",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-009",
-          "PM-GA-010"
+          "PM-GA-010",
+          "PM-SEC-001"
         ]
       }
     },

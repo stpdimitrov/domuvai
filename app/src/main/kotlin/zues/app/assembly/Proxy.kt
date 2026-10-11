@@ -7,10 +7,13 @@ import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import zues.app.registry.Holdings
+import zues.app.registry.TitleRole
 import zues.kernel.toSofiaDate
 import zues.law.constantOn
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 /**
@@ -29,6 +32,9 @@ data class Proxy(
     val scopeItems: String?,         // the agenda ordinals, "2,3", when the scope is LISTED_ITEMS
     val form: String,                // AuthorisationForm
     val registeredAt: Instant,
+    /** The sign-in that registered it, as tied to the principal at that moment (PM-SEC-001). */
+    val loginIssuer: String? = null,
+    val loginSubject: String? = null,
 )
 
 /** Who may be a proxy: an adult household member, another owner, or a third party. Rule: PM-GA-009 */
@@ -43,7 +49,7 @@ interface ProxyRepository : ListCrudRepository<Proxy, UUID> {
     fun findByAssemblyId(assemblyId: UUID): List<Proxy>
 }
 
-/** What is stated when a proxy is registered. */
+/** A proxy to register, as the service takes it: the principal is the sign-in's party, put here by the controller, never read from a request. */
 data class RegisterProxy(
     val principalPartyId: UUID,
     val agentPartyId: UUID,
@@ -64,12 +70,14 @@ class ProxyService(
     private val assemblies: AssemblyRepository,
     private val agenda: AgendaItemRepository,
     private val proxies: ProxyRepository,
+    private val holdings: Holdings,
     private val clock: Clock,
 ) {
     // Rule: PM-GA-009
     // Rule: PM-GA-010
     @Transactional
-    fun register(entranceId: UUID, assemblyId: UUID, request: RegisterProxy): Proxy {
+    fun register(entranceId: UUID, assemblyId: UUID, request: RegisterProxy, by: Actor): Proxy {
+        require(by.party == request.principalPartyId) { "a proxy is appointed by the one it represents" }
         val kind = named<AgentKind>(request.agentKind, "kind of representative")
         val scope = named<ProxyScope>(request.scope, "scope")
         val form = named<AuthorisationForm>(request.form, "form of authorisation")
@@ -86,6 +94,7 @@ class ProxyService(
         } else {
             require(items.isEmpty()) { "a proxy for the whole agenda lists no items" }
         }
+        requireWhoTheRuleNames(entranceId, request, kind)
         val registered = proxies.findByAssemblyId(assemblyId)
         check(registered.none { it.principalPartyId == request.principalPartyId }) { "this principal already has a proxy at this assembly" }
         // A represented person does not attend, so cannot represent; and nobody passes on what they were given —
@@ -100,13 +109,37 @@ class ProxyService(
         }
         val proxy = Proxy(
             UUID.randomUUID(), entranceId, assemblyId, request.principalPartyId, request.agentPartyId, kind.name,
-            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(),
+            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(), by.loginIssuer, by.loginSubject,
         )
         try {
             return aggregates.insert(proxy)
         } catch (e: DbActionExecutionException) {
             if (missingReference(e) != null) throw IllegalArgumentException("the principal or the representative is not a registered party")
             throw e
+        }
+    }
+
+    /**
+     * "An owner or user … MAY appoint a proxy: an adult household member, another owner, or a third party" — as the
+     * book stands today in Sofia, through the registry's port: the principal holds a title in the entrance, an agent
+     * called an owner owns in it, and an agent called a household member resides in a unit the principal holds.
+     */
+    // Rule: PM-GA-009
+    private fun requireWhoTheRuleNames(entranceId: UUID, request: RegisterProxy, kind: AgentKind) {
+        val today = LocalDate.parse(toSofiaDate(clock.instant()))                  // a Sofia calendar day (PM-SYS-004)
+        val owned = holdings.inForce(entranceId, today, TitleRole.OWN).holdings
+        val principals = (owned + holdings.inForce(entranceId, today, TitleRole.USR).holdings).filter { it.partyId == request.principalPartyId }
+        require(principals.isNotEmpty()) { "a proxy is appointed by an owner or a holder of a right of use in the entrance (PM-GA-009)" }
+        when (kind) {
+            AgentKind.OWNER -> require(owned.any { it.partyId == request.agentPartyId }) { "the representative is called another owner, and owns nothing in the entrance today (PM-GA-009)" }
+            AgentKind.HOUSEHOLD_MEMBER -> {
+                // TODO(legal): PM-GA-009 — "adult": the book records no date of birth, so adulthood is not checked
+                val units = principals.map { it.unitId }.toSet()
+                require(holdings.residents(entranceId, today).any { it.partyId == request.agentPartyId && it.unitId in units }) {
+                    "the representative is called a member of the principal's household, and the book has them in none of the principal's units today (PM-GA-009)"
+                }
+            }
+            AgentKind.THIRD_PARTY -> Unit                                          // anybody, under a written authorisation: its form is PM-GA-011's
         }
     }
 

@@ -76,8 +76,8 @@ RUNNING = {
    ('Record the posting act with its photograph — by the convenor signed in, co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
     ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
-   ('Register a proxy for an assembly — principal, agent, scope and form; refused past the limit one person may represent, with the limit shown',
-    ['PM-GA-009', 'PM-GA-010']),
+   ('Appoint one\'s own proxy for an assembly — the signed-in owner or holder of use is the principal; agent, scope and form; refused past the limit one person may represent, with the limit shown',
+    ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
    ('List the proxies registered for an assembly', ['PM-GA-009']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions'):

@@ -82,7 +82,7 @@ export interface paths {
         /** List the proxies registered for an assembly */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         put?: never;
-        /** Register a proxy for an assembly — principal, agent, scope and form; refused past the limit one person may represent, with the limit shown */
+        /** Appoint one's own proxy for an assembly — the signed-in owner or holder of use is the principal; agent, scope and form; refused past the limit one person may represent, with the limit shown */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         delete?: never;
         options?: never;
@@ -987,6 +987,14 @@ export interface components {
         AnimalsRegisteredResponse: {
             animalIds: string[];
         };
+        AppointProxyRequest: {
+            agentKind: string;
+            /** Format: uuid */
+            agentPartyId: string;
+            form: string;
+            items: number[];
+            scope: string;
+        };
         AssemblyView: {
             agenda: components["schemas"]["AgendaItemView"][];
             convenedAs: string;
@@ -1688,16 +1696,6 @@ export interface components {
             idType?: string;
             idValue?: string;
         };
-        RegisterProxy: {
-            agentKind: string;
-            /** Format: uuid */
-            agentPartyId: string;
-            form: string;
-            items: number[];
-            /** Format: uuid */
-            principalPartyId: string;
-            scope: string;
-        };
         RegisterUnitsRequest: {
             units: components["schemas"]["NewUnitRequest"][];
         };
@@ -2212,6 +2210,15 @@ export interface operations {
                     "application/json": components["schemas"]["ProxyRefused"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2244,7 +2251,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RegisterProxy"];
+                "application/json": components["schemas"]["AppointProxyRequest"];
             };
         };
         responses: {
@@ -2259,6 +2266,15 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyRefused"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

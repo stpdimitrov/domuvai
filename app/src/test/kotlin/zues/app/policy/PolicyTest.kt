@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            6 to listOf(
+            7 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -56,6 +56,8 @@ class PolicyTest {
                 "CONVENE_ASSEMBLY BM PM-GA-002",
                 "CONVENE_ASSEMBLY MB PM-GA-002",
                 "CONVENE_ASSEMBLY CTL PM-GA-002",
+                "APPOINT_PROXY OWN PM-GA-009",
+                "APPOINT_PROXY USR PM-GA-009",
             ),
         )
         assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance"))
@@ -74,6 +76,20 @@ class PolicyTest {
             assertThat(decision.role).isEqualTo(if (named) role else null)
             assertThat(decision.matrixVersion).isEqualTo(Policy.MATRIX_VERSION)
         }
+    }
+
+    @Test
+    fun `PM-GA-009 a proxy is appointed by an owner or a holder of use of the entrance on the day — and by no office, occupant or administrator`() {
+        val assembly = Resource.OfEntrance(entrance)
+        for (principal in listOf(Role.OWN, Role.USR)) {
+            assertThat(policy.decide(holder(principal, setOf(UUID.randomUUID())), Action.APPOINT_PROXY, assembly, day)).isEqualTo(Decision(true, "PM-GA-009", principal, Policy.MATRIX_VERSION))
+        }
+        for (other in Role.entries - setOf(Role.OWN, Role.USR)) assertThat(policy.decide(holder(other), Action.APPOINT_PROXY, assembly, day).allowed).describedAs("$other").isFalse()
+        val sold = person().also { holds(it, Role.OWN, from = day.minusYears(1), until = day) }
+        assertThat(policy.decide(sold, Action.APPOINT_PROXY, assembly, day)).isEqualTo(Decision(false, "PM-GA-009", null, Policy.MATRIX_VERSION))
+        val nextDoor = person().also { holds(it, Role.OWN, at = UUID.randomUUID()) }
+        assertThat(policy.decide(nextDoor, Action.APPOINT_PROXY, assembly, day).allowed).isFalse()
+        assertThat(policy.decide(Asking(null, null), Action.APPOINT_PROXY, assembly, day).allowed).isFalse()
     }
 
     @Test
