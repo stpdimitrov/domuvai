@@ -54,4 +54,22 @@ class LawTest {
         assertFalse(keyIsChangeableByAssembly(CostStream.REPAIR_FUND))
         assertTrue(keyIsChangeableByAssembly(CostStream.MANAGEMENT))
     }
+
+    @Test
+    fun `PM-GOV-004 the board's and the manager's mandate is at most 2 years, a confirmed figure, in force since the statute`() {
+        assertEquals("2", constantOn("MANDATE_TERM_YEARS", "2009-01-01").value)
+        assertEquals("2", constantOn("MANDATE_TERM_YEARS", "2026-10-11").value)
+        assertEquals("PM-GOV-004", constantOn("MANDATE_TERM_YEARS", "2026-10-11").rule)
+        assertTrue(constantOn("MANDATE_TERM_YEARS", "2026-10-11").verified)
+        assertTrue(runCatching { constantOn("MANDATE_TERM_YEARS", "2008-12-31") }.isFailure)   // no term before the statute: stop and ask
+    }
+
+    @Test
+    fun `PM-GOV-007 the controller's term is 2 years, a confirmed figure — and the cashier's is not confirmed`() {
+        assertEquals("2", constantOn("CONTROL_TERM_YEARS", "2026-10-11").value)
+        assertEquals("PM-GOV-007", constantOn("CONTROL_TERM_YEARS", "2026-10-11").rule)
+        assertTrue(constantOn("CONTROL_TERM_YEARS", "2026-10-11").verified)
+        assertTrue(unverified().map { it.code }.contains("CASHIER_TERM_YEARS"))
+        assertTrue(constantOn("CASHIER_TERM_YEARS", "2026-10-11").rule == null)
+    }
 }

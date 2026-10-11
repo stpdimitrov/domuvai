@@ -132,6 +132,47 @@ class MandateAdministrationTest {
         verifyNoInteractions(store, acts)
     }
 
+    /** The term the law module has in force on a day, in years — asked of the law, so the test names no figure of its own. */
+    private fun term(code: String, on: LocalDate) = zues.law.numberOn(code, on.toString()).toLong()
+
+    @Test
+    fun `PM-GOV-004 a board's or a manager's mandate runs no longer than the term in force on its first day — to the day`() {
+        for (office in listOf("BM", "MB")) {
+            val last = from.plusYears(term("MANDATE_TERM_YEARS", from))
+            assertThat(administration.record(operator, entrance, aMandate(office).copy(validTo = last))).describedAs("$office to the day").isInstanceOf(MandateAnswer.Done::class.java)
+            assertThatThrownBy { administration.record(operator, entrance, aMandate(office).copy(validTo = last.plusDays(1))) }.describedAs("$office a day over")
+                .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GOV-004")
+        }
+        verify(store, org.mockito.kotlin.times(2)).add(any(), any(), any(), any(), any(), any(), any())   // the two that fit, and neither that did not
+    }
+
+    @Test
+    fun `PM-GOV-007 a controller's mandate runs no longer than the controller's term in force on its first day`() {
+        val last = from.plusYears(term("CONTROL_TERM_YEARS", from))
+        assertThat(administration.record(operator, entrance, aMandate("CTL").copy(validTo = last))).isInstanceOf(MandateAnswer.Done::class.java)
+        assertThatThrownBy { administration.record(operator, entrance, aMandate("CTL").copy(validTo = last.plusDays(1))) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GOV-007")
+    }
+
+    @Test
+    fun `the cashier keeps the cap every mandate had — from a constant of its own, not yet confirmed, and a refusal cites no rule`() {
+        val last = from.plusYears(term("CASHIER_TERM_YEARS", from))
+        assertThat(administration.record(operator, entrance, aMandate("CSH").copy(validTo = last))).isInstanceOf(MandateAnswer.Done::class.java)
+        assertThatThrownBy { administration.record(operator, entrance, aMandate("CSH").copy(validTo = last.plusDays(1))) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("not yet confirmed").hasMessageNotContaining("PM-")
+        assertThat(zues.law.unverified().map { it.code }).contains("CASHIER_TERM_YEARS").doesNotContain("MANDATE_TERM_YEARS", "CONTROL_TERM_YEARS")
+    }
+
+    @Test
+    fun `PM-SYS-002 the term is the one in force on the mandate's first day — a day the law has no term for is refused, whatever today is`() {
+        // The law module's term is in force from a day; a mandate dated before it has no term to be judged by, and is
+        // not recorded on today's. (Today, by the test's clock, is 2026 — a term is in force.)
+        val beforeTheStatute = LocalDate.parse("2008-12-31")
+        assertThatThrownBy { administration.record(operator, entrance, aMandate("BM").copy(validFrom = beforeTheStatute, validTo = beforeTheStatute.plusMonths(6))) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("no term").hasMessageContaining("2008-12-31")
+        verify(store, never()).add(any(), any(), any(), any(), any(), any(), any())
+    }
+
     @Test
     fun `PM-SEC-011 an end is recorded once, with its basis, on a day the mandate had begun and not in the future — a past day's answer is not moved afterwards`() {
         val mandate = UUID.randomUUID()
