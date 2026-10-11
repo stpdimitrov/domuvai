@@ -30,7 +30,15 @@ data class ProxyView(
 data class ProxyRefused(val error: String, val limit: Int? = null)
 
 /** What a principal states when appointing their proxy. Who the principal is, is the sign-in's party. */
-data class AppointProxyRequest(val agentPartyId: UUID, val agentKind: String, val scope: String, val items: List<Int> = emptyList(), val form: String)
+data class AppointProxyRequest(
+    val agentPartyId: UUID,
+    val agentKind: String,
+    val scope: String,
+    val items: List<Int> = emptyList(),
+    val form: String,
+    /** Never who the principal is: a request that names one other than the caller is refused, not quietly made the caller's. */
+    val principalPartyId: UUID? = null,
+)
 
 /**
  * Proxies for a general assembly (PM-GA-009, PM-GA-010). A proxy is appointed by the one it represents: the principal
@@ -49,6 +57,8 @@ class ProxyController(private val proxies: ProxyService, private val who: WhoAsk
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: AppointProxyRequest, signedIn: JwtAuthenticationToken?,
     ): ProxyView {
         val principal = acting.actor(who.of(signedIn), Action.APPOINT_PROXY, entranceId)
+        // an appointment is not undone: one made for the caller when they named somebody else is one they did not ask for
+        require(request.principalPartyId == null || request.principalPartyId == principal.party) { "a proxy is appointed by the one it represents, for themselves" }
         return view(
             proxies.register(
                 entranceId, assemblyId, RegisterProxy(principal.party, request.agentPartyId, request.agentKind, request.scope, request.items, request.form), principal,
@@ -68,7 +78,7 @@ class ProxyController(private val proxies: ProxyService, private val who: WhoAsk
     /** The policy refuses, or nobody a record could name is asking. */
     @ExceptionHandler(ActRefused::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
-    fun onRefused(e: ActRefused) = ProxyRefused("${e.message} — ${e.ruleId}")
+    fun onRefused(e: ActRefused) = ProxyRefused(e.message ?: "not allowed")
 
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

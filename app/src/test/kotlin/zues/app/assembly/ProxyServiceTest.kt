@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import zues.law.constantOn
 import zues.app.registry.HeldOn
@@ -49,14 +50,20 @@ class ProxyServiceTest {
     private val living = mutableMapOf<UUID, UUID>()
     private val book = object : Holdings {
         override fun inForce(entranceId: UUID, on: LocalDate, role: TitleRole) = HeldOn(
-            (if (role == TitleRole.OWN) owners else holdersOfUse).map { (party, unit) -> Holding(party, unit, role.name, "1", "10", "10", "DECLARED") }, emptyList(),
+            (if (role == TitleRole.OWN) owners else holdersOfUse).takeIf { asked(entranceId, on) }.orEmpty()
+                .map { (party, unit) -> Holding(party, unit, role.name, "1", "10", "10", "DECLARED") },
+            emptyList(),
         )
-        override fun residents(entranceId: UUID, on: LocalDate) = living.map { (party, unit) -> Resident(party, unit) }
+        override fun residents(entranceId: UUID, on: LocalDate) = living.takeIf { asked(entranceId, on) }.orEmpty().map { (party, unit) -> Resident(party, unit) }
+
+        /** The book answers for this entrance today in Sofia, and for nothing else: the wrong entrance or day finds it empty. */
+        private fun asked(entrance: UUID, on: LocalDate) = entrance == entranceId && on == LocalDate.parse("2026-10-09")
     }
     private val service = ProxyService(aggregates, assemblies, agenda, proxies, book, Clock.fixed(now, ZoneOffset.UTC))
 
     private fun actor(party: UUID) = Actor(party, "https://id.example.test/realms/domuvai", "login-$party")
-    private fun owner(): UUID = UUID.randomUUID().also { owners[it] = UUID.randomUUID() }
+    /** An owner of a unit of their own, living in it. */
+    private fun owner(): UUID = UUID.randomUUID().also { owners[it] = UUID.randomUUID(); living[it] = owners.getValue(it) }
 
     private val agent = owner()
 
@@ -90,7 +97,7 @@ class ProxyServiceTest {
     fun `PM-GA-009 the agent is one of the rule's three kinds, and each of the four things captured is required to be a known one`() {
         for (kind in listOf("HOUSEHOLD_MEMBER", "OWNER", "THIRD_PARTY")) {
             val principal = owner()
-            val by = owner().also { living[it] = owners.getValue(principal) }        // an owner who also lives in the principal's unit: any kind fits
+            val by = owner().also { living[it] = owners.getValue(principal) }        // an owner who lives in the principal's unit: any kind fits
             assertThat(proxy(principal, by = by, kind = kind).agentKind).isEqualTo(kind)
         }
         val before = registered.size
@@ -124,10 +131,38 @@ class ProxyServiceTest {
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("household")
         }
         val atHome = UUID.randomUUID().also { living[it] = owners.getValue(principal) }
+        // the household is the principal's own: a landlord who does not live in the unit names no member of the household living there
+        val landlord = owner().also { living.remove(it) }
+        val lodger = UUID.randomUUID().also { living[it] = owners.getValue(landlord) }
+        assertThatThrownBy { proxy(landlord, by = lodger, kind = "HOUSEHOLD_MEMBER") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("household")
+        assertThat(proxy(landlord, by = lodger, kind = "THIRD_PARTY").agentKind).isEqualTo("THIRD_PARTY")       // … and appoints them as what they are
         assertThat(proxy(principal, by = atHome, kind = "HOUSEHOLD_MEMBER").agentPartyId).isEqualTo(atHome)
         // a third party is anybody
         assertThat(proxy(by = stranger, kind = "THIRD_PARTY").agentKind).isEqualTo("THIRD_PARTY")
-        assertThat(registered).hasSize(before + 3)
+        assertThat(registered).hasSize(before + 4)
+    }
+
+    @Test
+    fun `PM-GA-009 the book is asked about this entrance, today in Sofia - an owner elsewhere or on another day is not one here`() {
+        val principal = owner()
+        val elsewhere = UUID.randomUUID()
+        whenever(assemblies.lock(any(), any())).thenReturn(assembly.copy(entranceId = elsewhere))
+        assertThatThrownBy { service.register(elsewhere, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal)) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
+        val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
+        whenever(assemblies.lock(any(), any())).thenReturn(assembly)
+        assertThatThrownBy { tomorrow.register(entranceId, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal)) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
+        assertThat(registered).isEmpty()
+    }
+
+    @Test
+    fun `somebody who already has their proxy learns nothing of the book by trying again - refused before it is asked`() {
+        val principal = owner()
+        proxy(principal)
+        for (probe in listOf(owner(), UUID.randomUUID())) {
+            assertThatThrownBy { proxy(principal, by = probe, kind = "OWNER") }.isInstanceOf(IllegalStateException::class.java)   // the same answer, an owner or not
+        }
     }
 
     @Test

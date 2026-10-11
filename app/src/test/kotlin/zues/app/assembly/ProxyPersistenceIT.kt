@@ -170,9 +170,15 @@ class ProxyPersistenceIT {
     fun `PM-GA-009 PM-SEC-001 what the audit could do is refused - a principal named in the body, a principal with no title, an owner who owns nothing, a household member who lives elsewhere`() {
         val proxies = assembly(entrance())
         val entranceId = entranceOf(proxies)
+        val bothUnits = created(
+            "/api/registry/entrances/$entranceId/units",
+            """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"60.0000","separateEntrance":false},
+                         {"designation":"ап. 2","unitType":"FLAT","idealParts":"40.0000","separateEntrance":false}]}""",
+        ).get("unitIds").map { UUID.fromString(it.asText()) }
         val owner = owner(entranceId)
         val agent = owner(entranceId)
-        val unit = jdbc.queryForObject("SELECT unit_id FROM registry.title WHERE party_id = ?", UUID::class.java, owner)
+        val unit = jdbc.queryForObject("SELECT unit_id FROM registry.title WHERE party_id = ?", UUID::class.java, owner)!!
+        val otherUnit = bothUnits.single { it != unit }
         val stranger = person()
         val manager = jdbc.queryForObject("SELECT party_id FROM identity_org.management_mandate WHERE entrance_id = ?", UUID::class.java, entranceId)!!
         val naming = """{"principalPartyId":"$owner","agentPartyId":"$agent","agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"}"""
@@ -196,10 +202,26 @@ class ProxyPersistenceIT {
         appoint(proxies, owner, former).andExpect(status().isBadRequest)                                       // owned until yesterday
         val member = """"agentKind":"HOUSEHOLD_MEMBER","scope":"WHOLE_AGENDA","form":"WRITTEN""""
         appoint(proxies, owner, stranger, member).andExpect(status().isBadRequest)                             // lives nowhere the book knows
-        val resident = "INSERT INTO registry.household_member (id, entrance_id, unit_id, party_id, is_child_under_6, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, false, current_date - 100, ?)"
-        val movedOut = person().also { jdbc.update(resident, entranceId, unit, it, java.sql.Date.valueOf(java.time.LocalDate.now().minusDays(1))) }
+        val resident = "INSERT INTO registry.household_member (id, entrance_id, unit_id, party_id, is_child_under_6, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, false, current_date - 100, NULL)"
+        val atHome = person().also { jdbc.update(resident, entranceId, unit, it) }
+        appoint(proxies, owner, atHome, member).andExpect(status().isBadRequest)                               // the owner is not in the book as living there
+        jdbc.update(resident, entranceId, unit, owner)
+        val movedOut = person().also {
+            jdbc.update(resident.replace("current_date - 100, NULL", "current_date - 100, current_date - 1"), entranceId, unit, it)
+        }
         appoint(proxies, owner, movedOut, member).andExpect(status().isBadRequest)
-        val atHome = person().also { jdbc.update(resident, entranceId, unit, it, null) }
+        // a resident of another unit of the entrance is not of this household; an owner next door is not "another owner" here
+        val acrossTheLanding = person().also { jdbc.update(resident, entranceId, otherUnit, it) }
+        appoint(proxies, owner, acrossTheLanding, member).andExpect(status().isBadRequest)
+        appoint(proxies, owner, owner(entrance())).andExpect(status().isBadRequest)
+        // somebody whose title begins tomorrow is not an owner today: neither appoints nor is "another owner"
+        val buyer = person().also {
+            jdbc.update("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date + 1)", entranceId, unit, it)
+        }
+        appoint(proxies, buyer, agent).andExpect(status().isForbidden)
+        appoint(proxies, owner, buyer).andExpect(status().isBadRequest)
+        // a body naming another principal is refused, not made the caller's
+        signedIn(owner) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming.replace("$owner", "$agent"))).andExpect(status().isBadRequest) }
         appoint(proxies, owner, atHome, member).andExpect(status().isCreated)
         // a holder of a right of use appoints too, and another owner represents them
         val holderOfUse = person().also {

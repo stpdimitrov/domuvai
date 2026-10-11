@@ -993,6 +993,8 @@ export interface components {
             agentPartyId: string;
             form: string;
             items: number[];
+            /** Format: uuid */
+            principalPartyId?: string;
             scope: string;
         };
         AssemblyView: {

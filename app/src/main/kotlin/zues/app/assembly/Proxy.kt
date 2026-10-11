@@ -32,9 +32,12 @@ data class Proxy(
     val scopeItems: String?,         // the agenda ordinals, "2,3", when the scope is LISTED_ITEMS
     val form: String,                // AuthorisationForm
     val registeredAt: Instant,
-    /** The sign-in that registered it, as tied to the principal at that moment (PM-SEC-001). */
-    val loginIssuer: String? = null,
-    val loginSubject: String? = null,
+    /**
+     * The sign-in that registered it, as tied to the principal at that moment (PM-SEC-001). Null only on a row from
+     * before appointing asked who was signed in: such a proxy was never authenticated, and is not to be counted.
+     */
+    val loginIssuer: String?,
+    val loginSubject: String?,
 )
 
 /** Who may be a proxy: an adult household member, another owner, or a third party. Rule: PM-GA-009 */
@@ -94,15 +97,18 @@ class ProxyService(
         } else {
             require(items.isEmpty()) { "a proxy for the whole agenda lists no items" }
         }
-        requireWhoTheRuleNames(entranceId, request, kind)
         val registered = proxies.findByAssemblyId(assemblyId)
         check(registered.none { it.principalPartyId == request.principalPartyId }) { "this principal already has a proxy at this assembly" }
         // A represented person does not attend, so cannot represent; and nobody passes on what they were given —
         // otherwise one person stands for more than the limit through another's proxies.
         check(registered.none { it.principalPartyId == request.agentPartyId }) { "the representative is represented at this assembly, and cannot represent (PM-GA-010)" }
         check(registered.none { it.agentPartyId == request.principalPartyId }) { "the principal represents others at this assembly, and cannot be represented (PM-GA-010)" }
+        // The book is asked only after what this assembly already holds: somebody who has their one proxy learns
+        // nothing more about who owns or lives where by trying again.
+        requireWhoTheRuleNames(entranceId, request, kind)
         // TODO(legal): PM-GA-010 — the number is unconfirmed, and so is what it counts: here, the principals (owners or
-        // users alike) one party represents at one assembly, whatever kind of representative it is for each.
+        // users alike) one party represents at one assembly, whatever kind of representative it is for each. "One
+        // person" is one party of the book: a person registered twice is not recognised as one.
         val limit = constantOn("GA_PROXY_MAX_PRINCIPALS", toSofiaDate(assembly.scheduledAt))
         if (registered.count { it.agentPartyId == request.agentPartyId } >= limit.value.toInt()) {
             throw ProxyLimitReached(limit.value.toInt(), limit.source)
@@ -122,9 +128,13 @@ class ProxyService(
     /**
      * "An owner or user … MAY appoint a proxy: an adult household member, another owner, or a third party" — as the
      * book stands today in Sofia, through the registry's port: the principal holds a title in the entrance, an agent
-     * called an owner owns in it, and an agent called a household member resides in a unit the principal holds.
+     * called an owner owns in it, and an agent called a household member lives in the principal's own household — a
+     * unit the principal holds and lives in too. Anybody else is a third party, and is appointed as one.
      */
     // Rule: PM-GA-009
+    // TODO(legal): PM-GA-009 — whose household: the narrow reading is taken (the principal's own, where they live); whether
+    // a landlord may name a member of the household living in their unit is not in the catalogue. Nor is which day
+    // governs — the day of appointing, taken here, or the day of the meeting.
     private fun requireWhoTheRuleNames(entranceId: UUID, request: RegisterProxy, kind: AgentKind) {
         val today = LocalDate.parse(toSofiaDate(clock.instant()))                  // a Sofia calendar day (PM-SYS-004)
         val owned = holdings.inForce(entranceId, today, TitleRole.OWN).holdings
@@ -133,10 +143,12 @@ class ProxyService(
         when (kind) {
             AgentKind.OWNER -> require(owned.any { it.partyId == request.agentPartyId }) { "the representative is called another owner, and owns nothing in the entrance today (PM-GA-009)" }
             AgentKind.HOUSEHOLD_MEMBER -> {
-                // TODO(legal): PM-GA-009 — "adult": the book records no date of birth, so adulthood is not checked
-                val units = principals.map { it.unitId }.toSet()
-                require(holdings.residents(entranceId, today).any { it.partyId == request.agentPartyId && it.unitId in units }) {
-                    "the representative is called a member of the principal's household, and the book has them in none of the principal's units today (PM-GA-009)"
+                // TODO(legal): PM-GA-009 — "adult": the book records no date of birth, and the registry's port does not
+                // publish its one age fact (child under six), so no age is checked
+                val residents = holdings.residents(entranceId, today)
+                val home = residents.filter { it.partyId == request.principalPartyId }.map { it.unitId }.toSet().intersect(principals.map { it.unitId }.toSet())
+                require(residents.any { it.partyId == request.agentPartyId && it.unitId in home }) {
+                    "the representative is called a member of the principal's household, and the book does not have the two living in one of the principal's units today (PM-GA-009)"
                 }
             }
             AgentKind.THIRD_PARTY -> Unit                                          // anybody, under a written authorisation: its form is PM-GA-011's

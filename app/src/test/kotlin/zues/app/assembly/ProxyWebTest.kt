@@ -8,6 +8,7 @@ import com.nimbusds.jwt.SignedJWT
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
@@ -98,15 +99,19 @@ class ProxyWebTest {
     )
 
     @Test
-    fun `PM-GA-009 a proxy is appointed by the signed-in owner or holder of use for themselves - the body cannot name another principal`() {
+    fun `PM-GA-009 a proxy is appointed by the signed-in owner or holder of use for themselves - a body naming another principal is refused`() {
         val ana = person("login-ana", Role.OWN)
         val boris = person("login-boris", Role.USR)
         for ((principal, subject) in listOf(ana to "login-ana", boris to "login-boris")) {
             val command = RegisterProxy(principal, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED")
             whenever(proxies.register(entranceId, assemblyId, command, Actor(principal, ISSUER, subject))).thenReturn(stored(principal, subject))
         }
-        // Ana appoints, naming Boris as the principal: the proxy is hers
-        mvc.perform(post(base).by("login-ana").content(appointing(principal = boris)))
+        // Ana appoints, naming Boris as the principal: refused — not quietly made her own, since it is not undone
+        mvc.perform(post(base).by("login-ana").content(appointing(principal = boris))).andExpect(status().isBadRequest)
+        verifyNoInteractions(proxies)
+        // naming herself, or nobody, she appoints her own
+        mvc.perform(post(base).by("login-ana").content(appointing(principal = ana))).andExpect(status().isCreated)
+        mvc.perform(post(base).by("login-ana").content(appointing()))
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.principalPartyId").value(ana.toString()))
             .andExpect(jsonPath("$.agentPartyId").value(agent.toString()))
@@ -114,7 +119,7 @@ class ProxyWebTest {
             .andExpect(jsonPath("$.scope").value("LISTED_ITEMS"))
             .andExpect(jsonPath("$.items[1]").value(3))
             .andExpect(jsonPath("$.form").value("NOTARISED"))
-        verify(proxies).register(entranceId, assemblyId, RegisterProxy(ana, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED"), Actor(ana, ISSUER, "login-ana"))
+        verify(proxies, times(2)).register(entranceId, assemblyId, RegisterProxy(ana, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED"), Actor(ana, ISSUER, "login-ana"))
         // a holder of a right of use appoints too: the rule says "an owner or user"
         mvc.perform(post(base).by("login-boris").content(appointing())).andExpect(status().isCreated).andExpect(jsonPath("$.principalPartyId").value(boris.toString()))
     }
@@ -127,7 +132,7 @@ class ProxyWebTest {
         person("login-occupant", Role.OCC)
         person("login-stranger")
         for (subject in listOf("login-manager", "login-controller", "login-occupant", "login-stranger")) {
-            mvc.perform(post(base).by(subject).content(appointing(principal = owner))).andExpect(status().isForbidden).andExpect(jsonPath("$.error").value("not allowed (PM-GA-009) — PM-GA-009"))
+            mvc.perform(post(base).by(subject).content(appointing(principal = owner))).andExpect(status().isForbidden).andExpect(jsonPath("$.error").value("not allowed (PM-GA-009)"))
         }
         mvc.perform(post(base).by("login-tied-to-nobody").content(appointing(principal = owner))).andExpect(status().isForbidden)
         // an owner of this entrance appoints nothing in another

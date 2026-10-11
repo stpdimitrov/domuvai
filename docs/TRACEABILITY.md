@@ -81,7 +81,7 @@ A rule is *covered* only when a test is named after its ID. A `// Rule:` comment
 | `PM-GA-007` | `app/src/test/kotlin/zues/app/assembly/AssemblyPersistenceIT.kt:179` | `app/src/main/kotlin/zues/app/assembly/Assembly.kt:43` | ⚠ |
 | `PM-GA-008` | — | — |  |
 | `PM-GA-009` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:133` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:20` |  |
-| `PM-GA-010` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:214` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:77` | ⚠ |
+| `PM-GA-010` | `app/src/test/kotlin/zues/app/assembly/ProxyPersistenceIT.kt:236` | `app/src/main/kotlin/zues/app/assembly/Proxy.kt:80` | ⚠ |
 | `PM-GA-011` | — | — | ⚠ |
 | `PM-GA-012` | — | — |  |
 | `PM-GA-013` | — | — |  |

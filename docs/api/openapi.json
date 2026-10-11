@@ -159,6 +159,10 @@
             },
             "type": "array"
           },
+          "principalPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "scope": {
             "type": "string"
           }
