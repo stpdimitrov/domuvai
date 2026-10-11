@@ -61,12 +61,20 @@ class MandateStore(private val jdbc: JdbcClient) {
             .params(id, entranceId, body, partyId, validFrom, validTo, protocolRef).update()
     }
 
-    /** The entrance's mandates of these offices that have no end recorded and began before [before] — for [ranOutOnly], only those whose own dates have run out by then. */
-    fun open(entranceId: UUID, bodies: Collection<String>, before: LocalDate, ranOutOnly: Boolean): List<UUID> =
-        jdbc.sql(
-            "SELECT id FROM identity_org.management_mandate WHERE entrance_id = :entrance AND body IN (:bodies) AND succeeded_at IS NULL " +
-                "AND valid_from < :before AND (NOT :ranOutOnly OR valid_to <= :before) ORDER BY valid_from, id",
-        ).param("entrance", entranceId).param("bodies", bodies).param("before", before).param("ranOutOnly", ranOutOnly).query(UUID::class.java).list()
+    /**
+     * Every mandate of the entrance, past ones among them, oldest first: which count on a date, and which one succeeds
+     * which, are [Mandate]'s to say, in one place — no query here repeats either.
+     */
+    fun ofEntrance(entranceId: UUID): List<Mandate> =
+        jdbc.sql("SELECT id, entrance_id, body, party_id, valid_from, valid_to, succeeded_at FROM identity_org.management_mandate WHERE entrance_id = ? ORDER BY valid_from, id")
+            .param(entranceId)
+            .query { rs, _ ->
+                Mandate(
+                    rs.getObject("id", UUID::class.java), rs.getObject("entrance_id", UUID::class.java), rs.getString("body"), rs.getObject("party_id", UUID::class.java),
+                    rs.getObject("valid_from", LocalDate::class.java), rs.getObject("valid_to", LocalDate::class.java),
+                    rs.getObject("succeeded_at", LocalDate::class.java),
+                )
+            }.list()
 
     /** Whether the entrance has a mandate of these offices beginning on [from] or after. */
     fun beginsNoEarlier(entranceId: UUID, bodies: Collection<String>, from: LocalDate): Boolean =
@@ -131,8 +139,9 @@ class MandateAdministration(
 ) {
     /**
      * Records a mandate, and ends the ones it succeeds on its first day (Rule: PM-GOV-004 — the incumbent continues
-     * until a successor): a manager succeeds every open executive mandate before it; a board member succeeds an
-     * earlier manager, and earlier board members whose own dates have run out — never a fellow member still in term.
+     * until a successor). Which those are is [Mandate.succeeds]' to say: a manager succeeds every open executive
+     * mandate before it; a board member an earlier manager, and earlier board members whose own dates have run out —
+     * never a fellow member still in term.
      */
     // Rule: PM-SEC-001
     // Rule: PM-GOV-004
@@ -165,11 +174,13 @@ class MandateAdministration(
             throw explained(e, entranceId, party)
         }
         acts.record(MandateAct("RECORDED", entranceId, login, GOVERNED_BY, id, body, party, from, to, protocolRef = protocol))
-        val succeeded = when (body) {
-            "BM" -> mandates.open(entranceId, EXECUTIVE, from, ranOutOnly = false)
-            "MB" -> mandates.open(entranceId, listOf("BM"), from, ranOutOnly = false) + mandates.open(entranceId, listOf("MB"), from, ranOutOnly = true)
-            else -> emptyList()
-        }.filter { it != id && mandates.end(it, from) }
+        // Which mandates the new one ends is [Mandate.succeeds]' to say — the same question the reading side asks. Asked
+        // here the day the successor is recorded, so a manager or a board member is ended even within their own dates;
+        // the reading side asks it only of a mandate whose dates have run out and that nobody ended. A firm's mandate
+        // is not this api's to end.
+        val recorded = Mandate(id, entranceId, body, party, from, to, null)
+        val succeeded = mandates.ofEntrance(entranceId)
+            .filter { it.succeededAt == null && it.body in EXECUTIVE && recorded.succeeds(it) }.map { it.id }.filter { mandates.end(it, from) }
         succeeded.forEach { acts.record(MandateAct("ENDED", entranceId, login, "PM-GOV-004", it, onDay = from, succeededBy = id)) }
         return MandateAnswer.Done(MandateRecorded(id, succeeded))
     }

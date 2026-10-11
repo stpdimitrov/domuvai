@@ -197,6 +197,24 @@ class MandateAdministrationIT {
         assertThat(added.succeeded).isEmpty()
         assertThat(roles.holdersOn(block, today).filter { it.role == Role.MB }.map { it.partyId }).containsExactlyInAnyOrder(first, second, newcomer)
         assertThat(roles.holdersOn(block, elected.minusDays(1)).map { it.partyId }).containsExactly(expired)   // and the day before the election keeps its answer
+        // The audit's case, on the table and through both sides: a member whose own dates run out while a colleague
+        // by-elected in that term sits on keeps the office — nobody was elected to succeed them — and recording the
+        // colleague ended nothing.
+        val hall = entrance()
+        val (a, b) = listOf("Член А", "Член Б").map { party(it) }
+        fun seat(who: UUID, from: LocalDate, to: LocalDate) = (administration.record(operator, hall, RecordMandate("MB", who, from, to, "Протокол")) as MandateAnswer.Done).value
+        val termOfAEnds = today.minusMonths(1)
+        seat(a, termOfAEnds.minusYears(2), termOfAEnds)
+        assertThat(seat(b, termOfAEnds.minusMonths(10), termOfAEnds.plusMonths(14)).succeeded).isEmpty()
+        assertThat(roles.holdersOn(hall, termOfAEnds.minusDays(1)).map { it.partyId }).containsExactlyInAnyOrder(a, b)
+        assertThat(roles.holdersOn(hall, termOfAEnds).map { it.partyId }).containsExactlyInAnyOrder(a, b)       // the first day outside A's term
+        assertThat(roles.holdersOn(hall, today).map { it.partyId }).containsExactlyInAnyOrder(a, b)
+        // … until somebody is elected once A's term is over: recording them ends A on their first day, and B sits on.
+        val c = party("Член В")
+        assertThat(seat(c, today.minusDays(3), today.plusYears(1)).succeeded).containsExactly(mandateId(hall, a))
+        assertThat(roles.holdersOn(hall, today.minusDays(4)).map { it.partyId }).containsExactlyInAnyOrder(a, b)
+        assertThat(roles.holdersOn(hall, today).map { it.partyId }).containsExactlyInAnyOrder(b, c)
+
         // … and a sole manager replaces the board, sitting members too — a controller is nobody's predecessor
         val replaced = record("BM", manager, today, today.plusYears(2))
         assertThat(replaced.succeeded).containsExactlyInAnyOrder(mandateId(block, first), mandateId(block, second), added.mandateId)
