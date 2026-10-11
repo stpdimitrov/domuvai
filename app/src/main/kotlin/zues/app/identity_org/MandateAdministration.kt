@@ -11,6 +11,7 @@ import zues.app.policy.Login
 import zues.app.policy.Policy
 import zues.app.policy.Resource
 import zues.kernel.toSofiaDate
+import zues.law.numberOn
 import java.sql.SQLException
 import java.sql.Timestamp
 import java.time.Clock
@@ -47,11 +48,14 @@ class MandateOutOfOrder(message: String) : RuntimeException(message)
 /** A protocol reference is a line, as the table has it. */
 const val PROTOCOL_REF_MAX = 500
 
-/** This module's own table of mandates, written. Reading which count on a date is [MandateRoles]'. */
+/**
+ * This module's own table of mandates, written. Reading which count on a date is [MandateRoles]'. [MandateAdministration]
+ * is its only caller: what a mandate must satisfy — the law's term among it — is checked there and nowhere else.
+ */
 @Repository
 class MandateStore(private val jdbc: JdbcClient) {
 
-    /** Adds a mandate. The table's own word on it — an unregistered entrance or party, a mandate too long — comes back as the exception it raised. */
+    /** Adds a mandate. The table's own word on it — an unregistered entrance or party — comes back as the exception it raised. */
     fun add(id: UUID, entranceId: UUID, body: String, partyId: UUID, validFrom: LocalDate, validTo: LocalDate, protocolRef: String) {
         jdbc.sql("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to, protocol_ref) VALUES (?, ?, ?, ?, ?, ?, ?)")
             .params(id, entranceId, body, partyId, validFrom, validTo, protocolRef).update()
@@ -140,6 +144,9 @@ class MandateAdministration(
         val from = requireNotNull(request.validFrom) { "the mandate's first day is required" }
         val to = requireNotNull(request.validTo) { "the day the mandate runs up to is required" }
         require(to.isAfter(from)) { "a mandate runs up to a day after its first" }
+        require(!to.isAfter(from.plusYears(termYears(body, from)))) {
+            "the mandate is longer than a mandate of this office may be on its first day" + (TERM_RULE[body]?.let { " ($it)" } ?: " (the cashier's term is the law module's, not yet confirmed)")
+        }
         val protocol = protocolOf(request.protocolRef) { "the protocol that gave the mandate is required, in at most $PROTOCOL_REF_MAX characters" }
         // A successor is recorded after what it succeeds, so that recording it ends the predecessor — never the other
         // way round, where nothing would. A sole manager stands beside no other executive mandate from the same day on;
@@ -184,6 +191,26 @@ class MandateAdministration(
         return MandateAnswer.Done(MandateEnded(mandateId, day))
     }
 
+    /**
+     * How long a mandate of this office may run, in years: the law module's value in force on the mandate's first day
+     * (Rule: PM-SYS-002) — the board's and the manager's (Rule: PM-GOV-004), the controller's (Rule: PM-GOV-007).
+     * No figure lives here, nor in the table.
+     */
+    // Rule: PM-GOV-004
+    // Rule: PM-GOV-007
+    // TODO(legal): PM-GOV-004 — the cashier's term (CASHIER_TERM_YEARS) is unconfirmed: the catalogue gives the cashier none.
+    private fun termYears(office: String, firstDay: LocalDate): Long {
+        val code = requireNotNull(TERM[office]) { "no term is known for the office $office" }
+        val years = try {
+            numberOn(code, firstDay.toString())
+        } catch (e: NoSuchElementException) {
+            // A day the law module has no term for: the mandate cannot be judged, and is not recorded on some other day's.
+            throw IllegalArgumentException("the law holds no term for this office on $firstDay")
+        }
+        check(years % 1.0 == 0.0) { "$code is not a whole number of years: $years" }   // never cut short silently
+        return years.toLong()
+    }
+
     /** The administrator's login when the policy allows them, or null. Only a login can be allowed: there is nobody else to put on the record. */
     private fun allowed(by: Asking, entranceId: UUID): Login? {
         val decision = policy.decide(by, Action.RECORD_MANDATE, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(clock.instant())))
@@ -203,15 +230,13 @@ class MandateAdministration(
     /** What a refused caller sent, as it is kept: a line of ordinary characters, and short. */
     private fun kept(text: String) = text.filterNot { it.isISOControl() }.take(KEPT_MAX)
 
-    /** What the table refused, said to the administrator: which reference is missing, or that the mandate is too long. Anything else is passed on. */
+    /** What the table refused, said to the administrator: which reference is missing. Anything else is passed on. */
     private fun explained(e: DataIntegrityViolationException, entranceId: UUID, party: UUID): RuntimeException {
         val cause = e.rootCause as? SQLException ?: return e
         val text = cause.message.orEmpty()
         return when {
             cause.sqlState == FOREIGN_KEY_VIOLATION && "entrance_id" in text -> NoSuchElementException("no entrance $entranceId")
             cause.sqlState == FOREIGN_KEY_VIOLATION && "party_id" in text -> IllegalArgumentException("no party $party is registered")
-            // The length is the table's check, and the law's number lives there and in the law module only.
-            cause.sqlState == CHECK_VIOLATION && LENGTH_CHECK in text -> IllegalArgumentException("the mandate is longer than a mandate may be (PM-GOV-004)")
             else -> e
         }
     }
@@ -223,9 +248,10 @@ class MandateAdministration(
         val NOBODY = Login("", "")
         const val KEPT_MAX = 64
         const val FOREIGN_KEY_VIOLATION = "23503"
-        const val CHECK_VIOLATION = "23514"
 
-        /** The unnamed checks of the table as first written — its dates' order and its length; the order is checked here before the table sees it. */
-        const val LENGTH_CHECK = "management_mandate_check"
+        /** The law module's constant for each office's term, and the rule that gives it. */
+        val TERM = mapOf("BM" to "MANDATE_TERM_YEARS", "MB" to "MANDATE_TERM_YEARS", "CTL" to "CONTROL_TERM_YEARS", "CSH" to "CASHIER_TERM_YEARS")
+        /** The cashier has no rule: the catalogue gives the cashier no term, and a refusal does not cite one. */
+        val TERM_RULE = mapOf("BM" to "PM-GOV-004", "MB" to "PM-GOV-004", "CTL" to "PM-GOV-007")
     }
 }
