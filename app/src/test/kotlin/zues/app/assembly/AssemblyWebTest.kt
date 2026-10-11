@@ -208,6 +208,9 @@ class AssemblyWebTest {
         // sold: the convening owner is an owner no more, and runs it no more
         held[owner] = emptySet()
         mvc.perform(post("$base/${assembly.id}/agenda").by("login-owner").content(agenda)).andExpect(status().isForbidden)
+        // … not even if they have since become the manager: an owners' assembly is run as an owner
+        held[owner] = setOf(Role.BM)
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-owner").content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-003"))
         verify(assemblies).addAgendaItem(entranceId, assembly.id, "Ремонт на покрива", "GENERAL")      // the one time
     }
 
