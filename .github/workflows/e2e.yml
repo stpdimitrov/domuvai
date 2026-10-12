@@ -146,6 +146,11 @@ jobs:
           test "$(code "$administrator" book/declarations/overdue)" = 403
           test "$(code "$administrator" "owners?on=2026-09-01")" = 403
           test "$(code "$administrator" book/retention POST)" = 403
+          # … and money's personal reads ask the policy too (PM-SEC-002): the controller reads the entrance's arrears,
+          # the administrator — an office of no entrance — does not.
+          arrears() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $1" "http://localhost:8080/api/money/entrances/$entrance/arrears?asOf=2026-09-01"; }
+          test "$(arrears "$check")" = 200
+          test "$(arrears "$administrator")" = 403
 
       - name: Start the web against the API — signing people in, with nothing set, with a bad address, told to run without sign-in (PM-DEBT-011, #79)
         working-directory: web

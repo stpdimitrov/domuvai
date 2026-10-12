@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            9 to listOf(
+            10 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -66,6 +66,13 @@ class PolicyTest {
                 "KEEP_REGISTER MB PM-GA-012",
                 "KEEP_REGISTER CTL PM-GA-012",
                 "KEEP_REGISTER OWN PM-GA-012",
+                "READ_UNIT_CHARGES OWN PM-SEC-002 own unit",
+                "READ_UNIT_CHARGES BM PM-DEBT-007",
+                "READ_UNIT_CHARGES MB PM-DEBT-007",
+                "READ_UNIT_CHARGES CTL PM-GOV-008",
+                "READ_ENTRANCE_ARREARS BM PM-DEBT-003",
+                "READ_ENTRANCE_ARREARS MB PM-DEBT-003",
+                "READ_ENTRANCE_ARREARS CTL PM-GOV-008",
             ),
         )
         assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance"))

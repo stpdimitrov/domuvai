@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **73** (31%) |
-| Remaining | **160** |
+| Proved by a test named after the rule | **76** (33%) |
+| Remaining | **157** |
 | Proposed slices at ~10 rules each | **19** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-64 rule(s) remaining across 7 slice(s).
+63 rule(s) remaining across 7 slice(s).
 
 ### S-G2-01 · `assembly` · GA · 10 rule(s)
 
@@ -138,12 +138,11 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-009` | SHOULD | Declining a nomination requires a reason code. |
 | `PM-GOV-017` | SHOULD | Violation records cite the rule version in force on the incident date. |
 
-### S-G2-07 · `policy` · SEC · 9 rule(s) · ⚠ 1 unconfirmed
+### S-G2-07 · `policy` · SEC · 8 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-SEC-009` | MUST NOT ⚠ | Camera asset requires a decision reference. |
-| `PM-SEC-002` | MUST | Enforced at the query layer, not the UI. |
 | `PM-SEC-003` | MUST | Disclosure record with legal basis and requesting officer. |
 | `PM-SEC-005` | MUST | Purpose is attached to each data category. |
 | `PM-SEC-006` | MUST | Onboarding checklist includes the data agreement. |
@@ -154,17 +153,15 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 3 — collection beats their portfolio average
 
-9 rule(s) remaining across 1 slice(s).
+7 rule(s) remaining across 1 slice(s).
 
-### S-G3-01 · `money` · DEBT · 9 rule(s) · ⚠ 1 unconfirmed
+### S-G3-01 · `money` · DEBT · 7 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-DEBT-012` | MUST ⚠ | Transfer screen shows pre-transfer and post-transfer balances separately. |
-| `PM-DEBT-003` | MUST | One-click generation of the чл. 410 application packet with the decision, tally and arrears statement attached. |
 | `PM-DEBT-004` | MUST | Packet validation refuses to export if the announcement act is missing. |
 | `PM-DEBT-005` | MUST | The expulsion workflow enforces: GA decision at 75% → written warning → court filing. |
-| `PM-DEBT-007` | MUST | Certificate generation is logged; the figure is frozen at issue. |
 | `PM-DEBT-009` | MUST | The court packet shows a complete escalation history. |
 | `PM-DEBT-011` | MUST NOT | Notices posted at the entrance show unit identifiers only if the internal rules permit; personal data is never posted. |
 | `PM-DEBT-006` | SHOULD | Interest recalculates on partial payments. |

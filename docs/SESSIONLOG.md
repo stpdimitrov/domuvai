@@ -2586,3 +2586,49 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 **Read first next time** — `web/lib/refusal.ts`, `web/README.md` (the paragraph on answers not given), #178.
 
 ---
+
+---
+
+## AUTH-05a · 2026-10-12 · money — a unit's charges, an entrance's arrears and its journal are read only by those the policy allows (PM-SEC-002, PM-GOV-008, PM-DEBT-007, PM-DEBT-003)
+
+**Did**
+- Claim #208, part of #164.
+- Money's personal reads now ask the policy (ADR-002) who is asking, from the sign-in, as at today in Sofia.
+- **A unit's statement, its arrears, a payment's allocation** (new action `READ_UNIT_CHARGES`): the owner, for their own unit only (PM-SEC-002); the manager and the board (PM-DEBT-007); the controller (PM-GOV-008).
+- **An entrance's arrears and its journal** (`READ_ENTRANCE_ARREARS`): the manager and the board (PM-DEBT-003) and the controller; no owner. The journal was added after the review: it carries every unit's charges, so leaving it open would have undone the arrears guard.
+- **A unit's entrance** comes from money's own postings, never the caller. A unit with nothing posted is refused.
+- **A payment that isn't there** is decided on the entrance alone, so an owner learns nothing.
+- **A refusal is a 403** naming the rule (`MoneyRefusals`). With `DOMUVAI_AUTH=off` and nobody asking, reads are served, as everything else is in that mode.
+- Matrix version 9 → 10. The catalogue cites PM-SEC-002 on the five reads. e2e checks the controller is given the entrance's arrears and the administrator refused.
+
+**Rules covered** — PM-SEC-002, PM-GOV-008, PM-DEBT-007, PM-DEBT-003 (the read side each needs).
+
+**Tests added**
+- `MoneyAccessTest` (8, the real policy over stated roles):
+  - an owner gets their own unit, not another, not the entrance;
+  - the manager and board get all;
+  - the controller gets all;
+  - the cashier, a holder of use, an occupant, firm staff, an office elsewhere and a login tied to nobody get nothing;
+  - a unit with nothing posted is refused;
+  - a payment is decided on its unit, a missing one on the entrance;
+  - sign-in off is served.
+- `MoneyAccessIT` (2, Postgres, signed requests through real titles and mandates).
+- `PaymentWebTest` +1 (403 names the rule).
+- `PolicyTest`: the matrix pin.
+- **Mutations, each caught:** owner on any unit; a missing payment let through; the statement unguarded; the journal unguarded.
+
+**Decisions** — the owner's go on D1–D6 (2026-10-12). No rule grants CSH, USR, OCC or PMC staff a money read; they're refused pending counsel. Under ЗУЕС a holder of use bears the contributions, so USR is the first question.
+
+**Found** — the fresh review (subagent, diff + rule texts only) found no bypass in the guarded reads. Still open, filed as **#209**:
+- the headcount check (household data per unit);
+- the fund's holder names;
+- reads leaking through the unguarded `POST …/payments`;
+- a unit's entrance taken from its first posting (safe while every writer stamps one entrance).
+
+**Open**
+- **Money's writes** (charge runs, payments, the fund): the next AUTH slice.
+- #209.
+- An access log for money reads (PM-SEC-004).
+- A new owner reads the unit's whole statement, the previous owner's charges included ("their unit's charges"); a past owner reads nothing. Both per the decisions; worth confirming with counsel.
+
+**Read first next time** — #164, #209, this entry, `app/src/main/kotlin/zues/app/money/MoneyAccess.kt`.

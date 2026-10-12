@@ -30,6 +30,7 @@ data class PostingRow(
 interface PostingRepository : ListCrudRepository<PostingRow, UUID> {
     fun findByJournalId(journalId: UUID): List<PostingRow>
     fun findByUnitIdAndAccount(unitId: UUID, account: String): List<PostingRow>
+    fun findFirstByUnitId(unitId: UUID): PostingRow?
     fun findByEntranceIdAndAccount(entranceId: UUID, account: String): List<PostingRow>
 
     /** The entrance's postings dated from [from] to [to], both included. */

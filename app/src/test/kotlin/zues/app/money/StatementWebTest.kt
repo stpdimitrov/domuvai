@@ -18,6 +18,8 @@ class StatementWebTest {
     @Autowired lateinit var mvc: MockMvc
 
     @MockitoBean lateinit var statements: StatementService
+    @MockitoBean lateinit var access: MoneyAccess
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val unitId = UUID.randomUUID()
 
