@@ -18,7 +18,7 @@ Verify against the source tree, never against a document that claims coverage. D
 1. `docs/RULES.md` (and `rules.json`) for **the audited domain only** — the rule texts, quoted, are the yardstick
 2. `docs/adr/` for the decisions the code must honour
 3. The module's source and tests
-4. `docs/TRACEABILITY.md` — but as a claim to check, not a fact to trust
+4. `docs/TRACEABILITY.md` — generated, not committed: run `python3 tools/traceability.py` first — and read it as a claim to check, not a fact to trust
 
 ## 3. Verdict per rule — with file:line evidence
 

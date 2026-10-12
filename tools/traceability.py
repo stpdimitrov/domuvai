@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """A7 — rule traceability. Generates docs/TRACEABILITY.md from rules.json and the
 source tree. Fails when code cites a rule ID the catalogue does not contain, or
-when coverage falls below the floor recorded in the report it replaces."""
+when coverage falls below `--min-coverage`. The report is written locally and is
+not committed (.gitignore): every slice changes it, so two open PRs conflicted in it."""
 import json, re, sys, pathlib, argparse
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
