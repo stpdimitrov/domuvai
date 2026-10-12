@@ -41,7 +41,8 @@ Different modules barely touch, but a few shared files change on almost every sl
 
 | File(s) | On a conflict |
 |---|---|
-| Generated docs — `TRACEABILITY.md`, `TESTPLAN.md`, `FUNCTIONAL.md`, `api/openapi.json`, `docs/events/*` | They are derived — never hand-merge. Take `origin/main`'s copy, re-run the generators (the gate pack does), commit the regenerated result. |
+| Generated docs — `TESTPLAN.md`, `FUNCTIONAL.md`, `api/openapi.json`, `docs/events/*` | They are derived — never hand-merge. Take `origin/main`'s copy, re-run the generators (the gate pack does), commit the regenerated result. |
+| `docs/TRACEABILITY.md` | Not committed, so it cannot conflict: generated locally by `python3 tools/traceability.py` and by the gate pack. Every slice that adds a test changes its counts, which made any two open PRs conflict. |
 | Schema | Do not edit an applied migration. Each schema change is a **new** file `V<yyyyMMddHHmm>__desc.sql`, stamped with the real UTC minute (`date -u +%Y%m%d%H%M`); `V1__init.sql` is the baseline. The schema gate reads every `V*.sql` (`CREATE TABLE` and `ALTER TABLE … ADD COLUMN`) and fails on a duplicate version — S-41b and S-42 both wrote `…1200` on the same day, which no text merge flags and Flyway refuses. |
 | The session log | One file per entry in `docs/sessionlog/`, named by the UTC minute and the slice — two entries are two files and cannot conflict. `docs/SESSIONLOG.md` is the archive before 2026-10-10 (still `merge=union`, for a branch cut before the change) and takes no new entry. |
 | `law/…/Constants.kt`, `law/…/Keys.kt`, `rules.json` | Structured and rarely changed — coordinate the change; do **not** union-merge (it would break the syntax). |
