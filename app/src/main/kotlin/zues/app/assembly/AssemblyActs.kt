@@ -38,6 +38,7 @@ class AssemblyActs(
     private val convening: AssemblyService,
     private val notices: NoticeService,
     private val proxies: ProxyService,
+    private val attendance: AttendanceService,
 ) {
     // Rule: PM-GA-002
     // Rule: PM-SEC-001
@@ -57,6 +58,7 @@ class AssemblyActs(
     @Transactional
     fun addAgendaItem(who: Asking, entranceId: UUID, assemblyId: UUID, text: String, itemType: String): AgendaItemBound {
         running(who, entranceId, assemblyId)
+        notOnceTheRegisterIsOpen(assemblyId)
         return convening.addAgendaItem(entranceId, assemblyId, text, itemType)
     }
 
@@ -65,6 +67,7 @@ class AssemblyActs(
     @Transactional
     fun reschedule(who: Asking, entranceId: UUID, assemblyId: UUID, scheduledAt: Instant, place: String): Assembly {
         running(who, entranceId, assemblyId)
+        notOnceTheRegisterIsOpen(assemblyId)
         return convening.reschedule(entranceId, assemblyId, scheduledAt, place)
     }
 
@@ -94,6 +97,7 @@ class AssemblyActs(
         val named = request.principalPartyId
         if (named == null || named == who.party) {
             val principal = acting.actor(who, Action.APPOINT_PROXY, entranceId)
+            notAlreadyPresent(assemblyId, principal.party)
             require(request.authorisationHash == null) { "a proxy appointed in person carries no document: the sign-in is the appointment" }
             return proxies.register(entranceId, assemblyId, command(principal.party, request), principal, authorisationHash = null)
         }
@@ -109,8 +113,44 @@ class AssemblyActs(
         // Nobody records an authorisation that names themself: the one who wants them as proxy signs in and appoints them.
         // TODO(legal): PM-GA-009 — the strictest reading, pending the owner's answer.
         require(request.agentPartyId != recorder.party) { "whoever records a written proxy is not the proxy it names (PM-GA-009)" }
+        notAlreadyPresent(assemblyId, named)
         return proxies.register(entranceId, assemblyId, command(named, request), recorder, document)
     }
+
+    /** The register is kept by whoever runs the assembly: who is present, and that a remote participant was identified. */
+    // Rule: PM-GA-012
+    // Rule: PM-SEC-001
+    @Transactional
+    fun recordAttendance(who: Asking, entranceId: UUID, assemblyId: UUID, attendeePartyId: UUID, channel: String): Present =
+        attendance.record(entranceId, assemblyId, keepingTheRegister(who, entranceId, assemblyId), attendeePartyId, channel)
+
+    // Rule: PM-GA-016
+    // Rule: PM-SEC-001
+    @Transactional
+    fun verifyIdentity(who: Asking, entranceId: UUID, assemblyId: UUID, attendanceId: UUID, how: String): Present =
+        attendance.verifyIdentity(entranceId, assemblyId, attendanceId, keepingTheRegister(who, entranceId, assemblyId), how)
+
+    /** The policy's own line first, then: is this assembly theirs to run — refused under the register's rule either way. */
+    private fun keepingTheRegister(who: Asking, entranceId: UUID, assemblyId: UUID): Actor {
+        acting.actor(who, Action.KEEP_REGISTER, entranceId)
+        return try {
+            running(who, entranceId, assemblyId)
+        } catch (e: ActRefused) {
+            throw ActRefused(Action.KEEP_REGISTER.governedBy)
+        }
+    }
+
+    /**
+     * Once somebody is on the register the sitting has begun: its date, place and agenda are what the notice stated,
+     * and the people entered are present at that meeting and no other.
+     */
+    private fun notOnceTheRegisterIsOpen(assemblyId: UUID) =
+        check(!attendance.begun(assemblyId)) { "people are already on the register of this assembly: its date, place and agenda no longer change" }
+
+    /** Nobody is present twice: a person on the register does not then hand their presence to another (Rule: PM-ORG-005). */
+    // Rule: PM-ORG-005
+    private fun notAlreadyPresent(assemblyId: UUID, principal: UUID) =
+        check(!attendance.isPresent(assemblyId, principal)) { "this person is on the register of the assembly: they are present, and give no proxy (PM-ORG-005)" }
 
     private fun command(principal: UUID, request: AppointProxyRequest) =
         RegisterProxy(principal, request.agentPartyId, request.agentKind, request.scope, request.items, request.form)

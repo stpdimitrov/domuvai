@@ -88,6 +88,7 @@ class AssemblyWebTest {
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var proxies: ProxyService
+    @MockitoBean lateinit var attendance: AttendanceService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
 
@@ -273,6 +274,15 @@ class AssemblyWebTest {
         held[owner] = setOf(Role.BM)
         mvc.perform(post("$base/${assembly.id}/agenda").by("login-owner").content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-003"))
         verify(assemblies).addAgendaItem(entranceId, assembly.id, "Ремонт на покрива", "GENERAL")      // the one time
+    }
+
+    @Test
+    fun `PM-GA-006 once somebody is on the register the date, the place and the agenda no longer change - a 409 for the convenor too`() {
+        val assembly = stored(draft(manager, "BM"))
+        whenever(attendance.begun(assembly.id)).thenReturn(true)
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-manager").content("""{"text":"Още една точка","itemType":"GENERAL"}""")).andExpect(status().isConflict)
+        mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content("""{"scheduledAt":"$at","place":"двора"}""")).andExpect(status().isConflict)
+        verifyNoInteractions(assemblies)
     }
 
     @Test

@@ -45,6 +45,9 @@ enum class Action(val governedBy: String) {
 
     /** recording, for a principal who does not sign in, the written authorisation they handed over — by whoever runs that assembly */
     RECORD_PROXY("PM-GA-009"),
+
+    /** keeping the register of who is present at an assembly, and that a remote participant was identified — by whoever runs it */
+    KEEP_REGISTER("PM-GA-012"),
 }
 
 /**
@@ -123,7 +126,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 8
+        const val MATRIX_VERSION = 9
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -135,7 +138,8 @@ class Policy(private val sources: List<RoleSource>) {
          * the manager, the control board or controller — and no cashier, firm or owner as such (PM-GA-002). A proxy:
          * an owner or a holder of use appoints their own; a written authorisation handed over is recorded by whoever
          * runs the assembly it is for — an office, or the owner who convened on a petition — which of them it is being the
-         * assembly's to say (PM-GA-009).
+         * assembly's to say (PM-GA-009). The register of who is present is kept the same way, by whoever runs the
+         * assembly (PM-GA-012).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -170,6 +174,10 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.RECORD_PROXY, Role.MB, "PM-GA-009"),
             Permit(Action.RECORD_PROXY, Role.CTL, "PM-GA-009"),
             Permit(Action.RECORD_PROXY, Role.OWN, "PM-GA-009"),
+            Permit(Action.KEEP_REGISTER, Role.BM, "PM-GA-012"),
+            Permit(Action.KEEP_REGISTER, Role.MB, "PM-GA-012"),
+            Permit(Action.KEEP_REGISTER, Role.CTL, "PM-GA-012"),
+            Permit(Action.KEEP_REGISTER, Role.OWN, "PM-GA-012"),
         )
     }
 }

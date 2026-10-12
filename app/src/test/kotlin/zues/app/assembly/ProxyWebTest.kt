@@ -73,6 +73,7 @@ class ProxyWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var proxies: ProxyService
+    @MockitoBean lateinit var attendance: AttendanceService
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
@@ -193,6 +194,17 @@ class ProxyWebTest {
         }
         mvc.perform(post(base).by("login-convening-owner").content(appointing(principal = principal, hash = document)))
             .andExpect(status().isCreated).andExpect(jsonPath("$.recordedBy").value(convenor.toString()))
+    }
+
+    @Test
+    fun `PM-ORG-005 a person on the register is present, and gives no proxy - in person or recorded for them`() {
+        val owner = person("login-present-owner", Role.OWN)
+        val manager = person("login-manager-7", Role.BM)
+        convenedBy(manager)
+        whenever(attendance.isPresent(assemblyId, owner)).thenReturn(true)
+        mvc.perform(post(base).by("login-present-owner").content(appointing())).andExpect(status().isConflict)
+        mvc.perform(post(base).by("login-manager-7").content(appointing(principal = owner, hash = document))).andExpect(status().isConflict)
+        verifyNoInteractions(proxies)
     }
 
     @Test

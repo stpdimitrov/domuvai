@@ -89,6 +89,13 @@ RUNNING = {
     ['PM-GA-003', 'PM-ORG-005', 'PM-ORG-011']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly'):
    ('The owners convene on their petition — once, by the signed-in signatory, when it is unlocked and the demand was not met', ['PM-GA-003', 'PM-SEC-001']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
+   ('Enter a person in the register of the sitting — an owner, or a registered proxy\'s representative; in person or by video; kept by whoever runs the assembly',
+    ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification'):
+   ('Record that a remote participant was reliably identified, and how — from then on their presence counts', ['PM-GA-016', 'PM-SEC-001']),
+ ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
+   ('Read the register of the sitting — each line, whether it counts, and whom it makes present', ['PM-GA-012', 'PM-GA-016']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity
