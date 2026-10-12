@@ -1069,6 +1069,8 @@ export interface components {
             id: string;
             identityVerified: boolean;
             /** Format: date-time */
+            identityVerifiedAt?: string;
+            /** Format: date-time */
             recordedAt: string;
             /** Format: uuid */
             recordedBy: string;

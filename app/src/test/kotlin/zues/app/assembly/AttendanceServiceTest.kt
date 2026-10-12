@@ -24,7 +24,7 @@ class AttendanceServiceTest {
 
     private val meets = Instant.parse("2026-11-20T16:00:00Z")
     private val entranceId = UUID.randomUUID()
-    private var assembly: Assembly? = Assembly(UUID.randomUUID(), entranceId, UUID.randomUUID(), "BM", meets, "фоайето", "IN_PERSON", "NOTICED", false, null)
+    private var assembly: Assembly? = Assembly(UUID.randomUUID(), entranceId, UUID.randomUUID(), "BM", meets, "фоайето", "HYBRID", "NOTICED", false, null)
     private val keeper = Actor(UUID.randomUUID(), "https://id.example.test/realms/domuvai", "login-keeper")
 
     private val rows = mutableListOf<Attendance>()
@@ -72,8 +72,8 @@ class AttendanceServiceTest {
 
     private fun owner(from: String = "2026-01-01"): UUID = UUID.randomUUID().also { owners[it] = LocalDate.parse(from) }
 
-    private fun proxy(principal: UUID, agent: UUID, signedIn: Boolean = true) = Proxy(
-        UUID.randomUUID(), entranceId, assembly!!.id, principal, agent, "THIRD_PARTY", "WHOLE_AGENDA", null, "WRITTEN", meets,
+    private fun proxy(principal: UUID, agent: UUID, signedIn: Boolean = true, scope: String = "WHOLE_AGENDA", at: Instant = meets.minusSeconds(3600)) = Proxy(
+        UUID.randomUUID(), entranceId, assembly!!.id, principal, agent, "THIRD_PARTY", scope, if (scope == "WHOLE_AGENDA") null else "1", "WRITTEN", at,
         if (signedIn) keeper.loginIssuer else null, if (signedIn) "login-$principal" else null, principal, null,
     ).also { proxyRows += it }
 
@@ -108,6 +108,7 @@ class AttendanceServiceTest {
         assertThatThrownBy { record(unsigned) }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { record(ana, channel = "BY_PHONE") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { record(ana, at = Instant.parse("2026-11-19T20:00:00Z")) }.isInstanceOf(IllegalStateException::class.java)   // the evening before
+        assertThatThrownBy { record(ana, at = Instant.parse("2026-11-20T22:30:00Z")) }.isInstanceOf(IllegalStateException::class.java)   // 00:30 on the 21st in Sofia: the day after
         assertThat(rows).isEmpty()
 
         record(ana, at = Instant.parse("2026-11-19T22:30:00Z"))                      // 00:30 on the 20th in Sofia: the day has begun
@@ -151,14 +152,73 @@ class AttendanceServiceTest {
         val remote = record(owner(), channel = "VIDEO")
         assertThatThrownBy { service().verifyIdentity(UUID.randomUUID(), assembly!!.id, remote.attendance.id, keeper, "камера") }.isInstanceOf(NoSuchElementException::class.java)
         assertThatThrownBy { service().verifyIdentity(entranceId, assembly!!.id, UUID.randomUUID(), keeper, "камера") }.isInstanceOf(NoSuchElementException::class.java)
+        // a real line, asked for through another assembly of the same entrance
+        val here = assembly!!
+        assembly = here.copy(id = UUID.randomUUID())
+        assertThatThrownBy { service().verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера") }.isInstanceOf(NoSuchElementException::class.java)
+        assembly = here
         assertThat(verified).isEmpty()
     }
 
     @Test
-    fun `PM-GA-012 an owner who has sold since is on the register and no longer brings themself`() {
+    fun `PM-ORG-011 whom a line brings is as of the day of the sitting, whenever the register is read - a sale the day after changes nothing`() {
         val seller = owner()
+        val buyerLater = owner(from = "2026-11-21")                                  // an owner only from the day after
+        proxy(principal = buyerLater, agent = seller)
         record(seller)
-        owners.remove(seller)                                                        // the book no longer has them owning today
+        owners[seller] = LocalDate.parse("2030-01-01")                              // as if the book now had them owning only from 2030: not on the day
         assertThat(register().single().represented).isEmpty()
+        owners[seller] = LocalDate.parse("2026-01-01")
+        val readNextYear = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, book, Clock.fixed(Instant.parse("2027-06-01T09:00:00Z"), ZoneOffset.UTC))
+        assertThat(readNextYear.register(entranceId, assembly!!.id).single().represented).containsExactly(seller)   // read a year on: the same answer
+        assertThat(buyerLater).isNotIn(register().flatMap { it.represented })
+    }
+
+    @Test
+    fun `PM-ORG-005 nobody is present twice - an owner who gave a proxy is not entered beside their representative`() {
+        val (ana, boris) = listOf(owner(), owner())
+        proxy(principal = boris, agent = ana)
+        record(ana)
+        assertThatThrownBy { record(boris) }.isInstanceOf(IllegalStateException::class.java).hasMessageContaining("PM-ORG-005")
+        assertThat(register().flatMap { it.represented }).containsExactlyInAnyOrder(ana, boris)      // Boris once, through Ana
+        assertThat(service().isPresent(assembly!!.id, ana)).isTrue()
+        assertThat(service().isPresent(assembly!!.id, boris)).isFalse()
+        assertThat(service().begun(assembly!!.id)).isTrue()
+    }
+
+    @Test
+    fun `PM-GA-012 a line brings owners only, by proxies for the whole agenda registered before it was entered`() {
+        val ana = owner()
+        val holderOfUse = UUID.randomUUID()                                          // holds a right of use, owns nothing
+        val soldSince = owner().also { owners.remove(it) }                           // appointed, then sold before the day
+        val listedOnly = owner()
+        val lateComer = owner()
+        proxy(principal = holderOfUse, agent = ana)
+        proxy(principal = soldSince, agent = ana)
+        proxy(principal = listedOnly, agent = ana, scope = "LISTED_ITEMS")
+        proxy(principal = lateComer, agent = ana, at = meets.plusSeconds(600))       // handed over ten minutes after Ana was entered
+        assertThat(record(ana).represented).containsExactly(ana)
+        assertThat(register().single().represented).containsExactly(ana)
+        // an agent whose only principal is not an owner is nobody's presence
+        val lawyer = UUID.randomUUID().also { proxy(principal = holderOfUse, agent = it) }
+        assertThatThrownBy { record(lawyer) }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `PM-GA-016 a person is present in the way the assembly meets, and nobody verifies their own identity`() {
+        val ana = owner()
+        assembly = assembly!!.copy(mode = "IN_PERSON")
+        assertThatThrownBy { record(ana, channel = "VIDEO") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-016")
+        assembly = assembly!!.copy(mode = "VIDEO")
+        assertThatThrownBy { record(ana, channel = "IN_PERSON") }.isInstanceOf(IllegalArgumentException::class.java)
+        val remote = record(ana, channel = "VIDEO")
+        val herself = Actor(ana, keeper.loginIssuer, "login-ana")
+        assertThatThrownBy { service().verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, herself, "аз съм") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-016")
+        // nor on another day
+        val dayAfter = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, book, Clock.fixed(meets.plusSeconds(86_400), ZoneOffset.UTC))
+        assertThatThrownBy { dayAfter.verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера") }.isInstanceOf(IllegalStateException::class.java)
+        assertThat(verified).isEmpty()
+        assertThat(service().verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера").identityVerifiedAt).isEqualTo(meets)
     }
 }

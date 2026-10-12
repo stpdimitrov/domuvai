@@ -126,7 +126,7 @@ class AttendancePersistenceIT {
         val proxies = assembly(entranceId)
         val base = proxies.removeSuffix("/proxies")
         created("$base/notice-posting", """{"postedAt":"${Instant.now()}","coSignatoryPartyId":"$coSignatory","photoHash":"${"3f".repeat(32)}"}""")
-        jdbc.update("UPDATE assembly.assembly SET scheduled_at = now() WHERE id = ?::uuid", base.substringAfterLast("/"))
+        jdbc.update("UPDATE assembly.assembly SET scheduled_at = now(), mode = 'HYBRID' WHERE id = ?::uuid", base.substringAfterLast("/"))
         return base
     }
 
@@ -149,6 +149,14 @@ class AttendancePersistenceIT {
         present(base, stranger).andExpect(status().isBadRequest)                     // neither an owner nor anybody's proxy
         present(base, ana).andExpect(status().isCreated)
         present(base, ana).andExpect(status().isConflict)                            // once
+        present(base, boris).andExpect(status().isConflict)                          // Boris is represented by Ana: not entered beside her (PM-ORG-005)
+        // once somebody is on the register the agenda and the date stay as noticed, and a present person gives no proxy
+        mvc.perform(post("$base/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Още една точка","itemType":"GENERAL"}""")).andExpect(status().isConflict)
+        signedIn(ana) {
+            mvc.perform(post("$base/proxies").contentType(MediaType.APPLICATION_JSON).content("""{"agentPartyId":"$vera","agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"}"""))
+                .andExpect(status().isConflict)
+        }
+        assertThat(jdbc.queryForObject("SELECT status FROM assembly.assembly WHERE entrance_id = ?", String::class.java, entranceId)).isEqualTo("NOTICED")
         val remote = json.readTree(present(base, vera, "VIDEO").andExpect(status().isCreated).andReturn().response.contentAsString)
         assertThat(remote.get("counted").asBoolean()).isFalse()
 
@@ -164,7 +172,7 @@ class AttendancePersistenceIT {
         val verify = "$base/attendance/${remote.get("id").asText()}/identity-verification"
         for (who in listOf(ana, controller, null)) {
             signedIn(who) {
-                present(base, boris).andExpect(status().isForbidden)
+                present(base, vera).andExpect(status().isForbidden)
                 mvc.perform(post(verify).contentType(MediaType.APPLICATION_JSON).content("""{"how":"камера"}""")).andExpect(status().isForbidden)
             }
         }
@@ -181,6 +189,8 @@ class AttendancePersistenceIT {
         assertThat(jdbc.queryForList("SELECT channel || ' ' || login_subject FROM assembly.attendance WHERE entrance_id = ? ORDER BY recorded_at", String::class.java, entranceId))
             .containsExactly("IN_PERSON login-$manager", "VIDEO login-$manager")
         assertThat(jdbc.queryForObject("SELECT how FROM assembly.identity_verification WHERE entrance_id = ?", String::class.java, entranceId)).isEqualTo("лична карта пред камерата")
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.attendance CASCADE") }.hasMessageContaining("is not emptied")
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.identity_verification") }.hasMessageContaining("is not emptied")
         // a verification belongs to a line of its own assembly
         assertThatThrownBy {
             jdbc.update(

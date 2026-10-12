@@ -197,6 +197,17 @@ class ProxyWebTest {
     }
 
     @Test
+    fun `PM-ORG-005 a person on the register is present, and gives no proxy - in person or recorded for them`() {
+        val owner = person("login-present-owner", Role.OWN)
+        val manager = person("login-manager-7", Role.BM)
+        convenedBy(manager)
+        whenever(attendance.isPresent(assemblyId, owner)).thenReturn(true)
+        mvc.perform(post(base).by("login-present-owner").content(appointing())).andExpect(status().isConflict)
+        mvc.perform(post(base).by("login-manager-7").content(appointing(principal = owner, hash = document))).andExpect(status().isConflict)
+        verifyNoInteractions(proxies)
+    }
+
+    @Test
     fun `PM-SEC-001 nobody without a title appoints - the manager for themselves, an occupant, a stranger and a login tied to no party are a 403`() {
         person("login-manager", Role.BM)
         person("login-occupant", Role.OCC)

@@ -25,6 +25,7 @@ data class AttendanceView(
     val attendeePartyId: UUID,
     val channel: String,
     val identityVerified: Boolean,
+    val identityVerifiedAt: Instant?,
     val counted: Boolean,
     val represents: List<UUID>,
     val recordedBy: UUID,
@@ -61,7 +62,7 @@ class AttendanceController(private val acts: AssemblyActs, private val attendanc
         attendance.register(entranceId, assemblyId).map(::view)
 
     private fun view(p: Present) = p.attendance.let {
-        AttendanceView(it.id, it.sessionNo, it.attendeePartyId, it.channel, p.identityVerified, p.counted, p.represented.sortedBy { id -> id.toString() }, it.recordedBy, it.recordedAt)
+        AttendanceView(it.id, it.sessionNo, it.attendeePartyId, it.channel, p.identityVerified, p.identityVerifiedAt, p.counted, p.represented.sortedBy { id -> id.toString() }, it.recordedBy, it.recordedAt)
     }
 
     @ExceptionHandler(ActRefused::class)

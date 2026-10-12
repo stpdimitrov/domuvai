@@ -285,6 +285,10 @@
           "identityVerified": {
             "type": "boolean"
           },
+          "identityVerifiedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "recordedAt": {
             "format": "date-time",
             "type": "string"

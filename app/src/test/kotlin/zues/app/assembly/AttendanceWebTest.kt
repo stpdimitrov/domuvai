@@ -105,7 +105,7 @@ class AttendanceWebTest {
     )
 
     private fun line(attendee: UUID, keeper: UUID, channel: String, verified: Boolean, brings: Set<UUID>) =
-        Present(Attendance(UUID.randomUUID(), entranceId, assemblyId, 1, attendee, channel, keeper, ISSUER, "login-keeper", at), verified, brings)
+        Present(Attendance(UUID.randomUUID(), entranceId, assemblyId, 1, attendee, channel, keeper, ISSUER, "login-keeper", at), at.takeIf { verified }, brings)
 
     @Test
     fun `PM-GA-012 the register is kept by whoever runs the assembly, signed in - and by no other office, owner or stranger`() {
@@ -153,7 +153,7 @@ class AttendanceWebTest {
         val id = unverified.attendance.id
         val how = """{"how":"лична карта пред камерата"}"""
         mvc.perform(post("$base/$id/identity-verification").by("login-owner-2").content(how)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-012"))
-        whenever(attendance.verifyIdentity(entranceId, assemblyId, id, keeper, "лична карта пред камерата")).thenReturn(unverified.copy(identityVerified = true))
+        whenever(attendance.verifyIdentity(entranceId, assemblyId, id, keeper, "лична карта пред камерата")).thenReturn(unverified.copy(identityVerifiedAt = at))
         mvc.perform(post("$base/$id/identity-verification").by("login-keeper-2").content(how))
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.counted").value(true))
