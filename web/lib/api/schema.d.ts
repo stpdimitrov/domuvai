@@ -47,7 +47,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Put an item on the agenda, bound to the majority the law has in force for its type — by whoever runs the assembly; after posting it voids the notice */
+        /** Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda"];
         delete?: never;
         options?: never;
@@ -64,7 +64,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record the posting act with its photograph — by the convenor signed in, co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting */
+        /** Record the posting act with its photograph — signed by whoever runs the assembly (the convenor, or their successor in the office), co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_notice_posting"];
         delete?: never;
         options?: never;
@@ -82,7 +82,7 @@ export interface paths {
         /** List the proxies registered for an assembly */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         put?: never;
-        /** Appoint one's own proxy for an assembly — the signed-in owner or holder of use is the principal; agent, scope and form; refused past the limit one person may represent, with the limit shown */
+        /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         delete?: never;
         options?: never;
@@ -991,6 +991,7 @@ export interface components {
             agentKind: string;
             /** Format: uuid */
             agentPartyId: string;
+            authorisationHash?: string;
             form: string;
             items: number[];
             /** Format: uuid */
@@ -1629,12 +1630,15 @@ export interface components {
             agentKind: string;
             /** Format: uuid */
             agentPartyId: string;
+            authorisationHash?: string;
             form: string;
             /** Format: uuid */
             id: string;
             items: number[];
             /** Format: uuid */
             principalPartyId: string;
+            /** Format: uuid */
+            recordedBy?: string;
             /** Format: date-time */
             registeredAt: string;
             scope: string;

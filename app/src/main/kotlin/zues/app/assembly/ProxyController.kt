@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import zues.app.identity_org.WhoAsks
-import zues.app.policy.Action
 import java.time.Instant
 import java.util.UUID
 
@@ -24,6 +23,8 @@ data class ProxyView(
     val items: List<Int>,
     val form: String,
     val registeredAt: Instant,
+    val recordedBy: UUID?,
+    val authorisationHash: String?,
 )
 
 /** A refusal; [limit] is the number one person may represent, when that is why (PM-GA-010). */
@@ -36,18 +37,21 @@ data class AppointProxyRequest(
     val scope: String,
     val items: List<Int> = emptyList(),
     val form: String,
-    /** Never who the principal is: a request that names one other than the caller is refused, not quietly made the caller's. */
+    /** Named only by whoever runs the assembly, recording a written authorisation; anybody else naming another is refused. */
     val principalPartyId: UUID? = null,
+    /** The SHA-256 of the written authorisation handed over — required with a principal other than the caller, and only then. */
+    val authorisationHash: String? = null,
 )
 
 /**
- * Proxies for a general assembly (PM-GA-009, PM-GA-010). A proxy is appointed by the one it represents: the principal
- * is the party the sign-in is tied to — never a field of the request — and must be an owner or a holder of use in the
- * entrance today (PM-SEC-001); anybody else is a 403 naming the rule. A body that cannot be read is a 400 for anyone.
+ * Proxies for a general assembly (PM-GA-009, PM-GA-010). A proxy is appointed by the one it represents, signed in —
+ * an owner or a holder of use in the entrance today — or recorded by whoever runs the assembly from a written
+ * authorisation they were handed, with the document's SHA-256 (PM-SEC-001). Anybody else naming a principal is a 403.
+ * A body that cannot be read is a 400 for anyone.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies")
-class ProxyController(private val proxies: ProxyService, private val who: WhoAsks, private val acting: Acting) {
+class ProxyController(private val acts: AssemblyActs, private val proxies: ProxyService, private val who: WhoAsks) {
 
     // Rule: PM-GA-009
     // Rule: PM-SEC-001
@@ -55,16 +59,7 @@ class ProxyController(private val proxies: ProxyService, private val who: WhoAsk
     @ResponseStatus(HttpStatus.CREATED)
     fun register(
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: AppointProxyRequest, signedIn: JwtAuthenticationToken?,
-    ): ProxyView {
-        val principal = acting.actor(who.of(signedIn), Action.APPOINT_PROXY, entranceId)
-        // an appointment is not undone: one made for the caller when they named somebody else is one they did not ask for
-        require(request.principalPartyId == null || request.principalPartyId == principal.party) { "a proxy is appointed by the one it represents, for themselves" }
-        return view(
-            proxies.register(
-                entranceId, assemblyId, RegisterProxy(principal.party, request.agentPartyId, request.agentKind, request.scope, request.items, request.form), principal,
-            ),
-        )
-    }
+    ): ProxyView = view(acts.registerProxy(who.of(signedIn), entranceId, assemblyId, request))
 
     @GetMapping
     fun list(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): List<ProxyView> =
@@ -72,7 +67,7 @@ class ProxyController(private val proxies: ProxyService, private val who: WhoAsk
 
     private fun view(p: Proxy) = ProxyView(
         p.id, p.principalPartyId, p.agentPartyId, p.agentKind, p.scope,
-        p.scopeItems?.split(",")?.map { it.toInt() } ?: emptyList(), p.form, p.registeredAt,
+        p.scopeItems?.split(",")?.map { it.toInt() } ?: emptyList(), p.form, p.registeredAt, p.recordedBy, p.authorisationHash,
     )
 
     /** The policy refuses, or nobody a record could name is asking. */

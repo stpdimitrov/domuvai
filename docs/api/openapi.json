@@ -149,6 +149,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "authorisationHash": {
+            "type": "string"
+          },
           "form": {
             "type": "string"
           },
@@ -2263,6 +2266,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "authorisationHash": {
+            "type": "string"
+          },
           "form": {
             "type": "string"
           },
@@ -2278,6 +2284,10 @@
             "type": "array"
           },
           "principalPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "recordedBy": {
             "format": "uuid",
             "type": "string"
           },
@@ -3335,7 +3345,7 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — by whoever runs the assembly; after posting it voids the notice",
+        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice",
         "tags": [
           "assembly"
         ],
@@ -3456,7 +3466,7 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Record the posting act with its photograph — by the convenor signed in, co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting",
+        "summary": "Record the posting act with its photograph — signed by whoever runs the assembly (the convenor, or their successor in the office), co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting",
         "tags": [
           "assembly"
         ],
@@ -3640,7 +3650,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Appoint one's own proxy for an assembly — the signed-in owner or holder of use is the principal; agent, scope and form; refused past the limit one person may represent, with the limit shown",
+        "summary": "Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown",
         "tags": [
           "assembly"
         ],

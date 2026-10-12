@@ -152,9 +152,9 @@ class ProxyPersistenceIT {
         appoint(proxies, owner(entranceId), UUID.randomUUID(), """"agentKind":"THIRD_PARTY","scope":"WHOLE_AGENDA","form":"WRITTEN"""").andExpect(status().isBadRequest)
 
         // and the table's own refusals, each by its constraint
-        val copy = "INSERT INTO assembly.proxy SELECT gen_random_uuid(), entrance_id, assembly_id, %s, %s, agent_kind, %s, %s, form, registered_at, %s, login_subject FROM assembly.proxy WHERE principal_party_id = '$principal'"
+        val copy = "INSERT INTO assembly.proxy SELECT gen_random_uuid(), entrance_id, assembly_id, %s, %s, agent_kind, %s, %s, form, registered_at, %s, login_subject, %s, authorisation_hash FROM assembly.proxy WHERE principal_party_id = '$principal'"
         fun refused(principalSql: String, agentSql: String, scope: String, items: String, constraint: String, login: String = "login_issuer") =
-            assertThatThrownBy { jdbc.update(copy.format(principalSql, agentSql, scope, items, login)) }
+            assertThatThrownBy { jdbc.update(copy.format(principalSql, agentSql, scope, items, login, principalSql)) }
                 .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining(constraint)
         val other = "'${party()}'::uuid"
         refused("principal_party_id", "agent_party_id", "scope", "scope_items", "proxy_one_per_principal")
@@ -163,7 +163,10 @@ class ProxyPersistenceIT {
         refused(other, "agent_party_id", "'LISTED_ITEMS'", "NULL", "proxy_scope_lists_its_items")
         refused(other, "agent_party_id", "scope", "'2;3'", "proxy_scope_items_check")
         refused(other, "agent_party_id", "scope", "scope_items", "proxy_names_its_login", login = "NULL")
-        assertThat(jdbc.update(copy.format(other, "agent_party_id", "scope", "scope_items", "login_issuer"))).isEqualTo(1)      // the control: a well-formed copy goes in
+        // recorded for somebody else, it carries its document; in person, none
+        assertThatThrownBy { jdbc.update(copy.format(other, "agent_party_id", "scope", "scope_items", "login_issuer", "agent_party_id")) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("proxy_recorded_with_its_authorisation")
+        assertThat(jdbc.update(copy.format(other, "agent_party_id", "scope", "scope_items", "login_issuer", other))).isEqualTo(1)      // the control: a well-formed copy goes in
     }
 
     @Test
@@ -183,8 +186,19 @@ class ProxyPersistenceIT {
         val manager = jdbc.queryForObject("SELECT party_id FROM identity_org.management_mandate WHERE entrance_id = ?", UUID::class.java, entranceId)!!
         val naming = """{"principalPartyId":"$owner","agentPartyId":"$agent","agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"}"""
 
-        // nobody appoints for the owner by naming them: a stranger, the manager, a login tied to no party, nobody at all, an owner next door
-        for (who in listOf(stranger, manager, owner(entrance()))) {
+        // nobody appoints for the owner by naming them: a stranger, a login tied to no party, nobody at all, an owner next door, another owner,
+        // the controller — with a document or without
+        val controller = person().also {
+            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)", entranceId, it)
+        }
+        val document = "5d".repeat(32)
+        val withDocument = naming.replace("{", """{"authorisationHash":"$document",""")
+        for (who in listOf(stranger, agent, controller, owner(entrance()))) {
+            signedIn(who) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(withDocument)).andExpect(status().isForbidden) }
+        }
+        // the manager convened this assembly and runs it: without the document they record nothing
+        signedIn(manager) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming)).andExpect(status().isBadRequest) }
+        for (who in listOf(stranger, owner(entrance()))) {
             signedIn(who) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming)).andExpect(status().isForbidden) }
         }
         signedInAs = "login-tied-to-nobody-${UUID.randomUUID()}"
@@ -220,8 +234,8 @@ class ProxyPersistenceIT {
         }
         appoint(proxies, buyer, agent).andExpect(status().isForbidden)
         appoint(proxies, owner, buyer).andExpect(status().isBadRequest)
-        // a body naming another principal is refused, not made the caller's
-        signedIn(owner) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming.replace("$owner", "$agent"))).andExpect(status().isBadRequest) }
+        // an owner naming another principal is refused — they do not run the assembly — and it is not made the caller's own
+        signedIn(owner) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming.replace("$owner", "$agent"))).andExpect(status().isForbidden) }
         appoint(proxies, owner, atHome, member).andExpect(status().isCreated)
         // a holder of a right of use appoints too, and another owner represents them
         val holderOfUse = person().also {
@@ -230,6 +244,30 @@ class ProxyPersistenceIT {
         appoint(proxies, holderOfUse, agent).andExpect(status().isCreated)
         assertThat(jdbc.queryForList("SELECT principal_party_id FROM assembly.proxy WHERE entrance_id = ? ORDER BY registered_at", UUID::class.java, entranceId))
             .containsExactly(owner, holderOfUse)
+
+        // the owner's decision: the manager, running the assembly, records the written authorisation another owner handed them
+        val onPaper = owner(entranceId)
+        val recorded = signedIn(manager) { created(proxies, withDocument.replace("$owner", "$onPaper")) }
+        assertThat(recorded.get("principalPartyId").asText()).isEqualTo(onPaper.toString())
+        assertThat(recorded.get("recordedBy").asText()).isEqualTo(manager.toString())
+        assertThat(jdbc.queryForMap("SELECT recorded_by, authorisation_hash, login_subject FROM assembly.proxy WHERE principal_party_id = ?", onPaper))
+            .containsEntry("recorded_by", manager).containsEntry("authorisation_hash", document).containsEntry("login_subject", "login-$manager")
+        // nobody records an authorisation naming themself as the proxy
+        signedIn(manager) {
+            mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(withDocument.replace("$owner", "${owner(entranceId)}").replace("$agent", "$manager")))
+                .andExpect(status().isBadRequest)
+        }
+        // the table holds both halves: in person no document, recorded always one, and always somebody who registered it
+        for (broken in listOf("authorisation_hash = '$document'", "recorded_by = NULL")) {
+            assertThatThrownBy { jdbc.update("UPDATE assembly.proxy SET $broken WHERE principal_party_id = ?", owner) }
+                .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("proxy_recorded_with_its_authorisation")
+        }
+        assertThatThrownBy { jdbc.update("UPDATE assembly.proxy SET authorisation_hash = NULL WHERE principal_party_id = ?", onPaper) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("proxy_recorded_with_its_authorisation")
+        // a principal with no title is not recorded either, document or not
+        signedIn(manager) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(withDocument.replace("$owner", "$stranger"))).andExpect(status().isBadRequest) }
+        assertThat(jdbc.queryForMap("SELECT recorded_by, authorisation_hash FROM assembly.proxy WHERE principal_party_id = ?", owner))
+            .containsEntry("recorded_by", owner).containsEntry("authorisation_hash", null)
     }
 
     @Test
