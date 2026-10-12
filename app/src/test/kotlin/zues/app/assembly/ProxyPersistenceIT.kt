@@ -252,6 +252,18 @@ class ProxyPersistenceIT {
         assertThat(recorded.get("recordedBy").asText()).isEqualTo(manager.toString())
         assertThat(jdbc.queryForMap("SELECT recorded_by, authorisation_hash, login_subject FROM assembly.proxy WHERE principal_party_id = ?", onPaper))
             .containsEntry("recorded_by", manager).containsEntry("authorisation_hash", document).containsEntry("login_subject", "login-$manager")
+        // nobody records an authorisation naming themself as the proxy
+        signedIn(manager) {
+            mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(withDocument.replace("$owner", "${owner(entranceId)}").replace("$agent", "$manager")))
+                .andExpect(status().isBadRequest)
+        }
+        // the table holds both halves: in person no document, recorded always one, and always somebody who registered it
+        for (broken in listOf("authorisation_hash = '$document'", "recorded_by = NULL")) {
+            assertThatThrownBy { jdbc.update("UPDATE assembly.proxy SET $broken WHERE principal_party_id = ?", owner) }
+                .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("proxy_recorded_with_its_authorisation")
+        }
+        assertThatThrownBy { jdbc.update("UPDATE assembly.proxy SET authorisation_hash = NULL WHERE principal_party_id = ?", onPaper) }
+            .isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("proxy_recorded_with_its_authorisation")
         // a principal with no title is not recorded either, document or not
         signedIn(manager) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(withDocument.replace("$owner", "$stranger"))).andExpect(status().isBadRequest) }
         assertThat(jdbc.queryForMap("SELECT recorded_by, authorisation_hash FROM assembly.proxy WHERE principal_party_id = ?", owner))

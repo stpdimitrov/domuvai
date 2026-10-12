@@ -44,6 +44,7 @@ import java.security.KeyPairGenerator
 import java.security.interfaces.RSAPublicKey
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Date
 import java.util.Optional
@@ -66,6 +67,9 @@ class AssemblyWebTest {
         val issuer: KeyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
         val entranceId: UUID = UUID.randomUUID()
         val held = mutableMapOf<UUID, Set<Role>>()
+
+        /** The day a person's roles begin, for those the test dates; everybody else has held theirs all along. */
+        val since = mutableMapOf<UUID, LocalDate>()
     }
 
     @TestConfiguration
@@ -74,8 +78,9 @@ class AssemblyWebTest {
         @Bean fun keys() = IssuerKeys { NimbusJwtDecoder.withPublicKey(issuer.public as RSAPublicKey).build() }
 
         /** Roles as the test says them, in the one entrance and nowhere else. */
-        @Bean fun roles() = RoleSource { who, entrance, _ ->
-            if (entrance != entranceId) emptySet() else held[who.party].orEmpty().mapTo(mutableSetOf()) { Held(it, entrance, setOf(UUID.randomUUID())) }
+        @Bean fun roles() = RoleSource { who, entrance, asAt ->
+            if (entrance != entranceId || since[who.party]?.let { asAt.isBefore(it) } == true) emptySet()
+            else held[who.party].orEmpty().mapTo(mutableSetOf()) { Held(it, entrance, setOf(UUID.randomUUID())) }
         }
     }
 
@@ -227,6 +232,24 @@ class AssemblyWebTest {
         verify(assemblies).addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL")
         verify(notices).recordPosting(entranceId, assembly.id, actor(successor, "login-successor"), posted, owner, photo)
         verifyNoMoreInteractions(notices)
+    }
+
+    @Test
+    fun `PM-GA-007 whoever signs the posting act held the office on the day of posting - a successor does not certify a posting from before their time`() {
+        val assembly = stored(draft(manager, "BM"))
+        held[manager] = emptySet()
+        val newcomer = person("login-newcomer", Role.BM).also { since[it] = LocalDate.parse("2026-10-09") }       // in office from today
+        val photo = "ab".repeat(32)
+        fun posting(at: Instant) = """{"postedAt":"$at","coSignatoryPartyId":"$owner","photoHash":"$photo"}"""
+        val yesterday = Instant.parse("2026-10-08T08:00:00Z")
+        mvc.perform(post("$base/${assembly.id}/notice-posting").by("login-newcomer").content(posting(yesterday)))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-007"))
+        verifyNoInteractions(notices)
+        val today = Instant.parse("2026-10-09T08:00:00Z")
+        whenever(notices.recordPosting(entranceId, assembly.id, actor(newcomer, "login-newcomer"), today, owner, photo)).thenReturn(
+            NoticePosting(UUID.randomUUID(), entranceId, assembly.id, today, newcomer, owner, photo, at, "фоайето", "1. Отчет", today, ISSUER, "login-newcomer"),
+        )
+        mvc.perform(post("$base/${assembly.id}/notice-posting").by("login-newcomer").content(posting(today))).andExpect(status().isCreated)
     }
 
     @Test

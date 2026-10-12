@@ -5,7 +5,9 @@ import org.springframework.transaction.annotation.Transactional
 import zues.app.policy.Action
 import zues.app.policy.Asking
 import zues.app.policy.Role
+import zues.kernel.toSofiaDate
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 /** What a convenor states when convening. Who convenes is the sign-in's party; the office stated must be theirs today. */
@@ -68,8 +70,17 @@ class AssemblyActs(
 
     // Rule: PM-GA-007
     @Transactional
-    fun recordPosting(who: Asking, entranceId: UUID, assemblyId: UUID, postedAt: Instant, coSignatoryPartyId: UUID, photoHash: String): NoticePosting =
-        notices.recordPosting(entranceId, assemblyId, running(who, entranceId, assemblyId), postedAt, coSignatoryPartyId, photoHash)
+    fun recordPosting(who: Asking, entranceId: UUID, assemblyId: UUID, postedAt: Instant, coSignatoryPartyId: UUID, photoHash: String): NoticePosting {
+        val (signer, assembly) = runningIt(who, entranceId, assemblyId)
+        // Whoever certifies that a notice went up held the office that day too: a successor does not sign for a posting
+        // from before their time. TODO(legal): PM-GA-007 — the strictest reading, pending the owner's answer.
+        if (assembly.convenedAs in OFFICES &&
+            !acting.heldOn(signer.party, entranceId, Role.valueOf(assembly.convenedAs), LocalDate.parse(toSofiaDate(postedAt)))
+        ) {
+            throw ActRefused("PM-GA-007")
+        }
+        return notices.recordPosting(entranceId, assemblyId, signer, postedAt, coSignatoryPartyId, photoHash)
+    }
 
     /**
      * A proxy (the owner's decision of 2026-10-11): appointed by the principal signed in, for themselves; or recorded
@@ -86,9 +97,18 @@ class AssemblyActs(
             require(request.authorisationHash == null) { "a proxy appointed in person carries no document: the sign-in is the appointment" }
             return proxies.register(entranceId, assemblyId, command(principal.party, request), principal, authorisationHash = null)
         }
-        val recorder = running(who, entranceId, assemblyId)
+        // the policy's own line first (PM-SEC-001: the grant is in the matrix), then: is this assembly theirs to run
+        acting.actor(who, Action.RECORD_PROXY, entranceId)
+        val recorder = try {
+            running(who, entranceId, assemblyId)
+        } catch (e: ActRefused) {
+            throw ActRefused(Action.RECORD_PROXY.governedBy)
+        }
         val document = request.authorisationHash
             ?: throw IllegalArgumentException("a proxy recorded for somebody else is a written authorisation: its SHA-256 is required (PM-GA-009)")
+        // Nobody records an authorisation that names themself: the one who wants them as proxy signs in and appoints them.
+        // TODO(legal): PM-GA-009 — the strictest reading, pending the owner's answer.
+        require(request.agentPartyId != recorder.party) { "whoever records a written proxy is not the proxy it names (PM-GA-009)" }
         return proxies.register(entranceId, assemblyId, command(named, request), recorder, document)
     }
 
@@ -101,7 +121,9 @@ class AssemblyActs(
      * it was convened in, and the convenor no longer does — or they are the convenor.
      */
     // Rule: PM-GA-002
-    private fun running(who: Asking, entranceId: UUID, assemblyId: UUID): Actor {
+    private fun running(who: Asking, entranceId: UUID, assemblyId: UUID): Actor = runningIt(who, entranceId, assemblyId).first
+
+    private fun runningIt(who: Asking, entranceId: UUID, assemblyId: UUID): Pair<Actor, Assembly> {
         val allowed = acting.allowedAny(who, entranceId, Action.CONVENE_ASSEMBLY, Action.CONVENE_ON_PETITION)
         val assembly = assemblies.findById(assemblyId).filter { it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no assembly $assemblyId in entrance $entranceId") }
@@ -121,7 +143,7 @@ class AssemblyActs(
         check(assembly.convenedLoginIssuer != null && assembly.convenedLoginSubject != null) {
             "this assembly was convened before a convening recorded who signed in; convene it anew"
         }
-        return allowed.actor
+        return allowed.actor to assembly
     }
 
     private companion object {

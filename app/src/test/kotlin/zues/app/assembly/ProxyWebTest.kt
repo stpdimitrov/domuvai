@@ -11,6 +11,7 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
+import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -99,11 +100,11 @@ class ProxyWebTest {
     private fun appointing(principal: UUID? = null, hash: String? = null) =
         """{${principal?.let { "\"principalPartyId\":\"$it\"," }.orEmpty()}${hash?.let { "\"authorisationHash\":\"$it\"," }.orEmpty()}"agentPartyId":"$agent","agentKind":"THIRD_PARTY","scope":"LISTED_ITEMS","items":[2,3],"form":"NOTARISED"}"""
 
-    /** The assembly these proxies are for, convened by [convenor] as the manager. */
-    private fun convenedBy(convenor: UUID) = whenever(repository.findById(assemblyId)).thenReturn(
+    /** The assembly these proxies are for, convened by [convenor] — as the manager unless said otherwise. */
+    private fun convenedBy(convenor: UUID, convenedAs: String = "BM") = whenever(repository.findById(assemblyId)).thenReturn(
         java.util.Optional.of(
             Assembly(
-                assemblyId, entranceId, convenor, "BM", Instant.parse("2026-11-20T17:00:00Z"), "фоайето", "IN_PERSON", "DRAFT", false, null,
+                assemblyId, entranceId, convenor, convenedAs, Instant.parse("2026-11-20T17:00:00Z"), "фоайето", "IN_PERSON", "DRAFT", false, null,
                 convenedLoginIssuer = ISSUER, convenedLoginSubject = "login-of-the-convenor",
             ),
         ),
@@ -154,9 +155,11 @@ class ProxyWebTest {
             .thenReturn(stored(owner, "login-manager-5").copy(recordedBy = manager, authorisationHash = document))
 
         // another office, another owner, a stranger and a login tied to no party do not record a proxy for the owner — document or not
-        for (subject in listOf("login-controller-5", "login-other-owner-5", "login-stranger-5", "login-tied-to-nobody")) {
-            mvc.perform(post(base).by(subject).content(appointing(principal = owner, hash = document))).andExpect(status().isForbidden)
+        for (subject in listOf("login-controller-5", "login-other-owner-5", "login-stranger-5")) {
+            mvc.perform(post(base).by(subject).content(appointing(principal = owner, hash = document)))
+                .andExpect(status().isForbidden).andExpect(jsonPath("$.error").value("not allowed (PM-GA-009)"))      // the proxy's rule, whoever they are
         }
+        mvc.perform(post(base).by("login-tied-to-nobody").content(appointing(principal = owner, hash = document))).andExpect(status().isForbidden)
         // the convenor without the document records nothing
         mvc.perform(post(base).by("login-manager-5").content(appointing(principal = owner))).andExpect(status().isBadRequest)
         verifyNoInteractions(proxies)
@@ -167,9 +170,29 @@ class ProxyWebTest {
             .andExpect(jsonPath("$.recordedBy").value(manager.toString()))
             .andExpect(jsonPath("$.authorisationHash").value(document))
         verify(proxies).register(entranceId, assemblyId, command, Actor(manager, ISSUER, "login-manager-5"), document)
+        // nobody records an authorisation that names themself as the proxy
+        mvc.perform(post(base).by("login-manager-5").content(appointing(principal = owner, hash = document).replace("$agent", "$manager"))).andExpect(status().isBadRequest)
+        verifyNoMoreInteractions(proxies)
         // a manager who did not convene this assembly, while its convenor holds the office, records nothing either
         convenedBy(person("login-another-manager-5", Role.BM))
         mvc.perform(post(base).by("login-manager-5").content(appointing(principal = owner, hash = document))).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `PM-GA-009 the owner who convened on a petition records written proxies for that assembly - another owner, and the manager, do not`() {
+        val convenor = person("login-convening-owner", Role.OWN)
+        val principal = person("login-absent-owner", Role.OWN)
+        person("login-manager-6", Role.BM)
+        convenedBy(convenor, "OWNERS")
+        val command = RegisterProxy(principal, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED")
+        whenever(proxies.register(entranceId, assemblyId, command, Actor(convenor, ISSUER, "login-convening-owner"), document))
+            .thenReturn(stored(principal, "login-convening-owner").copy(recordedBy = convenor, authorisationHash = document))
+        for (subject in listOf("login-absent-owner", "login-manager-6")) {
+            val named = if (subject == "login-absent-owner") convenor else principal
+            mvc.perform(post(base).by(subject).content(appointing(principal = named, hash = document))).andExpect(status().isForbidden)
+        }
+        mvc.perform(post(base).by("login-convening-owner").content(appointing(principal = principal, hash = document)))
+            .andExpect(status().isCreated).andExpect(jsonPath("$.recordedBy").value(convenor.toString()))
     }
 
     @Test

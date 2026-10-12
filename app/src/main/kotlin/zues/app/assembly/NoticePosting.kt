@@ -27,6 +27,7 @@ data class NoticePosting(
     val entranceId: UUID,
     val assemblyId: UUID,
     val postedAt: Instant,
+    /** Who signed the act as the convenor: whoever ran the assembly that day — not always the one who convened it. */
     val convenorPartyId: UUID,
     val coSignatoryPartyId: UUID,
     val photoHash: String,

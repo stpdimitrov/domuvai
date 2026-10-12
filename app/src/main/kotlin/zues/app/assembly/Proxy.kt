@@ -33,7 +33,8 @@ data class Proxy(
     val form: String,                // AuthorisationForm
     val registeredAt: Instant,
     /**
-     * The sign-in that registered it, as tied to the principal at that moment (PM-SEC-001). Null only on a row from
+     * The sign-in that registered it, as tied at that moment to whoever registered it — [recordedBy]: the principal, or
+     * whoever ran the assembly (PM-SEC-001). Null only on a row from
      * before appointing asked who was signed in: such a proxy was never authenticated, and is not to be counted.
      */
     val loginIssuer: String?,
@@ -56,7 +57,11 @@ interface ProxyRepository : ListCrudRepository<Proxy, UUID> {
     fun findByAssemblyId(assemblyId: UUID): List<Proxy>
 }
 
-/** A proxy to register, as the service takes it: the principal is the sign-in's party, put here by the controller, never read from a request. */
+/**
+ * A proxy to register, as the service takes it. The principal is the sign-in's party — or, when whoever runs the
+ * assembly records a written authorisation, the principal that document names: put here by [AssemblyActs], which
+ * decides who may name one.
+ */
 data class RegisterProxy(
     val principalPartyId: UUID,
     val agentPartyId: UUID,

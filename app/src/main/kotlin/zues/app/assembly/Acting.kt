@@ -66,8 +66,11 @@ class Acting(private val policy: Policy, private val clock: Clock) {
      * Whether a party holds a role in the entrance today — asked of the policy, whose answer for an office comes from
      * the mandates and their one reading of who succeeded whom. Nothing about succession is worked out here.
      */
-    fun holdsToday(party: UUID, entranceId: UUID, role: Role): Boolean =
-        policy.rolesOf(Asking(null, party), entranceId, today()).any { it.role == role }
+    fun holdsToday(party: UUID, entranceId: UUID, role: Role): Boolean = heldOn(party, entranceId, role, today())
+
+    /** Whether a party held a role in the entrance on a day — the same question of the policy, about a day that is not today. */
+    fun heldOn(party: UUID, entranceId: UUID, role: Role, on: LocalDate): Boolean =
+        policy.rolesOf(Asking(null, party), entranceId, on).any { it.role == role }
 
     private fun signedIn(who: Asking): Actor {
         val party = who.party
