@@ -98,6 +98,14 @@ private val CONSTANTS: List<Constant> = listOf(
     // PM-GOV-004 — the management board's and the manager's mandate runs no longer than this, in years. The statute
     // states the figure, so it is confirmed.
     Constant("MANDATE_TERM_YEARS", "2", "2009-01-01", "чл. 19, чл. 21 ЗУЕС", true, rule = "PM-GOV-004"),
+    // PM-GOV-004 (acceptance) — how many days before a mandate's term ends the election is called due. The statute names
+    // no such period: it is the catalogue's reminder, a product number. Unconfirmed.
+    Constant(
+        "MANDATE_ELECTION_REMINDER_DAYS", "60", "2009-01-01", "PM-GOV-004's acceptance — a product reminder, not a statutory period", false,
+        rule = "PM-GOV-004",
+        todoLegal = "Confirm that the statute sets no period before a mandate's end within which the election must be called " +
+            "(PM-GOV-005 says only: no later than the expiry date); if it does, this is that period, not a reminder.",
+    ),
     // PM-GOV-007 — the control board, or the single controller, is elected for a term of this many years.
     Constant("CONTROL_TERM_YEARS", "2", "2009-01-01", "чл. 24 ЗУЕС", true, rule = "PM-GOV-007"),
     // The cashier's term. The catalogue names none: no rule gives the cashier a term of office. The schema capped every

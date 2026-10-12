@@ -6,6 +6,8 @@ import zues.app.policy.Asking
 import zues.app.policy.Held
 import zues.app.policy.Role
 import zues.app.policy.RoleSource
+import zues.law.constantOn
+import zues.law.numberOn
 import java.time.LocalDate
 import java.util.UUID
 
@@ -55,6 +57,43 @@ data class Mandate(
         return role in CONTINUING && ofTheEntrance.none { it.succeeds(this) && !it.validFrom.isAfter(date) }
     }
 
+    /**
+     * The first day this mandate is no longer in force, as far as the record says — the day [inForceOn] turns false:
+     * the day an end is recorded, or, for the manager and the board, the first day of the earliest mandate that
+     * [succeeds] it, and never before its own term ends; for every other office, the day its term ends. Null only for
+     * a manager or a board member nothing on record ends: that one is open.
+     */
+    fun endsOnRecord(ofTheEntrance: List<Mandate>): LocalDate? {
+        val byItsOffice = if (role in CONTINUING) ofTheEntrance.filter { it.succeeds(this) }.minOfOrNull { it.validFrom }?.let { maxOf(it, validTo) } else validTo
+        return listOfNotNull(succeededAt, byItsOffice).minOrNull()
+    }
+
+    /**
+     * How the mandate stands on [date] (Rule: PM-GOV-004) — or null when it is not in force that day. A derived fact,
+     * from the mandate's own dates and the one reading of "successor"; nothing is stored, so nothing can disagree with
+     * the mandate. **A standing is a fact to be read: no task is raised, no election is scheduled, and nothing shows it
+     * yet** — the acceptance's election task and PM-GOV-005's scheduling are not built here.
+     *
+     * The manager and the board: **in term**; then **an election is due**, once the date is within [reminderDays] of the
+     * day the office is left — the day the term ends, or an earlier day an end is recorded for — unless a mandate that
+     * succeeds this one is already on record; then **acting past term**, from the day the term ends for as long as
+     * nobody has taken the place (the incumbent continues). An end recorded with nobody to succeed — a resignation —
+     * silences nothing: the election is due by that day. The controller and the cashier are in term or not in force:
+     * the rule names the board and the manager only.
+     */
+    // Rule: PM-GOV-004
+    fun standingOn(date: LocalDate, ofTheEntrance: List<Mandate>, reminderDays: (leaves: LocalDate) -> Long?): Standing? {
+        if (!inForceOn(date, ofTheEntrance)) return null
+        val until = endsOnRecord(ofTheEntrance)
+        if (role !in CONTINUING) return Standing(StandingKind.IN_TERM, until = until)
+        if (!date.isBefore(validTo)) return Standing(StandingKind.EXPIRED_ACTING, electBy = validTo, actingSince = validTo, until = until)
+        if (ofTheEntrance.any { it.succeeds(this) }) return Standing(StandingKind.IN_TERM, until = until)   // somebody is elected to follow
+        val leaves = listOfNotNull(validTo, succeededAt).min()
+        val reminder = reminderDays(leaves) ?: return Standing(StandingKind.IN_TERM, until = until)        // the law holds no period for that day
+        return if (date.isBefore(leaves.minusDays(reminder))) Standing(StandingKind.IN_TERM, until = until)
+        else Standing(StandingKind.ELECTION_DUE, electBy = leaves, until = until)
+    }
+
     private companion object {
         val OFFICES = mapOf("BM" to Role.BM, "MB" to Role.MB, "CTL" to Role.CTL, "CSH" to Role.CSH)
         val CONTINUING = setOf(Role.BM, Role.MB)
@@ -62,6 +101,26 @@ data class Mandate(
         const val MANAGER = "BM"
     }
 }
+
+/** How a mandate in force stands (Rule: PM-GOV-004): within its dates, an election due, or acting past them until a successor. */
+enum class StandingKind { IN_TERM, ELECTION_DUE, EXPIRED_ACTING }
+
+/**
+ * A mandate's standing on a date. [electBy] is the day the office is left — the day the term ends, or an earlier
+ * recorded end: PM-GOV-005 wants the election no later; [actingSince] the day from which the office is held past its
+ * term; [until] the first day the mandate is no longer in force, where the record says ([Mandate.endsOnRecord]).
+ */
+data class Standing(val kind: StandingKind, val electBy: LocalDate? = null, val actingSince: LocalDate? = null, val until: LocalDate? = null)
+
+/** A mandate in force in an entrance on a date, with how it stands. The office-holder is a party's id — the name is the registry's — or nobody, where the mandate names none. */
+data class StandingMandate(
+    val mandateId: UUID,
+    val partyId: UUID?,
+    val role: Role,
+    val validFrom: LocalDate,
+    val validTo: LocalDate,
+    val standing: Standing,
+)
 
 /** A party holding a role in an entrance on a date, and the mandate that says so. */
 data class RoleHolder(val partyId: UUID, val role: Role, val mandateId: UUID)
@@ -87,5 +146,46 @@ class MandateRoles(private val mandates: MandateStore) : RoleSource {
     fun holdersOn(entranceId: UUID, asAt: LocalDate): Set<RoleHolder> {
         val all = mandates.ofEntrance(entranceId)
         return all.filter { it.inForceOn(asAt, all) }.mapNotNullTo(mutableSetOf()) { m -> m.role?.let { role -> m.partyId?.let { RoleHolder(it, role, m.id) } } }
+    }
+}
+
+/**
+ * How every mandate in force in an entrance stands on a date (Rule: PM-GOV-004): who is in term, for whom an election
+ * is due and by when, who is acting past term and since when. In-process only: no endpoint serves it, no screen shows
+ * it and no task is raised from it yet. The same mandates, read the same way, as [MandateRoles]: a mandate has a
+ * standing exactly when it is in force — one that names no party included, since its office still needs an election.
+ */
+@Service
+class MandateStanding(private val mandates: MandateStore) {
+
+    init {
+        // A period the law module does not know at all is a mistake here, not "no reminder": say so when the application starts.
+        constantOn(REMINDER, FAR_AHEAD)
+    }
+
+    @Transactional(readOnly = true)
+    fun of(entranceId: UUID, on: LocalDate): List<StandingMandate> {
+        val all = mandates.ofEntrance(entranceId)
+        return all.mapNotNull { m ->
+            val role = m.role ?: return@mapNotNull null
+            m.standingOn(on, all, ::reminderDays)?.let { StandingMandate(m.id, m.partyId, role, m.validFrom, m.validTo, it) }
+        }
+    }
+
+    /**
+     * How long before an office is left the election is called due: the law module's value in force on that day
+     * (Rule: PM-SYS-002) — or null on a day the law holds none, when no reminder is given and none is invented.
+     */
+    // TODO(legal): PM-GOV-004 — MANDATE_ELECTION_REMINDER_DAYS is the catalogue's reminder, not a statutory period; unconfirmed.
+    private fun reminderDays(leaves: LocalDate): Long? =
+        try {
+            numberOn(REMINDER, leaves.toString()).toLong()
+        } catch (e: NoSuchElementException) {
+            null
+        }
+
+    private companion object {
+        const val REMINDER = "MANDATE_ELECTION_REMINDER_DAYS"
+        const val FAR_AHEAD = "9999-12-31"
     }
 }
