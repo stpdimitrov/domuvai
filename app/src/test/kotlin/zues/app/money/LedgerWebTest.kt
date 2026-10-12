@@ -22,6 +22,8 @@ class LedgerWebTest {
     @Autowired lateinit var mvc: MockMvc
 
     @MockitoBean lateinit var ledger: LedgerReads
+    @MockitoBean lateinit var access: MoneyAccess
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
     private val from = LocalDate.parse("2026-09-01")

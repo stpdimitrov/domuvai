@@ -8,6 +8,7 @@ import org.springframework.data.repository.ListCrudRepository
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import zues.app.policy.Asking
 import zues.app.registry.Units
 import zues.kernel.toSofiaDate
 import zues.law.CATALOGUE_VERSION
@@ -160,6 +161,7 @@ class PaymentService(
     private val jdbc: JdbcTemplate,
     private val events: ApplicationEventPublisher,
     private val clock: Clock,
+    private val access: MoneyAccess,
 ) {
     // Rule: PM-DEBT-008
     @Transactional
@@ -220,11 +222,15 @@ class PaymentService(
         return PaymentView.of(payment, journal)
     }
 
-    /** A recorded payment with its allocation, read back from the journal (PM-DEBT-008). */
+    /**
+     * A recorded payment with its allocation, read back from the journal (PM-DEBT-008) — by those who may read its unit's
+     * charges (Rule: PM-SEC-002), decided before anything is said about whether it exists.
+     */
     @Transactional(readOnly = true)
-    fun find(entranceId: UUID, paymentId: UUID): PaymentView {
-        val payment = payments.findById(paymentId).filter { it.entranceId == entranceId }
-            .orElseThrow { NoSuchElementException("no payment $paymentId in entrance $entranceId") }
+    fun find(entranceId: UUID, paymentId: UUID, who: Asking): PaymentView {
+        val found = payments.findById(paymentId).orElse(null)?.takeIf { it.entranceId == entranceId }
+        access.payment(entranceId, found, who)
+        val payment = found ?: throw NoSuchElementException("no payment $paymentId in entrance $entranceId")
         return PaymentView.of(payment, postings.findByJournalId(payment.id))
     }
 

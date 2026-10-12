@@ -48,6 +48,12 @@ enum class Action(val governedBy: String) {
 
     /** keeping the register of who is present at an assembly, and that a remote participant was identified — by whoever runs it */
     KEEP_REGISTER("PM-GA-012"),
+
+    /** one unit's charges: its statement, its arrears, how a payment for it was allocated */
+    READ_UNIT_CHARGES("PM-SEC-002"),
+
+    /** every unit of an entrance and what each was charged, paid and owes — its arrears, its journal: other persons' debts */
+    READ_ENTRANCE_ARREARS("PM-SEC-002"),
 }
 
 /**
@@ -126,7 +132,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 9
+        const val MATRIX_VERSION = 10
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -139,7 +145,11 @@ class Policy(private val sources: List<RoleSource>) {
          * an owner or a holder of use appoints their own; a written authorisation handed over is recorded by whoever
          * runs the assembly it is for — an office, or the owner who convened on a petition — which of them it is being the
          * assembly's to say (PM-GA-009). The register of who is present is kept the same way, by whoever runs the
-         * assembly (PM-GA-012).
+         * assembly (PM-GA-012). A unit's charges: its owner, for their own unit (PM-SEC-002), the manager and the board, who
+         * certify a unit's obligations (PM-DEBT-007), and the controller, who reads everything (PM-GOV-008). An entrance's
+         * arrears — other persons' debts: the manager and the board, who pursue them (PM-DEBT-003), and the controller —
+         * no owner as such. The cashier, a holder of use, an occupant and a firm's staff are given neither: no rule says so,
+         * pending counsel.
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -178,6 +188,13 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.KEEP_REGISTER, Role.MB, "PM-GA-012"),
             Permit(Action.KEEP_REGISTER, Role.CTL, "PM-GA-012"),
             Permit(Action.KEEP_REGISTER, Role.OWN, "PM-GA-012"),
+            Permit(Action.READ_UNIT_CHARGES, Role.OWN, "PM-SEC-002", ownUnitOnly = true),
+            Permit(Action.READ_UNIT_CHARGES, Role.BM, "PM-DEBT-007"),
+            Permit(Action.READ_UNIT_CHARGES, Role.MB, "PM-DEBT-007"),
+            Permit(Action.READ_UNIT_CHARGES, Role.CTL, "PM-GOV-008"),
+            Permit(Action.READ_ENTRANCE_ARREARS, Role.BM, "PM-DEBT-003"),
+            Permit(Action.READ_ENTRANCE_ARREARS, Role.MB, "PM-DEBT-003"),
+            Permit(Action.READ_ENTRANCE_ARREARS, Role.CTL, "PM-GOV-008"),
         )
     }
 }

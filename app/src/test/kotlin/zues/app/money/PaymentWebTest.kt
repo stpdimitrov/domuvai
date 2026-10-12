@@ -3,6 +3,7 @@ package zues.app.money
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,6 +24,7 @@ class PaymentWebTest {
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var payments: PaymentService
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
@@ -49,7 +51,7 @@ class PaymentWebTest {
 
     @Test
     fun `GET returns a payment's allocation`() {
-        whenever(payments.find(entranceId, view.paymentId)).thenReturn(view)
+        whenever(payments.find(eq(entranceId), eq(view.paymentId), anyOrNull())).thenReturn(view)
         mvc.perform(get("/api/money/entrances/$entranceId/payments/${view.paymentId}"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.allocationRule").value("OLDEST_FIRST"))
@@ -82,5 +84,13 @@ class PaymentWebTest {
     fun `an unregistered account is a 400`() {
         whenever(payments.record(any(), any(), any())).thenThrow(IllegalArgumentException("no OPERATING account"))
         mvc.perform(postPayment()).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `PM-SEC-002 a reader the policy refuses is a 403 naming the rule`() {
+        whenever(payments.find(any(), any(), anyOrNull())).thenThrow(MoneyReadForbidden("PM-SEC-002"))
+        mvc.perform(get("/api/money/entrances/$entranceId/payments/${view.paymentId}"))
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.rule").value("PM-SEC-002"))
     }
 }

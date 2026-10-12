@@ -2,6 +2,7 @@ package zues.app.money
 
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -11,17 +12,19 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
 /**
  * Records a payment for a unit and reads back how it was allocated (Rule: PM-DEBT-008). The
  * `Idempotency-Key` makes a retry safe: the same key returns the payment already recorded, with
- * the same response. Access will be narrowed by the authorization module (ADR-002).
+ * the same response. Reading one back is for those who may read its unit's charges (Rule: PM-SEC-002); recording is
+ * not yet guarded (ADR-002, #164).
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/payments")
-class PaymentController(private val payments: PaymentService) {
+class PaymentController(private val payments: PaymentService, private val who: WhoAsks) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -32,8 +35,8 @@ class PaymentController(private val payments: PaymentService) {
     ): PaymentView = payments.record(entranceId, idempotencyKey, request)
 
     @GetMapping("/{paymentId}")
-    fun find(@PathVariable entranceId: UUID, @PathVariable paymentId: UUID): PaymentView =
-        payments.find(entranceId, paymentId)
+    fun find(@PathVariable entranceId: UUID, @PathVariable paymentId: UUID, signedIn: JwtAuthenticationToken?): PaymentView =
+        payments.find(entranceId, paymentId, who.of(signedIn))
 
     /** A non-positive amount, a malformed or future date, an unknown or unregistered account, a debt not owed → 400. */
     @ExceptionHandler(IllegalArgumentException::class, DateTimeParseException::class)

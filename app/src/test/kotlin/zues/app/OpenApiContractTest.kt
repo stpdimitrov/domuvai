@@ -32,6 +32,7 @@ import zues.app.money.ArrearsService
 import zues.app.money.ChargeRunService
 import zues.app.money.ChargeRunStore
 import zues.app.money.FundAccountService
+import zues.app.money.MoneyAccess
 import zues.app.money.FundHandoverService
 import zues.app.money.FundService
 import zues.app.money.HeadcountCheckService
@@ -83,6 +84,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var loginAdministration: LoginAdministration
     @MockitoBean lateinit var mandateAdministration: MandateAdministration
     @MockitoBean lateinit var whoAsks: WhoAsks
+    @MockitoBean lateinit var moneyAccess: MoneyAccess
     @MockitoBean lateinit var headcount: HeadcountCheckService
     @MockitoBean lateinit var bookAccess: BookAccessService
     @MockitoBean lateinit var arrears: ArrearsService

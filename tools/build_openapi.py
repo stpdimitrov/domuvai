@@ -124,12 +124,12 @@ RUNNING = {
  ('get', '/api/money/entrances/{entranceId}/charge-runs/{period}/headcount'):
    ("The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed", ['PM-BOOK-012']),
  ('get', '/api/money/units/{unitId}/statement'):
-   ("The unit's itemised statement, showing how each number was derived — a metered line with its reading and item", ['PM-FEE-017', 'PM-FEE-018']),
+   ("The unit's itemised statement, showing how each number was derived — a metered line with its reading and item", ['PM-FEE-017', 'PM-FEE-018', 'PM-SEC-002']),
  ('get', '/api/money/units/{unitId}/arrears'):
-   ("The unit's arrears, aged as of a date, with the day its oldest open debt fell due", ['PM-DEBT-001', 'PM-DEBT-002']),
+   ("The unit's arrears, aged as of a date, with the day its oldest open debt fell due", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/arrears'):
    ("The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day "
-    "its oldest open debt fell due — and their total", ['PM-DEBT-001', 'PM-DEBT-002']),
+    "its oldest open debt fell due — and their total", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
@@ -137,7 +137,7 @@ RUNNING = {
  ('get', '/api/money/entrances/{entranceId}/journal'):
    ("The entrance's double-entry journal from one date to another, both included — each journal whole, its legs "
     "summing to zero, with what wrote it where money knows; optionally only the journals that touch one account",
-    ['PM-FUND-005', 'PM-PMC-008']),
+    ['PM-FUND-005', 'PM-PMC-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/operating-account'):
    ("The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's "
     "account and the cash box; outflows are not recorded yet, and the response says so", ['PM-FUND-004', 'PM-FEE-019']),
@@ -162,7 +162,7 @@ RUNNING = {
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
     ['PM-DEBT-008']),
  ('get', '/api/money/entrances/{entranceId}/payments/{paymentId}'):
-   ("A payment's allocation — the rule applied and what each debt received", ['PM-DEBT-008']),
+   ("A payment's allocation — the rule applied and what each debt received", ['PM-DEBT-008', 'PM-SEC-002']),
  # ---- intake
  ('post', '/api/intake/entrances/{entranceId}/fee-sheet/profile'):
    ("Profile a sheet's columns — propose a mapping onto the domain fields, to confirm",

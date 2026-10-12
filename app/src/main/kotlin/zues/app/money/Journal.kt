@@ -97,12 +97,13 @@ class LedgerReads(
 }
 
 /**
- * The ledger's reads for an entrance (Rule: PM-FUND-005, PM-PMC-008). Read access will narrow to the board and the
- * firm's staff for that entrance with the authorization module (PM-SEC-002, ADR-002); until then the reads are open.
+ * The ledger's reads for an entrance (Rule: PM-FUND-005, PM-PMC-008). The journal carries every unit's charges and
+ * payments — other persons' debts — so it is read as the entrance's arrears are: by the manager, the board and the
+ * controller (Rule: PM-SEC-002, ADR-002). The operating account's record is not yet guarded (#209).
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}")
-class LedgerController(private val ledger: LedgerReads) {
+class LedgerController(private val ledger: LedgerReads, private val access: MoneyAccess, private val who: zues.app.identity_org.WhoAsks) {
 
     @GetMapping("/journal")
     fun journal(
@@ -110,7 +111,11 @@ class LedgerController(private val ledger: LedgerReads) {
         @RequestParam from: String,
         @RequestParam to: String,
         @RequestParam(required = false) account: String?,
-    ): JournalView = ledger.journal(entranceId, date("from", from), date("to", to), account?.takeIf { it.isNotBlank() })
+        signedIn: org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken?,
+    ): JournalView {
+        access.entranceArrears(entranceId, who.of(signedIn))
+        return ledger.journal(entranceId, date("from", from), date("to", to), account?.takeIf { it.isNotBlank() })
+    }
 
     @GetMapping("/operating-account")
     fun operatingAccount(@PathVariable entranceId: UUID): OperatingAccountView = ledger.operatingAccount(entranceId)
