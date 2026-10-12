@@ -52,8 +52,8 @@ RUNNING = {
    ("Anonymise residents' links to named persons and animals' passport numbers past their retention window — today in Sofia, irreversible; run by the entrance's manager and board only, and logged whether run or refused (403)",
     ['PM-BOOK-010', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-GOV-008']),
  ('post', '/api/registry/entrances/{entranceId}/book/declarations'):
-   ('File a declaration for entry in the book — dated by the system, on the template in force',
-    ['PM-BOOK-003', 'PM-BOOK-004']),
+   ('File a declaration for entry in the book — by its declarant, or recorded in their name by the manager; dated by the system, on the template in force',
+    ['PM-BOOK-003', 'PM-BOOK-004', 'PM-BOOK-005']),
  ('get', '/api/registry/entrances/{entranceId}/book/declarations/overdue'):
    ("Owners and users past their declaration deadline on a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-BOOK-003', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/parties'):

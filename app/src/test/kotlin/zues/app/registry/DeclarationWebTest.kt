@@ -2,6 +2,7 @@ package zues.app.registry
 
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
@@ -31,7 +32,7 @@ import java.util.UUID
 class DeclarationWebTest {
 
     @Autowired lateinit var mvc: MockMvc
-    @MockitoBean lateinit var declarations: DeclarationService
+    @MockitoBean lateinit var filing: DeclarationFiling
     @MockitoBean lateinit var lists: BookLists
     @MockitoBean lateinit var logins: Logins
 
@@ -47,7 +48,7 @@ class DeclarationWebTest {
 
     @Test
     fun `POST a declaration returns 201 with the system's filing date and the template version`() {
-        whenever(declarations.file(entranceId, unitId, partyId, "ACQUISITION")).thenReturn(
+        whenever(filing.file(entranceId, unitId, partyId, "ACQUISITION", Asking(null, null))).thenReturn(
             BookDeclaration(UUID.randomUUID(), entranceId, unitId, partyId, "ACQUISITION", LocalDate.parse("2026-06-10"), "ministry-template-1"),
         )
         mvc.perform(
@@ -73,7 +74,7 @@ class DeclarationWebTest {
 
     @Test
     fun `an unknown kind or a malformed date is a 400`() {
-        whenever(declarations.file(any(), any(), any(), eq("WHIM"))).thenThrow(IllegalArgumentException("unknown kind WHIM"))
+        whenever(filing.file(any(), any(), any(), eq("WHIM"), any())).thenThrow(IllegalArgumentException("unknown kind WHIM"))
         mvc.perform(
             post("/api/registry/entrances/$entranceId/book/declarations")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -81,5 +82,13 @@ class DeclarationWebTest {
         ).andExpect(status().isBadRequest)
         mvc.perform(get("/api/registry/entrances/$entranceId/book/declarations/overdue").param("on", "16.06.2026"))
             .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `PM-BOOK-003 a filing the policy refuses is a 403 naming the rule`() {
+        whenever(filing.file(any(), any(), anyOrNull(), any(), any())).thenThrow(BookReadForbidden("PM-BOOK-003"))
+        mvc.perform(
+            post("/api/registry/entrances/$entranceId/book/declarations").contentType(MediaType.APPLICATION_JSON).content("""{"unitId":"$unitId"}"""),
+        ).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-003"))
     }
 }

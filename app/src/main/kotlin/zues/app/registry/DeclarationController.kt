@@ -18,8 +18,11 @@ import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
-/** A declaration to file: who declares, for which unit, and why. The filing date is never the caller's. */
-data class FileDeclarationRequest(val unitId: UUID, val partyId: UUID, val kind: String = DeclarationKind.ACQUISITION.name)
+/**
+ * A declaration to file, for which unit and why. The declarant is the sign-in's party; `partyId` names another
+ * declarant only when the manager or the board record one handed in (PM-BOOK-005). The filing date is never the caller's.
+ */
+data class FileDeclarationRequest(val unitId: UUID, val partyId: UUID? = null, val kind: String = DeclarationKind.ACQUISITION.name)
 
 data class DeclarationFiled(val id: UUID, val filedOn: LocalDate, val templateVersion: String)
 
@@ -30,7 +33,7 @@ data class DeclarationFiled(val id: UUID, val filedOn: LocalDate, val templateVe
 @RestController
 @RequestMapping("/api/registry/entrances/{entranceId}/book/declarations")
 class DeclarationController(
-    private val declarations: DeclarationService,
+    private val filing: DeclarationFiling,
     private val lists: BookLists,
     private val who: WhoAsks,
     private val clock: Clock,
@@ -38,8 +41,8 @@ class DeclarationController(
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun file(@PathVariable entranceId: UUID, @RequestBody request: FileDeclarationRequest): DeclarationFiled =
-        declarations.file(entranceId, request.unitId, request.partyId, request.kind)
+    fun file(@PathVariable entranceId: UUID, @RequestBody request: FileDeclarationRequest, signedIn: JwtAuthenticationToken?): DeclarationFiled =
+        filing.file(entranceId, request.unitId, request.partyId, request.kind, who.of(signedIn))
             .let { DeclarationFiled(it.id, it.filedOn, it.templateVersion) }
 
     /**

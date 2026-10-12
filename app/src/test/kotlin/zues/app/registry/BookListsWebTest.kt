@@ -78,6 +78,7 @@ class BookListsWebTest {
     @MockitoBean lateinit var access: BookAccessService
     @MockitoBean lateinit var ownership: OwnershipService
     @MockitoBean lateinit var declarations: DeclarationService
+    @MockitoBean lateinit var declarationFiling: zues.app.registry.DeclarationFiling
     @MockitoBean lateinit var logins: Logins
 
     private val entrance = UUID.randomUUID()
