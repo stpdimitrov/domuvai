@@ -91,9 +91,12 @@ class MandateRolesIT {
         assertThat(standing("2023-06-01")[ivan]).isEqualTo(Standing(StandingKind.IN_TERM, until = day("2024-05-10")))          // his successor is on record
         assertThat(standing("2024-04-01")[ivan]).isEqualTo(Standing(StandingKind.EXPIRED_ACTING, electBy = day("2024-03-01"), actingSince = day("2024-03-01"), until = day("2024-05-10")))
         assertThat(standing("2024-05-10")[ivan]).isNull()
-        assertThat(standing("2024-05-10")[petar]).isEqualTo(Standing(StandingKind.IN_TERM))
+        assertThat(standing("2024-05-10")[petar]).isEqualTo(Standing(StandingKind.IN_TERM, until = day("2025-01-01")))
         for (on in listOf("2022-02-28", "2023-06-01", "2024-04-01", "2024-05-10", "2025-01-01", "2026-05-09", "2026-05-10"))
-            assertThat(this.standing.of(block, day(on)).map { it.mandateId }).describedAs(on).containsExactlyInAnyOrderElementsOf(roles.holdersOn(block, day(on)).map { it.mandateId })
+            assertThat(this.standing.of(block, day(on)).filter { it.partyId != null }.map { it.mandateId }).describedAs(on)
+                .containsExactlyInAnyOrderElementsOf(roles.holdersOn(block, day(on)).map { it.mandateId })
+        // the seat that names nobody gives nobody a role, and is listed all the same: its office is held by a mandate, and will need its election
+        assertThat(this.standing.of(block, day("2026-05-10")).single().partyId).isNull()
 
         assertThat(roles.held(Asking(null, ivan), block, day("2024-04-01"))).containsExactly(Held(Role.BM, block))
         assertThat(roles.held(Asking(null, ivan), block, day("2024-05-10"))).isEmpty()
