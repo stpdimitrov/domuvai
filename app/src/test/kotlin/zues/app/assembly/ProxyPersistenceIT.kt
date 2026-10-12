@@ -234,8 +234,8 @@ class ProxyPersistenceIT {
         }
         appoint(proxies, buyer, agent).andExpect(status().isForbidden)
         appoint(proxies, owner, buyer).andExpect(status().isBadRequest)
-        // a body naming another principal is refused, not made the caller's
-        signedIn(owner) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming.replace("$owner", "$agent"))).andExpect(status().isBadRequest) }
+        // an owner naming another principal is refused — they do not run the assembly — and it is not made the caller's own
+        signedIn(owner) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming.replace("$owner", "$agent"))).andExpect(status().isForbidden) }
         appoint(proxies, owner, atHome, member).andExpect(status().isCreated)
         // a holder of a right of use appoints too, and another owner represents them
         val holderOfUse = person().also {

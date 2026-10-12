@@ -257,6 +257,7 @@ class NoticeServiceTest {
     fun `PM-GA-007 a successor in the office signs the act as the convenor - it names them and their sign-in, and they do not co-sign with themselves`() {
         val assembly = convened("2026-10-20T16:00:00Z")
         val successor = Actor(UUID.randomUUID(), "https://id.example.test/realms/domuvai", "login-successor")
+        owners[successor.party] = LocalDate.parse("2026-01-01")                       // an owner too: only signing twice is in the way
         assertThatThrownBy { notices.recordPosting(entranceId, assembly.id, successor, now, successor.party, photo) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-007")
         val act = notices.recordPosting(entranceId, assembly.id, successor, now, owner, photo)

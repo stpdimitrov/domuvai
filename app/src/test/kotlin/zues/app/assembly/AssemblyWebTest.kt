@@ -209,7 +209,7 @@ class AssemblyWebTest {
         mvc.perform(post("$base/${assembly.id}/notice-posting").by("login-successor").content(posting)).andExpect(status().isForbidden)
         verifyNoInteractions(assemblies, notices)
 
-        held[manager] = emptySet()                                                    // the convenor's mandate has ended
+        held[manager] = setOf(Role.CTL)                                               // the convenor is the manager no more — the controller now, another office
         val majority = MajorityRule("GENERAL", "50", Comparison.MORE_THAN, Denominator.REPRESENTED, "2009-01-01", "чл. 17 ЗУЕС", true, "PM-VOTE-002")
         whenever(assemblies.addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL"))
             .thenReturn(AgendaItemBound(AgendaItem(UUID.randomUUID(), entranceId, assembly.id, 1, "Отчет", "GENERAL", majority.id), majority, false))
