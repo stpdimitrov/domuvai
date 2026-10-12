@@ -266,6 +266,58 @@
         ],
         "type": "object"
       },
+      "AttendanceView": {
+        "properties": {
+          "attendeePartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "counted": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "identityVerified": {
+            "type": "boolean"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "recordedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "represents": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sessionNo": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attendeePartyId",
+          "channel",
+          "counted",
+          "id",
+          "identityVerified",
+          "recordedAt",
+          "recordedBy",
+          "represents",
+          "sessionNo"
+        ],
+        "type": "object"
+      },
       "BookAccessView": {
         "properties": {
           "actor": {
@@ -2330,6 +2382,22 @@
         ],
         "type": "object"
       },
+      "RecordAttendanceRequest": {
+        "properties": {
+          "attendeePartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attendeePartyId",
+          "channel"
+        ],
+        "type": "object"
+      },
       "RecordMandate": {
         "properties": {
           "body": {
@@ -2987,6 +3055,17 @@
         },
         "type": "object"
       },
+      "VerifyIdentityRequest": {
+        "properties": {
+          "how": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "how"
+        ],
+        "type": "object"
+      },
       "WhoIsAsking": {
         "properties": {
           "partyId": {
@@ -3352,6 +3431,328 @@
         "x-rules": [
           "PM-VOTE-004",
           "PM-GA-006",
+          "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_attendance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AttendanceView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Read the register of the sitting — each line, whether it counts, and whom it makes present",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-012",
+          "PM-GA-016"
+        ]
+      },
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_attendance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAttendanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-012",
+          "PM-GA-016",
+          "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_attendance_attendanceId_identity_verification",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attendanceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyIdentityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record that a remote participant was reliably identified, and how — from then on their presence counts",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-016",
           "PM-SEC-001"
         ]
       }

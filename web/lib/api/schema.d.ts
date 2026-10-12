@@ -55,6 +55,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the register of the sitting — each line, whether it counts, and whom it makes present */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
+        put?: never;
+        /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record that a remote participant was reliably identified, and how — from then on their presence counts */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_attendance_attendanceId_identity_verification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting": {
         parameters: {
             query?: never;
@@ -1025,6 +1060,22 @@ export interface components {
             validFrom?: string;
             validTo?: string;
         };
+        AttendanceView: {
+            /** Format: uuid */
+            attendeePartyId: string;
+            channel: string;
+            counted: boolean;
+            /** Format: uuid */
+            id: string;
+            identityVerified: boolean;
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: uuid */
+            recordedBy: string;
+            represents: string[];
+            /** Format: int32 */
+            sessionNo: number;
+        };
         BookAccessView: {
             /** Format: uuid */
             actor?: string;
@@ -1648,6 +1699,11 @@ export interface components {
             quantity: string;
             unitId: string;
         };
+        RecordAttendanceRequest: {
+            /** Format: uuid */
+            attendeePartyId: string;
+            channel: string;
+        };
         RecordMandate: {
             body?: string;
             /** Format: uuid */
@@ -1848,6 +1904,9 @@ export interface components {
         UntieLogin: {
             issuer?: string;
             subject?: string;
+        };
+        VerifyIdentityRequest: {
+            how: string;
         };
         WhoIsAsking: {
             /** Format: uuid */
@@ -2093,6 +2152,216 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_attendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_attendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordAttendanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_attendance_attendanceId_identity_verification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                attendanceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyIdentityRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

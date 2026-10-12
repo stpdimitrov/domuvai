@@ -38,6 +38,7 @@ class AssemblyActs(
     private val convening: AssemblyService,
     private val notices: NoticeService,
     private val proxies: ProxyService,
+    private val attendance: AttendanceService,
 ) {
     // Rule: PM-GA-002
     // Rule: PM-SEC-001
@@ -110,6 +111,29 @@ class AssemblyActs(
         // TODO(legal): PM-GA-009 — the strictest reading, pending the owner's answer.
         require(request.agentPartyId != recorder.party) { "whoever records a written proxy is not the proxy it names (PM-GA-009)" }
         return proxies.register(entranceId, assemblyId, command(named, request), recorder, document)
+    }
+
+    /** The register is kept by whoever runs the assembly: who is present, and that a remote participant was identified. */
+    // Rule: PM-GA-012
+    // Rule: PM-SEC-001
+    @Transactional
+    fun recordAttendance(who: Asking, entranceId: UUID, assemblyId: UUID, attendeePartyId: UUID, channel: String): Present =
+        attendance.record(entranceId, assemblyId, keepingTheRegister(who, entranceId, assemblyId), attendeePartyId, channel)
+
+    // Rule: PM-GA-016
+    // Rule: PM-SEC-001
+    @Transactional
+    fun verifyIdentity(who: Asking, entranceId: UUID, assemblyId: UUID, attendanceId: UUID, how: String): Present =
+        attendance.verifyIdentity(entranceId, assemblyId, attendanceId, keepingTheRegister(who, entranceId, assemblyId), how)
+
+    /** The policy's own line first, then: is this assembly theirs to run — refused under the register's rule either way. */
+    private fun keepingTheRegister(who: Asking, entranceId: UUID, assemblyId: UUID): Actor {
+        acting.actor(who, Action.KEEP_REGISTER, entranceId)
+        return try {
+            running(who, entranceId, assemblyId)
+        } catch (e: ActRefused) {
+            throw ActRefused(Action.KEEP_REGISTER.governedBy)
+        }
     }
 
     private fun command(principal: UUID, request: AppointProxyRequest) =

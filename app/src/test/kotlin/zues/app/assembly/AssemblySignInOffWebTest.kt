@@ -45,6 +45,7 @@ class AssemblySignInOffWebTest {
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var proxies: ProxyService
+    @MockitoBean lateinit var attendance: AttendanceService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
 
