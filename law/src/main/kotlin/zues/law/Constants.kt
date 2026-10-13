@@ -121,6 +121,9 @@ private val CONSTANTS: List<Constant> = listOf(
         todoLegal = "Confirm the share; the period after which an unmet demand lets the owners convene (the catalogue " +
             "gives none); and whose ideal parts count for a unit with both an owner and a holder of a right of use.",
     ),
+    // PM-GA-012 — the assembly is held if owners of at least 51% of the ideal parts are present, in person or by proxy.
+    // The statute states the figure; it is a share of all the ideal parts, not of those represented.
+    Constant("GA_QUORUM_PCT", "51", "2009-01-01", "чл. 15 ал. 1 ЗУЕС", true, rule = "PM-GA-012"),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */

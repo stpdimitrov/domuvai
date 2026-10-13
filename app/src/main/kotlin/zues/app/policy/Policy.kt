@@ -60,6 +60,9 @@ enum class Action(val governedBy: String) {
 
     /** recording a declaration a declarant handed in, in their name */
     RECORD_DECLARATION("PM-BOOK-003"),
+
+    /** weighing the quorum of a sitting and opening it — by whoever runs the assembly */
+    OPEN_SITTING("PM-GA-012"),
 }
 
 /**
@@ -138,7 +141,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 11
+        const val MATRIX_VERSION = 12
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -151,7 +154,7 @@ class Policy(private val sources: List<RoleSource>) {
          * an owner or a holder of use appoints their own; a written authorisation handed over is recorded by whoever
          * runs the assembly it is for — an office, or the owner who convened on a petition — which of them it is being the
          * assembly's to say (PM-GA-009). The register of who is present is kept the same way, by whoever runs the
-         * assembly (PM-GA-012). A unit's charges: its owner, for their own unit (PM-SEC-002), the manager and the board, who
+         * assembly, and by them its quorum is weighed and a sitting opened (PM-GA-012). A unit's charges: its owner, for their own unit (PM-SEC-002), the manager and the board, who
          * certify a unit's obligations (PM-DEBT-007), and the controller, who reads everything (PM-GOV-008). An entrance's
          * arrears — other persons' debts: the manager and the board, who pursue them (PM-DEBT-003), and the controller —
          * no owner as such. The cashier, a holder of use, an occupant and a firm's staff are given neither: no rule says so,
@@ -207,6 +210,10 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.FILE_DECLARATION, Role.USR, "PM-BOOK-003", ownUnitOnly = true),
             Permit(Action.RECORD_DECLARATION, Role.BM, "PM-BOOK-005"),
             Permit(Action.RECORD_DECLARATION, Role.MB, "PM-BOOK-005"),
+            Permit(Action.OPEN_SITTING, Role.BM, "PM-GA-012"),
+            Permit(Action.OPEN_SITTING, Role.MB, "PM-GA-012"),
+            Permit(Action.OPEN_SITTING, Role.CTL, "PM-GA-012"),
+            Permit(Action.OPEN_SITTING, Role.OWN, "PM-GA-012"),
         )
     }
 }

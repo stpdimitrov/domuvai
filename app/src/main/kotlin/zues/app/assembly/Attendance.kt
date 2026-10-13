@@ -66,6 +66,9 @@ data class Present(val attendance: Attendance, val identityVerifiedAt: Instant?,
     val represented: Set<UUID> get() = if (counted) brings else emptySet()
 }
 
+/** The register is kept from the notice on, and through the sitting: somebody arriving after it opened is entered too. */
+private val REGISTER_KEPT = setOf(AssemblyStatus.NOTICED.name, AssemblyStatus.OPEN.name)
+
 /** The first sitting. Which sitting an assembly is at, and how many there may be, is the quorum ladder's to say. */
 const val FIRST_SITTING = 1
 
@@ -152,7 +155,7 @@ class AttendanceService(
     /** The assembly, locked, when its notice is posted and today in Sofia is the day it meets — the register's one day. */
     private fun sittingToday(entranceId: UUID, assemblyId: UUID): Assembly {
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
-        check(assembly.status == AssemblyStatus.NOTICED.name) { "the register is kept for an assembly whose notice is posted; this one is ${assembly.status}" }
+        check(assembly.status in REGISTER_KEPT) { "the register is kept for an assembly whose notice is posted; this one is ${assembly.status}" }
         check(LocalDate.parse(toSofiaDate(clock.instant())) == sittingDay(assembly)) { "the register is kept on the day the assembly meets, ${sittingDay(assembly)}" }
         return assembly
     }
