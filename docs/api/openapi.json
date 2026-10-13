@@ -2366,6 +2366,56 @@
         ],
         "type": "object"
       },
+      "QuorumView": {
+        "properties": {
+          "cannotWeigh": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "derivedParts": {
+            "type": "boolean"
+          },
+          "met": {
+            "type": "boolean"
+          },
+          "representedPct": {
+            "type": "string"
+          },
+          "sittings": {
+            "items": {
+              "$ref": "#/components/schemas/SittingView"
+            },
+            "type": "array"
+          },
+          "thresholdPct": {
+            "type": "string"
+          },
+          "thresholdSource": {
+            "type": "string"
+          },
+          "thresholdVerified": {
+            "type": "boolean"
+          },
+          "weighedOn": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cannotWeigh",
+          "derivedParts",
+          "met",
+          "representedPct",
+          "sittings",
+          "thresholdPct",
+          "thresholdSource",
+          "thresholdVerified",
+          "weighedOn"
+        ],
+        "type": "object"
+      },
       "ReadingRequest": {
         "properties": {
           "item": {
@@ -2645,6 +2695,74 @@
         "required": [
           "reason",
           "revertedBy"
+        ],
+        "type": "object"
+      },
+      "SittingView": {
+        "properties": {
+          "basisHash": {
+            "type": "string"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lawVersion": {
+            "type": "string"
+          },
+          "openedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "quorumMet": {
+            "type": "boolean"
+          },
+          "representedPct": {
+            "type": "string"
+          },
+          "sessionNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "thresholdConstant": {
+            "type": "string"
+          },
+          "thresholdPct": {
+            "type": "string"
+          },
+          "thresholdVerified": {
+            "type": "boolean"
+          },
+          "weighedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "weighedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "weighedOn": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "basisHash",
+          "engineVersion",
+          "id",
+          "lawVersion",
+          "quorumMet",
+          "representedPct",
+          "sessionNo",
+          "thresholdConstant",
+          "thresholdPct",
+          "thresholdVerified",
+          "weighedAt",
+          "weighedBy",
+          "weighedOn"
         ],
         "type": "object"
       },
@@ -4065,6 +4183,91 @@
         ]
       }
     },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_quorum",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuorumView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "The quorum meter — the share of all ideal parts the register makes present against the threshold in force, or why it cannot be weighed; and the sittings weighed so far",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-012",
+          "PM-ORG-005",
+          "PM-ORG-011"
+        ]
+      }
+    },
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule": {
       "post": {
         "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_schedule",
@@ -4182,6 +4385,90 @@
         "x-rules": [
           "PM-GA-004",
           "PM-GA-006",
+          "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_sittings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SittingView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Weigh the quorum of the sitting, once, and open the assembly if it is met — by whoever runs it, not before the hour the notice stated",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-012",
           "PM-SEC-001"
         ]
       }
