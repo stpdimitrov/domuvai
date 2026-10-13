@@ -54,7 +54,8 @@ interface SittingRepository : ListCrudRepository<Sitting, UUID> {
 /**
  * Quorum as it stands: the ideal parts of the owners the register makes present, by title share, against the
  * threshold in force on the day of the sitting. [cannotWeigh] is why it cannot be weighed at all; then nothing is met.
- * [basis] lists what was counted, one line per holding, and [basisHash] is its SHA-256.
+ * [basis] says what was weighed against what, then one line per holding counted — the owner, the unit, the parts, and
+ * the line of the register that made them present — and [basisHash] is its SHA-256.
  */
 data class Quorum(
     val on: LocalDate,
@@ -138,7 +139,8 @@ class SittingService(
     // TODO(legal): PM-GA-012 — whose ideal parts count for a unit with both an owner and a holder of a right of use
     internal fun weigh(assembly: Assembly): Quorum {
         val on = sittingDay(assembly)
-        val represented = attendance.register(assembly.entranceId, assembly.id).flatMapTo(mutableSetOf()) { it.represented }
+        val register = attendance.register(assembly.entranceId, assembly.id)
+        val represented = register.flatMapTo(mutableSetOf()) { it.represented }
         val owned = holdings.inForce(assembly.entranceId, on, TitleRole.OWN)
         val theirs = owned.holdings.filter { it.partyId in represented }
         val ownedUnits = owned.holdings.map { it.unitId }.toSet()
@@ -151,18 +153,35 @@ class SittingService(
         }
         val weighed = theirs.filter { it.unitId !in bothRoles && it.unitId !in overHeld }
         val threshold = constantOn("GA_QUORUM_PCT", on.toString())
+        // A unit never weighs more than its own ideal parts, however its co-owners' rounded shares add up (PM-ORG-005).
+        val representedPct = weighed.groupBy { it.unitId }.values.fold(BigDecimal.ZERO) { sum, ofUnit ->
+            sum + ofUnit.fold(BigDecimal.ZERO) { parts, held -> parts + BigDecimal(held.idealParts) }.min(BigDecimal(ofUnit.first().unitIdealParts))
+        }
+        val thresholdConstant = "${threshold.code}@${threshold.inForceFrom}"
+        // why each owner counted: the first line of the register that brings them, how they were present, and when identified
+        val through = weighed.map { it.partyId }.distinct().associateWith { party -> register.first { party in it.represented } }
         return Quorum(
             on = on,
-            representedPct = weighed.fold(BigDecimal.ZERO) { sum, held -> sum + BigDecimal(held.idealParts) },
+            representedPct = representedPct,
             thresholdPct = BigDecimal(threshold.value),
             thresholdSource = threshold.source,
             thresholdVerified = threshold.verified,
-            thresholdConstant = "${threshold.code}@${threshold.inForceFrom}",
+            thresholdConstant = thresholdConstant,
             cannotWeigh = cannotWeigh,
             derivedParts = weighed.any { it.idealPartsSource != "DECLARED" },
-            basis = weighed.map { "${it.partyId} ${it.unitId} ${it.idealParts}" }.sorted().joinToString("\n"),
+            basis = (
+                listOf("on $on against $thresholdConstant ${threshold.value}: ${representedPct.stripTrailingZeros().toPlainString()}") +
+                    weighed.map {
+                        val line = through.getValue(it.partyId)
+                        "${it.partyId} ${it.unitId} ${it.idealParts} of ${it.unitIdealParts} by ${line.attendance.id} ${line.attendance.channel} ${line.identityVerifiedAt ?: "-"}"
+                    }.sorted()
+                ).joinToString("\n"),
         )
     }
+
+    /** Whether a quorum of this assembly has been weighed: from then on what its notice stated stays as it is. */
+    @Transactional(readOnly = true)
+    fun weighed(assemblyId: UUID): Boolean = sittings.findByAssemblyIdOrderBySessionNo(assemblyId).isNotEmpty()
 
     private fun sittingDay(assembly: Assembly): LocalDate = LocalDate.parse(toSofiaDate(assembly.scheduledAt))   // a Sofia calendar day (PM-SYS-004)
 }

@@ -283,6 +283,11 @@ class AssemblyWebTest {
         whenever(attendance.begun(assembly.id)).thenReturn(true)
         mvc.perform(post("$base/${assembly.id}/agenda").by("login-manager").content("""{"text":"Още една точка","itemType":"GENERAL"}""")).andExpect(status().isConflict)
         mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content("""{"scheduledAt":"$at","place":"двора"}""")).andExpect(status().isConflict)
+        // … nor once its quorum has been weighed, though nobody came
+        whenever(attendance.begun(assembly.id)).thenReturn(false)
+        whenever(sittings.weighed(assembly.id)).thenReturn(true)
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-manager").content("""{"text":"Още една точка","itemType":"GENERAL"}""")).andExpect(status().isConflict)
+        mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content("""{"scheduledAt":"$at","place":"двора"}""")).andExpect(status().isConflict)
         verifyNoInteractions(assemblies)
     }
 

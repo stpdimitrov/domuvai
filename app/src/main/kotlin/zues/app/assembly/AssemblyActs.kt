@@ -160,7 +160,9 @@ class AssemblyActs(
      * and the people entered are present at that meeting and no other.
      */
     private fun notOnceTheRegisterIsOpen(assemblyId: UUID) =
-        check(!attendance.begun(assemblyId)) { "people are already on the register of this assembly: its date, place and agenda no longer change" }
+        check(!attendance.begun(assemblyId) && !sittings.weighed(assemblyId)) {
+            "people are already on the register of this assembly, or its quorum is weighed: its date, place and agenda no longer change"
+        }
 
     /** Nobody is present twice: a person on the register does not then hand their presence to another (Rule: PM-ORG-005). */
     // Rule: PM-ORG-005

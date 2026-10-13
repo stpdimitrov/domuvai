@@ -12,7 +12,7 @@ ALTER TABLE assembly.session ADD COLUMN threshold_pct numeric(14,10) NOT NULL;
 -- which dated constant the threshold was, and whether counsel had confirmed it that day
 ALTER TABLE assembly.session ADD COLUMN threshold_constant text NOT NULL;
 ALTER TABLE assembly.session ADD COLUMN threshold_verified boolean NOT NULL;
--- what was weighed — each owner represented, each unit, the ideal parts counted — and its hash (ADR-001)
+-- what was weighed — each owner represented, each unit, the ideal parts counted, the line of the register that made them present — and its hash (ADR-001)
 ALTER TABLE assembly.session ADD COLUMN basis text NOT NULL;
 ALTER TABLE assembly.session ADD COLUMN basis_hash text NOT NULL CHECK (basis_hash ~ '^[0-9a-f]{64}$');
 ALTER TABLE assembly.session ADD COLUMN law_version text NOT NULL;

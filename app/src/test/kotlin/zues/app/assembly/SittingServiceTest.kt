@@ -135,11 +135,32 @@ class SittingServiceTest {
         assertThat(meter().representedPct).isEqualByComparingTo("20")                // half of 40, never 40
         present(big, half)                                                           // big attends, and also holds the half-owner's proxy: half is not counted again
         assertThat(meter().representedPct).isEqualByComparingTo("51")
-        assertThat(meter().basis.lines()).hasSize(2)
+        assertThat(meter().basis.lines()).hasSize(3)                                 // what against what, then the two holdings
         present(otherHalf)
         assertThat(meter().representedPct).isEqualByComparingTo("71")
         // read a week later, it is still the day of the sitting whose book is weighed (PM-ORG-011)
         assertThat(service(meets.plusSeconds(7 * 86400)).read(entranceId, assembly.id).quorum.representedPct).isEqualByComparingTo("71")
+    }
+
+    @Test
+    fun `PM-ORG-005 a unit never weighs more than its own ideal parts, however its co-owners' rounded shares add up`() {
+        val unit = UUID.randomUUID()
+        val six = List(6) { owner("50.9999", share = "0.166667", unit = unit) }     // six sixths, each rounded up: 51.0000019998 if simply added
+        owner("49.0001")
+        present(*six.toTypedArray())
+        assertThat(meter().representedPct).isEqualByComparingTo("50.9999")
+        assertThat(meter().met).isFalse()
+    }
+
+    @Test
+    fun `PM-LAW-002 a weighing stores the catalogue version, the engine version and the dated constant that produced it`() {
+        present(owner("80"))
+        val sitting = service().open(entranceId, assembly.id, keeper)
+        assertThat(sitting.lawVersion).isEqualTo(CATALOGUE_VERSION)
+        assertThat(sitting.engineVersion).isEqualTo(ENGINE_VERSION)
+        assertThat(sitting.thresholdConstant).isEqualTo("GA_QUORUM_PCT@${threshold.inForceFrom}")
+        assertThat(sitting.thresholdVerified).isEqualTo(threshold.verified)
+        assertThat(sitting.basis).startsWith("on $sittingDay against GA_QUORUM_PCT@${threshold.inForceFrom} ${threshold.value}: 80")
     }
 
     @Test
@@ -203,7 +224,8 @@ class SittingServiceTest {
 
         val sitting = service(meets.plusSeconds(600)).open(entranceId, assembly.id, keeper)
         val unit = book.first { it.party == a }.unit
-        assertThat(sitting.basis).isEqualTo("$a $unit 70")
+        assertThat(sitting.basis).isEqualTo("on 2026-11-20 against GA_QUORUM_PCT@${threshold.inForceFrom} 51: 70\n$a $unit 70 of 70 by ${lines.single().attendance.id} IN_PERSON -")
+        assertThat(service().weighed(assembly.id)).isTrue()
         assertThat(sitting.basisHash).matches("[0-9a-f]{64}").isEqualTo(service().read(entranceId, assembly.id).quorum.basisHash)
         assertThatThrownBy { service(meets.plusSeconds(900)).open(entranceId, assembly.id, keeper) }.isInstanceOf(IllegalStateException::class.java)   // it is open
     }
