@@ -2632,3 +2632,41 @@ The retention windows were answered on 2026-09-28: 3 months where no law says ot
 - A new owner reads the unit's whole statement, the previous owner's charges included ("their unit's charges"); a past owner reads nothing. Both per the decisions; worth confirming with counsel.
 
 **Read first next time** — #164, #209, this entry, `app/src/main/kotlin/zues/app/money/MoneyAccess.kt`.
+
+---
+
+## AUTH-05b · 2026-10-13 · registry — a book declaration is filed by its declarant, or recorded in their name by the manager (PM-BOOK-003, PM-BOOK-005)
+
+**Did**
+- Claim #211, part of #164. Closes #164's item 1: `POST …/book/declarations` took its declarant from the request body, so any signed-in person could file for the book in someone else's name.
+- **The declarant is now the sign-in's party** (`DeclarationFiling`).
+- **Filing your own** (`FILE_DECLARATION`): an owner or a user of the unit today (PM-BOOK-003, own unit only).
+- **Naming another person** (`RECORD_DECLARATION`): the manager or the board recording one handed in on paper (PM-BOOK-005). The controller writes nothing. The named declarant must be an owner or user of the unit today, like any declarant. Anyone else, or a party not there, gets the same 404.
+- **The row records who filed it:** new `book_declaration.filed_by`, migration `V202610122030__declaration_filed_by.sql`; existing rows NULL.
+- **Ordering:** a unit missing or in another entrance is decided on the entrance alone, so a declarant learns nothing. A manager gets one "no unit X in entrance E" whether the unit is missing or elsewhere.
+- **A refusal is a 403** naming PM-BOOK-003. With `DOMUVAI_AUTH=off` and nobody asking, the body's `partyId` is used as before.
+- Matrix 10 → 11. `DeclarationService.file` says callers go through `DeclarationFiling`.
+
+**Rules covered** — PM-BOOK-003, PM-BOOK-005 (who files and records).
+
+**Tests added**
+- `DeclarationFilingIT` (2, Postgres, signed requests through real titles and mandates). Each declaration is checked as the stored (declarant, filed_by) pair.
+  - **Owners and users:** each files their own. Refused: a unit they don't hold, someone else's name, a unit not there, a login tied to nobody.
+  - **Manager and board:** each records in an owner's name.
+  - **Refused:** the controller, the cashier, and an office as its own declarant.
+  - **404:** an unknown unit, a non-holder, or a party not there.
+- `DeclarationWebTest` +1: the 403 names the rule.
+- `PolicyTest`: the matrix pin.
+- **Mutations, each caught:** naming another person treated as filing your own; the controller allowed to record; the filer not stored; the holder check dropped.
+
+**Decisions**
+- D1–D4: the owner's go, 2026-10-12.
+- **After the fresh review (subagent, diff + rule texts only):** D2's declarant is narrowed to an owner or user of the unit, per PM-BOOK-003's "owners and users", so a manager can't put a book entry under a non-holder's name.
+
+**Open**
+- **PM-BOOK-009:** a self-filed declaration landing *pending* for the manager to approve.
+- **`filed_by` is recorded but read back nowhere.** A declaration the manager recorded clears the overdue entry like a self-filed one (it should, per PM-BOOK-005), but no view shows who filed it.
+- The registry's other writes (parties, titles, units, households, animals, absences): #164 item 2.
+- The RECORD lines cite PM-BOOK-005, whose text is about animals. The review suggests PM-BOOK-003 for the line, as in the approved contract; worth the owner's look.
+
+**Read first next time** — #164, this entry, `app/src/main/kotlin/zues/app/registry/DeclarationFiling.kt`.

@@ -1106,7 +1106,6 @@
         },
         "required": [
           "kind",
-          "partyId",
           "unitId"
         ],
         "type": "object"
@@ -7627,13 +7626,14 @@
             "description": "Not Found"
           }
         },
-        "summary": "File a declaration for entry in the book — dated by the system, on the template in force",
+        "summary": "File a declaration for entry in the book — by its declarant, or recorded in their name by the manager; dated by the system, on the template in force",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-BOOK-003",
-          "PM-BOOK-004"
+          "PM-BOOK-004",
+          "PM-BOOK-005"
         ]
       }
     },

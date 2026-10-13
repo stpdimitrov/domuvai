@@ -54,6 +54,12 @@ enum class Action(val governedBy: String) {
 
     /** every unit of an entrance and what each was charged, paid and owes — its arrears, its journal: other persons' debts */
     READ_ENTRANCE_ARREARS("PM-SEC-002"),
+
+    /** filing one's own declaration for the book, for a unit one holds */
+    FILE_DECLARATION("PM-BOOK-003"),
+
+    /** recording a declaration a declarant handed in, in their name */
+    RECORD_DECLARATION("PM-BOOK-003"),
 }
 
 /**
@@ -132,7 +138,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 10
+        const val MATRIX_VERSION = 11
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -149,7 +155,9 @@ class Policy(private val sources: List<RoleSource>) {
          * certify a unit's obligations (PM-DEBT-007), and the controller, who reads everything (PM-GOV-008). An entrance's
          * arrears — other persons' debts: the manager and the board, who pursue them (PM-DEBT-003), and the controller —
          * no owner as such. The cashier, a holder of use, an occupant and a firm's staff are given neither: no rule says so,
-         * pending counsel.
+         * pending counsel. A declaration for the book: an owner or a user files their own, for a unit they hold
+         * (PM-BOOK-003); one handed in on paper is recorded in its declarant's name by the manager or the board, who enter
+         * the book from the owner's declaration (PM-BOOK-005) — not the controller, who writes nothing (PM-GOV-008).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -195,6 +203,10 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.READ_ENTRANCE_ARREARS, Role.BM, "PM-DEBT-003"),
             Permit(Action.READ_ENTRANCE_ARREARS, Role.MB, "PM-DEBT-003"),
             Permit(Action.READ_ENTRANCE_ARREARS, Role.CTL, "PM-GOV-008"),
+            Permit(Action.FILE_DECLARATION, Role.OWN, "PM-BOOK-003", ownUnitOnly = true),
+            Permit(Action.FILE_DECLARATION, Role.USR, "PM-BOOK-003", ownUnitOnly = true),
+            Permit(Action.RECORD_DECLARATION, Role.BM, "PM-BOOK-005"),
+            Permit(Action.RECORD_DECLARATION, Role.MB, "PM-BOOK-005"),
         )
     }
 }

@@ -53,6 +53,7 @@ class BookRefusals {
         val REFUSALS = mapOf(
             "PM-BOOK-006" to "the book's data is for the manager, the board and the controller of this entrance",
             "PM-BOOK-010" to "what is past its retention window is anonymised by the manager and the board of this entrance",
+            "PM-BOOK-003" to "a declaration is filed by its declarant, an owner or a user of the unit, or recorded in their name by the manager or the board",
         )
     }
 }

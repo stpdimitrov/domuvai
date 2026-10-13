@@ -36,10 +36,15 @@ class DeclarationService(
     private val parties: PartyRepository,
     private val clock: Clock,
 ) {
+    /**
+     * Writes the declaration as told — it checks no one. Every caller goes through [DeclarationFiling], which says who the
+     * declarant is and whether they may file (PM-BOOK-003, PM-BOOK-005).
+     */
     @Transactional
-    fun file(entranceId: UUID, unitId: UUID, partyId: UUID, kind: String): BookDeclaration {
-        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
-        if (unit.entranceId != entranceId) throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
+    fun file(entranceId: UUID, unitId: UUID, partyId: UUID, kind: String, filedBy: UUID? = null): BookDeclaration {
+        // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
+        val unit = units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
+            ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
         if (!parties.existsById(partyId)) throw NoSuchElementException("no party $partyId")
         val declared = enumValueOf<DeclarationKind>(kind)                        // unknown kind -> 400
         val filedOn = LocalDate.parse(toSofiaDate(clock.instant()))              // a Sofia calendar day (PM-SYS-004)
@@ -52,6 +57,7 @@ class DeclarationService(
                 kind = declared.name,
                 filedOn = filedOn,
                 templateVersion = constantOn("BOOK_DECLARATION_TEMPLATE", filedOn.toString()).value,   // PM-BOOK-004
+                filedBy = filedBy,
             ),
         )
     }

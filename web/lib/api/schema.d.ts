@@ -783,7 +783,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** File a declaration for entry in the book — dated by the system, on the template in force */
+        /** File a declaration for entry in the book — by its declarant, or recorded in their name by the manager; dated by the system, on the template in force */
         post: operations["post_registry_entrances_entranceId_book_declarations"];
         delete?: never;
         options?: never;
@@ -1312,7 +1312,7 @@ export interface components {
         FileDeclarationRequest: {
             kind: string;
             /** Format: uuid */
-            partyId: string;
+            partyId?: string;
             /** Format: uuid */
             unitId: string;
         };

@@ -100,6 +100,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var retention: BookRetentionService
     @MockitoBean lateinit var bookLists: BookLists
     @MockitoBean lateinit var declarations: DeclarationService
+    @MockitoBean lateinit var declarationFiling: zues.app.registry.DeclarationFiling
     @MockitoBean lateinit var ownership: OwnershipService
     @MockitoBean lateinit var registry: RegistryService
 

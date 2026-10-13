@@ -20,6 +20,8 @@ data class BookDeclaration(
     val kind: String,              // DeclarationKind
     val filedOn: LocalDate,
     val templateVersion: String,
+    /** Rule: PM-BOOK-003 — who filed it: the declarant, or the manager recording it (PM-BOOK-005). Null with sign-in switched off. */
+    val filedBy: UUID? = null,
 )
 
 /** Why a declaration is filed: title or use newly acquired, or a change of the declared data. */
