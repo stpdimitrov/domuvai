@@ -94,14 +94,20 @@ class ProxyPersistenceIT {
         signedInAs = "login-$it"
     }
 
+    /**
+     * The book as a fixture enters it: by nobody signed in, as sign-in switched off allows — whoever is signed in for the
+     * test is not the one entering the book (PM-BOOK-005: the manager or the board do).
+     */
+    private fun entered(path: String, body: String): JsonNode = signedIn(null) { created(path, body) }
+
     /** An owner of a unit of the entrance since the start of last year — the whole entrance, the first time it is asked for. */
     private fun owner(entranceId: UUID): UUID = person().also {
         val existing = jdbc.queryForList("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)
         val unit = existing.firstOrNull() ?: UUID.fromString(
-            created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
+            entered("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
                 .get("unitIds")[0].asText(),
         )
-        created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"${if (existing.isEmpty()) "0.5" else "0.25"}","validFrom":"2025-01-01"}""")
+        entered("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"${if (existing.isEmpty()) "0.5" else "0.25"}","validFrom":"2025-01-01"}""")
     }
 
     /** A month from now: far enough for any notice period, whenever this runs. */
@@ -173,7 +179,7 @@ class ProxyPersistenceIT {
     fun `PM-GA-009 PM-SEC-001 what the audit could do is refused - a principal named in the body, a principal with no title, an owner who owns nothing, a household member who lives elsewhere`() {
         val proxies = assembly(entrance())
         val entranceId = entranceOf(proxies)
-        val bothUnits = created(
+        val bothUnits = entered(
             "/api/registry/entrances/$entranceId/units",
             """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"60.0000","separateEntrance":false},
                          {"designation":"ап. 2","unitType":"FLAT","idealParts":"40.0000","separateEntrance":false}]}""",
@@ -239,7 +245,7 @@ class ProxyPersistenceIT {
         appoint(proxies, owner, atHome, member).andExpect(status().isCreated)
         // a holder of a right of use appoints too, and another owner represents them
         val holderOfUse = person().also {
-            created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"USR","share":"1","validFrom":"2025-01-01"}""")
+            entered("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"USR","share":"1","validFrom":"2025-01-01"}""")
         }
         appoint(proxies, holderOfUse, agent).andExpect(status().isCreated)
         assertThat(jdbc.queryForList("SELECT principal_party_id FROM assembly.proxy WHERE entrance_id = ? ORDER BY registered_at", UUID::class.java, entranceId))
