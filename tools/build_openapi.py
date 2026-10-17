@@ -35,15 +35,15 @@ RUNNING = {
  ('get', '/api/registry/entrances/{entranceId}/units'):
    ('List the units of an entrance', ['PM-ORG-001', 'PM-ORG-002', 'PM-ORG-003']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household'):
-   ("Register a unit's household — who counts for per-person charges", ['PM-FEE-005', 'PM-FEE-008']),
+   ("Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403", ['PM-FEE-005', 'PM-FEE-008', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals'):
-   ('Record the animals kept in a unit', ['PM-BOOK-005', 'PM-FEE-009']),
+   ('Record the animals kept in a unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-005', 'PM-FEE-009']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/absences'):
-   ('File an absence declaration — the long-absence exemption', ['PM-FEE-006', 'PM-FEE-007']),
+   ('File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-FEE-006', 'PM-FEE-007', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end'):
-   ('Record or correct the day a resident left — their occupancy range closes', ['PM-BOOK-008']),
+   ('Record or correct the day a resident left — their occupancy range closes — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-008', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end'):
-   ('Record or correct the day an animal left the unit', ['PM-BOOK-005', 'PM-BOOK-008']),
+   ('Record or correct the day an animal left the unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-005', 'PM-BOOK-008']),
  ('get', '/api/registry/entrances/{entranceId}/book'):
    ('Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)', ['PM-BOOK-001', 'PM-BOOK-002', 'PM-BOOK-006', 'PM-BOOK-007']),
  ('get', '/api/registry/entrances/{entranceId}/book/access-log'):

@@ -27,6 +27,8 @@ class RegistryWebTest {
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var registry: RegistryService
+    @MockitoBean lateinit var book: BookEntries
+    @MockitoBean lateinit var who: zues.app.identity_org.WhoAsks
 
     @Test
     fun `POST an entrance returns 201 with the created ids`() {

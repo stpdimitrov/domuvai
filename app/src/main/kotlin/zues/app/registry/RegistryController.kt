@@ -2,6 +2,7 @@ package zues.app.registry
 
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -92,10 +94,13 @@ data class EndStayRequest(val on: String)
 
 data class StayEnded(val id: UUID, val validFrom: LocalDate, val validTo: LocalDate)
 
-/** The registry module's HTTP edge — entrances and their units. */
+/**
+ * The registry module's HTTP edge — entrances and their units. Who lives in a unit is entered in the book by the
+ * manager or the board, as the sign-in says who is asking; anybody else is a 403 (PM-BOOK-005).
+ */
 @RestController
 @RequestMapping("/api/registry/entrances")
-class RegistryController(private val registry: RegistryService) {
+class RegistryController(private val registry: RegistryService, private val book: BookEntries, private val who: WhoAsks) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -131,11 +136,13 @@ class RegistryController(private val registry: RegistryService) {
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: RegisterHouseholdRequest,
+        signedIn: JwtAuthenticationToken?,
     ): HouseholdRegisteredResponse {
-        val ids = registry.registerHousehold(
+        val ids = book.household(
             entranceId,
             unitId,
             request.members.map { RegisterMember(it.isChildUnder6, it.validFrom) },
+            who.of(signedIn),
         )
         return HouseholdRegisteredResponse(ids)
     }
@@ -146,11 +153,13 @@ class RegistryController(private val registry: RegistryService) {
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: RegisterAnimalsRequest,
+        signedIn: JwtAuthenticationToken?,
     ): AnimalsRegisteredResponse {
-        val ids = registry.registerAnimals(
+        val ids = book.animals(
             entranceId,
             unitId,
             request.animals.map { RegisterAnimal(it.species, it.vetPassportNo, it.validFrom) },
+            who.of(signedIn),
         )
         return AnimalsRegisteredResponse(ids)
     }
@@ -161,11 +170,13 @@ class RegistryController(private val registry: RegistryService) {
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: RegisterAbsencesRequest,
+        signedIn: JwtAuthenticationToken?,
     ): AbsencesRegisteredResponse {
-        val ids = registry.registerAbsence(
+        val ids = book.absences(
             entranceId,
             unitId,
             request.absences.map { RegisterAbsence(it.absentFrom, it.absentTo) },
+            who.of(signedIn),
         )
         return AbsencesRegisteredResponse(ids)
     }
@@ -176,10 +187,9 @@ class RegistryController(private val registry: RegistryService) {
         @PathVariable unitId: UUID,
         @PathVariable memberId: UUID,
         @RequestBody request: EndStayRequest,
-    ): StayEnded {
-        val on = LocalDate.parse(request.on)
-        return registry.endHouseholdStay(entranceId, unitId, memberId, on).let { StayEnded(it.id, it.validFrom, on) }
-    }
+        signedIn: JwtAuthenticationToken?,
+    ): StayEnded =
+        book.endHouseholdStay(entranceId, unitId, memberId, request.on, who.of(signedIn))
 
     @PostMapping("/{entranceId}/units/{unitId}/animals/{animalId}/end")
     fun endAnimalStay(
@@ -187,10 +197,9 @@ class RegistryController(private val registry: RegistryService) {
         @PathVariable unitId: UUID,
         @PathVariable animalId: UUID,
         @RequestBody request: EndStayRequest,
-    ): StayEnded {
-        val on = LocalDate.parse(request.on)
-        return registry.endAnimalStay(entranceId, unitId, animalId, on).let { StayEnded(it.id, it.validFrom, on) }
-    }
+        signedIn: JwtAuthenticationToken?,
+    ): StayEnded =
+        book.endAnimalStay(entranceId, unitId, animalId, request.on, who.of(signedIn))
 
     @GetMapping("/{entranceId}/units")
     fun listUnits(@PathVariable entranceId: UUID): List<UnitView> =
