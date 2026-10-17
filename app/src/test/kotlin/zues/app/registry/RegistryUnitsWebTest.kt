@@ -23,14 +23,17 @@ import java.math.BigDecimal
  * failure modes surface (invalid parts → 400, unknown entrance → 404) without a database.
  */
 @WebMvcTest(RegistryController::class)
+@org.springframework.context.annotation.Import(zues.app.identity_org.WhoAsks::class, BookEntries::class)
 class RegistryUnitsWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var registry: RegistryService
-    @MockitoBean lateinit var book: BookEntries
-    @MockitoBean lateinit var who: zues.app.identity_org.WhoAsks
+    @MockitoBean lateinit var ownership: OwnershipService
+    @MockitoBean lateinit var policy: zues.app.policy.Policy
+    @MockitoBean lateinit var logins: zues.app.identity_org.Logins
+    @MockitoBean lateinit var clock: java.time.Clock
 
     private val entranceId = UUID.randomUUID()
     private val body = RegisterUnitsRequest(

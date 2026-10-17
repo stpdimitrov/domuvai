@@ -3,8 +3,10 @@ package zues.app.registry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -26,8 +28,9 @@ import java.time.LocalDate
 import java.util.UUID
 
 /**
- * Who enters in the book who lives in a unit, against real PostgreSQL — through the sign-in, the titles and mandates that
- * give roles, and the policy (PM-BOOK-005, PM-GOV-008, ADR-002). Docker-gated — runs in CI.
+ * Who enters the book — an entrance's units, a unit's titles, who lives in it — against real PostgreSQL: through the
+ * sign-in, the titles and mandates that give roles, and the policy (PM-BOOK-005, PM-GOV-008, ADR-002); and the database's
+ * own refusal of an entry for a unit of another entrance (PM-ORG-001, #170). Docker-gated — runs in CI.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -146,5 +149,89 @@ class BookEntriesIT {
             .andExpect(status().isForbidden)                                                                   // a unit not there: told nothing
         send("/api/registry/entrances/$entrance/units/$flat/household/${UUID.randomUUID()}/end", "x-owner", """{"on":"01.05.2026"}""")
             .andExpect(status().isForbidden)                                                                   // refused before the day is read
+    }
+
+    private fun titles(unit: UUID): Int = jdbc.queryForObject("SELECT count(*) FROM registry.title WHERE unit_id = ?", Int::class.java, unit)!!
+
+    private fun units(entrance: UUID): Int = jdbc.queryForObject("SELECT count(*) FROM registry.unit WHERE entrance_id = ?", Int::class.java, entrance)!!
+
+    private fun title(entrance: UUID, unit: UUID, by: String, party: UUID, role: String = "OWN"): ResultActions =
+        send("/api/registry/entrances/$entrance/units/$unit/titles", by, """{"partyId":"$party","titleRole":"$role","share":"1","validFrom":"2020-01-01"}""")
+
+    private fun unitsBy(entrance: UUID, by: String): ResultActions =
+        send("/api/registry/entrances/$entrance/units", by, """{"units":[{"designation":"ап. 1","unitType":"APARTMENT","idealParts":"55.0000"},{"designation":"ап. 2","unitType":"APARTMENT","idealParts":"45.0000"}]}""")
+
+    @Test
+    fun `PM-BOOK-005 the manager and the board enter an entrance's units and a unit's owners and users`() {
+        val forManager = registry.registerEntrance(RegisterEntrance("ул. Витоша 14", "А", "GA")).entranceId
+        val forBoard = registry.registerEntrance(RegisterEntrance("ул. Витоша 16", "А", "GA")).entranceId
+        person("Мария Иванова", "t-manager").also { mandate(forManager, "BM", it) }
+        person("Радка Тонева", "t-board").also { mandate(forBoard, "MB", it) }
+        val owner = person("Иван Петров", "t-owner")
+        val user = person("Анна Петрова", "t-user")
+
+        for ((entrance, by) in listOf(forManager to "t-manager", forBoard to "t-board")) {
+            unitsBy(entrance, by).andExpect(status().isCreated).andExpect(jsonPath("$.unitIds.length()").value(2))
+            val flat = registry.listUnits(entrance).first { it.designation == "ап. 1" }.id
+            title(entrance, flat, by, owner).andExpect(status().isCreated)
+            title(entrance, flat, by, user, role = "USR").andExpect(status().isCreated)
+            assertThat(units(entrance) to titles(flat)).describedAs(by).isEqualTo(2 to 2)
+        }
+        // a unit of another entrance, asked through this one: the manager here records no title there
+        val (_, elsewhere) = entrance("ул. Витоша 18")
+        title(forManager, elsewhere, "t-manager", owner).andExpect(status().isNotFound)
+        assertThat(titles(elsewhere)).isZero()
+    }
+
+    @Test
+    fun `PM-BOOK-005 nobody makes themself an owner — the owner and user of a unit, the controller, the cashier, another entrance's manager and a login tied to nobody record no title and register no unit`() {
+        val (entrance, flat) = entrance("ул. Витоша 20")
+        val (elsewhere) = entrance("ул. Витоша 22")
+        val empty = registry.registerEntrance(RegisterEntrance("ул. Витоша 24", "А", "GA")).entranceId
+        person("Елена Колева", "n-controller").also { mandate(entrance, "CTL", it); mandate(empty, "CTL", it) }
+        person("Стефан Илиев", "n-cashier").also { mandate(entrance, "CSH", it); mandate(empty, "CSH", it) }
+        val owner = person("Иван Петров", "n-owner").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
+        person("Анна Петрова", "n-user").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
+        person("Мария Иванова", "n-other-manager").also { mandate(elsewhere, "BM", it) }
+        val stranger = person("Петя Колева", "n-stranger")
+
+        for (by in listOf("n-owner", "n-user", "n-controller", "n-cashier", "n-other-manager", "n-stranger", "n-a-login-tied-to-nobody")) {
+            val party = if (by == "n-owner") owner else stranger         // the owner adding themself again, or a stranger made owner
+            title(entrance, flat, by, party).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-005"))
+            unitsBy(empty, by).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-005"))
+            assertThat(titles(flat) to units(empty)).describedAs(by).isEqualTo(2 to 0)
+        }
+        title(entrance, UUID.randomUUID(), "n-owner", owner).andExpect(status().isForbidden)             // a unit not there: told nothing
+        title(entrance, flat, "n-owner", owner).andExpect(status().isForbidden)                           // whatever the body says
+    }
+
+    @Test
+    fun `PM-ORG-001 what is entered for a unit belongs to the entrance the unit lies in — the database refuses a row naming another`() {
+        val (entrance, flat) = entrance("ул. Витоша 26")
+        val (elsewhere) = entrance("ул. Витоша 28")
+        val party = person("Иван Петров", "o-owner")
+        assertThatThrownBy {
+            jdbc.update(
+                "INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from) VALUES (?, ?, ?, ?, 'OWN', 1, ?)",
+                UUID.randomUUID(), elsewhere, flat, party, today,
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("title_unit_in_entrance")
+        assertThatThrownBy {
+            jdbc.update("INSERT INTO registry.household_member (id, entrance_id, unit_id, valid_from) VALUES (?, ?, ?, ?)", UUID.randomUUID(), elsewhere, flat, today)
+        }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("household_member_unit_in_entrance")
+        jdbc.update("INSERT INTO registry.household_member (id, entrance_id, unit_id, valid_from) VALUES (?, ?, ?, ?)", UUID.randomUUID(), entrance, flat, today)
+        // every table that names a unit and an entrance holds them together
+        val held = jdbc.queryForList(
+            """SELECT c.conrelid::regclass::text FROM pg_constraint c
+               WHERE c.contype = 'f' AND c.confrelid = 'registry.unit'::regclass AND array_length(c.conkey, 1) = 2""",
+            String::class.java,
+        )
+        val naming = jdbc.queryForList(
+            """SELECT table_name FROM information_schema.columns WHERE table_schema = 'registry' AND column_name IN ('unit_id', 'entrance_id')
+               GROUP BY table_name HAVING count(*) = 2""",
+            String::class.java,
+        )
+        assertThat(naming).contains("title", "household_member", "animal", "absence_declaration", "book_declaration")
+        assertThat(held.map { it.removePrefix("registry.") }).containsExactlyInAnyOrderElementsOf(naming)
     }
 }

@@ -8081,14 +8081,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Add units with their ideal parts — declared, or derived from area and marked DERIVED",
+        "summary": "Add units with their ideal parts — declared, or derived from area and marked DERIVED — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-ORG-002",
           "PM-ORG-003",
-          "PM-ORG-009"
+          "PM-ORG-009",
+          "PM-BOOK-005"
         ]
       }
     },
@@ -8744,13 +8745,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record a title to a unit — effective-dated, with its share",
+        "summary": "Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-ORG-005",
-          "PM-ORG-011"
+          "PM-ORG-011",
+          "PM-BOOK-005"
         ]
       }
     },

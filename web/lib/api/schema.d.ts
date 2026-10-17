@@ -852,7 +852,7 @@ export interface paths {
         /** List the units of an entrance */
         get: operations["get_registry_entrances_entranceId_units"];
         put?: never;
-        /** Add units with their ideal parts — declared, or derived from area and marked DERIVED */
+        /** Add units with their ideal parts — declared, or derived from area and marked DERIVED — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units"];
         delete?: never;
         options?: never;
@@ -954,7 +954,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a title to a unit — effective-dated, with its share */
+        /** Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included */
         post: operations["post_registry_entrances_entranceId_units_unitId_titles"];
         delete?: never;
         options?: never;
