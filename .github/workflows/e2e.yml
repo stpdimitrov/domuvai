@@ -13,6 +13,8 @@ name: e2e
 # So a third identity is this run's administrator (DOMUVAI_AUTH_ADMINS), and through the API — never SQL — it says who
 # the person signing in and the check's own client are, and records the first as the manager and the second as the
 # controller of every seeded entrance.
+# AUTH-05c — who lives in a unit is entered in the book by the manager or the board, never the controller: a fourth
+# identity, the check's manager client, is recorded as each entrance's board, and the check enters the book with it.
 # Not path-filtered, so it runs on every PR — a required check on main.
 on:
   push: { branches: [main] }
@@ -74,8 +76,8 @@ jobs:
           curl -sf -o /dev/null --max-time 10 --retry 60 --retry-connrefused --retry-all-errors --retry-delay 3 "$ISSUER/.well-known/openid-configuration"
           kc() { docker exec -i keycloak /opt/keycloak/bin/kcadm.sh "$@"; }
           kc config credentials --server http://localhost:8080 --realm master --user admin --password "$KC_ADMIN"
-          secret=$(openssl rand -hex 24); password=$(openssl rand -hex 16); check=$(openssl rand -hex 24); administrator=$(openssl rand -hex 24)
-          for value in "$secret" "$password" "$check" "$administrator"; do echo "::add-mask::$value"; done
+          secret=$(openssl rand -hex 24); password=$(openssl rand -hex 16); check=$(openssl rand -hex 24); administrator=$(openssl rand -hex 24); manager=$(openssl rand -hex 24)
+          for value in "$secret" "$password" "$check" "$administrator" "$manager"; do echo "::add-mask::$value"; done
           id=$(kc get clients -r domuvai -q clientId=domuvai-web --fields id --format csv --noquotes)
           kc update "clients/$id" -r domuvai -s "secret=$secret"
           kc create users -r domuvai -s username=ivan -s enabled=true -s emailVerified=true -s email=ivan@example.test -s firstName=Ivan -s lastName=Petrov
@@ -96,9 +98,11 @@ jobs:
           }
           check_subject=$(service_client e2e-check "$check" | tail -n 1)
           administrator_subject=$(service_client e2e-administrator "$administrator" | tail -n 1)
-          test -n "$subject" && test -n "$check_subject" && test -n "$administrator_subject"
+          manager_subject=$(service_client e2e-manager "$manager" | tail -n 1)        # enters the book as the board (AUTH-05c)
+          test -n "$subject" && test -n "$check_subject" && test -n "$administrator_subject" && test -n "$manager_subject"
           { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject";
-            echo "CHECK_SUBJECT=$check_subject"; echo "ADMINISTRATOR_SECRET=$administrator"; echo "ADMINISTRATOR_SUBJECT=$administrator_subject"; } >> "$GITHUB_ENV"
+            echo "CHECK_SUBJECT=$check_subject"; echo "ADMINISTRATOR_SECRET=$administrator"; echo "ADMINISTRATOR_SUBJECT=$administrator_subject";
+            echo "MANAGER_SECRET=$manager"; echo "MANAGER_SUBJECT=$manager_subject"; } >> "$GITHUB_ENV"
 
       - name: Start the API closed — it accepts only a token this Keycloak signed for it (ADR-011)
         env: { DOMUVAI_AUTH_ISSUER: '${{ env.ISSUER }}', DOMUVAI_AUTH_AUDIENCE: domuvai-api, DOMUVAI_AUTH_ADMINS: '${{ env.ADMINISTRATOR_SUBJECT }}' }
@@ -129,7 +133,8 @@ jobs:
                   return json.loads(raw) if raw else None
           today = datetime.date.today()
           first, last = str(today - datetime.timedelta(days=2)), str(today + datetime.timedelta(days=365))   # in force today, in Sofia as here
-          offices = {"BM": (os.environ["SUBJECT"], "Иван Петров (управител)"), "CTL": (os.environ["CHECK_SUBJECT"], "Проверката (контрольор)")}
+          offices = {"BM": (os.environ["SUBJECT"], "Иван Петров (управител)"), "CTL": (os.environ["CHECK_SUBJECT"], "Проверката (контрольор)"),
+                     "MB": (os.environ["MANAGER_SUBJECT"], "Проверката (управителен съвет)")}
           for office, (subject, name) in offices.items():
               party = call("POST", "/api/registry/parties", {"fullName": name})["partyId"]
               call("POST", "/api/identity/logins", {"subject": subject, "partyId": party})
@@ -170,8 +175,10 @@ jobs:
         run: |
           token=$(curl -sf -d grant_type=client_credentials -d client_id=e2e-check -d "client_secret=$CHECK_SECRET" "$ISSUER/protocol/openid-connect/token" \
             | python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])')
-          echo "::add-mask::$token"
-          E2E_API_TOKEN="$token" python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
+          manager=$(curl -sf -d grant_type=client_credentials -d client_id=e2e-manager -d "client_secret=$MANAGER_SECRET" "$ISSUER/protocol/openid-connect/token" \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])')
+          echo "::add-mask::$token"; echo "::add-mask::$manager"
+          E2E_API_TOKEN="$token" E2E_MANAGER_TOKEN="$manager" python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
             --open-web http://localhost:3003 --closed-web http://localhost:3001 --bad-contact-web http://localhost:3002 \
             --contact demo@example.test --issuer "$ISSUER" --user ivan --subject "$SUBJECT" --entrance "$ENTRANCE"
 
