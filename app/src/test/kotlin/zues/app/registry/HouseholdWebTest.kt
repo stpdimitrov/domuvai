@@ -30,6 +30,7 @@ class HouseholdWebTest {
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var registry: RegistryService
+    @MockitoBean lateinit var ownership: OwnershipService
     @MockitoBean lateinit var policy: Policy
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var clock: Clock

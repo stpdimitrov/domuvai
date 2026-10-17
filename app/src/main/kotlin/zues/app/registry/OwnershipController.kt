@@ -46,7 +46,12 @@ data class OwnerResponse(
 /** Parties, their titles over units, and the owners read — who a charge is owed by. */
 @RestController
 @RequestMapping("/api/registry")
-class OwnershipController(private val ownership: OwnershipService, private val lists: BookLists, private val who: WhoAsks) {
+class OwnershipController(
+    private val ownership: OwnershipService,
+    private val lists: BookLists,
+    private val book: BookEntries,
+    private val who: WhoAsks,
+) {
 
     @PostMapping("/parties")
     @ResponseStatus(HttpStatus.CREATED)
@@ -55,17 +60,23 @@ class OwnershipController(private val ownership: OwnershipService, private val l
         return PartyRegisteredResponse(id)
     }
 
+    /**
+     * A unit's owner or user, entered in the book by the manager or the board of the entrance from the declarant's
+     * declaration, as the sign-in says who is asking; anybody else — the owner themself included — is a 403 (PM-BOOK-005).
+     */
     @PostMapping("/entrances/{entranceId}/units/{unitId}/titles")
     @ResponseStatus(HttpStatus.CREATED)
     fun assignTitle(
         @PathVariable entranceId: UUID,
         @PathVariable unitId: UUID,
         @RequestBody request: AssignTitleRequest,
+        signedIn: JwtAuthenticationToken?,
     ): TitleAssignedResponse {
-        val id = ownership.assignTitle(
+        val id = book.title(
             entranceId,
             unitId,
             AssignTitle(request.partyId, request.titleRole, request.share, request.validFrom, request.validTo),
+            who.of(signedIn),
         )
         return TitleAssignedResponse(id)
     }

@@ -95,8 +95,8 @@ data class EndStayRequest(val on: String)
 data class StayEnded(val id: UUID, val validFrom: LocalDate, val validTo: LocalDate)
 
 /**
- * The registry module's HTTP edge — entrances and their units. Who lives in a unit is entered in the book by the
- * manager or the board, as the sign-in says who is asking; anybody else is a 403 (PM-BOOK-005).
+ * The registry module's HTTP edge — entrances and their units. A unit, and who lives in it, is entered in the book by
+ * the manager or the board, as the sign-in says who is asking; anybody else is a 403 (PM-BOOK-005).
  */
 @RestController
 @RequestMapping("/api/registry/entrances")
@@ -120,12 +120,14 @@ class RegistryController(private val registry: RegistryService, private val book
     fun registerUnits(
         @PathVariable entranceId: UUID,
         @RequestBody request: RegisterUnitsRequest,
+        signedIn: JwtAuthenticationToken?,
     ): UnitsCreatedResponse {
-        val ids = registry.registerUnits(
+        val ids = book.units(
             entranceId,
             request.units.map {
                 RegisterUnit(it.designation, it.unitType, it.areaM2, it.idealParts, it.separateEntrance, it.businessUse)
             },
+            who.of(signedIn),
         )
         return UnitsCreatedResponse(ids)
     }

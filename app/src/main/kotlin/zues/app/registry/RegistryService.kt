@@ -253,10 +253,9 @@ class RegistryService(
      */
     @Transactional
     fun registerHousehold(entranceId: UUID, unitId: UUID, members: List<RegisterMember>): List<UUID> {
-        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
-        if (unit.entranceId != entranceId) {
-            throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
-        }
+        // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
+        units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
+            ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
         val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
         return members.map { member ->
             aggregates.insert(
@@ -280,10 +279,9 @@ class RegistryService(
      */
     @Transactional
     fun registerAnimals(entranceId: UUID, unitId: UUID, animals: List<RegisterAnimal>): List<UUID> {
-        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
-        if (unit.entranceId != entranceId) {
-            throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
-        }
+        // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
+        units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
+            ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
         val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
         return animals.map { animal ->
             aggregates.insert(
@@ -309,10 +307,9 @@ class RegistryService(
      */
     @Transactional
     fun registerAbsence(entranceId: UUID, unitId: UUID, declarations: List<RegisterAbsence>): List<UUID> {
-        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
-        if (unit.entranceId != entranceId) {
-            throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
-        }
+        // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
+        units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
+            ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
         val filedOn = LocalDate.parse(toSofiaDate(clock.instant()))             // a Sofia calendar day (PM-SYS-004)
         return declarations.map { declaration ->
             val from = LocalDate.parse(declaration.absentFrom)

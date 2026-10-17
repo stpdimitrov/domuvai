@@ -61,7 +61,7 @@ enum class Action(val governedBy: String) {
     /** recording a declaration a declarant handed in, in their name */
     RECORD_DECLARATION("PM-BOOK-003"),
 
-    /** entering in the book who lives in a unit, from its declarant's declaration: its household, its animals, its absences, the day one left */
+    /** an entry of the book, from its declarant's declaration: an entrance's units, a unit's owners and users, its household, its animals, its absences, the day one left */
     ENTER_BOOK("PM-BOOK-005"),
 }
 
@@ -160,10 +160,10 @@ class Policy(private val sources: List<RoleSource>) {
          * no owner as such. The cashier, a holder of use, an occupant and a firm's staff are given neither: no rule says so,
          * pending counsel. A declaration for the book: an owner or a user files their own, for a unit they hold
          * (PM-BOOK-003); one handed in on paper is recorded in its declarant's name by the manager or the board, who enter
-         * the book from the owner's declaration (PM-BOOK-005) — not the controller, who writes nothing (PM-GOV-008). Who
-         * lives in a unit — its household, its animals, its absences — is entered in the book the same way, by the manager
-         * or the board (PM-BOOK-005, PM-BOOK-002): an owner or a user changes it by declaring (PM-BOOK-003), not by
-         * writing the book themselves.
+         * the book from the owner's declaration (PM-BOOK-005) — not the controller, who writes nothing (PM-GOV-008). The
+         * book's entries — an entrance's units, a unit's owners and users, its household, its animals, its absences — are
+         * entered the same way, by the manager or the board (PM-BOOK-005, PM-BOOK-002): an owner or a user changes them by
+         * declaring (PM-BOOK-003), never by writing the book, nor recording their own title, themselves.
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
