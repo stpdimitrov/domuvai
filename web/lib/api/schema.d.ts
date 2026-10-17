@@ -869,7 +869,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** File an absence declaration — the long-absence exemption */
+        /** File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units_unitId_absences"];
         delete?: never;
         options?: never;
@@ -886,7 +886,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record the animals kept in a unit */
+        /** Record the animals kept in a unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units_unitId_animals"];
         delete?: never;
         options?: never;
@@ -903,7 +903,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record or correct the day an animal left the unit */
+        /** Record or correct the day an animal left the unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units_unitId_animals_animalId_end"];
         delete?: never;
         options?: never;
@@ -920,7 +920,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a unit's household — who counts for per-person charges */
+        /** Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units_unitId_household"];
         delete?: never;
         options?: never;
@@ -937,7 +937,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record or correct the day a resident left — their occupancy range closes */
+        /** Record or correct the day a resident left — their occupancy range closes — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units_unitId_household_memberId_end"];
         delete?: never;
         options?: never;
