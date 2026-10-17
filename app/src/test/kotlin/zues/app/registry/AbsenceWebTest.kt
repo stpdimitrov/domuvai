@@ -6,21 +6,31 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import zues.app.identity_org.Logins
+import zues.app.identity_org.WhoAsks
+import zues.app.policy.Policy
+import java.time.Clock
 import java.util.UUID
 
+/** Sign-in switched off, as the test task runs: nobody is asking, and the entry is made as before (PM-BOOK-005). Who may enter is BookEntriesIT's. */
 @WebMvcTest(RegistryController::class)
+@Import(BookEntries::class, WhoAsks::class)
 class AbsenceWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var registry: RegistryService
+    @MockitoBean lateinit var policy: Policy
+    @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var clock: Clock
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()

@@ -2,10 +2,12 @@ package zues.app.registry
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.mockito.kotlin.any
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
@@ -13,15 +15,24 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDate
+import zues.app.identity_org.Logins
+import zues.app.identity_org.WhoAsks
+import zues.app.policy.Policy
+import java.time.Clock
 import java.util.UUID
 
+/** Sign-in switched off, as the test task runs: nobody is asking, and the entry is made as before (PM-BOOK-005). Who may enter is BookEntriesIT's. */
 @WebMvcTest(RegistryController::class)
+@Import(BookEntries::class, WhoAsks::class)
 class HouseholdWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var registry: RegistryService
+    @MockitoBean lateinit var policy: Policy
+    @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var clock: Clock
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
@@ -71,5 +82,12 @@ class HouseholdWebTest {
         whenever(registry.endHouseholdStay(any(), any(), any(), any())).thenThrow(IllegalArgumentException("move-out before move-in"))
         mvc.perform(endStay(UUID.randomUUID(), "2026-05-01")).andExpect(status().isBadRequest)
         mvc.perform(endStay(UUID.randomUUID(), "01.05.2026")).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `PM-BOOK-005 with sign-in switched off nobody is asking — the entry is made and the policy is not asked`() {
+        whenever(registry.registerHousehold(any(), any(), any())).thenReturn(listOf(UUID.randomUUID()))
+        mvc.perform(postHousehold()).andExpect(status().isCreated)
+        verifyNoInteractions(policy)
     }
 }

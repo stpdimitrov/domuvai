@@ -60,6 +60,9 @@ enum class Action(val governedBy: String) {
 
     /** recording a declaration a declarant handed in, in their name */
     RECORD_DECLARATION("PM-BOOK-003"),
+
+    /** entering in the book who lives in a unit, from its declarant's declaration: its household, its animals, its absences, the day one left */
+    ENTER_BOOK("PM-BOOK-005"),
 }
 
 /**
@@ -138,7 +141,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 11
+        const val MATRIX_VERSION = 12
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -157,7 +160,10 @@ class Policy(private val sources: List<RoleSource>) {
          * no owner as such. The cashier, a holder of use, an occupant and a firm's staff are given neither: no rule says so,
          * pending counsel. A declaration for the book: an owner or a user files their own, for a unit they hold
          * (PM-BOOK-003); one handed in on paper is recorded in its declarant's name by the manager or the board, who enter
-         * the book from the owner's declaration (PM-BOOK-005) — not the controller, who writes nothing (PM-GOV-008).
+         * the book from the owner's declaration (PM-BOOK-005) — not the controller, who writes nothing (PM-GOV-008). Who
+         * lives in a unit — its household, its animals, its absences — is entered in the book the same way, by the manager
+         * or the board (PM-BOOK-005, PM-BOOK-002): an owner or a user changes it by declaring (PM-BOOK-003), not by
+         * writing the book themselves.
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -207,6 +213,8 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.FILE_DECLARATION, Role.USR, "PM-BOOK-003", ownUnitOnly = true),
             Permit(Action.RECORD_DECLARATION, Role.BM, "PM-BOOK-005"),
             Permit(Action.RECORD_DECLARATION, Role.MB, "PM-BOOK-005"),
+            Permit(Action.ENTER_BOOK, Role.BM, "PM-BOOK-005"),
+            Permit(Action.ENTER_BOOK, Role.MB, "PM-BOOK-005"),
         )
     }
 }

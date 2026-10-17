@@ -8189,13 +8189,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "File an absence declaration — the long-absence exemption",
+        "summary": "File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-FEE-006",
-          "PM-FEE-007"
+          "PM-FEE-007",
+          "PM-BOOK-005"
         ]
       }
     },
@@ -8296,7 +8297,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record the animals kept in a unit",
+        "summary": "Record the animals kept in a unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
@@ -8412,7 +8413,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record or correct the day an animal left the unit",
+        "summary": "Record or correct the day an animal left the unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
@@ -8519,13 +8520,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register a unit's household — who counts for per-person charges",
+        "summary": "Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-FEE-005",
-          "PM-FEE-008"
+          "PM-FEE-008",
+          "PM-BOOK-005"
         ]
       }
     },
@@ -8635,12 +8637,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record or correct the day a resident left — their occupancy range closes",
+        "summary": "Record or correct the day a resident left — their occupancy range closes — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
-          "PM-BOOK-008"
+          "PM-BOOK-008",
+          "PM-BOOK-005"
         ]
       }
     },

@@ -29,6 +29,8 @@ class RegistryUnitsWebTest {
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var registry: RegistryService
+    @MockitoBean lateinit var book: BookEntries
+    @MockitoBean lateinit var who: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
     private val body = RegisterUnitsRequest(
