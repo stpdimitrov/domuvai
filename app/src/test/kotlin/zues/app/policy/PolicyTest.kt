@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            12 to listOf(
+            13 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -77,6 +77,8 @@ class PolicyTest {
                 "FILE_DECLARATION USR PM-BOOK-003 own unit",
                 "RECORD_DECLARATION BM PM-BOOK-005",
                 "RECORD_DECLARATION MB PM-BOOK-005",
+                "ENTER_BOOK BM PM-BOOK-005",
+                "ENTER_BOOK MB PM-BOOK-005",
                 "OPEN_SITTING BM PM-GA-012",
                 "OPEN_SITTING MB PM-GA-012",
                 "OPEN_SITTING CTL PM-GA-012",
@@ -363,5 +365,23 @@ class PolicyTest {
         val admin = Asking(Login("https://id.example.test/realms/domuvai", "operator"), null)
         assertThat(withAdministrators(admin).decide(admin, Action.ANONYMISE_BOOK, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(false, "PM-BOOK-010", null, Policy.MATRIX_VERSION))
         assertThat(policy.decide(Asking(null, null), Action.ANONYMISE_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
+    }
+
+    @Test
+    fun `PM-BOOK-005 who lives in a unit is entered in the book by the manager and the board — not by the controller, nor by the owner or user of that unit`() {
+        val expected = mapOf(
+            Role.OWN to false, Role.USR to false, Role.OCC to false, Role.BM to true, Role.MB to true, Role.CTL to false,
+            Role.CSH to false, Role.PMC_STAFF to false, Role.MUN to false, Role.SYS_ADMIN to false,
+        )
+        for (role in Role.entries) for (resource in listOf(Resource.OfEntrance(entrance), Resource.OfUnit(entrance, flat1))) {
+            val decision = policy.decide(holder(role, setOf(flat1)), Action.ENTER_BOOK, resource, day)
+            assertThat(decision).describedAs("$role $resource").isEqualTo(Decision(expected.getValue(role), "PM-BOOK-005", role.takeIf { expected.getValue(it) }, Policy.MATRIX_VERSION))
+        }
+        assertThat(policy.decide(holder(Role.BM), Action.ENTER_BOOK, Resource.OfEntrance(another), day).allowed).isFalse()
+        val former = person().also { holds(it, Role.MB, until = day) }
+        assertThat(policy.decide(former, Action.ENTER_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
+        val admin = Asking(Login("https://id.example.test/realms/domuvai", "operator"), null)
+        assertThat(withAdministrators(admin).decide(admin, Action.ENTER_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
+        assertThat(policy.decide(Asking(null, null), Action.ENTER_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
     }
 }

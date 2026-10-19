@@ -670,8 +670,14 @@ def compliance_screen(api, web, entrance):
             failures.append("/compliance: a check with no difference is not said to have none")
         status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units")
         unit = sorted(json.loads(raw), key=lambda u: u["designation"])[0]["id"] if status == 200 else None
-        status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units/{unit}/household",
-                            {"members": [{"isChildUnder6": True, "validFrom": "2026-08-01"}]})
+        # AUTH-05c (PM-BOOK-005): the book is entered by the manager or the board — the check's own token is the
+        # controller's, refused; the entry is made with the board's (E2E_MANAGER_TOKEN). With no sign-in, neither is carried.
+        entry = (f"/api/registry/entrances/{entrance}/units/{unit}/household", {"members": [{"isChildUnder6": True, "validFrom": "2026-08-01"}]})
+        manager = os.environ.get("E2E_MANAGER_TOKEN")
+        if manager:
+            refused, _ = fetch(api, *entry)
+            failures += [] if refused == 403 else [f"/compliance: the controller entered the book (HTTP {refused}), not refused (PM-BOOK-005)"]
+        status, raw = fetch(api, *entry, headers={"Authorization": f"Bearer {manager}"} if manager else None)
         check = headcount() if status in (200, 201) else None
         if not check or not check["mismatches"]:
             failures.append(f"/compliance: a person entered in the book for a date already billed (HTTP {status}) makes no difference the API reports — no row to read")

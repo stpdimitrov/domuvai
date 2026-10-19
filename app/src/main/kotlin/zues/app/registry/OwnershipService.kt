@@ -65,10 +65,9 @@ class OwnershipService(
 
     @Transactional
     fun assignTitle(entranceId: UUID, unitId: UUID, command: AssignTitle): UUID {
-        val unit = units.findById(unitId).orElseThrow { NoSuchElementException("no unit $unitId") }
-        if (unit.entranceId != entranceId) {
-            throw NoSuchElementException("unit $unitId is not in entrance $entranceId")
-        }
+        // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
+        units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
+            ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
         if (!parties.existsById(command.partyId)) {
             throw NoSuchElementException("no party ${command.partyId}")
         }

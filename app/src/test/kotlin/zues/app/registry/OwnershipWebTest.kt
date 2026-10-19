@@ -17,7 +17,7 @@ import java.math.BigDecimal
 import java.util.UUID
 
 @WebMvcTest(OwnershipController::class)
-@org.springframework.context.annotation.Import(zues.app.identity_org.WhoAsks::class)
+@org.springframework.context.annotation.Import(zues.app.identity_org.WhoAsks::class, BookEntries::class)
 class OwnershipWebTest {
 
     @Autowired lateinit var mvc: MockMvc
@@ -26,6 +26,9 @@ class OwnershipWebTest {
     @MockitoBean lateinit var ownership: OwnershipService
     @MockitoBean lateinit var lists: BookLists
     @MockitoBean lateinit var logins: zues.app.identity_org.Logins
+    @MockitoBean lateinit var registry: RegistryService
+    @MockitoBean lateinit var policy: zues.app.policy.Policy
+    @MockitoBean lateinit var clock: java.time.Clock
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
