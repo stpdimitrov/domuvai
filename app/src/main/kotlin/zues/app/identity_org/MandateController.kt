@@ -3,10 +3,12 @@ package zues.app.identity_org
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
@@ -23,7 +25,24 @@ data class EndMandate(val on: LocalDate? = null, val protocolRef: String? = null
  */
 @RestController
 @RequestMapping("/api/identity/entrances/{entranceId}/mandates")
-class MandateController(private val administration: MandateAdministration, private val who: WhoAsks) {
+class MandateController(private val administration: MandateAdministration, private val reading: MandateReading, private val who: WhoAsks) {
+
+    /**
+     * Every mandate in force in the entrance on [on] — today in Sofia if none is given — and how each stands: in term,
+     * an election due and by when, or acting past term and since when (PM-GOV-004, PM-GOV-005). The office-holder is a
+     * party's id; the name is the registry's. Read by the entrance's manager, board and controller and by the
+     * administrator; anybody else is a 403. No task is stored or sent from it.
+     */
+    @GetMapping
+    fun read(@PathVariable entranceId: UUID, @RequestParam(required = false) on: String?, signedIn: JwtAuthenticationToken?): List<StandingMandate> =
+        when (val answer = reading.read(who.of(signedIn), entranceId, on?.let(::aDay))) {
+            is MandateAnswer.Done -> answer.value
+            is MandateAnswer.Refused -> throw MandatesReadForbidden(answer.ruleId)
+        }
+
+    /** A day as the caller wrote it: an ISO date of an ordinary year, or the caller's error. */
+    private fun aDay(text: String): LocalDate =
+        runCatching { LocalDate.parse(text) }.getOrNull()?.takeIf { it.year in 1900..2999 } ?: throw IllegalArgumentException("on must be an ISO date (YYYY-MM-DD)")
 
     @PostMapping
     fun record(@PathVariable entranceId: UUID, @RequestBody request: RecordMandate, signedIn: JwtAuthenticationToken?): MandateRecorded =
@@ -44,7 +63,13 @@ class MandateController(private val administration: MandateAdministration, priva
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onForbidden(e: MandateAdministrationForbidden): Map<String, String> = mapOf("error" to "a mandate is recorded by the deployment's administrator", "rule" to e.ruleId)
 
-    /** No such entrance, or no such mandate in it → 404 — said only to the administrator. */
+    /** Not the entrance's manager, board or controller, nor the administrator → 403, naming the rule. */
+    @ExceptionHandler(MandatesReadForbidden::class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    fun onReadForbidden(e: MandatesReadForbidden): Map<String, String> =
+        mapOf("error" to "an entrance's mandates are read by its manager, its board, its controller and the deployment's administrator", "rule" to e.ruleId)
+
+    /** No such entrance, or no such mandate in it, when one is recorded or ended → 404 — said only to the administrator. */
     @ExceptionHandler(NoSuchElementException::class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
@@ -59,7 +84,7 @@ class MandateController(private val administration: MandateAdministration, priva
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onEnded(e: MandateAlreadyEnded): Map<String, String> = mapOf("error" to (e.message ?: "already ended"))
 
-    /** Something the mandate lacks, a party nobody registered, a mandate too long → 400. */
+    /** Something the mandate lacks, a party nobody registered, a mandate too long, a day that is not one → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid"))
@@ -67,3 +92,6 @@ class MandateController(private val administration: MandateAdministration, priva
 
 /** The policy refused this caller; the entry of the refusal, if they are signed in, is already written. */
 class MandateAdministrationForbidden(val ruleId: String) : RuntimeException("refused by $ruleId")
+
+/** The policy refused to show this caller the entrance's mandates. */
+class MandatesReadForbidden(val ruleId: String) : RuntimeException("refused by $ruleId")
