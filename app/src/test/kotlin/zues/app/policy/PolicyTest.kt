@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            13 to listOf(
+            14 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -79,13 +79,17 @@ class PolicyTest {
                 "RECORD_DECLARATION MB PM-BOOK-005",
                 "ENTER_BOOK BM PM-BOOK-005",
                 "ENTER_BOOK MB PM-BOOK-005",
+                "READ_MANDATES BM PM-GOV-005",
+                "READ_MANDATES MB PM-GOV-005",
+                "READ_MANDATES CTL PM-GOV-008",
+                "READ_MANDATES SYS_ADMIN PM-SEC-001",
                 "OPEN_SITTING BM PM-GA-012",
                 "OPEN_SITTING MB PM-GA-012",
                 "OPEN_SITTING CTL PM-GA-012",
                 "OPEN_SITTING OWN PM-GA-012",
             ),
         )
-        assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance"))
+        assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance", Action.READ_MANDATES to "OfEntrance"))
         assertThat(Policy.MATRIX.filter { it.role == Role.SYS_ADMIN }.map { it.action }).containsExactlyInAnyOrderElementsOf(Policy.ADMINISTERED.keys)
         assertThat(Role.entries.map { it.name }).containsExactly("OWN", "USR", "OCC", "BM", "MB", "CTL", "CSH", "PMC_STAFF", "MUN", "SYS_ADMIN")
     }
@@ -383,5 +387,22 @@ class PolicyTest {
         val admin = Asking(Login("https://id.example.test/realms/domuvai", "operator"), null)
         assertThat(withAdministrators(admin).decide(admin, Action.ENTER_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
         assertThat(policy.decide(Asking(null, null), Action.ENTER_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()
+    }
+
+    @Test
+    fun `PM-SEC-001 an entrance's mandates are read by its manager, board and controller, and by the administrator — nobody else`() {
+        val expected = mapOf(
+            Role.OWN to false, Role.USR to false, Role.OCC to false, Role.BM to true, Role.MB to true, Role.CTL to true,
+            Role.CSH to false, Role.PMC_STAFF to false, Role.MUN to false, Role.SYS_ADMIN to false,
+        )
+        for (role in Role.entries)
+            assertThat(policy.decide(holder(role, setOf(flat1)), Action.READ_MANDATES, Resource.OfEntrance(entrance), day).allowed).describedAs("$role").isEqualTo(expected.getValue(role))
+        assertThat(policy.decide(holder(Role.BM), Action.READ_MANDATES, Resource.OfEntrance(another), day).allowed).isFalse()
+        val admin = Asking(Login("https://id.example.test/realms/domuvai", "operator"), null)
+        val deployment = withAdministrators(admin)
+        assertThat(deployment.decide(admin, Action.READ_MANDATES, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(true, "PM-SEC-001", Role.SYS_ADMIN, Policy.MATRIX_VERSION))
+        assertThat(deployment.decide(admin, Action.READ_MANDATES, Resource.Deployment, day).allowed).isFalse()      // an entrance's, and only asked of one
+        assertThat(deployment.decide(admin, Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()  // and still no book
+        assertThat(policy.decide(Asking(null, null), Action.READ_MANDATES, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(false, "PM-SEC-001", null, Policy.MATRIX_VERSION))
     }
 }

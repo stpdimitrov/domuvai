@@ -27,6 +27,7 @@ import zues.app.assembly.SittingService
 import zues.app.identity_org.LoginAdministration
 import zues.app.identity_org.Logins
 import zues.app.identity_org.MandateAdministration
+import zues.app.identity_org.MandateReading
 import zues.app.identity_org.WhoAsks
 import zues.app.intake.ImportService
 import zues.app.money.ArrearsService
@@ -85,6 +86,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var loginAdministration: LoginAdministration
     @MockitoBean lateinit var mandateAdministration: MandateAdministration
+    @MockitoBean lateinit var mandateReading: MandateReading
     @MockitoBean lateinit var whoAsks: WhoAsks
     @MockitoBean lateinit var moneyAccess: MoneyAccess
     @MockitoBean lateinit var headcount: HeadcountCheckService
