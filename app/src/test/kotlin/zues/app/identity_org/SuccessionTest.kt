@@ -107,11 +107,14 @@ class SuccessionTest {
     @Test
     fun `the place passes through the predecessor's own later mandate, a firm's and one that names nobody — and is answered for whoever holds it`() {
         // A sits on the board, then becomes sole manager; C, a board member elected after A's manager mandate, follows it
-        val seat = mandate("MB", ivan, "2022-01-01", "2024-01-01", ended = "2023-01-01")
+        // (C begins inside the seat's own dates, so C does not follow the seat directly — only through A's manager mandate)
+        val seat = mandate("MB", ivan, "2022-01-01", "2026-01-01", ended = "2023-01-01")
         val managing = mandate("BM", ivan, "2023-01-01", "2025-01-01", ended = "2025-01-01")
         val c = mandate("MB", petar, "2025-01-01", "2027-01-01")
         record(seat, managing, c)
+        assertThat(c.succeeds(seat)).isFalse()
         assertThat(succession.successorsOf(ivan, block, Role.MB, day("2025-06-01")).map { it.partyId }).containsExactly(petar)
+        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2024-06-01"))).isEmpty()     // he holds the place himself, as manager: nobody's successor
         // through a firm's mandate and one that names nobody
         val firm = mandate("PMC", georgi, "2024-01-01", "2026-01-01", ended = "2025-01-01")
         val nobody = mandate("BM", null, "2025-01-01", "2026-01-01", ended = "2026-01-01")
