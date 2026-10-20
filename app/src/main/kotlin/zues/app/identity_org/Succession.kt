@@ -18,7 +18,11 @@ data class Successor(val partyId: UUID, val role: Role, val mandateId: UUID, val
  * The answer is every party holding, on [on], a mandate that follows one of [predecessor]'s mandates in [office] — a
  * manager's place is taken by a later manager or board; a board member's by a later manager, or a member elected on or
  * after the day that member's term ended. Each with the role it holds, which may not be [office]: a board may follow
- * a manager. Empty while the predecessor still holds the office, or nobody on record has followed them.
+ * a manager. Empty while the predecessor still holds [office] that day, or nobody on record has followed them. A party
+ * is never their own successor, though the place may pass through their own later mandate.
+ *
+ * It answers who *succeeded*; whether a successor may carry on an act of the predecessor — and whether they must hold
+ * the very same office — is the asking module's rule, not this one's.
  */
 @Service
 class Succession(private val mandates: MandateStore) {
@@ -27,21 +31,27 @@ class Succession(private val mandates: MandateStore) {
     @Transactional(readOnly = true)
     fun successorsOf(predecessor: UUID, entranceId: UUID, office: Role, on: LocalDate): List<Successor> {
         val all = mandates.ofEntrance(entranceId)
-        var reached = all.filter { it.partyId == predecessor && it.role == office && !it.validFrom.isAfter(on) }.toSet()
+        val held = all.filter { it.partyId == predecessor && it.role == office && !it.validFrom.isAfter(on) }
+        // While the predecessor holds the office that day, nobody has taken their place — whatever else is on record.
+        if (held.any { it.inForceOn(on, all) }) return emptyList()
+        var reached = held.toSet()
         val followers = mutableSetOf<Mandate>()
         while (true) {
-            val next = all.filter { later -> later !in followers && later.partyId != predecessor && reached.any { later.succeeds(it) } }
+            // The walk goes through every mandate that follows — the predecessor's own later ones, a firm's, one that
+            // names nobody — since the place passes through them; who is answered is filtered below.
+            val next = all.filter { later -> later !in followers && reached.any { later.succeeds(it) } }
             if (next.isEmpty()) break
             followers += next
             reached = next.toSet()
         }
-        return followers.filter { it.inForceOn(on, all) && it.partyId != null && it.role != null }
+        return followers.filter { it.inForceOn(on, all) && it.partyId != null && it.partyId != predecessor && it.role != null }
             .sortedWith(compareBy({ it.validFrom }, { it.id }))
             .map { Successor(it.partyId!!, it.role!!, it.id, it.validFrom) }
     }
 
     /** Whether [candidate] has, as at [on], taken [predecessor]'s place in [office] — the same question, asked of one party. */
     // Rule: PM-GOV-004
+    @Transactional(readOnly = true)
     fun hasSucceeded(candidate: UUID, predecessor: UUID, entranceId: UUID, office: Role, on: LocalDate): Boolean =
         successorsOf(predecessor, entranceId, office, on).any { it.partyId == candidate }
 }

@@ -89,6 +89,39 @@ class SuccessionTest {
     }
 
     @Test
+    fun `PM-GOV-004 while the predecessor holds the office that day nobody has their place — even with a later mandate on record that would follow them`() {
+        // A sits on the board to 2026-01-01, never stamped; a sole manager is recorded from 2025-01-01 by SQL, unstamping nothing
+        val a = mandate("MB", ivan, "2024-01-01", "2026-01-01")
+        val manager = mandate("BM", maria, "2025-01-01", "2027-01-01")
+        record(a, manager)
+        assertThat(manager.succeeds(a)).isTrue()
+        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2025-03-01"))).isEmpty()     // A still sits: both cannot be
+        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2026-01-01")).map { it.partyId }).containsExactly(maria)
+        // re-elected, and a colleague elected the same day: the colleague follows A's first seat, and A sits on
+        val again = mandate("MB", ivan, "2026-01-01", "2028-01-01")
+        val colleague = mandate("MB", petar, "2026-01-01", "2028-01-01")
+        record(a.copy(validTo = day("2026-01-01")), again, colleague)
+        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2026-06-01"))).isEmpty()
+    }
+
+    @Test
+    fun `the place passes through the predecessor's own later mandate, a firm's and one that names nobody — and is answered for whoever holds it`() {
+        // A sits on the board, then becomes sole manager; C, a board member elected after A's manager mandate, follows it
+        val seat = mandate("MB", ivan, "2022-01-01", "2024-01-01", ended = "2023-01-01")
+        val managing = mandate("BM", ivan, "2023-01-01", "2025-01-01", ended = "2025-01-01")
+        val c = mandate("MB", petar, "2025-01-01", "2027-01-01")
+        record(seat, managing, c)
+        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2025-06-01")).map { it.partyId }).containsExactly(petar)
+        // through a firm's mandate and one that names nobody
+        val firm = mandate("PMC", georgi, "2024-01-01", "2026-01-01", ended = "2025-01-01")
+        val nobody = mandate("BM", null, "2025-01-01", "2026-01-01", ended = "2026-01-01")
+        val after = mandate("BM", elena, "2026-01-01", "2028-01-01")
+        record(mandate("BM", ivan, "2022-01-01", "2024-01-01", ended = "2024-01-01"), firm, nobody, after)
+        assertThat(succession.successorsOf(ivan, block, Role.BM, day("2024-06-01"))).isEmpty()     // a firm holds it: nobody's role, nobody answered
+        assertThat(succession.successorsOf(ivan, block, Role.BM, day("2026-06-01")).map { it.partyId }).containsExactly(elena)
+    }
+
+    @Test
     fun `a party re-elected to the office is nobody's successor — not their own`() {
         val first = mandate("BM", ivan, "2020-03-01", "2022-03-01")
         val again = mandate("BM", ivan, "2022-03-01", "2024-03-01")
