@@ -209,6 +209,11 @@ class MandateAdministrationIT {
         assertThat(roles.holdersOn(hall, termOfAEnds.minusDays(1)).map { it.partyId }).containsExactlyInAnyOrder(a, b)
         assertThat(roles.holdersOn(hall, termOfAEnds).map { it.partyId }).containsExactlyInAnyOrder(a, b)       // the first day outside A's term
         assertThat(roles.holdersOn(hall, today).map { it.partyId }).containsExactlyInAnyOrder(a, b)
+        // … and that is what the entrance's offices say over HTTP today: A acting past term since the day it ended, B in term
+        val acting = mvc.perform(get("/api/identity/entrances/$hall/mandates").by("operator-m")).andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2)).andReturn().response.contentAsString
+        assertThat(acting).contains(""""partyId":"$a"""").contains("\"EXPIRED_ACTING\"").contains(""""actingSince":"$termOfAEnds"""")
+        mvc.perform(get("/api/identity/entrances/$hall/mandates").by("login-$run-nobody")).andExpect(status().isForbidden)
         // … until somebody is elected once A's term is over: recording them ends A on their first day, and B sits on.
         val c = party("Член В")
         assertThat(seat(c, today.minusDays(3), today.plusYears(1)).succeeded).containsExactly(mandateId(hall, a))

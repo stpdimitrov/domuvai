@@ -217,7 +217,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when; party ids, not names. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). No task is stored or sent */
+        get: operations["get_identity_entrances_entranceId_mandates"];
         put?: never;
         /** Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too */
         post: operations["post_identity_entrances_entranceId_mandates"];
@@ -1781,6 +1782,29 @@ export interface components {
             /** Format: uuid */
             revertedBy: string;
         };
+        Standing: {
+            /** Format: date */
+            actingSince?: string;
+            /** Format: date */
+            electBy?: string;
+            /** @enum {string} */
+            kind: "IN_TERM" | "ELECTION_DUE" | "EXPIRED_ACTING";
+            /** Format: date */
+            until?: string;
+        };
+        StandingMandate: {
+            /** Format: uuid */
+            mandateId: string;
+            /** Format: uuid */
+            partyId?: string;
+            /** @enum {string} */
+            role: "OWN" | "USR" | "OCC" | "BM" | "MB" | "CTL" | "CSH" | "PMC_STAFF" | "MUN" | "SYS_ADMIN";
+            standing: components["schemas"]["Standing"];
+            /** Format: date */
+            validFrom: string;
+            /** Format: date */
+            validTo: string;
+        };
         StatementLine: {
             allocationKey: string;
             /** Format: int64 */
@@ -2888,6 +2912,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PetitionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_identity_entrances_entranceId_mandates: {
+        parameters: {
+            query?: {
+                on?: string;
+            };
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandingMandate"][];
                 };
             };
             /** @description Bad Request */

@@ -63,6 +63,9 @@ enum class Action(val governedBy: String) {
 
     /** an entry of the book, from its declarant's declaration: an entrance's units, a unit's owners and users, its household, its animals, its absences, the day one left */
     ENTER_BOOK("PM-BOOK-005"),
+
+    /** an entrance's mandates, and how each stands — in term, an election due, acting past term */
+    READ_MANDATES("PM-SEC-001"),
 }
 
 /**
@@ -141,7 +144,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 12
+        const val MATRIX_VERSION = 13
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -163,7 +166,9 @@ class Policy(private val sources: List<RoleSource>) {
          * the book from the owner's declaration (PM-BOOK-005) — not the controller, who writes nothing (PM-GOV-008). The
          * book's entries — an entrance's units, a unit's owners and users, its household, its animals, its absences — are
          * entered the same way, by the manager or the board (PM-BOOK-005, PM-BOOK-002): an owner or a user changes them by
-         * declaring (PM-BOOK-003), never by writing the book, nor recording their own title, themselves.
+         * declaring (PM-BOOK-003), never by writing the book, nor recording their own title, themselves. An entrance's
+         * mandates and how each stands: the manager and the board, whose election comes due (PM-GOV-005), the controller,
+         * who reads everything (PM-GOV-008), and the administrator, who records them — no owner as such.
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -172,6 +177,7 @@ class Policy(private val sources: List<RoleSource>) {
         val ADMINISTERED: Map<Action, Class<out Resource>> = mapOf(
             Action.TIE_LOGIN to Resource.Deployment::class.java,
             Action.RECORD_MANDATE to Resource.OfEntrance::class.java,
+            Action.READ_MANDATES to Resource.OfEntrance::class.java,
         )
 
         val MATRIX: List<Permit> = listOf(
@@ -215,6 +221,10 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.RECORD_DECLARATION, Role.MB, "PM-BOOK-005"),
             Permit(Action.ENTER_BOOK, Role.BM, "PM-BOOK-005"),
             Permit(Action.ENTER_BOOK, Role.MB, "PM-BOOK-005"),
+            Permit(Action.READ_MANDATES, Role.BM, "PM-GOV-005"),
+            Permit(Action.READ_MANDATES, Role.MB, "PM-GOV-005"),
+            Permit(Action.READ_MANDATES, Role.CTL, "PM-GOV-008"),
+            Permit(Action.READ_MANDATES, Role.SYS_ADMIN, "PM-SEC-001"),
         )
     }
 }

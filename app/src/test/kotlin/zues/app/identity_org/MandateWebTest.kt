@@ -54,7 +54,7 @@ private fun bearer(by: KeyPair, subject: String, more: JWTClaimsSet.Builder.() -
     MandateController::class,
     properties = ["domuvai.auth.issuer-uri=$MANDATE_REALM", "domuvai.auth.audience=$MANDATE_API", "domuvai.auth.mode=", "domuvai.auth.admins=operator"],
 )
-@Import(WhoAsks::class, MandateAdministration::class, Policy::class, Administrators::class)
+@Import(WhoAsks::class, MandateAdministration::class, MandateReading::class, MandateStanding::class, Policy::class, Administrators::class)
 class MandateWebTest {
 
     companion object {
@@ -133,7 +133,7 @@ class MandateWebTest {
 
 /** Sign-in switched off: there is no login, so there is no administrator — whatever is sent. */
 @WebMvcTest(MandateController::class)
-@Import(WhoAsks::class, MandateAdministration::class, Policy::class, Administrators::class)
+@Import(WhoAsks::class, MandateAdministration::class, MandateReading::class, MandateStanding::class, Policy::class, Administrators::class)
 class MandateOpenTest {
 
     @TestConfiguration
