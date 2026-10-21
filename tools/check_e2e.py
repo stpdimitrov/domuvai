@@ -82,8 +82,7 @@ ON_AN_ASSEMBLY = {
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
 CALLS = {
-    ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (
-        f"/api/identity/entrances/{e}/mandates?on={datetime.datetime.now(ZoneInfo('Europe/Sofia')).date()}", None),
+    ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
     ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
@@ -723,6 +722,15 @@ def compliance_screen(api, web, entrance):
     return failures
 
 
+def refusal_words(raw):
+    """The API's own words in a refusal's body, or None when the body is not one."""
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return None
+    return body.get("error") if isinstance(body, dict) and isinstance(body.get("error"), str) else None
+
+
 def submit_form(web, path, page, marker, fields):
     """
     A form posted as a browser with no script posts it: every hidden input the server rendered in the form that
@@ -756,7 +764,7 @@ def assembly_screen(api, web, entrance, signed_in):
     identity gives them (PM-GOV-005); an assembly convened through the page's own form, by the office the person holds
     (PM-GA-002), landing on it and showing what the API stored — when in Sofia, where, how, by which office, a draft
     whose notice is not posted, an empty agenda — and the quorum meter in the API's figures or the API's refusal; and
-    convening as an office the person does not hold, refused in the API's words, nothing convened. The page computes
+    convening as an office the person does not hold, refused in the API's words, the form kept. The page computes
     no deadline, share or threshold: every value compared here is taken from the API.
     """
     failures, date = [], lambda iso: ".".join(reversed(iso.split("-")))
@@ -766,19 +774,26 @@ def assembly_screen(api, web, entrance, signed_in):
     if status != 200 or "Свикване на общо събрание" not in text or 'name="convenedAs"' not in page:
         return [f"{path}: HTTP {status}, or no form to convene"]
     if not signed_in:
-        print("—   /entrance/assembly  read; convening NOT checked: nobody is signed in on this run")
+        print("—   /entrance/assembly  read; convening, and the five operations on an assembly, NOT checked: nobody is signed in on this run")
         return failures
 
-    on = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date()
-    status, raw = fetch(api, f"/api/identity/entrances/{entrance}/mandates?on={on}")
+    status, raw = fetch(api, f"/api/identity/entrances/{entrance}/mandates")       # as at the api's own today, as the page asks
     offices = {"MB": "член на управителния съвет", "BM": "управител", "CTL": "контролен съвет / контрольор", "CSH": "касиер"}
     mandates = json.loads(raw) if status == 200 else []
-    failures += [] if mandates else [f"{path}: the API gives no mandate in force on {on} (HTTP {status}) — nothing to read off the page"]
+    failures += [] if mandates else [f"{path}: the API gives no mandate in force today (HTTP {status}) — nothing to read off the page"]
+    def standing(s):               # PM-GOV-005 — how identity says each office stands, read back as the page words it
+        if s["kind"] == "IN_TERM":
+            return "в мандат" + (f" до {date(s['until'])}" if s.get("until") else "")
+        if s["kind"] == "ELECTION_DUE":
+            return "изборът се дължи" + (f" до {date(s['electBy'])}" if s.get("electBy") else "")
+        if s["kind"] == "EXPIRED_ACTING":
+            return "мандатът е изтекъл — изпълнява" + (f" от {date(s['actingSince'])}" if s.get("actingSince") else "")
+        return s["kind"]
     for m in mandates:
-        row = f"{offices.get(m['role'], m['role'])} {m['partyId'][:8]} {date(m['validFrom'])} {date(m['validTo'])}"
+        row = f"{offices.get(m['role'], m['role'])} {m['partyId'][:8]} {date(m['validFrom'])} {date(m['validTo'])} {standing(m['standing'])}"
         failures += [] if row in text else [f"{path}: does not show the office {row!r}"]
 
-    day = on + datetime.timedelta(days=30)
+    day = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date() + datetime.timedelta(days=30)
     place = f"Входът, партер — проверката {uuid.uuid4().hex[:6]}"
     status, location, _ = submit_form(web, path, page, 'name="convenedAs"',
                                       {"convenedAs": "MB", "scheduledAt": f"{day}T18:30", "place": place, "mode": "IN_PERSON"})
@@ -797,6 +812,10 @@ def assembly_screen(api, web, entrance, signed_in):
         failures += [f"GET …/assemblies/{{assemblyId}}{path_}: {'/'.join(map(str, e.absolute_path)) or '(root)'} — {e.message}" for e in errors]
     status, raw = fetch(api, of)
     stored = json.loads(raw) if status == 200 else {}
+    # the instant stored, against Python's own reading of 18:30 in Sofia — not the web's code checking itself
+    at = datetime.datetime.combine(day, datetime.time(18, 30), ZoneInfo("Europe/Sofia")).astimezone(datetime.timezone.utc)
+    if stored.get("scheduledAt") and datetime.datetime.fromisoformat(stored["scheduledAt"].replace("Z", "+00:00")) != at:
+        failures.append(f"{path}: the form asked for 18:30 in Sofia on {day}; the API stored {stored['scheduledAt']}, not {at.isoformat()}")
     if stored.get("place") != place or stored.get("convenedAs") != "MB" or stored.get("status") != "DRAFT":
         failures.append(f"{path}: the API stored {stored or status} — not the assembly the form asked for")
     wanted = [f"Кога {date(str(day))} 18:30", f"Къде {place}", "Начин присъствено", "Свикано от член на управителния съвет",
@@ -807,14 +826,15 @@ def assembly_screen(api, web, entrance, signed_in):
         q = json.loads(raw)
         meter = f"Присъстват {q['representedPct']}% от идеалните части · праг {q['thresholdPct']}%"
         failures += [] if meter in shown else [f"{path}: the quorum meter does not show {meter!r}"]
-    elif (json.loads(raw or "{}").get("error") or f"HTTP {status}") not in shown:
+    elif (refusal_words(raw) or f"HTTP {status}") not in shown:
         failures.append(f"{path}: the quorum is refused (HTTP {status}) and the page does not say the API's words")
 
     # an office the person does not hold: refused in the API's words, and nothing convened
     status, location, refused_page = submit_form(web, path, page, 'name="convenedAs"',
                                                  {"convenedAs": "BM", "scheduledAt": f"{day}T19:30", "place": place + " (отказано)", "mode": "IN_PERSON"})
     said = visible_text(refused_page)
-    if status != 200 or location or "Нямате право да свикате общо събрание" not in said or place + " (отказано)" not in refused_page:
+    kept = f'value="{html.escape(place + " (отказано)", quote=True)}"' in refused_page        # the field itself, not the page's script payload
+    if status != 200 or location or "Нямате право да свикате общо събрание" not in said or not kept:
         failures.append(f"{path}: convening as an office not held answers HTTP {status} → {location or 'the page'} — expected the API's refusal, the form kept")
     print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; convened through the form and shown as "
           f"stored; the meter in the API's figures; an office not held refused in the API's words")

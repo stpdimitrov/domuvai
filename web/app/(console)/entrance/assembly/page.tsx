@@ -26,7 +26,6 @@ type Loaded =
   | Exclude<EntranceAt, { kind: "ok" }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
 
 /**
  * One screen, one server-side aggregation (ADR-011): the entrance's offices in force today and how each stands
@@ -52,7 +51,7 @@ async function load(entranceId: string | undefined, assemblyId: string | undefin
     return { assembly: part(assembly), quorum: part(quorum), attendance: part(attendance), proxies: part(proxies) };
   };
   const [mandates, shown] = await Promise.all([
-    reach(() => api.GET("/api/identity/entrances/{entranceId}/mandates", { params: { path, query: { on: today() } } })),
+    reach(() => api.GET("/api/identity/entrances/{entranceId}/mandates", { params: { path } })),   // "today" is the api's own: Sofia's, not this server's clock
     asked && UUID.test(asked) ? shownFor(asked) : Promise.resolve(null),
   ]);
   return { kind: "ok", entrance, mandates: part(mandates), shown, asked };

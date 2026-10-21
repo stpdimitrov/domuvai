@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { refused, unanswered, unansweredBy, undone, undoneBy } from "./refusal.ts";
+import { refused, unanswered, unansweredBy, undone, undoneBy, unknownOutcome } from "./refusal.ts";
 
 const answer = (status: number, error?: string) => ({ response: { status }, ...(error !== undefined && { error: { error } }) });
 
@@ -46,8 +46,9 @@ test("an act refused is said as one, and as not done — a 403 is \"you may not\
     undoneBy(body(403, { error: "PM-GA-002: convened only by the holder of the office stated, in force today", rule: "PM-GA-002" }), "свикате общо събрание"),
     "Нямате право да свикате общо събрание: PM-GA-002: convened only by the holder of the office stated, in force today",
   );
-  assert.equal(undoneBy(body(401), "свикате общо събрание"), "Входът ви не беше приет — не е направено нищо. Излезте и влезте отново.");
-  assert.equal(undoneBy(null, "свикате общо събрание"), "Бекендът не отговори — не е направено нищо. Опитайте отново.");
+  assert.equal(undoneBy(body(401), "свикате общо събрание"), "Входът ви не беше приет — не е направено нищо. Излезте и влезте отново.");   // refused before anything was done
+  // no answer: the api may have done it before the answer was lost — never "nothing was done"
+  assert.equal(unknownOutcome("свикването"), "Не е ясно дали свикването е направено — системата не отговори. Проверете, преди да опитате отново.");
   for (const status of [400, 404, 409, 422]) {
     assert.equal(undoneBy(body(status, { error: "the notice could not be in time" }), "свикате общо събрание"), "Системата не прие това: the notice could not be in time");
   }

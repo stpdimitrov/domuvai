@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { reach } from "@/lib/console";
-import { undoneBy } from "@/lib/refusal";
+import { undoneBy, unknownOutcome } from "@/lib/refusal";
 import { sofiaInstant } from "@/lib/sofia";
 
 export type ConveneState = { refused?: string; values?: Record<string, string> };
@@ -36,10 +36,14 @@ export async function convene(_: ConveneState, form: FormData): Promise<ConveneS
         place: values.place,
         mode: values.mode,
         urgent,
-        ...(urgent && values.urgencyReason && { urgencyReason: values.urgencyReason }),
+        // sent whenever typed: a reason without urgency is the api's to refuse (PM-GA-005), not the page's to drop
+        ...(values.urgencyReason && { urgencyReason: values.urgencyReason }),
       },
     }),
   );
-  if (!answer?.data) return { refused: undoneBy(answer, "свикате общо събрание"), values };
+  if (!answer?.data) {
+    // no answer at all (the backend down, or the call given up after its time): the api may have convened it already
+    return { refused: answer ? undoneBy(answer, "свикате общо събрание") : unknownOutcome("свикването"), values };
+  }
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${answer.data.id}`);
 }

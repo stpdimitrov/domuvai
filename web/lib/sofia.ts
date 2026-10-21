@@ -16,7 +16,8 @@ function wall(instant: number): string {
 /**
  * The instant a Sofia wall-clock time names (`YYYY-MM-DDTHH:MM`, as a `datetime-local` field sends it), as ISO-8601
  * in UTC — or null: not such a time, or one the clocks skip in spring. An hour the clocks repeat in autumn is its
- * first, summer, occurrence: the earlier of the two, said back to the person before anything is done with it.
+ * first, summer, occurrence: the earlier of the two. (Nothing tells the person which one was taken; the page shows
+ * the time back as Sofia's clock reads it, which is the same for both.)
  */
 export function sofiaInstant(local: string): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
