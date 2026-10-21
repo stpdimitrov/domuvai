@@ -430,7 +430,7 @@ class SittingServiceTest {
     }
 
     @Test
-    fun `PM-GA-015 the higher quorum holds at every sitting - the postponed one and the following day's too, pending counsel`() {
+    fun `PM-GA-015 the higher quorum holds at the first and the postponed sittings - the following day's opens at any share`() {
         val big = owner("60")
         owner("40")
         present(big)
@@ -440,8 +440,9 @@ class SittingServiceTest {
         assertThat(second.quorumMet).isFalse()
         present(big, sitting = 3)
         val third = service(meets.plusSeconds(86_400)).open(entranceId, assembly.id, keeper)
-        assertThat(third.thresholdPct).isEqualByComparingTo("75")
-        assertThat(third.quorumMet).isFalse()
+        assertThat(third.thresholdPct).isEqualByComparingTo("0")                     // the owner's decision (Q4c): PM-GA-014 as it reads
+        assertThat(third.thresholdConstant).startsWith("GA_LAST_SITTING_QUORUM_PCT@")
+        assertThat(third.quorumMet).isTrue()                                         // the owner of more than half cannot keep it from being held
     }
 
     @Test
