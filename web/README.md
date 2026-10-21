@@ -216,7 +216,6 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
 - **The console's footer** (WEB-22, PM-SYS-010) — every screen under the console's layout ends in the rule
   catalogue's version and the engine's, read from `GET /api/law/version` on each request
   (`app/(console)/CatalogueFooter.tsx`); the web keeps no copy, and says so when the API does not answer.
-  `/assembly` sits outside that layout and has no footer.
 - **`/portfolio`** — the console's firm-wide portfolio (screen 01) — **live** (WEB-19): every registered
   entrance with its number of units, what it owes after the advances as of `?asOf=` (default today in Sofia;
   `GET …/arrears`, `netMinor`), and its repair fund's balance beside what is available (`GET …/fund`; "няма
@@ -236,6 +235,16 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   built — those columns show `—`, and the two buttons stay disabled. **It names debtors and their debts, so it
   must never be reachable by the public** (PM-DEBT-011) — served only to a person who is signed in (see
   [Who the console is served to](#who-the-console-is-served-to)), and see TODO before launch.
+- **`/entrance/assembly`** — the entrance's general assembly (screen 04) — **live as far as the API goes** (WEB-25):
+  the offices in force today and how each stands (identity: in term, election due by, acting past term); one
+  assembly, opened by its link (`?assembly=<id>`) — status, when (in Sofia), where, how, the office that convened
+  it, urgency and its recorded reason, the notice's posting; its agenda with the rule of each item's majority; the
+  quorum meter (the share present against the threshold in force, its source, whether verified); the register and
+  the proxies. Every figure is the API's — no deadline, share or threshold is computed here. Party ids are shown
+  short: the API pairs them with no names yet. The API lists no assemblies of an entrance, so the screen cannot
+  offer them; **convening** is a form (the office, the time in Sofia, place, mode, urgency and why) whose refusal
+  is shown as the API words it, the form kept; on success the person lands on the new assembly. Agenda, posting,
+  proxies, register and sittings as forms are later slices.
 - **`/compliance`** — what the firm must keep in order (screen 07 Съответствие) — **live as far as the API goes**
   (WEB-23): for every entrance, who is past the registry's due date to declare for the book (PM-BOOK-003 — unit,
   name, role, the day the title began, the registry's own due date; the page computes no deadline) and one month's
@@ -279,9 +288,6 @@ The **7-screen manager console is complete** (01–07): Портфейл, Вхо
   narrowed to the fund's account, the operating one or the cash box by `?account=fund|operating|cash`.
   The API serves no description or document number, so none is shown. The operating account, the
   statements and the journal each fail alone — the fund stays on screen.
-- **`/assembly`** — the live general assembly (screen 04 Общо събрание): a full-bleed, no-sidebar
-  view — session-quorum banner, agenda, the item being voted (quorum + tally with the majority
-  threshold), and live attendance with proxies. Has its own stylesheet (`assembly.css`).
 
 The console has two navigation contexts — the **firm** sidebar (`(firm)/`) and the **entrance**
 sidebar (`entrance/`) — as sibling nested layouts under one flex shell. A handful of nav items

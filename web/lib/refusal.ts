@@ -28,6 +28,18 @@ export function unanswered(by: Refused | null, what: string): string {
   return `API отказа ${what}: ${by.message}`;
 }
 
+/**
+ * The same for an act the person asked for — a write, not a read: [act] is the verb phrase after "да"
+ * („свикате общо събрание“). A 403 is "you may not …", and nothing is said to have been done.
+ */
+export function undone(by: Refused | null, act: string): string {
+  if (!by) return `Бекендът не отговори — не е направено нищо. Опитайте отново.`;
+  if (by.status === 403) return `Нямате право да ${act}: ${by.message}`;
+  if (by.status === 401) return `Входът ви не беше приет — не е направено нищо. Излезте и влезте отново.`;
+  return `Системата не прие това: ${by.message}`;
+}
+
 /** The same, straight from a call: `null` when the backend did not answer at all. */
 export const unansweredBy = (answer: Answer | null | undefined, what: string): string =>
   unanswered(answer ? refused(answer) : null, what);
+export const undoneBy = (answer: Answer | null | undefined, act: string): string => undone(answer ? refused(answer) : null, act);
