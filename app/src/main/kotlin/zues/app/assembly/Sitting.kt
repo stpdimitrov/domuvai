@@ -70,6 +70,9 @@ data class Quorum(
     val cannotWeigh: List<String>,
     val derivedParts: Boolean,
     val basis: String,
+    /** The one owner of more than the law's share at the notice date who raises the threshold (PM-GA-015), and that share. */
+    val concentratedBy: UUID? = null,
+    val concentratedPct: BigDecimal? = null,
 ) {
     /** "At least" the threshold, of all the ideal parts (PM-GA-012) — and nothing in the way of weighing. */
     val met: Boolean get() = cannotWeigh.isEmpty() && representedPct >= thresholdPct
@@ -200,6 +203,7 @@ class SittingService(
     // Rule: PM-GA-012
     // Rule: PM-GA-013
     // Rule: PM-GA-014
+    // Rule: PM-GA-015
     // TODO(legal): PM-GA-012 — whose ideal parts count for a unit with both an owner and a holder of a right of use
     private fun weigh(assembly: Assembly, ladder: Ladder, n: Int): Quorum {
         val on = ladder.day(n)
@@ -216,7 +220,12 @@ class SittingService(
             "unit $it is owned for more than the whole of it — weighing it would count it twice (PM-ORG-005)"
         }
         val weighed = theirs.filter { it.unitId !in bothRoles && it.unitId !in overHeld }
-        val threshold = constantOn(ladder.thresholdCode(n), on.toString())
+        val ofSitting = constantOn(ladder.thresholdCode(n), on.toString())
+        val concentrated = concentration(assembly)
+        // TODO(legal): PM-GA-015 — which sittings the higher quorum governs is not in the catalogue; the strictest reading
+        // is taken: every one, the postponed and the following day's too — never below it while the concentration holds.
+        val threshold = concentrated?.let { constantOn("GA_CONCENTRATED_QUORUM_PCT", on.toString()) }
+            ?.takeIf { BigDecimal(it.value) > BigDecimal(ofSitting.value) } ?: ofSitting
         // A unit never weighs more than its own ideal parts, however its co-owners' rounded shares add up (PM-ORG-005).
         val representedPct = weighed.groupBy { it.unitId }.values.fold(BigDecimal.ZERO) { sum, ofUnit ->
             sum + ofUnit.fold(BigDecimal.ZERO) { parts, held -> parts + BigDecimal(held.idealParts) }.min(BigDecimal(ofUnit.first().unitIdealParts))
@@ -234,13 +243,41 @@ class SittingService(
             cannotWeigh = cannotWeigh,
             derivedParts = weighed.any { it.idealPartsSource != "DECLARED" },
             basis = (
-                listOf("sitting $n on $on against $thresholdConstant ${threshold.value}: ${representedPct.stripTrailingZeros().toPlainString()}") +
+                listOf(
+                    "sitting $n on $on against $thresholdConstant ${threshold.value}" +
+                        (concentrated?.let { (party, pct) -> " (one owner, $party, held ${pct.stripTrailingZeros().toPlainString()} at the notice)" } ?: "") +
+                        ": ${representedPct.stripTrailingZeros().toPlainString()}",
+                ) +
                     weighed.map {
                         val line = through.getValue(it.partyId)
                         "${it.partyId} ${it.unitId} ${it.idealParts} of ${it.unitIdealParts} by ${line.attendance.id} ${line.attendance.channel} ${line.identityVerifiedAt ?: "-"}"
                     }.sorted()
                 ).joinToString("\n"),
+            concentratedBy = concentrated?.first,
+            concentratedPct = concentrated?.second,
         )
+    }
+
+    /**
+     * The one owner of more than the law's share of all the ideal parts on the day the notice was posted (Rule:
+     * PM-GA-015), and their share — or null. A party's ideal parts are summed over every unit they own in the entrance, by
+     * title share, a unit never more than itself (PM-ORG-005). Co-owners are each their own person, for their share.
+     */
+    // Rule: PM-GA-015
+    // TODO(legal): PM-GA-015 — whether co-owners of common property (spouses) are one person for this is not settled; each is their own
+    private fun concentration(assembly: Assembly): Pair<UUID, BigDecimal>? {
+        val posted = assembly.noticePostedAt
+            ?: throw IllegalStateException("the notice of assembly ${assembly.id} has no posting date: its quorum cannot be chosen (PM-GA-015)")
+        val day = toSofiaDate(posted)                                                       // a Sofia calendar day (PM-SYS-004)
+        val more = BigDecimal(constantOn("GA_CONCENTRATION_PCT", day).value)
+        return holdings.inForce(assembly.entranceId, LocalDate.parse(day), TitleRole.OWN).holdings.groupBy { it.partyId }
+            .mapValues { (_, held) ->
+                held.groupBy { it.unitId }.values.fold(BigDecimal.ZERO) { sum, ofUnit ->
+                    sum + ofUnit.fold(BigDecimal.ZERO) { parts, h -> parts + BigDecimal(h.idealParts) }.min(BigDecimal(ofUnit.first().unitIdealParts))
+                }
+            }
+            .filterValues { it > more }                                                     // "more than"
+            .maxByOrNull { it.value }?.toPair()
     }
 
     /** Whether a quorum of this assembly has been weighed: from then on what its notice stated stays as it is. */

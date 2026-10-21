@@ -48,6 +48,9 @@ data class QuorumView(
     val met: Boolean,
     val cannotWeigh: List<String>,
     val derivedParts: Boolean,
+    /** Where one owner held more than the law's share at the notice date, who and how much: the threshold is the higher one (PM-GA-015). */
+    val concentratedBy: UUID?,
+    val concentratedPct: String?,
     val sittings: List<SittingView>,
 )
 
@@ -62,10 +65,11 @@ class SittingController(private val acts: AssemblyActs, private val sittings: Si
     // Rule: PM-GA-012
     // Rule: PM-GA-013
     // Rule: PM-GA-014
+    // Rule: PM-GA-015
     @GetMapping("/quorum")
     fun quorum(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): QuorumView =
         sittings.read(entranceId, assemblyId).let { (q, weighed, n, opensFrom) ->
-            QuorumView(n, opensFrom, q.on, q.representedPct.percent(), q.thresholdPct.percent(), q.thresholdSource, q.thresholdVerified, q.met, q.cannotWeigh, q.derivedParts, weighed.map(::view))
+            QuorumView(n, opensFrom, q.on, q.representedPct.percent(), q.thresholdPct.percent(), q.thresholdSource, q.thresholdVerified, q.met, q.cannotWeigh, q.derivedParts, q.concentratedBy, q.concentratedPct?.percent(), weighed.map(::view))
         }
 
     // Rule: PM-GA-012

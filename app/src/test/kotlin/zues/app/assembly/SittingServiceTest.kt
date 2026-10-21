@@ -32,16 +32,20 @@ class SittingServiceTest {
     private val meets = Instant.parse("2026-11-20T16:00:00Z")                   // 18:00 on 20 November in Sofia
     private val sittingDay = LocalDate.parse("2026-11-20")
     private val entranceId = UUID.randomUUID()
-    private var assembly = Assembly(UUID.randomUUID(), entranceId, UUID.randomUUID(), "BM", meets, "фоайето", "HYBRID", "NOTICED", false, null)
+    private val noticeDay = LocalDate.parse("2026-11-10")
+    private var assembly = Assembly(
+        UUID.randomUUID(), entranceId, UUID.randomUUID(), "BM", meets, "фоайето", "HYBRID", "NOTICED", false, null,
+        noticePostedAt = Instant.parse("2026-11-09T22:30:00Z"),                          // 00:30 on 10 November in Sofia
+    )
     private val keeper = Actor(UUID.randomUUID(), "https://id.example.test/realms/domuvai", "login-keeper")
 
-    private data class Titled(val party: UUID, val unit: UUID, val role: TitleRole, val parts: String, val share: String, val derived: Boolean, val from: LocalDate? = null)
+    private data class Titled(val party: UUID, val unit: UUID, val role: TitleRole, val parts: String, val share: String, val derived: Boolean, val from: LocalDate? = null, val until: LocalDate? = null)
     private val book = mutableListOf<Titled>()
     private val overHeld = mutableSetOf<UUID>()
     private val holdings = object : Holdings {
         override fun inForce(entranceId: UUID, on: LocalDate, role: TitleRole): HeldOn {
-            if (entranceId != this@SittingServiceTest.entranceId || on !in setOf(sittingDay, sittingDay.plusDays(1))) return HeldOn(emptyList(), emptyList())   // this entrance, the days of its sittings
-            val held = book.filter { it.role == role && (it.from == null || !on.isBefore(it.from)) }.map {
+            if (entranceId != this@SittingServiceTest.entranceId || on !in setOf(noticeDay, sittingDay, sittingDay.plusDays(1))) return HeldOn(emptyList(), emptyList())   // this entrance: the notice date, the days of its sittings
+            val held = book.filter { it.role == role && (it.from == null || !on.isBefore(it.from)) && (it.until == null || on.isBefore(it.until)) }.map {
                 Holding(it.party, it.unit, role.name, it.share, it.parts, (BigDecimal(it.parts) * BigDecimal(it.share)).stripTrailingZeros().toPlainString(), if (it.derived) "DERIVED" else "DECLARED")
             }
             return HeldOn(held, if (role == TitleRole.OWN) overHeld.toList() else emptyList())
@@ -68,8 +72,8 @@ class SittingServiceTest {
 
     private fun service(at: Instant = meets) = SittingService(aggregates, assemblies, sittings, attendance, holdings, Clock.fixed(at, ZoneOffset.UTC))
 
-    private fun owner(parts: String, share: String = "1", unit: UUID = UUID.randomUUID(), derived: Boolean = false, from: String? = null): UUID =
-        UUID.randomUUID().also { book += Titled(it, unit, TitleRole.OWN, parts, share, derived, from?.let(LocalDate::parse)) }
+    private fun owner(parts: String, share: String = "1", unit: UUID = UUID.randomUUID(), derived: Boolean = false, from: String? = null, until: String? = null, party: UUID = UUID.randomUUID()): UUID =
+        party.also { book += Titled(it, unit, TitleRole.OWN, parts, share, derived, from?.let(LocalDate::parse), until?.let(LocalDate::parse)) }
 
     /** On the register, in person: brings these owners. */
     private fun present(vararg brings: UUID, channel: String = "IN_PERSON", verified: Boolean = false, sitting: Int = 1) {
@@ -160,7 +164,7 @@ class SittingServiceTest {
 
     @Test
     fun `PM-LAW-002 a weighing stores the catalogue version, the engine version and the dated constant that produced it`() {
-        present(owner("80"))
+        present(owner("50"), owner("30"))                                            // nobody over half: the ordinary quorum
         val sitting = service().open(entranceId, assembly.id, keeper)
         assertThat(sitting.lawVersion).isEqualTo(CATALOGUE_VERSION)
         assertThat(sitting.engineVersion).isEqualTo(ENGINE_VERSION)
@@ -181,28 +185,28 @@ class SittingServiceTest {
 
     @Test
     fun `PM-GA-012 a unit with both an owner and a holder of use makes the quorum unweighable - the meter says why and no sitting is opened or recorded`() {
-        val a = owner("60")
-        val other = owner("40")
+        val a = owner("51")
+        val other = owner("49")
         present(a)
         assertThat(meter().met).isTrue()                                             // owners only: weighed in full
         val unit = book.first { it.party == other }.unit
-        book += Titled(UUID.randomUUID(), unit, TitleRole.USR, "40", "1", false)     // a right of use over a unit nobody present owns
+        book += Titled(UUID.randomUUID(), unit, TitleRole.USR, "49", "1", false)     // a right of use over a unit nobody present owns
         val weighed = meter()
         assertThat(weighed.met).isFalse()
-        assertThat(weighed.representedPct).isEqualByComparingTo("60")                // present, and still
+        assertThat(weighed.representedPct).isEqualByComparingTo("51")                // present, and still
         assertThat(weighed.cannotWeigh).singleElement().asString().contains(unit.toString()).contains("holder of a right of use").contains("TODO(legal): PM-GA-012")
         assertThatThrownBy { service().open(entranceId, assembly.id, keeper) }
             .isInstanceOf(QuorumNotWeighable::class.java).hasMessageContaining("cannot be weighed").hasMessageContaining(unit.toString())
         assertThat(stored).isEmpty()
         assertThat(assembly.status).isEqualTo("NOTICED")
-        book += Titled(UUID.randomUUID(), book.first { it.party == a }.unit, TitleRole.USR, "60", "1", false)   // and over the unit of the owner who is present
+        book += Titled(UUID.randomUUID(), book.first { it.party == a }.unit, TitleRole.USR, "51", "1", false)   // and over the unit of the owner who is present
         assertThat(meter().representedPct).isEqualByComparingTo("0")                 // such a unit is left out of the figure
         assertThat(meter().cannotWeigh).hasSize(2)
     }
 
     @Test
     fun `PM-ORG-005 a represented owner's unit owned for more than the whole is not weighed, and a derived weight is flagged`() {
-        val doubled = owner("60")
+        val doubled = owner("50")
         overHeld += book.first { it.party == doubled }.unit
         present(doubled)
         val weighed = meter()
@@ -217,7 +221,7 @@ class SittingServiceTest {
 
     @Test
     fun `PM-GA-012 a sitting opens on the day and not before the hour its notice stated, for a noticed assembly, with what was weighed kept and hashed`() {
-        val a = owner("70")
+        val a = owner("51")
         present(a)
         assertThatThrownBy { service(meets.minusSeconds(1)).open(entranceId, assembly.id, keeper) }.isInstanceOf(IllegalStateException::class.java).hasMessageContaining("does not open before")
         assertThatThrownBy { service(meets.plusSeconds(8 * 3600)).open(entranceId, assembly.id, keeper) }      // 02:00 on the 21st in Sofia
@@ -230,7 +234,7 @@ class SittingServiceTest {
 
         val sitting = service(meets.plusSeconds(600)).open(entranceId, assembly.id, keeper)
         val unit = book.first { it.party == a }.unit
-        assertThat(sitting.basis).isEqualTo("sitting 1 on 2026-11-20 against GA_QUORUM_PCT@${threshold.inForceFrom} 51: 70\n$a $unit 70 of 70 by ${lines.single().attendance.id} IN_PERSON -")
+        assertThat(sitting.basis).isEqualTo("sitting 1 on 2026-11-20 against GA_QUORUM_PCT@${threshold.inForceFrom} 51: 51\n$a $unit 51 of 51 by ${lines.single().attendance.id} IN_PERSON -")
         assertThat(service().weighed(assembly.id)).isTrue()
         assertThat(sitting.basisHash).matches("[0-9a-f]{64}").isEqualTo(service().read(entranceId, assembly.id).quorum.basisHash)
         assertThatThrownBy { service(meets.plusSeconds(900)).open(entranceId, assembly.id, keeper) }.isInstanceOf(IllegalStateException::class.java)   // it is open
@@ -244,7 +248,8 @@ class SittingServiceTest {
         assertThat(listOf(reduced.value, reduced.verified, reduced.source)).containsExactly("26", true, "чл. 15 ал. 2 ЗУЕС")
         assertThat(postponed).isEqualTo(3600)
         val (a, b, c) = listOf(owner("25.99"), owner("0.01"), owner("10"))
-        owner("63.99")
+        owner("31.99")
+        owner("32")
         present(a)
         assertThat(service().open(entranceId, assembly.id, keeper).quorumMet).isFalse()
         val read = service().read(entranceId, assembly.id)
@@ -288,7 +293,8 @@ class SittingServiceTest {
         assertThat(listOf(last.value, last.verified, last.source)).containsExactly("0", true, "чл. 15 ал. 3 ЗУЕС")
         assertThat(constantOn("GA_SITTINGS", "2026-11-20").value).isEqualTo("3")
         val (a, b) = listOf(owner("20"), owner("0.5", from = "2026-11-21"))         // b owns from the following day: weighed on it
-        owner("79.5")
+        owner("39.5")
+        owner("40")
         present(a)
         val noticed = assembly
         service().open(entranceId, assembly.id, keeper)
@@ -357,5 +363,92 @@ class SittingServiceTest {
         assertThat(service(late).open(entranceId, assembly.id, keeper).quorumMet).isFalse()
         assertThatThrownBy { service(late.plusSeconds(postponed)).open(entranceId, assembly.id, keeper) }
             .isInstanceOf(IllegalStateException::class.java).hasMessageContaining("TODO(legal): PM-GA-013")
+    }
+
+    private val concentrated = constantOn("GA_CONCENTRATED_QUORUM_PCT", "2026-11-20")
+    private val concentration = constantOn("GA_CONCENTRATION_PCT", "2026-11-10")
+
+    @Test
+    fun `PM-GA-015 where one person owns more than 51 percent the quorum is 75 - at 74_99 the meeting cannot open, at 75 it does`() {
+        assertThat(listOf(concentration.value, concentrated.value, concentrated.verified, concentrated.source)).containsExactly("51", "75", true, "чл. 15 ал. 4 ЗУЕС")
+        val big = owner("51.0001")                                                   // one ten-thousandth more than 51
+        val (a, b) = listOf(owner("23.9899"), owner("0.0100"))
+        owner("24.9900")
+        present(big)
+        present(a)
+        val short = meter()
+        assertThat(short.thresholdPct).isEqualByComparingTo("75")
+        assertThat(short.thresholdConstant).isEqualTo("GA_CONCENTRATED_QUORUM_PCT@${concentrated.inForceFrom}")
+        assertThat(short.thresholdSource).isEqualTo("чл. 15 ал. 4 ЗУЕС")
+        assertThat(short.concentratedBy).isEqualTo(big)
+        assertThat(short.concentratedPct).isEqualByComparingTo("51.0001")
+        assertThat(short.representedPct).isEqualByComparingTo("74.99")
+        assertThat(short.met).isFalse()
+        present(b)
+        val sitting = service().open(entranceId, assembly.id, keeper)
+        assertThat(sitting.quorumMet).isTrue()
+        assertThat(sitting.thresholdPct).isEqualByComparingTo("75")
+        assertThat(sitting.basis.lines().first()).contains("one owner, $big, held 51.0001 at the notice")
+    }
+
+    @Test
+    fun `PM-GA-015 an owner of exactly 51 percent does not raise the quorum - more than, not at least`() {
+        val big = owner("51")
+        owner("49")
+        present(big)
+        assertThat(meter().thresholdPct).isEqualByComparingTo("51")
+        assertThat(meter().concentratedBy).isNull()
+        assertThat(meter().met).isTrue()
+    }
+
+    @Test
+    fun `PM-GA-015 the concentration is the notice date's - a sale before the sitting keeps 75, a purchase after the notice does not raise it`() {
+        val seller = owner("60", until = "2026-11-15")                              // sold between the notice and the sitting
+        owner("60", from = "2026-11-15")                                             // the buyer
+        owner("40")
+        assertThat(meter().thresholdPct).isEqualByComparingTo("75")
+        assertThat(meter().concentratedBy).isEqualTo(seller)
+        book.clear()
+        owner("40")
+        owner("60", from = "2026-11-15")                                             // bought after the notice
+        assertThat(meter().thresholdPct).isEqualByComparingTo("51")
+    }
+
+    @Test
+    fun `PM-GA-015 a person's ideal parts are summed over their units by title share - co-owners are each their own person`() {
+        val unit = UUID.randomUUID()
+        owner("100", share = "0.5", unit = unit)
+        owner("100", share = "0.5", unit = unit)
+        assertThat(meter().thresholdPct).isEqualByComparingTo("51")                  // two halves: fifty each
+        book.clear()
+        val one = UUID.randomUUID()
+        owner("30", party = one)
+        owner("21.0001", party = one)                                                // two flats of one person: 51.0001
+        owner("48.9999")
+        assertThat(meter().concentratedBy).isEqualTo(one)
+        assertThat(meter().thresholdPct).isEqualByComparingTo("75")
+    }
+
+    @Test
+    fun `PM-GA-015 the higher quorum holds at every sitting - the postponed one and the following day's too, pending counsel`() {
+        val big = owner("60")
+        owner("40")
+        present(big)
+        assertThat(service().open(entranceId, assembly.id, keeper).quorumMet).isFalse()        // 60 of 75
+        val second = service(meets.plusSeconds(postponed)).open(entranceId, assembly.id, keeper)
+        assertThat(second.thresholdPct).isEqualByComparingTo("75")
+        assertThat(second.quorumMet).isFalse()
+        present(big, sitting = 3)
+        val third = service(meets.plusSeconds(86_400)).open(entranceId, assembly.id, keeper)
+        assertThat(third.thresholdPct).isEqualByComparingTo("75")
+        assertThat(third.quorumMet).isFalse()
+    }
+
+    @Test
+    fun `PM-GA-015 without the date its notice was posted the quorum of an assembly cannot be chosen`() {
+        present(owner("100"))
+        assembly = assembly.copy(noticePostedAt = null)
+        assertThatThrownBy { service().open(entranceId, assembly.id, keeper) }.isInstanceOf(IllegalStateException::class.java).hasMessageContaining("PM-GA-015")
+        assertThat(stored).isEmpty()
     }
 }

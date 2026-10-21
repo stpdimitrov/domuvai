@@ -132,6 +132,10 @@ private val CONSTANTS: List<Constant> = listOf(
     Constant("GA_LAST_SITTING_QUORUM_PCT", "0", "2009-01-01", "чл. 15 ал. 3 ЗУЕС", true, rule = "PM-GA-014"),
     // How many sittings one assembly may have — the first, the postponed one, the following day's (#189: no longer in the schema).
     Constant("GA_SITTINGS", "3", "2009-01-01", "чл. 15 ал. 1–3 ЗУЕС", true, rule = "PM-GA-014"),
+    // PM-GA-015 — where one person owns more than 51% of the ideal parts, the quorum is at least 75%; the concentration
+    // is the one at the date of the notice.
+    Constant("GA_CONCENTRATION_PCT", "51", "2009-01-01", "чл. 15 ал. 4 ЗУЕС", true, rule = "PM-GA-015"),
+    Constant("GA_CONCENTRATED_QUORUM_PCT", "75", "2009-01-01", "чл. 15 ал. 4 ЗУЕС", true, rule = "PM-GA-015"),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */
