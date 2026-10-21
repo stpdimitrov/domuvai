@@ -170,7 +170,7 @@ class SittingServiceTest {
         assertThat(sitting.engineVersion).isEqualTo(ENGINE_VERSION)
         assertThat(sitting.thresholdConstant).isEqualTo("GA_QUORUM_PCT@${threshold.inForceFrom}")
         assertThat(sitting.thresholdVerified).isEqualTo(threshold.verified)
-        assertThat(sitting.basis).startsWith("sitting 1 on $sittingDay against GA_QUORUM_PCT@${threshold.inForceFrom} ${threshold.value}: 80")
+        assertThat(sitting.basis.lines().first()).isEqualTo("sitting 1 on $sittingDay against GA_QUORUM_PCT@${threshold.inForceFrom} ${threshold.value} (no owner over 51% at the notice on 2026-11-10): 80")
     }
 
     @Test
@@ -234,7 +234,7 @@ class SittingServiceTest {
 
         val sitting = service(meets.plusSeconds(600)).open(entranceId, assembly.id, keeper)
         val unit = book.first { it.party == a }.unit
-        assertThat(sitting.basis).isEqualTo("sitting 1 on 2026-11-20 against GA_QUORUM_PCT@${threshold.inForceFrom} 51: 51\n$a $unit 51 of 51 by ${lines.single().attendance.id} IN_PERSON -")
+        assertThat(sitting.basis).isEqualTo("sitting 1 on 2026-11-20 against GA_QUORUM_PCT@${threshold.inForceFrom} 51 (no owner over 51% at the notice on 2026-11-10): 51\n$a $unit 51 of 51 by ${lines.single().attendance.id} IN_PERSON -")
         assertThat(service().weighed(assembly.id)).isTrue()
         assertThat(sitting.basisHash).matches("[0-9a-f]{64}").isEqualTo(service().read(entranceId, assembly.id).quorum.basisHash)
         assertThatThrownBy { service(meets.plusSeconds(900)).open(entranceId, assembly.id, keeper) }.isInstanceOf(IllegalStateException::class.java)   // it is open
@@ -388,7 +388,7 @@ class SittingServiceTest {
         val sitting = service().open(entranceId, assembly.id, keeper)
         assertThat(sitting.quorumMet).isTrue()
         assertThat(sitting.thresholdPct).isEqualByComparingTo("75")
-        assertThat(sitting.basis.lines().first()).contains("one owner, $big, held 51.0001 at the notice")
+        assertThat(sitting.basis.lines().first()).contains("one owner, $big, held 51.0001 at the notice on 2026-11-10")
     }
 
     @Test
@@ -445,10 +445,35 @@ class SittingServiceTest {
     }
 
     @Test
-    fun `PM-GA-015 without the date its notice was posted the quorum of an assembly cannot be chosen`() {
+    fun `PM-GA-015 without the date its notice was posted the quorum of an assembly cannot be chosen - a draft's meter says it is not yet chosen`() {
         present(owner("100"))
         assembly = assembly.copy(noticePostedAt = null)
         assertThatThrownBy { service().open(entranceId, assembly.id, keeper) }.isInstanceOf(IllegalStateException::class.java).hasMessageContaining("PM-GA-015")
+        assertThatThrownBy { meter() }.isInstanceOf(IllegalStateException::class.java)
         assertThat(stored).isEmpty()
+        assembly = assembly.copy(status = "DRAFT")
+        assertThat(meter().basis.lines().first()).contains("not yet noticed")
+    }
+
+    @Test
+    fun `PM-GA-015 a unit owned for more than the whole of it at the notice date leaves the concentration unknowable - not weighed, whoever is present`() {
+        val unit = UUID.randomUUID()
+        owner("60", unit = unit)
+        owner("60", unit = unit)                                                     // booked twice over, both absent
+        val present = owner("40")
+        overHeld += unit
+        present(present)
+        val weighed = meter()
+        assertThat(weighed.concentratedBy).isNull()
+        assertThat(weighed.cannotWeigh).anyMatch { it.contains("$unit") && it.contains("notice date") && it.contains("PM-GA-015") }
+        assertThat(weighed.met).isFalse()
+        assertThatThrownBy { service().open(entranceId, assembly.id, keeper) }.isInstanceOf(QuorumNotWeighable::class.java)
+    }
+
+    @Test
+    fun `PM-GA-015 with nobody over 51 percent the weighing says so, and of which notice date`() {
+        present(owner("51"))
+        owner("49")
+        assertThat(service().open(entranceId, assembly.id, keeper).basis.lines().first()).contains("no owner over 51% at the notice on 2026-11-10")
     }
 }
