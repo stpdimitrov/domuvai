@@ -229,4 +229,37 @@ class SittingPersistenceIT {
         assertThat(refused).contains("cannot be weighed")
         assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.session WHERE entrance_id = ?", Int::class.java, entranceId)).isZero()
     }
+
+    @Test
+    fun `PM-GA-013 an hour after a first sitting weighed short, the postponed one opens at the reduced share - and the schema caps no count of sittings`() {
+        val entranceId = entrance()
+        val ana = owner(entranceId)                                                  // a half
+        owner(entranceId)
+        val base = meetingToday(entranceId, ana)
+        val manager = jdbc.queryForObject("SELECT convened_by FROM assembly.assembly WHERE entrance_id = ?", UUID::class.java, entranceId)!!
+        // the first sitting, an hour and more ago, with nobody present: weighed short (as recorded, the row is insert-only)
+        val hour = constantOn("GA_POSTPONE_MINUTES", toSofiaDate(Instant.now())).value.toLong()
+        val earlier = Instant.now().minus(hour + 5, ChronoUnit.MINUTES)
+        org.junit.jupiter.api.Assumptions.assumeTrue(toSofiaDate(earlier) == toSofiaDate(Instant.now()), "not across midnight in Sofia")
+        jdbc.update("UPDATE assembly.assembly SET scheduled_at = ? WHERE entrance_id = ?", java.sql.Timestamp.from(earlier.minusSeconds(60)), entranceId)
+        jdbc.update(
+            "INSERT INTO assembly.session (id, entrance_id, assembly_id, session_no, opened_at, represented, quorum_met, weighed_at, weighed_on, threshold_pct, threshold_constant, " +
+                "threshold_verified, basis, basis_hash, law_version, engine_version, weighed_by, login_issuer, login_subject) " +
+                "SELECT gen_random_uuid(), entrance_id, id, 1, NULL, 0, false, ?, ?::date, 51, 'GA_QUORUM_PCT@2009-01-01', true, 'sitting 1', encode(sha256('sitting 1'), 'hex'), 'v', 'e', ?, 'realm', 'login' " +
+                "FROM assembly.assembly WHERE entrance_id = ?",
+            java.sql.Timestamp.from(earlier), toSofiaDate(earlier), manager, entranceId,
+        )
+        val meter = meter(base)
+        assertThat(meter.get("sessionNo").asInt()).isEqualTo(2)
+        assertThat(meter.get("thresholdPct").asText()).isEqualTo(constantOn("GA_REDUCED_QUORUM_PCT", toSofiaDate(Instant.now())).value)
+        present(base, ana).andExpect(status().isCreated)                             // entered for the postponed sitting
+        assertThat(jdbc.queryForObject("SELECT session_no FROM assembly.attendance WHERE entrance_id = ?", Int::class.java, entranceId)).isEqualTo(2)
+        val sitting = json.readTree(open(base).andExpect(status().isCreated).andReturn().response.contentAsString)
+        assertThat(sitting.get("sessionNo").asInt()).isEqualTo(2)
+        assertThat(sitting.get("quorumMet").asBoolean()).isTrue()                    // a half is more than the reduced share
+        assertThat(jdbc.queryForObject("SELECT status FROM assembly.assembly WHERE entrance_id = ?", String::class.java, entranceId)).isEqualTo("OPEN")
+        // how many sittings there may be is the law's: the schema numbers them from one and caps nothing (#189)
+        assertThat(jdbc.queryForList("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'assembly.session'::regclass AND contype = 'c'", String::class.java))
+            .noneMatch { it.contains("<= 3") || it.contains("BETWEEN") }.anyMatch { it.contains("session_no >= 1") }
+    }
 }
