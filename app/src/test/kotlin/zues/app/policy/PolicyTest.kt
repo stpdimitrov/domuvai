@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            13 to listOf(
+            14 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -83,6 +83,10 @@ class PolicyTest {
                 "READ_MANDATES MB PM-GOV-005",
                 "READ_MANDATES CTL PM-GOV-008",
                 "READ_MANDATES SYS_ADMIN PM-SEC-001",
+                "OPEN_SITTING BM PM-GA-012",
+                "OPEN_SITTING MB PM-GA-012",
+                "OPEN_SITTING CTL PM-GA-012",
+                "OPEN_SITTING OWN PM-GA-012",
             ),
         )
         assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance", Action.READ_MANDATES to "OfEntrance"))
@@ -131,13 +135,15 @@ class PolicyTest {
     }
 
     @Test
-    fun `PM-GA-012 the register of who is present is kept by an office or an owner of the entrance on the day — and by nobody else`() {
+    fun `PM-GA-012 the register is kept and a sitting opened by an office or an owner of the entrance on the day — and by nobody else`() {
         val assembly = Resource.OfEntrance(entrance)
         for (keeper in listOf(Role.BM, Role.MB, Role.CTL, Role.OWN)) {
+            assertThat(policy.decide(holder(keeper), Action.OPEN_SITTING, assembly, day)).isEqualTo(Decision(true, "PM-GA-012", keeper, Policy.MATRIX_VERSION))
             assertThat(policy.decide(holder(keeper), Action.KEEP_REGISTER, assembly, day)).isEqualTo(Decision(true, "PM-GA-012", keeper, Policy.MATRIX_VERSION))
         }
         for (other in Role.entries - setOf(Role.BM, Role.MB, Role.CTL, Role.OWN)) {
             assertThat(policy.decide(holder(other), Action.KEEP_REGISTER, assembly, day).allowed).describedAs("$other").isFalse()
+            assertThat(policy.decide(holder(other), Action.OPEN_SITTING, assembly, day).allowed).describedAs("$other opens").isFalse()
         }
         assertThat(policy.decide(person().also { holds(it, Role.BM, at = UUID.randomUUID()) }, Action.KEEP_REGISTER, assembly, day).allowed).isFalse()
         assertThat(policy.decide(Asking(null, null), Action.KEEP_REGISTER, assembly, day).allowed).isFalse()

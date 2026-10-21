@@ -23,6 +23,7 @@ import zues.app.assembly.AttendanceService
 import zues.app.assembly.NoticeService
 import zues.app.assembly.PetitionService
 import zues.app.assembly.ProxyService
+import zues.app.assembly.SittingService
 import zues.app.identity_org.LoginAdministration
 import zues.app.identity_org.Logins
 import zues.app.identity_org.MandateAdministration
@@ -80,6 +81,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var petitions: PetitionService
     @MockitoBean lateinit var proxies: ProxyService
+    @MockitoBean lateinit var sittings: SittingService
     @MockitoBean lateinit var imports: ImportService
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var loginAdministration: LoginAdministration

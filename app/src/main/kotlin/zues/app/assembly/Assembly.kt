@@ -40,8 +40,8 @@ enum class ConvenorOffice { MB, BM, CTL }
 
 enum class MeetingMode { IN_PERSON, VIDEO, HYBRID }
 
-/** `NOTICED` is reached only by a recorded posting act (Rule: PM-GA-007). */
-enum class AssemblyStatus { DRAFT, NOTICED }
+/** `NOTICED` is reached only by a recorded posting act (Rule: PM-GA-007); `OPEN` only by a sitting whose quorum was met (Rule: PM-GA-012). */
+enum class AssemblyStatus { DRAFT, NOTICED, OPEN }
 
 /** One item of the agenda, bound to the majority that decides it (Rule: PM-VOTE-004). */
 @Table("agenda_item")

@@ -125,6 +125,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The quorum meter — the share of all ideal parts the register makes present against the threshold in force, or why it cannot be weighed; and the sittings weighed so far */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_quorum"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule": {
         parameters: {
             query?: never;
@@ -136,6 +153,23 @@ export interface paths {
         put?: never;
         /** Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_schedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Weigh the quorum of the sitting, once, and open the assembly if it is met — by whoever runs it, not before the hour the notice stated */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_sittings"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1697,6 +1731,18 @@ export interface components {
             registeredAt: string;
             scope: string;
         };
+        QuorumView: {
+            cannotWeigh: string[];
+            derivedParts: boolean;
+            met: boolean;
+            representedPct: string;
+            sittings: components["schemas"]["SittingView"][];
+            thresholdPct: string;
+            thresholdSource: string;
+            thresholdVerified: boolean;
+            /** Format: date */
+            weighedOn: string;
+        };
         ReadingRequest: {
             item: string;
             quantity: string;
@@ -1781,6 +1827,28 @@ export interface components {
             reason: string;
             /** Format: uuid */
             revertedBy: string;
+        };
+        SittingView: {
+            basisHash: string;
+            engineVersion: string;
+            /** Format: uuid */
+            id: string;
+            lawVersion: string;
+            /** Format: date-time */
+            openedAt?: string;
+            quorumMet: boolean;
+            representedPct: string;
+            /** Format: int32 */
+            sessionNo: number;
+            thresholdConstant: string;
+            thresholdPct: string;
+            thresholdVerified: boolean;
+            /** Format: date-time */
+            weighedAt: string;
+            /** Format: uuid */
+            weighedBy: string;
+            /** Format: date */
+            weighedOn: string;
         };
         Standing: {
             /** Format: date */
@@ -2603,6 +2671,62 @@ export interface operations {
             };
         };
     };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_quorum: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuorumView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     post_assembly_entrances_entranceId_assemblies_assemblyId_schedule: {
         parameters: {
             query?: never;
@@ -2674,6 +2798,62 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_sittings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SittingView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

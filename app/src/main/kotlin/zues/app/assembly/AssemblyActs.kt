@@ -39,6 +39,7 @@ class AssemblyActs(
     private val notices: NoticeService,
     private val proxies: ProxyService,
     private val attendance: AttendanceService,
+    private val sittings: SittingService,
 ) {
     // Rule: PM-GA-002
     // Rule: PM-SEC-001
@@ -130,6 +131,20 @@ class AssemblyActs(
     fun verifyIdentity(who: Asking, entranceId: UUID, assemblyId: UUID, attendanceId: UUID, how: String): Present =
         attendance.verifyIdentity(entranceId, assemblyId, attendanceId, keepingTheRegister(who, entranceId, assemblyId), how)
 
+    /** Quorum is weighed and the sitting opened by whoever runs the assembly, once, at the hour the notice stated or after. */
+    // Rule: PM-GA-012
+    // Rule: PM-SEC-001
+    @Transactional
+    fun openSitting(who: Asking, entranceId: UUID, assemblyId: UUID): Sitting {
+        acting.actor(who, Action.OPEN_SITTING, entranceId)
+        val by = try {
+            running(who, entranceId, assemblyId)
+        } catch (e: ActRefused) {
+            throw ActRefused(Action.OPEN_SITTING.governedBy)
+        }
+        return sittings.open(entranceId, assemblyId, by)
+    }
+
     /** The policy's own line first, then: is this assembly theirs to run — refused under the register's rule either way. */
     private fun keepingTheRegister(who: Asking, entranceId: UUID, assemblyId: UUID): Actor {
         acting.actor(who, Action.KEEP_REGISTER, entranceId)
@@ -145,7 +160,9 @@ class AssemblyActs(
      * and the people entered are present at that meeting and no other.
      */
     private fun notOnceTheRegisterIsOpen(assemblyId: UUID) =
-        check(!attendance.begun(assemblyId)) { "people are already on the register of this assembly: its date, place and agenda no longer change" }
+        check(!attendance.begun(assemblyId) && !sittings.weighed(assemblyId)) {
+            "people are already on the register of this assembly, or its quorum is weighed: its date, place and agenda no longer change"
+        }
 
     /** Nobody is present twice: a person on the register does not then hand their presence to another (Rule: PM-ORG-005). */
     // Rule: PM-ORG-005

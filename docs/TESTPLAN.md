@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **76** (33%) |
-| Remaining | **157** |
+| Proved by a test named after the rule | **77** (33%) |
+| Remaining | **156** |
 | Proposed slices at ~10 rules each | **19** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -169,7 +169,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 4 — the risk board is credible
 
-69 rule(s) remaining across 8 slice(s).
+68 rule(s) remaining across 8 slice(s).
 
 ### S-G4-01 · `agent` · AI · 10 rule(s) · ⚠ 1 unconfirmed
 
@@ -239,12 +239,11 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-PMC-015` | SHOULD | A first-time domoupravitel can run a lawful GA end to end without reading the statute. |
 | `PM-PMC-018` | SHOULD | Every notice has a delivery record. |
 
-### S-G4-06 · `law` · LAW · 10 rule(s)
+### S-G4-06 · `law` · LAW · 9 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-LAW-001` | MUST | The watcher's database role has no write access to `legal_constant`, `majority_rule` or the rule catalogue. |
-| `PM-LAW-002` | MUST | Opening any past charge shows which law version computed it; two charges from different versions are visibly different. |
 | `PM-LAW-003` | MUST | An automatic update inserts `in_force_from` = the official effective date and closes the previous row; no historical figure moves. |
 | `PM-LAW-004` | MUST | You can show, years later, what the law said on the day you computed a charge. |
 | `PM-LAW-005` | MUST | A change to чл. 51 names PM-FEE-002, PM-FEE-005, PM-FEE-010 and the files tagged with those IDs, without a human searching. |

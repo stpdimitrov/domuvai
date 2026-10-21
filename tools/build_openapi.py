@@ -96,6 +96,12 @@ RUNNING = {
    ('Record that a remote participant was reliably identified, and how — from then on their presence counts', ['PM-GA-016', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
    ('Read the register of the sitting — each line, whether it counts, and whom it makes present', ['PM-GA-012', 'PM-GA-016']),
+ ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum'):
+   ('The quorum meter — the share of all ideal parts the register makes present against the threshold in force, or why it cannot be weighed; and the sittings weighed so far',
+    ['PM-GA-012', 'PM-ORG-005', 'PM-ORG-011']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings'):
+   ('Weigh the quorum of the sitting, once, and open the assembly if it is met — by whoever runs it, not before the hour the notice stated',
+    ['PM-GA-012', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity
@@ -193,7 +199,7 @@ PLANNED = [
  ('post', '/assemblies/{assembly_id}/notice', 'assembly',
   'Generate the notice document and send the electronic notification beside the posting', ['PM-GA-008', 'PM-SYS-013']),
  ('post', '/assemblies/{assembly_id}/sessions', 'assembly',
-  'Open a session and record the quorum reached', ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015']),
+  'Open the second and the third sitting on the lowered quorum, and the higher one where one person owns more than half', ['PM-GA-013', 'PM-GA-014', 'PM-GA-015']),
  ('post', '/agenda-items/{agenda_item_id}/votes', 'assembly',
   'Cast or record a vote', ['PM-GA-009', 'PM-GA-018', 'PM-VOTE-014', 'PM-ORG-005']),
  ('post', '/agenda-items/{agenda_item_id}/close', 'assembly',
