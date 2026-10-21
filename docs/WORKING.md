@@ -57,7 +57,7 @@ The foundation (the A-plan) is built; work is now module slices from `docs/TESTP
 - A lane is **held** while an open issue labelled `lane:<lane>` has an assignee: the slice issue, opened by `tools/lanes.py claim` with the slice contract as its body. The PR's `Closes #n` frees it on merge.
 - Two sessions claiming one free lane at once: the lower issue number holds it, and `claim` tells the other to close theirs.
 - **A claim belongs to the session that opened it, not to a GitHub account.** One owner's sessions all sign in as the same person, so `check` and `claim` treat every open claim as someone else's: a held lane is refused unless the session names the claim it opened itself (`check <lane> --mine <n>`).
-- A slice that must touch a second lane claims both in one issue: `claim <lane> --also <other lane> …`. Both are held, and both are freed, together.
+- A slice that must touch a second lane claims both in one issue: `claim <lane> --also <other lane> …`. Both are held, and both are freed, together. **CI enforces it**: the `gates` job fails a PR that changes a lane its closing claim does not name (`tools/lanes.py covers <pr>`); label the claim issue with the missing lane if it is free, or wait for its holder, then re-run the job.
 - A **finding** for another lane is the same label with no assignee: counted on the map, claimed by nobody until someone takes it into a slice.
 - A developer who prefers a lane sets `git config zues.lane <lane>`: it is listed first, never reserved.
 
