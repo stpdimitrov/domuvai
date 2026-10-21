@@ -70,12 +70,15 @@ class Acting(private val policy: Policy, private val succession: Succession, pri
     fun holdsToday(party: UUID, entranceId: UUID, role: Role): Boolean = heldOn(party, entranceId, role, today())
 
     /**
-     * Whether [candidate] has, today, taken [predecessor]'s place in [office] — `identity_org`'s one reading of
-     * succession ([Succession], following `Mandate.succeeds`), asked, never worked out here.
+     * Whether [candidate] has, today, taken [predecessor]'s place in [office] *in that same office* — `identity_org`'s
+     * one reading of succession ([Succession], following `Mandate.succeeds`), asked, never worked out here: a board
+     * member who later became manager has succeeded nobody on the board by it.
      */
     // Rule: PM-GOV-004
+    // TODO(legal): PM-GOV-004 — `identity_org` reads no succession for the controller: an assembly a controller convened is
+    // carried on by nobody once they leave office (the owner's C-a, its cost); asked of the owner
     fun hasSucceeded(candidate: UUID, predecessor: UUID, entranceId: UUID, office: Role): Boolean =
-        succession.hasSucceeded(candidate, predecessor, entranceId, office, today())
+        succession.successorsOf(predecessor, entranceId, office, today()).any { it.partyId == candidate && it.role == office }
 
     /** Whether a party held a role in the entrance on a day — the same question of the policy, about a day that is not today. */
     fun heldOn(party: UUID, entranceId: UUID, role: Role, on: LocalDate): Boolean =

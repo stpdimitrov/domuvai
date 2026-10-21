@@ -477,4 +477,21 @@ class SittingServiceTest {
         owner("49")
         assertThat(service().open(entranceId, assembly.id, keeper).basis.lines().first()).contains("no owner over 51% at the notice on 2026-11-10")
     }
+
+    @Test
+    fun `PM-GA-014 the following day's sitting is held at any share even when the concentration at the notice could not be told - and says the raise is not applied`() {
+        val unit = UUID.randomUUID()
+        owner("60", unit = unit)
+        owner("60", unit = unit)                                                     // booked twice over at the notice
+        overHeld += unit
+        val p = owner("40")
+        present(p)
+        assertThatThrownBy { service().open(entranceId, assembly.id, keeper) }.isInstanceOf(QuorumNotWeighable::class.java)   // the first: unknowable
+        stored += Sitting(UUID.randomUUID(), entranceId, assembly.id, 1, null, BigDecimal.ZERO, false, meets, sittingDay, BigDecimal("75"), "c", true, "b", "ab".repeat(32), "v", "e", keeper.party, keeper.loginIssuer, keeper.loginSubject)
+        stored += stored.last().copy(id = UUID.randomUUID(), sessionNo = 2, weighedAt = meets.plusSeconds(postponed))
+        present(p, sitting = 3)                                                      // the double booking still stands: only the raise is unknowable, and it is not applied
+        val third = service(meets.plusSeconds(86_400)).open(entranceId, assembly.id, keeper)
+        assertThat(third.quorumMet).isTrue()
+        assertThat(third.thresholdPct).isEqualByComparingTo("0")
+    }
 }

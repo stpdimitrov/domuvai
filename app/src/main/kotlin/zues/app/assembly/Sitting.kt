@@ -243,12 +243,12 @@ class SittingService(
             thresholdSource = threshold.source,
             thresholdVerified = threshold.verified,
             thresholdConstant = thresholdConstant,
-            cannotWeigh = cannotWeigh + concentration.cannotWeigh,
+            cannotWeigh = cannotWeigh + (if (raised) concentration.cannotWeigh else emptyList()),   // the following day's is held at any share
             derivedParts = weighed.any { it.idealPartsSource != "DECLARED" },
             basis = (
                 listOf(
                     "sitting $n on $on against $thresholdConstant ${threshold.value}" +
-                        " (${concentration.said})" +
+                        " (${concentration.said}${if (raised || concentration.raisedTo == null) "" else "; not raised at this sitting"})" +
                         ": ${representedPct.stripTrailingZeros().toPlainString()}",
                 ) +
                     weighed.map {

@@ -1,6 +1,8 @@
 package zues.app.assembly
 
+import org.mockito.kotlin.times
 import zues.app.identity_org.Succession
+import zues.app.identity_org.Successor
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.mock
@@ -118,9 +120,13 @@ class ActingTest {
     @Test
     fun `PM-GOV-004 who succeeded whom is identity_org's answer, asked as at today in Sofia - never worked out here`() {
         val (candidate, convenor) = listOf(UUID.randomUUID(), UUID.randomUUID())
-        whenever(succession.hasSucceeded(candidate, convenor, entrance, Role.BM, LocalDate.parse("2026-10-10"))).thenReturn(true)
+        val promoted = UUID.randomUUID()
+        whenever(succession.successorsOf(convenor, entrance, Role.BM, LocalDate.parse("2026-10-10"))).thenReturn(
+            listOf(Successor(candidate, Role.BM, UUID.randomUUID(), LocalDate.parse("2026-10-01")), Successor(promoted, Role.MB, UUID.randomUUID(), LocalDate.parse("2026-10-01"))),
+        )
         assertThat(acting.hasSucceeded(candidate, convenor, entrance, Role.BM)).isTrue()
+        assertThat(acting.hasSucceeded(promoted, convenor, entrance, Role.BM)).isFalse()      // took the place as the board, not as manager
         assertThat(acting.hasSucceeded(convenor, candidate, entrance, Role.BM)).isFalse()
-        verify(succession).hasSucceeded(candidate, convenor, entrance, Role.BM, LocalDate.parse("2026-10-10"))
+        verify(succession, times(2)).successorsOf(convenor, entrance, Role.BM, LocalDate.parse("2026-10-10"))
     }
 }
