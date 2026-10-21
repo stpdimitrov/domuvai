@@ -223,9 +223,12 @@ class SittingService(
         val weighed = theirs.filter { it.unitId !in bothRoles && it.unitId !in overHeld }
         val ofSitting = constantOn(ladder.thresholdCode(n), on.toString())
         val concentration = concentration(assembly)
-        // TODO(legal): PM-GA-015 — which sittings the higher quorum governs is not in the catalogue; the strictest reading
-        // is taken: every one, the postponed and the following day's too — never below it while the concentration holds.
-        val threshold = concentration.raisedTo?.takeIf { BigDecimal(it.value) > BigDecimal(ofSitting.value) } ?: ofSitting
+        // The owner's decision (2026-10-21, Q4c): the higher quorum governs the first and the postponed sittings; the
+        // following day's opens at any share, as PM-GA-014 says — so one owner of more than half can neither carry a thin
+        // sitting nor keep the assembly from ever being held.
+        // TODO(legal): PM-GA-015 — counsel to confirm which sittings чл. 15 ал. 4 governs
+        val raised = n == FIRST_SITTING || n != ladder.last
+        val threshold = concentration.raisedTo?.takeIf { raised && BigDecimal(it.value) > BigDecimal(ofSitting.value) } ?: ofSitting
         // A unit never weighs more than its own ideal parts, however its co-owners' rounded shares add up (PM-ORG-005).
         val representedPct = weighed.groupBy { it.unitId }.values.fold(BigDecimal.ZERO) { sum, ofUnit ->
             sum + ofUnit.fold(BigDecimal.ZERO) { parts, held -> parts + BigDecimal(held.idealParts) }.min(BigDecimal(ofUnit.first().unitIdealParts))
@@ -240,12 +243,12 @@ class SittingService(
             thresholdSource = threshold.source,
             thresholdVerified = threshold.verified,
             thresholdConstant = thresholdConstant,
-            cannotWeigh = cannotWeigh + concentration.cannotWeigh,
+            cannotWeigh = cannotWeigh + (if (raised) concentration.cannotWeigh else emptyList()),   // the following day's is held at any share
             derivedParts = weighed.any { it.idealPartsSource != "DECLARED" },
             basis = (
                 listOf(
                     "sitting $n on $on against $thresholdConstant ${threshold.value}" +
-                        " (${concentration.said})" +
+                        " (${concentration.said}${if (raised || concentration.raisedTo == null) "" else "; not raised at this sitting"})" +
                         ": ${representedPct.stripTrailingZeros().toPlainString()}",
                 ) +
                     weighed.map {

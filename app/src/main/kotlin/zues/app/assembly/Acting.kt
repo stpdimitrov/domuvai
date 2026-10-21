@@ -3,6 +3,7 @@ package zues.app.assembly
 import org.springframework.stereotype.Service
 import zues.app.policy.Action
 import zues.app.policy.Asking
+import zues.app.identity_org.Succession
 import zues.app.policy.Policy
 import zues.app.policy.Resource
 import zues.app.policy.Role
@@ -27,7 +28,7 @@ class ActRefused(val ruleId: String) : RuntimeException("not allowed ($ruleId)")
  * off — act on nothing here, since what `assembly` records is not undone and must name who did it.
  */
 @Service
-class Acting(private val policy: Policy, private val clock: Clock) {
+class Acting(private val policy: Policy, private val succession: Succession, private val clock: Clock) {
 
     /**
      * Who acts, when the policy allows [action] in the entrance today; otherwise [ActRefused] — naming the action's
@@ -67,6 +68,17 @@ class Acting(private val policy: Policy, private val clock: Clock) {
      * the mandates and their one reading of who succeeded whom. Nothing about succession is worked out here.
      */
     fun holdsToday(party: UUID, entranceId: UUID, role: Role): Boolean = heldOn(party, entranceId, role, today())
+
+    /**
+     * Whether [candidate] has, today, taken [predecessor]'s place in [office] *in that same office* — `identity_org`'s
+     * one reading of succession ([Succession], following `Mandate.succeeds`), asked, never worked out here: a board
+     * member who later became manager has succeeded nobody on the board by it.
+     */
+    // Rule: PM-GOV-004
+    // TODO(legal): PM-GOV-004 — `identity_org` reads no succession for the controller: an assembly a controller convened is
+    // carried on by nobody once they leave office (the owner's C-a, its cost); asked of the owner
+    fun hasSucceeded(candidate: UUID, predecessor: UUID, entranceId: UUID, office: Role): Boolean =
+        succession.successorsOf(predecessor, entranceId, office, today()).any { it.partyId == candidate && it.role == office }
 
     /** Whether a party held a role in the entrance on a day — the same question of the policy, about a day that is not today. */
     fun heldOn(party: UUID, entranceId: UUID, role: Role, on: LocalDate): Boolean =

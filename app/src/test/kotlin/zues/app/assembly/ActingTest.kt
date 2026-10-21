@@ -1,5 +1,11 @@
 package zues.app.assembly
 
+import org.mockito.kotlin.times
+import zues.app.identity_org.Succession
+import zues.app.identity_org.Successor
+import org.mockito.kotlin.whenever
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.mock
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -33,7 +39,8 @@ class ActingTest {
         ),
     )
     // 00:30 on 10 October in Sofia; still the 9th in UTC
-    private val acting = Acting(policy, Clock.fixed(Instant.parse("2026-10-09T21:30:00Z"), ZoneOffset.UTC))
+    private val succession: Succession = mock()
+    private val acting = Acting(policy, succession, Clock.fixed(Instant.parse("2026-10-09T21:30:00Z"), ZoneOffset.UTC))
 
     private fun person(role: Role? = null, at: UUID = entrance, from: String = "2026-01-01", until: String? = null): Asking {
         val party = UUID.randomUUID()
@@ -69,7 +76,7 @@ class ActingTest {
         refused(Asking(null, null), Action.CONVENE_ON_PETITION).isEqualTo("PM-SEC-001")
         refused(Asking(null, person(Role.OWN).party)).isEqualTo("PM-SEC-001")        // an owner's party with no sign-in behind it
         // even a source that would answer for a login with no party: an act is a party's
-        val generous = Acting(Policy(listOf(RoleSource { _, entranceId, _ -> setOf(Held(Role.OWN, entranceId)) })), Clock.systemUTC())
+        val generous = Acting(Policy(listOf(RoleSource { _, entranceId, _ -> setOf(Held(Role.OWN, entranceId)) })), mock(), Clock.systemUTC())
         assertThatThrownBy { generous.actor(Asking(Login(issuer, "login-of-nobody"), null), Action.SIGN_PETITION, entrance) }.isInstanceOf(ActRefused::class.java)
     }
 
@@ -108,5 +115,18 @@ class ActingTest {
         assertThat(asked(ownerAndManager).actions).containsExactlyInAnyOrder(Action.CONVENE_ASSEMBLY, Action.CONVENE_ON_PETITION)
         assertThatThrownBy { asked(person(Role.CSH)) }.isInstanceOf(ActRefused::class.java).extracting { (it as ActRefused).ruleId }.isEqualTo("PM-GA-002")
         assertThatThrownBy { asked(Asking(Login(issuer, "login-of-nobody"), null)) }.isInstanceOf(ActRefused::class.java).extracting { (it as ActRefused).ruleId }.isEqualTo("PM-SEC-001")
+    }
+
+    @Test
+    fun `PM-GOV-004 who succeeded whom is identity_org's answer, asked as at today in Sofia - never worked out here`() {
+        val (candidate, convenor) = listOf(UUID.randomUUID(), UUID.randomUUID())
+        val promoted = UUID.randomUUID()
+        whenever(succession.successorsOf(convenor, entrance, Role.BM, LocalDate.parse("2026-10-10"))).thenReturn(
+            listOf(Successor(candidate, Role.BM, UUID.randomUUID(), LocalDate.parse("2026-10-01")), Successor(promoted, Role.MB, UUID.randomUUID(), LocalDate.parse("2026-10-01"))),
+        )
+        assertThat(acting.hasSucceeded(candidate, convenor, entrance, Role.BM)).isTrue()
+        assertThat(acting.hasSucceeded(promoted, convenor, entrance, Role.BM)).isFalse()      // took the place as the board, not as manager
+        assertThat(acting.hasSucceeded(convenor, candidate, entrance, Role.BM)).isFalse()
+        verify(succession, times(2)).successorsOf(convenor, entrance, Role.BM, LocalDate.parse("2026-10-10"))
     }
 }
