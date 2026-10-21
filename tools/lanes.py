@@ -12,6 +12,7 @@ list of names up to date.
     python3 tools/lanes.py                    the map: taken lanes, free lanes and their next slice
     python3 tools/lanes.py check <lane> [--mine <n>]   exit 1 if <lane> is held — unless by claim #<n>, the one this session opened
     python3 tools/lanes.py claim <lane> [--also <lane> …] --title "S-nn …" --body-file contract.md
+    python3 tools/lanes.py covers <pr>                 exit 1 if PR <pr> touches a lane its closing claim does not name (CI runs it)
 
 A claim belongs to the session that opened it, not to a GitHub account: one owner's sessions all sign in as the
 same person, so an open claim is never taken for "mine" unless the session names it (`--mine`).
@@ -167,12 +168,39 @@ def claim(lanes: list[str], title: str, body_file: str) -> int:
     return 0
 
 
+def covers(pr: int) -> int:
+    """0 if every lane PR #pr touches is named by an issue it closes; 1, naming the missing lanes, otherwise.
+    A slice that edits a second lane claims it (`claim … --also <lane>`): without this, a claim on `registry`
+    could change `policy` while someone else holds `policy`, and nothing would say so until both merged."""
+    view = json.loads(gh('pr', 'view', str(pr), '--json', 'files,closingIssuesReferences'))
+    touched = {lane for f in view['files'] if (lane := lane_of(f['path']))}
+    if not touched:
+        print(f'PR #{pr} touches no lane (shared files only) — nothing to claim')
+        return 0
+    claimed: set[str] = set()
+    for ref in view['closingIssuesReferences']:
+        labels = json.loads(gh('issue', 'view', str(ref['number']), '--json', 'labels'))['labels']
+        claimed |= {l['name'][len(LABEL):] for l in labels if l['name'].startswith(LABEL)}
+    missing = sorted(touched - claimed)
+    if missing:
+        closes = numbers(view['closingIssuesReferences']) or 'no issue'
+        issue = view['closingIssuesReferences'][0]['number'] if view['closingIssuesReferences'] else '<the claim issue>'
+        print(f'PR #{pr} touches {", ".join(sorted(touched))}; the claim it closes ({closes}) names '
+              f'{", ".join(sorted(claimed)) or "no lane"}. Unclaimed: {", ".join(missing)}.\n'
+              f'Claim it before merging — label the claim issue (gh issue edit {issue} --add-label {LABEL}{missing[0]}) '
+              f'if the lane is free (python3 tools/lanes.py check {missing[0]}), or wait for its holder — then re-run this check.')
+        return 1
+    print(f'PR #{pr}: every lane it touches is claimed ({", ".join(sorted(touched))})')
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description='Who is working where — lanes claimed live on GitHub.')
     sub = parser.add_subparsers(dest='command')
     checking = sub.add_parser('check')
     checking.add_argument('lane', choices=LANES)
     checking.add_argument('--mine', type=int, metavar='N', help='the claim issue this session opened itself')
+    sub.add_parser('covers').add_argument('pr', type=int)
     claiming = sub.add_parser('claim')
     claiming.add_argument('lane', choices=LANES)
     claiming.add_argument('--also', action='append', default=[], choices=LANES, metavar='LANE',
@@ -182,6 +210,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == 'check':
         return check(args.lane, args.mine)
+    if args.command == 'covers':
+        return covers(args.pr)
     if args.command == 'claim':
         return claim(list(dict.fromkeys([args.lane, *args.also])), args.title, args.body_file)
     return show()
