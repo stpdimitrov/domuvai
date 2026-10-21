@@ -29,7 +29,9 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 
 11. WEB-23 (PM-BOOK-003, PM-BOOK-012): the compliance screen shows each entrance's overdue declarations and the month's
     headcount check as the API gives them, says so where no run was issued, and nothing of the design's sample.
-12. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
+12. WEB-25 (PM-GA-002, PM-GA-012, PM-GOV-005): the entrance's assembly screen — in CI, an assembly convened through the
+    page's own form and shown as the API stored it, its quorum meter in the API's figures, an office not held refused.
+13. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
     httpOnly cookie and no token; every screen above is then read signed in, from an api that is closed; the console
     names the person, with the login the api read from the web's bearer; sign-out ends the session at the web and at
     the issuer.
@@ -42,6 +44,7 @@ Usage, on a machine with no issuer — --web told to run without sign-in, the ap
   check_e2e.py --api URL --web URL --closed-web URL --bad-contact-web URL --signin-web URL --contact ADDRESS --entrance ID
 """
 import argparse
+import datetime
 import html
 import http.client
 import json
@@ -51,7 +54,9 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from jsonschema import Draft202012Validator
 
@@ -66,7 +71,18 @@ DEMO_BASIS = [
 ]
 
 # (method, contract path) → how the live screens call it for the seeded entrance: the URL and the body.
+# The operations about one assembly need an assembly, and the seed convenes none: assembly_screen convenes one
+# through the page and validates these itself, signed in (WEB-25). Here they are listed so that the web calls nothing
+# this check does not cover.
+ON_AN_ASSEMBLY = {
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies"),
+    ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}"),
+    ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum"),
+    ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
+    ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
+}
 CALLS = {
+    ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
     ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
@@ -101,7 +117,7 @@ SCREENS = {
         "Обекти 6 · 6 жил. Форма на управление общо събрание Управител — Мандат до — Последно ОС — Книга на собствениците 7 просрочени декларации",
         "Оперативна сметка BG44 UNCR 7000 1512 3456 78 €70,00 Постъпления по сметката — не салдото в банката",
         "Фонд „Ремонт и обновяване“ BG87 UNCR 7000 1512 9981 02 €570,00 Разполагаемо €145,00 — €425,00 поети, неплатени",
-        "Общите събрания още не се водят в системата.",
+        "Следващо събрание Системата още не изрежда събранията на входа. Общи събрания",
     ],
     "/entrance/charges?period=2026-09&entrance={e}": [
         "ул. Шипка 14, вх. Б",
@@ -706,6 +722,125 @@ def compliance_screen(api, web, entrance):
     return failures
 
 
+def refusal_words(raw):
+    """The API's own words in a refusal's body, or None when the body is not one."""
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return None
+    return body.get("error") if isinstance(body, dict) and isinstance(body.get("error"), str) else None
+
+
+def submit_form(web, path, page, marker, fields):
+    """
+    A form posted as a browser with no script posts it: every hidden input the server rendered in the form that
+    holds [marker] (a server action's own references among them), the visible fields given, multipart — signed in,
+    from this site's own page. Answers status, Location, body.
+    """
+    forms = [f for f in re.findall(r"<form\b.*?</form>", page, re.S) if marker in f]
+    if len(forms) != 1:
+        return 0, "", f"{len(forms)} forms hold {marker!r}"
+    hidden = []
+    for tag in re.findall(r"<input\b[^>]*>", forms[0]):
+        attrs = dict((k, html.unescape(v)) for k, v in re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag))
+        if attrs.get("type") == "hidden" and "name" in attrs:
+            hidden.append((attrs["name"], attrs.get("value", "")))
+    boundary = "----e2e" + uuid.uuid4().hex
+    body = b"".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in hidden + list(fields.items()))
+    body += f"--{boundary}--\r\n".encode()
+    target = urllib.parse.urlsplit(web)
+    connection = http.client.HTTPConnection(target.hostname, target.port, timeout=60)
+    try:
+        connection.request("POST", path, body=body, headers={**CARRIED.get(web, {}), "Origin": web, "Content-Type": f"multipart/form-data; boundary={boundary}"})
+        response = connection.getresponse()
+        return response.status, response.getheader("location") or "", response.read().decode("utf-8", "replace")
+    finally:
+        connection.close()
+
+
+def assembly_screen(api, web, entrance, signed_in):
+    """
+    WEB-25 — the entrance's general assembly as the API answers it. Signed in (CI): the offices in force today as
+    identity gives them (PM-GOV-005); an assembly convened through the page's own form, by the office the person holds
+    (PM-GA-002), landing on it and showing what the API stored — when in Sofia, where, how, by which office, a draft
+    whose notice is not posted, an empty agenda — and the quorum meter in the API's figures or the API's refusal; and
+    convening as an office the person does not hold, refused in the API's words, the form kept. The page computes
+    no deadline, share or threshold: every value compared here is taken from the API.
+    """
+    failures, date = [], lambda iso: ".".join(reversed(iso.split("-")))
+    path = f"/entrance/assembly?entrance={entrance}"
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    if status != 200 or "Свикване на общо събрание" not in text or 'name="convenedAs"' not in page:
+        return [f"{path}: HTTP {status}, or no form to convene"]
+    if not signed_in:
+        print("—   /entrance/assembly  read; convening, and the five operations on an assembly, NOT checked: nobody is signed in on this run")
+        return failures
+
+    status, raw = fetch(api, f"/api/identity/entrances/{entrance}/mandates")       # as at the api's own today, as the page asks
+    offices = {"MB": "член на управителния съвет", "BM": "управител", "CTL": "контролен съвет / контрольор", "CSH": "касиер"}
+    mandates = json.loads(raw) if status == 200 else []
+    failures += [] if mandates else [f"{path}: the API gives no mandate in force today (HTTP {status}) — nothing to read off the page"]
+    def standing(s):               # PM-GOV-005 — how identity says each office stands, read back as the page words it
+        if s["kind"] == "IN_TERM":
+            return "в мандат" + (f" до {date(s['until'])}" if s.get("until") else "")
+        if s["kind"] == "ELECTION_DUE":
+            return "изборът се дължи" + (f" до {date(s['electBy'])}" if s.get("electBy") else "")
+        if s["kind"] == "EXPIRED_ACTING":
+            return "мандатът е изтекъл — изпълнява" + (f" от {date(s['actingSince'])}" if s.get("actingSince") else "")
+        return s["kind"]
+    for m in mandates:
+        row = f"{offices.get(m['role'], m['role'])} {m['partyId'][:8]} {date(m['validFrom'])} {date(m['validTo'])} {standing(m['standing'])}"
+        failures += [] if row in text else [f"{path}: does not show the office {row!r}"]
+
+    day = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date() + datetime.timedelta(days=30)
+    place = f"Входът, партер — проверката {uuid.uuid4().hex[:6]}"
+    status, location, _ = submit_form(web, path, page, 'name="convenedAs"',
+                                      {"convenedAs": "MB", "scheduledAt": f"{day}T18:30", "place": place, "mode": "IN_PERSON"})
+    made = re.fullmatch(rf"(?:{re.escape(web)})?/entrance/assembly\?entrance={entrance}&assembly=([0-9a-f-]{{36}})", location)
+    if status != 303 or not made:
+        return failures + [f"{path}: convening through the page's form answers HTTP {status} → {location or 'nowhere'} — expected the new assembly's page"]
+    shown = visible_text(fetch(web, location.removeprefix(web))[1])
+    of = f"/api/assembly/entrances/{entrance}/assemblies/{made.group(1)}"
+    for suffix, path_ in (("", ""), ("/attendance", "/attendance"), ("/proxies", "/proxies"), ("/quorum", "/quorum")):
+        status, raw = fetch(api, of + suffix)
+        if status != 200:
+            failures += [] if suffix == "/quorum" else [f"GET {of + suffix}: HTTP {status} {raw[:200]}"]   # a draft's meter may be refused, below
+            continue
+        errors = list(Draft202012Validator(response_schema("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}" + path_, 200),
+                                           format_checker=Draft202012Validator.FORMAT_CHECKER).iter_errors(json.loads(raw)))
+        failures += [f"GET …/assemblies/{{assemblyId}}{path_}: {'/'.join(map(str, e.absolute_path)) or '(root)'} — {e.message}" for e in errors]
+    status, raw = fetch(api, of)
+    stored = json.loads(raw) if status == 200 else {}
+    # the instant stored, against Python's own reading of 18:30 in Sofia — not the web's code checking itself
+    at = datetime.datetime.combine(day, datetime.time(18, 30), ZoneInfo("Europe/Sofia")).astimezone(datetime.timezone.utc)
+    if stored.get("scheduledAt") and datetime.datetime.fromisoformat(stored["scheduledAt"].replace("Z", "+00:00")) != at:
+        failures.append(f"{path}: the form asked for 18:30 in Sofia on {day}; the API stored {stored['scheduledAt']}, not {at.isoformat()}")
+    if stored.get("place") != place or stored.get("convenedAs") != "MB" or stored.get("status") != "DRAFT":
+        failures.append(f"{path}: the API stored {stored or status} — not the assembly the form asked for")
+    wanted = [f"Кога {date(str(day))} 18:30", f"Къде {place}", "Начин присъствено", "Свикано от член на управителния съвет",
+              "Покана не е обявена", "Неотложно не", "чернова — поканата не е обявена", "Дневният ред е празен."]
+    failures += [f"{path}: the new assembly does not show {w!r}" for w in wanted if w not in shown]
+    status, raw = fetch(api, f"/api/assembly/entrances/{entrance}/assemblies/{made.group(1)}/quorum")
+    if status == 200:
+        q = json.loads(raw)
+        meter = f"Присъстват {q['representedPct']}% от идеалните части · праг {q['thresholdPct']}%"
+        failures += [] if meter in shown else [f"{path}: the quorum meter does not show {meter!r}"]
+    elif (refusal_words(raw) or f"HTTP {status}") not in shown:
+        failures.append(f"{path}: the quorum is refused (HTTP {status}) and the page does not say the API's words")
+
+    # an office the person does not hold: refused in the API's words, and nothing convened
+    status, location, refused_page = submit_form(web, path, page, 'name="convenedAs"',
+                                                 {"convenedAs": "BM", "scheduledAt": f"{day}T19:30", "place": place + " (отказано)", "mode": "IN_PERSON"})
+    said = visible_text(refused_page)
+    kept = f'value="{html.escape(place + " (отказано)", quote=True)}"' in refused_page        # the field itself, not the page's script payload
+    if status != 200 or location or "Нямате право да свикате общо събрание" not in said or not kept:
+        failures.append(f"{path}: convening as an office not held answers HTTP {status} → {location or 'the page'} — expected the API's refusal, the form kept")
+    print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; convened through the form and shown as "
+          f"stored; the meter in the API's figures; an office not held refused in the API's words")
+    return failures
+
+
 def visible_text(page):
     page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
     page = re.sub(r"<(script|style)\b.*?</\1>", " ", page, flags=re.S)
@@ -755,12 +890,12 @@ def main():
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable
-    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked)]
-    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted(checked - called)]
+    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY)]
+    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY) - called)]
 
     for (method, path), call in CALLS.items():
         url, body = call(entrance)
-        if path == "/api/identity/me" and api not in CARRIED:
+        if path in ("/api/identity/me", "/api/identity/entrances/{entranceId}/mandates") and api not in CARRIED:
             print(f"—   {method:4} {path}  NOT checked: it answers only a request with a token, and this run has none")
             continue
         status, raw = fetch(api, url, body)
@@ -790,6 +925,7 @@ def main():
     failures += charges_multiple(api, web)
     failures += entrance_screen(api, web, entrance)
     failures += compliance_screen(api, web, entrance)
+    failures += assembly_screen(api, web, entrance, signed_in=bool(args.user))
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
     status, raw = fetch(api, "/api/law/version")

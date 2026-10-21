@@ -851,6 +851,67 @@
   padding: 0 16px;
   min-width: 720px;
 }
+/* /entrance/assembly (WEB-25) */
+.as-mandates, .as-agenda, .as-register {
+  display: grid;
+  column-gap: 14px;
+  align-items: center;
+  padding: 0 16px;
+  min-width: 720px;
+}
+.as-mandates { grid-template-columns: 220px 120px 96px 96px minmax(0, 1fr); }
+.as-agenda { grid-template-columns: 40px minmax(0, 1fr) 160px 160px; }
+.as-register { grid-template-columns: 120px 90px minmax(0, 1fr) 90px minmax(0, 1fr); }
+.as-facts {
+  display: grid;
+  gap: 8px;
+  font: 400 13px/1.5 "IBM Plex Sans";
+}
+.as-facts .k {
+  display: inline-block;
+  width: 130px;
+  color: #6b6f6c;
+}
+.as-note {
+  margin-top: 16px;
+  font: 400 13px/1.5 "IBM Plex Sans";
+}
+.as-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  font: 400 12.5px/1.4 "IBM Plex Sans";
+  color: #3d413e;
+}
+.as-form label {
+  display: grid;
+  gap: 4px;
+}
+.as-form .wide {
+  grid-column: 1 / -1;
+}
+.as-form .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.as-form input[type="text"], .as-form input[type="datetime-local"], .as-form select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #deddd9;
+  border-radius: 4px;
+  font: inherit;
+  background: #fff;
+}
+.as-refused {
+  grid-column: 1 / -1;
+  color: #8e2318;
+}
+.as-hint {
+  margin-left: 12px;
+  color: #6b6f6c;
+}
+
 /* two tables on one screen: each as tall as its rows, and the screen scrolls — not each table inside itself */
 .pf-card.cp-card {
   flex: none;
