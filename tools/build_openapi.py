@@ -97,11 +97,11 @@ RUNNING = {
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
    ('Read the register of the sitting — each line, whether it counts, and whom it makes present', ['PM-GA-012', 'PM-GA-016']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum'):
-   ('The quorum meter — the share of all ideal parts the register makes present against the threshold in force, or why it cannot be weighed; and the sittings weighed so far',
-    ['PM-GA-012', 'PM-ORG-005', 'PM-ORG-011']),
+   ('The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting\'s threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far',
+    ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-ORG-005', 'PM-ORG-011']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings'):
-   ('Weigh the quorum of the sitting, once, and open the assembly if it is met — by whoever runs it, not before the hour the notice stated',
-    ['PM-GA-012', 'PM-SEC-001']),
+   ('Weigh the quorum of the sitting the assembly is at, once, and open the assembly if it is met — by whoever runs it: the first not before the hour the notice stated, the postponed one an hour after the first fell short at the reduced share, the last on the following day at any share',
+    ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity
@@ -199,7 +199,7 @@ PLANNED = [
  ('post', '/assemblies/{assembly_id}/notice', 'assembly',
   'Generate the notice document and send the electronic notification beside the posting', ['PM-GA-008', 'PM-SYS-013']),
  ('post', '/assemblies/{assembly_id}/sessions', 'assembly',
-  'Open the second and the third sitting on the lowered quorum, and the higher one where one person owns more than half', ['PM-GA-013', 'PM-GA-014', 'PM-GA-015']),
+  'Weigh a sitting on the higher quorum where one person owns more than half', ['PM-GA-015']),
  ('post', '/agenda-items/{agenda_item_id}/votes', 'assembly',
   'Cast or record a vote', ['PM-GA-009', 'PM-GA-018', 'PM-VOTE-014', 'PM-ORG-005']),
  ('post', '/agenda-items/{agenda_item_id}/close', 'assembly',

@@ -147,7 +147,7 @@ class SittingWebTest {
             LocalDate.parse("2026-10-09"), BigDecimal("50.9900000000"), BigDecimal("51"), "чл. 15 ал. 1 ЗУЕС", true, "GA_QUORUM_PCT@2009-01-01",
             listOf("unit X has both an owner and a holder of a right of use"), true, "basis",
         )
-        whenever(sittings.read(entranceId, assemblyId)).thenReturn(QuorumRead(quorum, emptyList()))
+        whenever(sittings.read(entranceId, assemblyId)).thenReturn(QuorumRead(quorum, emptyList(), 1, Instant.parse("2026-10-09T08:00:00Z")))
         mvc.perform(get("$base/quorum").by("login-owner-2"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.representedPct").value("50.99"))

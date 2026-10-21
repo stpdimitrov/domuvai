@@ -12,6 +12,7 @@ import zues.app.registry.Holding
 import zues.app.registry.Holdings
 import zues.app.registry.Resident
 import zues.app.registry.TitleRole
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -61,6 +62,17 @@ class AttendanceServiceTest {
     private val attendance: AttendanceRepository = mock {
         on { findByAssemblyIdAndSessionNoOrderByRecordedAt(any(), any()) } doAnswer { call -> rows.filter { it.assemblyId == call.arguments[0] && it.sessionNo == call.arguments[1] } }
         on { findById(any<UUID>()) } doAnswer { call -> Optional.ofNullable(rows.firstOrNull { it.id == call.arguments[0] }) }
+        on { findByAssemblyIdOrderByRecordedAt(any()) } doAnswer { call -> rows.filter { it.assemblyId == call.arguments[0] }.sortedBy { it.recordedAt } }
+    }
+    /** Sittings already weighed, each short: the register is the one of the sitting after them. */
+    private val weighed = mutableListOf<Sitting>()
+    private val sittingRows: SittingRepository = mock { on { findByAssemblyIdOrderBySessionNo(any()) } doAnswer { weighed.sortedBy { it.sessionNo } } }
+
+    private fun weighedShort(n: Int, at: Instant) {
+        weighed += Sitting(
+            UUID.randomUUID(), entranceId, assembly!!.id, n, null, BigDecimal.ZERO, false, at, LocalDate.parse(zues.kernel.toSofiaDate(at)), BigDecimal.ONE,
+            "a constant", true, "basis", "ab".repeat(32), "v", "e", keeper.party, keeper.loginIssuer, keeper.loginSubject,
+        )
     }
     private val verifications: IdentityVerificationRepository = mock {
         on { findByAssemblyId(any()) } doAnswer { verified.toList() }
@@ -68,7 +80,7 @@ class AttendanceServiceTest {
     }
     private val proxies: ProxyRepository = mock { on { findByAssemblyId(any()) } doAnswer { proxyRows.toList() } }
 
-    private fun service(at: Instant = meets) = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, book, Clock.fixed(at, ZoneOffset.UTC))
+    private fun service(at: Instant = meets) = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, Clock.fixed(at, ZoneOffset.UTC))
 
     private fun owner(from: String = "2026-01-01"): UUID = UUID.randomUUID().also { owners[it] = LocalDate.parse(from) }
 
@@ -169,7 +181,7 @@ class AttendanceServiceTest {
         owners[seller] = LocalDate.parse("2030-01-01")                              // as if the book now had them owning only from 2030: not on the day
         assertThat(register().single().represented).isEmpty()
         owners[seller] = LocalDate.parse("2026-01-01")
-        val readNextYear = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, book, Clock.fixed(Instant.parse("2027-06-01T09:00:00Z"), ZoneOffset.UTC))
+        val readNextYear = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, Clock.fixed(Instant.parse("2027-06-01T09:00:00Z"), ZoneOffset.UTC))
         assertThat(readNextYear.register(entranceId, assembly!!.id).single().represented).containsExactly(seller)   // read a year on: the same answer
         assertThat(buyerLater).isNotIn(register().flatMap { it.represented })
     }
@@ -205,6 +217,40 @@ class AttendanceServiceTest {
     }
 
     @Test
+    fun `PM-GA-013 after a short first weighing the register is the postponed sitting's - the same gathering an hour on, nobody entered twice`() {
+        val (ana, boris) = listOf(owner(), owner())
+        record(ana)
+        weighedShort(1, meets.plusSeconds(60))
+        val later = meets.plusSeconds(4200)
+        assertThatThrownBy { record(ana, at = later) }.isInstanceOf(IllegalStateException::class.java).hasMessageContaining("already on the register")
+        val line = record(boris, at = later)
+        assertThat(line.attendance.sessionNo).isEqualTo(2)
+        assertThat(service(later).register(entranceId, assembly!!.id).map { it.attendance.attendeePartyId }).containsExactly(ana, boris)
+        assertThat(service(later).register(entranceId, assembly!!.id, 1).map { it.attendance.attendeePartyId }).containsExactly(ana)   // the first sitting's, as weighed
+    }
+
+    @Test
+    fun `PM-GA-014 the following day's sitting has a register of its own, kept on that day and no other - a remote line of the day before is not verified on it`() {
+        val ana = owner()
+        val remote = record(owner(), channel = "VIDEO")
+        record(ana)
+        assertThat(service().isPresent(assembly!!.id, ana)).isTrue()
+        weighedShort(1, meets.plusSeconds(60))
+        weighedShort(2, meets.plusSeconds(3700))
+        assertThatThrownBy { record(owner(), at = meets.plusSeconds(4000)) }.isInstanceOf(IllegalStateException::class.java).hasMessageContaining("2026-11-21")
+        val nextDay = meets.plusSeconds(86_400)
+        assertThat(service(nextDay).register(entranceId, assembly!!.id)).isEmpty()
+        assertThatThrownBy { service(nextDay).verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера") }.isInstanceOf(NoSuchElementException::class.java)
+        assertThat(service(nextDay).isPresent(assembly!!.id, ana)).isFalse()            // on the day before's register, not yet on this one's: Ana may still give a proxy
+        val line = service(nextDay).record(entranceId, assembly!!.id, keeper, ana, "IN_PERSON")
+        assertThat(service(nextDay).isPresent(assembly!!.id, ana)).isTrue()
+        assertThat(line.attendance.sessionNo).isEqualTo(3)
+        assertThat(line.represented).containsExactly(ana)
+        weighed += weighed.last().copy(id = UUID.randomUUID(), sessionNo = 3, quorumMet = true, openedAt = nextDay)
+        assertThat(service(nextDay).register(entranceId, assembly!!.id).map { it.attendance.attendeePartyId }).containsExactly(ana)
+    }
+
+    @Test
     fun `PM-GA-016 a person is present in the way the assembly meets, and nobody verifies their own identity`() {
         val ana = owner()
         assembly = assembly!!.copy(mode = "IN_PERSON")
@@ -216,7 +262,7 @@ class AttendanceServiceTest {
         assertThatThrownBy { service().verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, herself, "аз съм") }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-016")
         // nor on another day
-        val dayAfter = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, book, Clock.fixed(meets.plusSeconds(86_400), ZoneOffset.UTC))
+        val dayAfter = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, Clock.fixed(meets.plusSeconds(86_400), ZoneOffset.UTC))
         assertThatThrownBy { dayAfter.verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера") }.isInstanceOf(IllegalStateException::class.java)
         assertThat(verified).isEmpty()
         assertThat(service().verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера").identityVerifiedAt).isEqualTo(meets)

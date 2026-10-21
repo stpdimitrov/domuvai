@@ -38,6 +38,8 @@ data class SittingView(
  * the weight rests on ideal parts derived from area.
  */
 data class QuorumView(
+    val sessionNo: Int,
+    val opensFrom: Instant,
     val weighedOn: LocalDate,
     val representedPct: String,
     val thresholdPct: String,
@@ -58,13 +60,17 @@ data class QuorumView(
 class SittingController(private val acts: AssemblyActs, private val sittings: SittingService, private val who: WhoAsks) {
 
     // Rule: PM-GA-012
+    // Rule: PM-GA-013
+    // Rule: PM-GA-014
     @GetMapping("/quorum")
     fun quorum(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): QuorumView =
-        sittings.read(entranceId, assemblyId).let { (q, weighed) ->
-            QuorumView(q.on, q.representedPct.percent(), q.thresholdPct.percent(), q.thresholdSource, q.thresholdVerified, q.met, q.cannotWeigh, q.derivedParts, weighed.map(::view))
+        sittings.read(entranceId, assemblyId).let { (q, weighed, n, opensFrom) ->
+            QuorumView(n, opensFrom, q.on, q.representedPct.percent(), q.thresholdPct.percent(), q.thresholdSource, q.thresholdVerified, q.met, q.cannotWeigh, q.derivedParts, weighed.map(::view))
         }
 
     // Rule: PM-GA-012
+    // Rule: PM-GA-013
+    // Rule: PM-GA-014
     // Rule: PM-SEC-001
     @PostMapping("/sittings")
     @ResponseStatus(HttpStatus.CREATED)

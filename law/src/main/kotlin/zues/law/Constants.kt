@@ -124,6 +124,14 @@ private val CONSTANTS: List<Constant> = listOf(
     // PM-GA-012 — the assembly is held if owners of at least 51% of the ideal parts are present, in person or by proxy.
     // The statute states the figure; it is a share of all the ideal parts, not of those represented.
     Constant("GA_QUORUM_PCT", "51", "2009-01-01", "чл. 15 ал. 1 ЗУЕС", true, rule = "PM-GA-012"),
+    // PM-GA-013 — without that quorum the assembly is postponed by one hour and is then held with at least 26%.
+    Constant("GA_POSTPONE_MINUTES", "60", "2009-01-01", "чл. 15 ал. 2 ЗУЕС", true, rule = "PM-GA-013"),
+    Constant("GA_REDUCED_QUORUM_PCT", "26", "2009-01-01", "чл. 15 ал. 2 ЗУЕС", true, rule = "PM-GA-013"),
+    // PM-GA-014 — without that either, it is held the following day, whatever the share represented: the last sitting.
+    Constant("GA_LAST_SITTING_AFTER_DAYS", "1", "2009-01-01", "чл. 15 ал. 3 ЗУЕС", true, rule = "PM-GA-014"),
+    Constant("GA_LAST_SITTING_QUORUM_PCT", "0", "2009-01-01", "чл. 15 ал. 3 ЗУЕС", true, rule = "PM-GA-014"),
+    // How many sittings one assembly may have — the first, the postponed one, the following day's (#189: no longer in the schema).
+    Constant("GA_SITTINGS", "3", "2009-01-01", "чл. 15 ал. 1–3 ЗУЕС", true, rule = "PM-GA-014"),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */

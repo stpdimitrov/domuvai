@@ -132,7 +132,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The quorum meter — the share of all ideal parts the register makes present against the threshold in force, or why it cannot be weighed; and the sittings weighed so far */
+        /** The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_quorum"];
         put?: never;
         post?: never;
@@ -168,7 +168,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Weigh the quorum of the sitting, once, and open the assembly if it is met — by whoever runs it, not before the hour the notice stated */
+        /** Weigh the quorum of the sitting the assembly is at, once, and open the assembly if it is met — by whoever runs it: the first not before the hour the notice stated, the postponed one an hour after the first fell short at the reduced share, the last on the following day at any share */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_sittings"];
         delete?: never;
         options?: never;
@@ -1735,7 +1735,11 @@ export interface components {
             cannotWeigh: string[];
             derivedParts: boolean;
             met: boolean;
+            /** Format: date-time */
+            opensFrom: string;
             representedPct: string;
+            /** Format: int32 */
+            sessionNo: number;
             sittings: components["schemas"]["SittingView"][];
             thresholdPct: string;
             thresholdSource: string;

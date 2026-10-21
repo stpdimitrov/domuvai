@@ -2,6 +2,7 @@ package zues.app.assembly
 
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
@@ -53,9 +54,9 @@ class AttendanceSignInOffWebTest {
             .andExpect(status().isForbidden)
         mvc.perform(post("$base/${UUID.randomUUID()}/identity-verification").contentType(MediaType.APPLICATION_JSON).content("""{"how":"камера"}"""))
             .andExpect(status().isForbidden)
-        whenever(attendance.register(any(), any(), any())).thenReturn(emptyList())
+        whenever(attendance.register(any(), any(), anyOrNull())).thenReturn(emptyList())
         mvc.perform(get(base)).andExpect(status().isOk)
-        verify(attendance).register(any(), any(), any())
+        verify(attendance).register(any(), any(), anyOrNull())
         verifyNoMoreInteractions(attendance)
     }
 }

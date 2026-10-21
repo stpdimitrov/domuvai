@@ -53,7 +53,7 @@ class SittingSignInOffWebTest {
         val base = "/api/assembly/entrances/${UUID.randomUUID()}/assemblies/${UUID.randomUUID()}"
         mvc.perform(post("$base/sittings").contentType(MediaType.APPLICATION_JSON)).andExpect(status().isForbidden)
         whenever(sittings.read(any(), any())).thenReturn(
-            QuorumRead(Quorum(LocalDate.parse("2026-10-09"), BigDecimal.ZERO, BigDecimal("51"), "чл. 15 ал. 1 ЗУЕС", true, "GA_QUORUM_PCT@2009-01-01", emptyList(), false, ""), emptyList()),
+            QuorumRead(Quorum(LocalDate.parse("2026-10-09"), BigDecimal.ZERO, BigDecimal("51"), "чл. 15 ал. 1 ЗУЕС", true, "GA_QUORUM_PCT@2009-01-01", emptyList(), false, ""), emptyList(), 1, java.time.Instant.parse("2026-10-09T08:00:00Z")),
         )
         mvc.perform(get("$base/quorum")).andExpect(status().isOk)
         verify(sittings).read(any(), any())

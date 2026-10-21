@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.registry.Holdings
 import zues.app.registry.TitleRole
+import zues.kernel.addCalendarDays
 import zues.kernel.toSofiaDate
 import zues.law.CATALOGUE_VERSION
 import zues.law.ENGINE_VERSION
@@ -15,8 +16,10 @@ import zues.law.constantOn
 import java.math.BigDecimal
 import java.security.MessageDigest
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 
 /**
@@ -70,11 +73,55 @@ data class Quorum(
 ) {
     /** "At least" the threshold, of all the ideal parts (PM-GA-012) — and nothing in the way of weighing. */
     val met: Boolean get() = cannotWeigh.isEmpty() && representedPct >= thresholdPct
+    /** How many holdings were weighed: the basis's lines after the first, which says what was weighed against what. */
+    val counted: Int get() = basis.lines().size - 1
     val basisHash: String get() = MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) }
 }
 
-/** The quorum of an assembly now, and the sittings already weighed. */
-data class QuorumRead(val quorum: Quorum, val sittings: List<Sitting>)
+/** The quorum of the sitting an assembly is at ([sessionNo], which opens from [opensFrom]), and the sittings already weighed. */
+data class QuorumRead(val quorum: Quorum, val sittings: List<Sitting>, val sessionNo: Int, val opensFrom: Instant)
+
+/**
+ * The sittings an assembly may hold (Rule: PM-GA-013, PM-GA-014): the first at the hour its notice stated; if its quorum
+ * falls short, the next postponed by the law's interval, against the reduced threshold; if that falls short too, the
+ * last on the following day, held whatever the share represented. How many there are and their intervals are `law`'s
+ * as in force on the day the assembly was noticed to meet; each sitting's threshold is the one in force on its own day
+ * (PM-SYS-002), as the book is that day's.
+ */
+// Rule: PM-GA-013
+// Rule: PM-GA-014
+// The kernel keeps its own Sofia zone private; it publishes calendar days, not a wall-clock hour a day later.
+private val SOFIA: ZoneId = ZoneId.of("Europe/Sofia")
+
+internal class Ladder(private val assembly: Assembly, private val weighed: List<Sitting>) {
+    private val firstDay = LocalDate.parse(toSofiaDate(assembly.scheduledAt))              // a Sofia calendar day (PM-SYS-004)
+    private fun law(code: String) = constantOn(code, firstDay.toString())
+    private val afterDays = law("GA_LAST_SITTING_AFTER_DAYS").value.toInt()
+    val last: Int = law("GA_SITTINGS").value.toInt()
+
+    /** The sitting the assembly is at: the one that opened, else the one after the last weighed short — null when none is left. */
+    val atHand: Int? = weighed.firstOrNull { it.quorumMet }?.sessionNo ?: (weighed.size + 1).takeIf { it <= last }
+
+    fun day(n: Int): LocalDate = if (n == last && n != FIRST_SITTING) LocalDate.parse(addCalendarDays(firstDay.toString(), afterDays)) else firstDay
+
+    // TODO(legal): PM-GA-014 — the hour of the following day's sitting is not in the catalogue; the strictest reading is
+    // taken: not before the hour the notice stated, on the clock in Sofia, the law's count of calendar days later — the
+    // same hour across a change of summer time, never an hour early.
+    fun opensFrom(n: Int): Instant = when {
+        n == FIRST_SITTING -> assembly.scheduledAt
+        n == last -> assembly.scheduledAt.atZone(SOFIA).plusDays(afterDays.toLong()).toInstant()
+        else -> weighed.single { it.sessionNo == n - 1 }.weighedAt.plus(Duration.ofMinutes(law("GA_POSTPONE_MINUTES").value.toLong()))
+    }
+
+    fun thresholdCode(n: Int): String = when (n) {
+        FIRST_SITTING -> "GA_QUORUM_PCT"
+        last -> "GA_LAST_SITTING_QUORUM_PCT"
+        else -> "GA_REDUCED_QUORUM_PCT"
+    }
+
+    /** The sittings whose register is this one's: those held the same day, up to it — the postponed sitting is the same gathering, an hour on. */
+    fun gathering(n: Int): Set<Int> = (FIRST_SITTING..n).filterTo(mutableSetOf()) { day(it) == day(n) }
+}
 
 /** Quorum cannot be weighed: a sitting is neither opened nor recorded as failed on a figure nobody can stand behind. */
 class QuorumNotWeighable(message: String) : IllegalStateException(message)
@@ -94,28 +141,43 @@ class SittingService(
     fun read(entranceId: UUID, assemblyId: UUID): QuorumRead {
         val assembly = assemblies.findById(assemblyId).filter { it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no assembly $assemblyId in entrance $entranceId") }
-        return QuorumRead(weigh(assembly), sittings.findByAssemblyIdOrderBySessionNo(assemblyId))
+        val weighed = sittings.findByAssemblyIdOrderBySessionNo(assemblyId)
+        val ladder = Ladder(assembly, weighed)
+        val n = ladder.atHand ?: weighed.last().sessionNo
+        return QuorumRead(weigh(assembly, ladder, n), weighed, n, ladder.opensFrom(n))
     }
 
     /**
-     * Weighs the quorum of the first sitting, once, and opens the assembly if it is met. Not before the hour the
-     * notice stated, and on the day of the sitting. A weighing that falls short is recorded too: it is what the next
-     * sitting follows from. One that cannot be made at all is refused, and records nothing.
+     * Weighs the quorum of the sitting the assembly is at, once, and opens the assembly if it is met: the first not
+     * before the hour the notice stated; the next not before the law's interval after the first was weighed short; the
+     * last on the following day. A weighing that falls short is recorded too: it is what the next sitting follows from.
+     * One that cannot be made at all is refused, and records nothing.
      */
     // Rule: PM-GA-012
+    // Rule: PM-GA-013
+    // Rule: PM-GA-014
     @Transactional
     fun open(entranceId: UUID, assemblyId: UUID, by: Actor): Sitting {
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
         check(assembly.status == AssemblyStatus.NOTICED.name) { "a sitting opens for an assembly whose notice is posted and that is not yet open; this one is ${assembly.status}" }
+        val ladder = Ladder(assembly, sittings.findByAssemblyIdOrderBySessionNo(assemblyId))
+        val n = ladder.atHand ?: throw IllegalStateException("every sitting the law allows this assembly is weighed")
         val now = clock.instant()
-        check(!now.isBefore(assembly.scheduledAt)) { "a sitting does not open before the hour its notice stated, ${assembly.scheduledAt}" }
-        check(LocalDate.parse(toSofiaDate(now)) == sittingDay(assembly)) { "the first sitting is on the day the assembly meets, ${sittingDay(assembly)}" }
-        check(sittings.findByAssemblyIdOrderBySessionNo(assemblyId).none { it.sessionNo == FIRST_SITTING }) { "the quorum of the first sitting is already weighed" }
-        val quorum = weigh(assembly)
+        // TODO(legal): PM-GA-013 — a postponed sitting whose hour falls past the day of the assembly: the catalogue does
+        // not say whether it is held after midnight, or the assembly goes to the following day; it is refused, and says so.
+        check(LocalDate.parse(toSofiaDate(ladder.opensFrom(n))) == ladder.day(n)) {
+            "sitting $n would open at ${ladder.opensFrom(n)}, past ${ladder.day(n)}, the day it is held on: whether it may is not settled (TODO(legal): PM-GA-013)"
+        }
+        check(!now.isBefore(ladder.opensFrom(n))) { "sitting $n does not open before ${ladder.opensFrom(n)} — the hour its notice stated, or the law's interval after the last" }
+        check(LocalDate.parse(toSofiaDate(now)) == ladder.day(n)) { "sitting $n is held on ${ladder.day(n)}" }
+        val quorum = weigh(assembly, ladder, n)
         if (quorum.cannotWeigh.isNotEmpty()) throw QuorumNotWeighable("the quorum cannot be weighed: " + quorum.cannotWeigh.joinToString("; "))
+        // TODO(legal): PM-GA-014 — whether the last sitting is held with nobody present is not settled; the strictest
+        // reading is taken: "regardless of the ideal parts represented" needs somebody there to represent them.
+        check(n != ladder.last || n == FIRST_SITTING || quorum.counted > 0) { "the last sitting is held whatever the share represented — but not with nobody present (TODO(legal): PM-GA-014)" }
         val sitting = aggregates.insert(
             Sitting(
-                id = UUID.randomUUID(), entranceId = entranceId, assemblyId = assemblyId, sessionNo = FIRST_SITTING,
+                id = UUID.randomUUID(), entranceId = entranceId, assemblyId = assemblyId, sessionNo = n,
                 openedAt = now.takeIf { quorum.met }, represented = quorum.representedPct, quorumMet = quorum.met,
                 weighedAt = now, weighedOn = quorum.on, thresholdPct = quorum.thresholdPct, thresholdConstant = quorum.thresholdConstant,
                 thresholdVerified = quorum.thresholdVerified, basis = quorum.basis, basisHash = quorum.basisHash,
@@ -136,10 +198,12 @@ class SittingService(
      * weighed at all. Nor is a represented owner's unit that is owned for more than the whole of it.
      */
     // Rule: PM-GA-012
+    // Rule: PM-GA-013
+    // Rule: PM-GA-014
     // TODO(legal): PM-GA-012 — whose ideal parts count for a unit with both an owner and a holder of a right of use
-    internal fun weigh(assembly: Assembly): Quorum {
-        val on = sittingDay(assembly)
-        val register = attendance.register(assembly.entranceId, assembly.id)
+    private fun weigh(assembly: Assembly, ladder: Ladder, n: Int): Quorum {
+        val on = ladder.day(n)
+        val register = attendance.register(assembly.entranceId, assembly.id, n)
         val represented = register.flatMapTo(mutableSetOf()) { it.represented }
         val owned = holdings.inForce(assembly.entranceId, on, TitleRole.OWN)
         val theirs = owned.holdings.filter { it.partyId in represented }
@@ -152,7 +216,7 @@ class SittingService(
             "unit $it is owned for more than the whole of it — weighing it would count it twice (PM-ORG-005)"
         }
         val weighed = theirs.filter { it.unitId !in bothRoles && it.unitId !in overHeld }
-        val threshold = constantOn("GA_QUORUM_PCT", on.toString())
+        val threshold = constantOn(ladder.thresholdCode(n), on.toString())
         // A unit never weighs more than its own ideal parts, however its co-owners' rounded shares add up (PM-ORG-005).
         val representedPct = weighed.groupBy { it.unitId }.values.fold(BigDecimal.ZERO) { sum, ofUnit ->
             sum + ofUnit.fold(BigDecimal.ZERO) { parts, held -> parts + BigDecimal(held.idealParts) }.min(BigDecimal(ofUnit.first().unitIdealParts))
@@ -170,7 +234,7 @@ class SittingService(
             cannotWeigh = cannotWeigh,
             derivedParts = weighed.any { it.idealPartsSource != "DECLARED" },
             basis = (
-                listOf("on $on against $thresholdConstant ${threshold.value}: ${representedPct.stripTrailingZeros().toPlainString()}") +
+                listOf("sitting $n on $on against $thresholdConstant ${threshold.value}: ${representedPct.stripTrailingZeros().toPlainString()}") +
                     weighed.map {
                         val line = through.getValue(it.partyId)
                         "${it.partyId} ${it.unitId} ${it.idealParts} of ${it.unitIdealParts} by ${line.attendance.id} ${line.attendance.channel} ${line.identityVerifiedAt ?: "-"}"
@@ -182,6 +246,4 @@ class SittingService(
     /** Whether a quorum of this assembly has been weighed: from then on what its notice stated stays as it is. */
     @Transactional(readOnly = true)
     fun weighed(assemblyId: UUID): Boolean = sittings.findByAssemblyIdOrderBySessionNo(assemblyId).isNotEmpty()
-
-    private fun sittingDay(assembly: Assembly): LocalDate = LocalDate.parse(toSofiaDate(assembly.scheduledAt))   // a Sofia calendar day (PM-SYS-004)
 }
