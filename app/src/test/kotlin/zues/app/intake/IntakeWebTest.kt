@@ -12,7 +12,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
 
 @WebMvcTest(IntakeController::class)
+@org.springframework.context.annotation.Import(ImportGuard::class, zues.app.identity_org.WhoAsks::class, zues.app.policy.Policy::class, IntakeTestClock::class)
 class IntakeWebTest {
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean lateinit var logins: zues.app.identity_org.Logins
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper

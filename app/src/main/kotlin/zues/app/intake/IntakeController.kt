@@ -1,6 +1,7 @@
 package zues.app.intake
 
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import java.util.UUID
 
 /**
@@ -37,7 +39,7 @@ data class ProfileRequest(val csv: String)
  */
 @RestController
 @RequestMapping("/api/intake/entrances/{entranceId}/fee-sheet")
-class IntakeController {
+class IntakeController(private val guard: ImportGuard, private val who: WhoAsks) {
 
     /**
      * Propose a column → field mapping for a sheet's header (ADR-012, STAGE1-ADDENDUM §1): the caller
@@ -46,12 +48,15 @@ class IntakeController {
      * header, so nothing is stored and nothing is adopted here.
      */
     @PostMapping("/profile")
-    fun profile(@PathVariable entranceId: UUID, @RequestBody request: ProfileRequest): ProposedMapping =
-        MappingProfiler.profile(headerColumns(request.csv))
+    fun profile(@PathVariable entranceId: UUID, @RequestBody request: ProfileRequest, signedIn: JwtAuthenticationToken?): ProposedMapping {
+        guard.allowed(entranceId, who.of(signedIn))                               // the import's first step: the same people (PM-BOOK-005)
+        return MappingProfiler.profile(headerColumns(request.csv))
+    }
 
     @PostMapping("/dry-run")
-    fun dryRun(@PathVariable entranceId: UUID, @RequestBody request: FeeSheetDryRunRequest): DryRunReport =
-        IntakeDryRun.of(
+    fun dryRun(@PathVariable entranceId: UUID, @RequestBody request: FeeSheetDryRunRequest, signedIn: JwtAuthenticationToken?): DryRunReport {
+        guard.allowed(entranceId, who.of(signedIn))
+        return IntakeDryRun.of(
             entranceId = entranceId.toString(),
             period = request.period,
             legalDate = request.legalDate,
@@ -59,6 +64,7 @@ class IntakeController {
             lines = request.lines,
             sheet = FeeSheet.parse(request.csv, request.mapping),
         )
+    }
 
     /** The header row's columns, trimmed — an empty sheet yields no columns, so every required field is missing. */
     private fun headerColumns(csv: String): List<String> =
@@ -68,4 +74,9 @@ class IntakeController {
     @ExceptionHandler(IllegalArgumentException::class, IllegalStateException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: RuntimeException): Map<String, String> = mapOf("error" to (e.message ?: "invalid dry-run request"))
+
+    /** Not the manager or the board of the entrance → 403, naming the rule. */
+    @ExceptionHandler(ImportForbidden::class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    fun onForbidden(e: ImportForbidden): Map<String, String> = mapOf("error" to "an entrance's book is entered by its manager or its board", "rule" to e.ruleId)
 }
