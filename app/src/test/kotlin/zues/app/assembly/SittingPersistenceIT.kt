@@ -262,4 +262,26 @@ class SittingPersistenceIT {
         assertThat(jdbc.queryForList("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'assembly.session'::regclass AND contype = 'c'", String::class.java))
             .noneMatch { it.contains("<= 3") || it.contains("BETWEEN") }.anyMatch { it.contains("session_no >= 1") }
     }
+
+    @Test
+    fun `PM-GA-015 an owner of the whole entrance at the notice date raises the quorum to the higher share, kept with the weighing`() {
+        val entranceId = entrance()
+        val sole = person()
+        val unit = created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
+            .get("unitIds")[0].asText()
+        created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$sole","titleRole":"OWN","share":"1","validFrom":"2025-01-01"}""")
+        val base = meetingToday(entranceId, sole)
+        val higher = constantOn("GA_CONCENTRATED_QUORUM_PCT", toSofiaDate(Instant.now()))
+        val meter = meter(base)
+        assertThat(meter.get("thresholdPct").asText()).isEqualTo(higher.value)
+        assertThat(meter.get("concentratedBy").asText()).isEqualTo("$sole")
+        assertThat(meter.get("concentratedPct").asText()).isEqualTo("100")
+        present(base, sole).andExpect(status().isCreated)
+        open(base).andExpect(status().isCreated)
+        val row = jdbc.queryForMap("SELECT threshold_constant, threshold_pct, quorum_met, basis FROM assembly.session WHERE entrance_id = ?", entranceId)
+        assertThat(row["threshold_constant"]).isEqualTo("GA_CONCENTRATED_QUORUM_PCT@${higher.inForceFrom}")
+        assertThat(row["threshold_pct"] as java.math.BigDecimal).isEqualByComparingTo(higher.value)
+        assertThat(row["quorum_met"]).isEqualTo(true)
+        assertThat(row["basis"] as String).contains("one owner, $sole, held 100 at the notice")
+    }
 }

@@ -1733,6 +1733,9 @@ export interface components {
         };
         QuorumView: {
             cannotWeigh: string[];
+            /** Format: uuid */
+            concentratedBy?: string;
+            concentratedPct?: string;
             derivedParts: boolean;
             met: boolean;
             /** Format: date-time */

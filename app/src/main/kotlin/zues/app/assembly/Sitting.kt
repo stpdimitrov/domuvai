@@ -11,6 +11,7 @@ import zues.app.registry.TitleRole
 import zues.kernel.addCalendarDays
 import zues.kernel.toSofiaDate
 import zues.law.CATALOGUE_VERSION
+import zues.law.Constant
 import zues.law.ENGINE_VERSION
 import zues.law.constantOn
 import java.math.BigDecimal
@@ -70,6 +71,9 @@ data class Quorum(
     val cannotWeigh: List<String>,
     val derivedParts: Boolean,
     val basis: String,
+    /** The one owner of more than the law's share at the notice date who raises the threshold (PM-GA-015), and that share. */
+    val concentratedBy: UUID? = null,
+    val concentratedPct: BigDecimal? = null,
 ) {
     /** "At least" the threshold, of all the ideal parts (PM-GA-012) — and nothing in the way of weighing. */
     val met: Boolean get() = cannotWeigh.isEmpty() && representedPct >= thresholdPct
@@ -200,6 +204,7 @@ class SittingService(
     // Rule: PM-GA-012
     // Rule: PM-GA-013
     // Rule: PM-GA-014
+    // Rule: PM-GA-015
     // TODO(legal): PM-GA-012 — whose ideal parts count for a unit with both an owner and a holder of a right of use
     private fun weigh(assembly: Assembly, ladder: Ladder, n: Int): Quorum {
         val on = ladder.day(n)
@@ -216,7 +221,11 @@ class SittingService(
             "unit $it is owned for more than the whole of it — weighing it would count it twice (PM-ORG-005)"
         }
         val weighed = theirs.filter { it.unitId !in bothRoles && it.unitId !in overHeld }
-        val threshold = constantOn(ladder.thresholdCode(n), on.toString())
+        val ofSitting = constantOn(ladder.thresholdCode(n), on.toString())
+        val concentration = concentration(assembly)
+        // TODO(legal): PM-GA-015 — which sittings the higher quorum governs is not in the catalogue; the strictest reading
+        // is taken: every one, the postponed and the following day's too — never below it while the concentration holds.
+        val threshold = concentration.raisedTo?.takeIf { BigDecimal(it.value) > BigDecimal(ofSitting.value) } ?: ofSitting
         // A unit never weighs more than its own ideal parts, however its co-owners' rounded shares add up (PM-ORG-005).
         val representedPct = weighed.groupBy { it.unitId }.values.fold(BigDecimal.ZERO) { sum, ofUnit ->
             sum + ofUnit.fold(BigDecimal.ZERO) { parts, held -> parts + BigDecimal(held.idealParts) }.min(BigDecimal(ofUnit.first().unitIdealParts))
@@ -231,15 +240,64 @@ class SittingService(
             thresholdSource = threshold.source,
             thresholdVerified = threshold.verified,
             thresholdConstant = thresholdConstant,
-            cannotWeigh = cannotWeigh,
+            cannotWeigh = cannotWeigh + concentration.cannotWeigh,
             derivedParts = weighed.any { it.idealPartsSource != "DECLARED" },
             basis = (
-                listOf("sitting $n on $on against $thresholdConstant ${threshold.value}: ${representedPct.stripTrailingZeros().toPlainString()}") +
+                listOf(
+                    "sitting $n on $on against $thresholdConstant ${threshold.value}" +
+                        " (${concentration.said})" +
+                        ": ${representedPct.stripTrailingZeros().toPlainString()}",
+                ) +
                     weighed.map {
                         val line = through.getValue(it.partyId)
                         "${it.partyId} ${it.unitId} ${it.idealParts} of ${it.unitIdealParts} by ${line.attendance.id} ${line.attendance.channel} ${line.identityVerifiedAt ?: "-"}"
                     }.sorted()
                 ).joinToString("\n"),
+            concentratedBy = concentration.party,
+            concentratedPct = concentration.pct,
+        )
+    }
+
+    /** What the notice date's book says of concentration: the owner over the law's share, if any, the threshold it raises the quorum to, what the basis says of it. */
+    private data class Concentration(val party: UUID?, val pct: BigDecimal?, val raisedTo: Constant?, val said: String, val cannotWeigh: List<String> = emptyList())
+
+    /**
+     * The one owner of more than the law's share of all the ideal parts on the day the notice was posted (Rule:
+     * PM-GA-015), their share, and the threshold that day's law raises the quorum to — both numbers read on the notice
+     * date, as the rule is "selected … at notice date". A party's ideal parts are summed over every unit they own in the
+     * entrance, by title share, a unit never more than itself (PM-ORG-005); a unit owned for more than the whole of it
+     * that day leaves the concentration unknowable, and the quorum is not weighed. Co-owners are each their own person.
+     * An assembly not yet noticed has no notice date: its meter says so, and no sitting opens (that needs a notice).
+     */
+    // Rule: PM-GA-015
+    // TODO(legal): PM-GA-015 — whether co-owners of common property (spouses) are one person for this is not settled; each is their own
+    private fun concentration(assembly: Assembly): Concentration {
+        val posted = assembly.noticePostedAt
+        if (posted == null) {
+            check(assembly.status == AssemblyStatus.DRAFT.name) { "the notice of assembly ${assembly.id} has no posting date: its quorum cannot be chosen (PM-GA-015)" }
+            return Concentration(null, null, null, "not yet noticed: the concentration is chosen at the notice date")
+        }
+        val day = toSofiaDate(posted)                                                       // a Sofia calendar day (PM-SYS-004)
+        val more = constantOn("GA_CONCENTRATION_PCT", day)
+        val book = holdings.inForce(assembly.entranceId, LocalDate.parse(day), TitleRole.OWN)
+        val byParty = book.holdings.groupBy { it.partyId }.mapValues { (_, held) ->
+            held.groupBy { it.unitId }.values.fold(BigDecimal.ZERO) { sum, ofUnit ->
+                sum + ofUnit.fold(BigDecimal.ZERO) { parts, h -> parts + BigDecimal(h.idealParts) }.min(BigDecimal(ofUnit.first().unitIdealParts))
+            }
+        }
+        val over = byParty.filterValues { it > BigDecimal(more.value) }                     // "more than"
+        val doubtful = book.holdings.filter { it.partyId in over && it.unitId in book.overHeldUnitIds }.map { it.unitId }.distinct().sortedBy { it.toString() }
+        if (doubtful.isNotEmpty()) {
+            return Concentration(
+                null, null, null, "concentration at the notice on $day unknowable",
+                doubtful.map { "unit $it was owned for more than the whole of it on $day, the notice date: whether one owner held more than ${more.value}% cannot be told (PM-ORG-005, PM-GA-015)" },
+            )
+        }
+        val top = over.maxByOrNull { it.value }
+            ?: return Concentration(null, null, null, "no owner over ${more.value}% at the notice on $day")
+        return Concentration(
+            top.key, top.value, constantOn("GA_CONCENTRATED_QUORUM_PCT", day),
+            "one owner, ${top.key}, held ${top.value.stripTrailingZeros().toPlainString()} at the notice on $day",
         )
     }
 

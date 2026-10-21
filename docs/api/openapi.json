@@ -2374,6 +2374,13 @@
             },
             "type": "array"
           },
+          "concentratedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "concentratedPct": {
+            "type": "string"
+          },
           "derivedParts": {
             "type": "boolean"
           },
@@ -4349,6 +4356,7 @@
           "PM-GA-012",
           "PM-GA-013",
           "PM-GA-014",
+          "PM-GA-015",
           "PM-ORG-005",
           "PM-ORG-011"
         ]
@@ -4557,6 +4565,7 @@
           "PM-GA-012",
           "PM-GA-013",
           "PM-GA-014",
+          "PM-GA-015",
           "PM-SEC-001"
         ]
       }
