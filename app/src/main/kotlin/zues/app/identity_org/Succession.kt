@@ -17,7 +17,8 @@ data class Successor(val partyId: UUID, val role: Role, val mandateId: UUID, val
  *
  * The answer is every party holding, on [on], a mandate that follows one of [predecessor]'s mandates in [office] — a
  * manager's place is taken by a later manager or board; a board member's by a later manager, or a member elected on or
- * after the day that member's term ended. Each with the role it holds, which may not be [office]: a board may follow
+ * after the day that member's term ended; a controller's by a controller elected on or after the day that one's term
+ * ended (PM-GOV-007). Each with the role it holds, which may not be [office]: a board may follow
  * a manager. Empty while the predecessor still holds [office] that day, or nobody on record has followed them. A party
  * is never their own successor, though the place may pass through their own later mandate.
  *
@@ -28,6 +29,7 @@ data class Successor(val partyId: UUID, val role: Role, val mandateId: UUID, val
 class Succession(private val mandates: MandateStore) {
 
     // Rule: PM-GOV-004
+    // Rule: PM-GOV-007
     @Transactional(readOnly = true)
     fun successorsOf(predecessor: UUID, entranceId: UUID, office: Role, on: LocalDate): List<Successor> {
         val all = mandates.ofEntrance(entranceId)
