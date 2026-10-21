@@ -2380,8 +2380,16 @@
           "met": {
             "type": "boolean"
           },
+          "opensFrom": {
+            "format": "date-time",
+            "type": "string"
+          },
           "representedPct": {
             "type": "string"
+          },
+          "sessionNo": {
+            "format": "int32",
+            "type": "integer"
           },
           "sittings": {
             "items": {
@@ -2407,7 +2415,9 @@
           "cannotWeigh",
           "derivedParts",
           "met",
+          "opensFrom",
           "representedPct",
+          "sessionNo",
           "sittings",
           "thresholdPct",
           "thresholdSource",
@@ -4331,12 +4341,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "The quorum meter — the share of all ideal parts the register makes present against the threshold in force, or why it cannot be weighed; and the sittings weighed so far",
+        "summary": "The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-012",
+          "PM-GA-013",
+          "PM-GA-014",
           "PM-ORG-005",
           "PM-ORG-011"
         ]
@@ -4537,12 +4549,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Weigh the quorum of the sitting, once, and open the assembly if it is met — by whoever runs it, not before the hour the notice stated",
+        "summary": "Weigh the quorum of the sitting the assembly is at, once, and open the assembly if it is met — by whoever runs it: the first not before the hour the notice stated, the postponed one an hour after the first fell short at the reduced share, the last on the following day at any share",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-012",
+          "PM-GA-013",
+          "PM-GA-014",
           "PM-SEC-001"
         ]
       }
