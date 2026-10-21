@@ -7,8 +7,15 @@ on:
 jobs:
   gates:
     runs-on: ubuntu-latest
+    permissions: { contents: read, pull-requests: read, issues: read }
     steps:
       - uses: actions/checkout@v4
+      # A PR may change only the lanes its closing claim names (`claim … --also <lane>` for a second one): two
+      # developers in one lane is how their work collides. Re-run the job after labelling the claim.
+      - name: Every lane the PR touches is claimed
+        if: github.event_name == 'pull_request'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: python3 tools/lanes.py covers ${{ github.event.pull_request.number }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
