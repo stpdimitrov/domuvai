@@ -71,7 +71,10 @@ class AssemblySignInOffWebTest {
         val assembly = Assembly(id, entranceId, anyone, "BM", at, "фоайето", "IN_PERSON", "DRAFT", false, null)
         whenever(assemblies.read(entranceId, id)).thenReturn(assembly to emptyList())
         mvc.perform(get("$base/$id")).andExpect(status().isOk).andExpect(jsonPath("$.status").value("DRAFT"))
+        whenever(assemblies.list(entranceId)).thenReturn(listOf(assembly))
+        mvc.perform(get(base)).andExpect(status().isOk).andExpect(jsonPath("$[0].id").value(id.toString()))        // the list is read as one is
         verify(assemblies).read(any(), any())
+        verify(assemblies).list(entranceId)
         verifyNoMoreInteractions(assemblies)
     }
 }

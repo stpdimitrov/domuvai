@@ -140,6 +140,24 @@ class AssemblyPersistenceIT {
     }
 
     @Test
+    fun `PM-GA-002 an entrance's assemblies list the one meeting latest first - its own, never another entrance's`() {
+        val entranceId = entrance()
+        val base = "/api/assembly/entrances/$entranceId/assemblies"
+        val convenor = manager(entranceId)
+        val sooner = created(base, convening(convenor, at = meets)).get("id").asText()
+        val later = created(base, convening(convenor, at = meets.plus(7, ChronoUnit.DAYS))).get("id").asText()
+        val other = entrance()
+        val otherManager = manager(other)
+        created("/api/assembly/entrances/$other/assemblies", convening(otherManager))
+        val listed = json.readTree(mvc.perform(get(base)).andExpect(status().isOk).andReturn().response.contentAsString)
+        assertThat(listed.map { it.get("id").asText() }).containsExactly(later, sooner)
+        assertThat(listed[0].get("status").asText()).isEqualTo("DRAFT")
+        assertThat(listed[0].get("convenedAs").asText()).isEqualTo("BM")
+        assertThat(listed[0].get("scheduledAt").asText()).isEqualTo(meets.plus(7, ChronoUnit.DAYS).toString())
+        assertThat(json.readTree(mvc.perform(get("/api/assembly/entrances/${UUID.randomUUID()}/assemblies")).andExpect(status().isOk).andReturn().response.contentAsString)).isEmpty()
+    }
+
+    @Test
     fun `PM-GA-005 the justification of an urgent assembly is stored, and the database refuses urgency without one`() {
         val entranceId = entrance()
         val convenor = manager(entranceId)

@@ -237,6 +237,25 @@ class AssemblyWebTest {
     }
 
     @Test
+    fun `PM-GA-002 an entrance's assemblies are listed as the service orders them - the one meeting latest first, with what finds and opens one, and nothing more`() {
+        person("login-owner-reads", Role.OWN)
+        val later = draft(manager, "BM").copy(scheduledAt = at.plusSeconds(86_400), status = "NOTICED")
+        val earlier = draft(owner, "OWNERS")
+        whenever(assemblies.list(entranceId)).thenReturn(listOf(later, earlier))
+        mvc.perform(get(base).by("login-owner-reads"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].id").value(later.id.toString()))
+            .andExpect(jsonPath("$[0].status").value("NOTICED"))
+            .andExpect(jsonPath("$[0].scheduledAt").value(later.scheduledAt.toString()))
+            .andExpect(jsonPath("$[0].convenedAs").value("BM"))
+            .andExpect(jsonPath("$[1].convenedAs").value("OWNERS"))
+            .andExpect(jsonPath("$[0].convenedBy").doesNotExist())                    // party ids are not part of the list
+            .andExpect(jsonPath("$[0].place").doesNotExist())
+        verify(assemblies).list(entranceId)
+    }
+
+    @Test
     fun `PM-GA-007 whoever signs the posting act held the office on the day of posting - a successor does not certify a posting from before their time`() {
         val assembly = stored(draft(manager, "BM"))
         held[manager] = emptySet()

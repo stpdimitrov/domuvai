@@ -172,6 +172,11 @@ class AssemblyService(
         require(noticeInTime(now, scheduledAt, urgent)) { tooSoon(now, urgent) }
     }
 
+    /** An entrance's assemblies, the one meeting latest first — read as one is (PM-GA-002). */
+    // Rule: PM-GA-002
+    @Transactional(readOnly = true)
+    fun list(entranceId: UUID): List<Assembly> = assemblies.findByEntranceIdOrderByScheduledAtDescIdAsc(entranceId)
+
     @Transactional(readOnly = true)
     fun read(entranceId: UUID, assemblyId: UUID): Pair<Assembly, List<AgendaItem>> {
         val assembly = assemblies.findById(assemblyId).filter { it.entranceId == entranceId }
