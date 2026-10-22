@@ -65,6 +65,10 @@ Then deliver it. **The owner never merges a PR, and is never asked to watch for 
 
 Repository settings (auto-merge, rulesets) and Claude's own permissions stay the owner's to change.
 
+## 7a. A question for the owner
+
+A decision no rule settles — who may see or do something, what a word in a rule means — is the owner's. Put it as an issue every session sees: `python3 tools/lanes.py ask --title "…" --body-file q.md`, the options with the recommended one first, what is blocked meanwhile. Build the strictest reading meanwhile and say so in the PR. When the answer comes (a comment on the issue), quote it with its date in the log entry of the slice that builds it, and close the issue.
+
 ## 8. When a rule and existing code disagree
 
 The rule wins. Raise a change plan naming the rule ID, the current behaviour and the correction, and get it confirmed before editing. If the rule itself looks wrong, that is an ADR and a finding for counsel, not a licence to code around it.
