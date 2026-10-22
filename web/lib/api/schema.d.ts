@@ -245,6 +245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/years/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first */
+        get: operations["get_assembly_entrances_entranceId_years_year"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/identity/entrances/{entranceId}/mandates": {
         parameters: {
             query?: never;
@@ -1464,6 +1481,20 @@ export interface components {
             difference: "COUNT_DIFFERS" | "NOT_IN_BOOK" | "NOT_BILLED";
             /** Format: uuid */
             unitId: string;
+        };
+        HeldInYearView: {
+            /** Format: uuid */
+            firstAssemblyId?: string;
+            /** Format: date */
+            firstHeldOn?: string;
+            /** Format: int32 */
+            held: number;
+            met: boolean;
+            /** Format: int32 */
+            required: number;
+            requiredSource: string;
+            /** Format: int32 */
+            year: number;
         };
         HouseholdRegisteredResponse: {
             memberIds: string[];
@@ -3222,6 +3253,51 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_years_year: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldInYearView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

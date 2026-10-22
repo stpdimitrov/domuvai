@@ -136,6 +136,8 @@ private val CONSTANTS: List<Constant> = listOf(
     // is the one at the date of the notice.
     Constant("GA_CONCENTRATION_PCT", "51", "2009-01-01", "чл. 15 ал. 4 ЗУЕС", true, rule = "PM-GA-015"),
     Constant("GA_CONCENTRATED_QUORUM_PCT", "75", "2009-01-01", "чл. 15 ал. 4 ЗУЕС", true, rule = "PM-GA-015"),
+    // PM-GA-001 — a general assembly at least once in every calendar year.
+    Constant("GA_ASSEMBLIES_PER_YEAR", "1", "2009-01-01", "чл. 12 ЗУЕС", true, rule = "PM-GA-001"),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */
