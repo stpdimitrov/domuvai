@@ -86,6 +86,8 @@ class HeadcountCheckWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var headcount: HeadcountCheckService
+    @MockitoBean lateinit var access: MoneyAccess
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
 

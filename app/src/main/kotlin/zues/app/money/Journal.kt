@@ -99,7 +99,8 @@ class LedgerReads(
 /**
  * The ledger's reads for an entrance (Rule: PM-FUND-005, PM-PMC-008). The journal carries every unit's charges and
  * payments — other persons' debts — so it is read as the entrance's arrears are: by the manager, the board and the
- * controller (Rule: PM-SEC-002, ADR-002). The operating account's record is not yet guarded (#209).
+ * controller (Rule: PM-SEC-002, ADR-002). The operating account is a report of the condominium: read as the fund is,
+ * by its owners too.
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}")
@@ -118,7 +119,13 @@ class LedgerController(private val ledger: LedgerReads, private val access: Mone
     }
 
     @GetMapping("/operating-account")
-    fun operatingAccount(@PathVariable entranceId: UUID): OperatingAccountView = ledger.operatingAccount(entranceId)
+    fun operatingAccount(
+        @PathVariable entranceId: UUID,
+        signedIn: org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken?,
+    ): OperatingAccountView {
+        access.fund(entranceId, who.of(signedIn))
+        return ledger.operatingAccount(entranceId)
+    }
 
     private fun date(name: String, value: String): LocalDate = runCatching { LocalDate.parse(value) }.getOrNull()
         ?.takeIf { it.year in 1..9999 }                                                  // a calendar year the database can hold

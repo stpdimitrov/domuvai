@@ -144,4 +144,37 @@ class MoneyAccessIT {
         mvc.perform(read(UUID.randomUUID()).by("p-owner-1")).andExpect(status().isForbidden)    // not a 404: an owner is told nothing
         mvc.perform(read(UUID.randomUUID()).by("p-manager")).andExpect(status().isNotFound)
     }
+
+    @Test
+    fun `PM-SEC-002 PM-SEC-001 PM-GOV-008 PM-BOOK-006 the fund is read by the offices and the entrance's owners, the headcount by the offices only`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 7", "А", "GA")).entranceId
+        val (flat1) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "f-owner"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Анна Петрова", "f-user"), "USR", validFrom = "2020-01-01"))
+        mandate(entrance, "BM", person("Мария Иванова", "f-manager"))
+        mandate(entrance, "MB", person("Петър Колев", "f-board"))
+        mandate(entrance, "CTL", person("Елена Колева", "f-controller"))
+        mandate(entrance, "CSH", person("Стефан Илиев", "f-cashier"))
+        val elsewhere = registry.registerEntrance(RegisterEntrance("ул. Шипка 9", "А", "GA")).entranceId
+        val (flatElsewhere) = registry.registerUnits(elsewhere, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
+        ownership.assignTitle(elsewhere, flatElsewhere, AssignTitle(person("Георги Стоянов", "f-owner-elsewhere"), "OWN", validFrom = "2020-01-01"))
+
+        val fundReads = listOf("fund-accounts", "fund/handover-statements").map { "/api/money/entrances/$entrance/$it" }
+        // allowed, and then told there is nothing: no fund account, no operating account, no such statement
+        val nothingThere = listOf("fund", "operating-account", "fund/handover-statements/${UUID.randomUUID()}").map { "/api/money/entrances/$entrance/$it" }
+        val headcount = "/api/money/entrances/$entrance/charge-runs/2026-05/headcount"
+        for (reader in listOf("f-owner", "f-manager", "f-board", "f-controller")) {
+            for (path in fundReads) mvc.perform(get(path).by(reader)).andExpect(status().isOk)
+            for (path in nothingThere) mvc.perform(get(path).by(reader)).andExpect(status().isNotFound)
+        }
+        for (nobody in listOf("f-user", "f-cashier", "f-owner-elsewhere", "a-login-tied-to-nobody")) {
+            for (path in fundReads + nothingThere) {
+                mvc.perform(get(path).by(nobody)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+            }
+        }
+        for (office in listOf("f-manager", "f-board", "f-controller")) mvc.perform(get(headcount).by(office)).andExpect(status().isNotFound)   // allowed; no run issued
+        for (nobody in listOf("f-owner", "f-cashier")) {
+            mvc.perform(get(headcount).by(nobody)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-006"))
+        }
+    }
 }

@@ -2,6 +2,7 @@ package zues.app.money
 
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.util.UUID
@@ -39,10 +41,13 @@ data class CancelDisbursementRequest(val cancelledBy: UUID, val reason: String)
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/fund")
-class FundController(private val fund: FundService) {
+class FundController(private val fund: FundService, private val access: MoneyAccess, private val who: WhoAsks) {
 
     @GetMapping
-    fun view(@PathVariable entranceId: UUID): FundView = fund.view(entranceId)
+    fun view(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): FundView {
+        access.fund(entranceId, who.of(signedIn))
+        return fund.view(entranceId)
+    }
 
     @PostMapping("/disbursements")
     @ResponseStatus(HttpStatus.CREATED)

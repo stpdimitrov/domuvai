@@ -69,6 +69,9 @@ enum class Action(val governedBy: String) {
 
     /** weighing the quorum of a sitting and opening it — by whoever runs the assembly */
     OPEN_SITTING("PM-GA-012"),
+
+    /** an entrance's fund — its balance, its accounts, its handover statements — and its operating account: a condominium-level report */
+    READ_FUND("PM-SEC-002"),
 }
 
 /**
@@ -147,7 +150,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 14
+        const val MATRIX_VERSION = 15
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -232,6 +235,10 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.OPEN_SITTING, Role.MB, "PM-GA-012"),
             Permit(Action.OPEN_SITTING, Role.CTL, "PM-GA-012"),
             Permit(Action.OPEN_SITTING, Role.OWN, "PM-GA-012"),
+            Permit(Action.READ_FUND, Role.BM, "PM-SEC-001"),
+            Permit(Action.READ_FUND, Role.MB, "PM-SEC-001"),
+            Permit(Action.READ_FUND, Role.CTL, "PM-GOV-008"),
+            Permit(Action.READ_FUND, Role.OWN, "PM-SEC-002"),
         )
     }
 }
