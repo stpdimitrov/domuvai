@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.IssuerKeys
 import zues.app.identity_org.Logins
+import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
 import zues.app.policy.Held
 import zues.app.policy.Policy
@@ -80,6 +81,7 @@ class SittingWebTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var succession: Succession
 
     private val assemblyId = UUID.randomUUID()
     private val base = "/api/assembly/entrances/$entranceId/assemblies/$assemblyId"

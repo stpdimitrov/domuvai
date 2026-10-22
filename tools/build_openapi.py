@@ -175,23 +175,23 @@ RUNNING = {
    ("A payment's allocation — the rule applied and what each debt received", ['PM-DEBT-008', 'PM-SEC-002']),
  # ---- intake
  ('post', '/api/intake/entrances/{entranceId}/fee-sheet/profile'):
-   ("Profile a sheet's columns — propose a mapping onto the domain fields, to confirm",
-    ['PM-ORG-002', 'PM-BOOK-002']),
+   ("Profile a sheet's columns — propose a mapping onto the domain fields, to confirm — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)",
+    ['PM-ORG-002', 'PM-BOOK-002', 'PM-BOOK-005', 'PM-SEC-001']),
  ('post', '/api/intake/entrances/{entranceId}/fee-sheet/dry-run'):
-   ("Dry-run a fee sheet — recompute every bill and compare it with the sheet's own figures",
-    ['PM-ORG-002', 'PM-FEE-014']),
+   ("Dry-run a fee sheet — recompute every bill and compare it with the sheet's own figures — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)",
+    ['PM-ORG-002', 'PM-FEE-014', 'PM-BOOK-005', 'PM-SEC-001']),
  ('post', '/api/intake/entrances/{entranceId}/imports'):
-   ('Record a source-file import: run the dry-run and store its verdict and content hash', ['PM-DOC-001']),
+   ('Record a source-file import: run the dry-run and store its verdict and content hash — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)', ['PM-DOC-001', 'PM-BOOK-005', 'PM-SEC-001']),
  ('get', '/api/intake/imports/{id}'):
-   ('Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why', ['PM-DOC-001']),
+   ('Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)', ['PM-DOC-001', 'PM-BOOK-005', 'PM-SEC-001']),
  ('post', '/api/intake/imports/{id}/commit'):
-   ('Ask for a reviewed import to be committed into the registry — units, households and owners; answers COMMITTING, '
+   ('Ask for a reviewed import to be committed into the registry, by the manager or the board of the entrance of the import — the record names the party of the sign-in — units, households and owners; answers COMMITTING, '
     'and the record then reads COMMITTED or COMMIT_BLOCKED; '
     'what needs a declaration is returned for a person to record, never adopted',
     ['PM-ORG-001', 'PM-ORG-002', 'PM-DOC-001', 'PM-BOOK-002', 'PM-FEE-005', 'PM-FEE-008',
-     'PM-ORG-011', 'PM-BOOK-011', 'PM-FEE-007', 'PM-BOOK-005']),
+     'PM-ORG-011', 'PM-BOOK-011', 'PM-FEE-007', 'PM-BOOK-005', 'PM-SEC-001']),
  ('post', '/api/intake/imports/{id}/revert'):
-   ('Ask for a committed import to be reverted wholesale, with its reason — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED', ['PM-DOC-001']),
+   ('Ask for a committed import to be reverted wholesale, with its reason, by the manager or the board of the entrance of the import — the record names the party of the sign-in — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED', ['PM-DOC-001', 'PM-BOOK-005', 'PM-SEC-001']),
 }
 
 # Designed in A9, not built yet — method, path as designed, module, summary, rules. Never published.

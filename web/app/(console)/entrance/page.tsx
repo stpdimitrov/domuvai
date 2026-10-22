@@ -98,7 +98,7 @@ export default async function EntrancePage({ searchParams }: { searchParams: Pro
     { label: "Обекти" },
     { label: "Начисления", href: `/entrance/charges${q}` },
     { label: "Каса и фонд", href: `/entrance/fund${q}` },
-    { label: "Събрания" },
+    { label: "Събрания", href: `/entrance/assembly${q}` },
     { label: "Задължения", href: "/debts" },
     { label: "Документи" },
   ];
@@ -244,7 +244,9 @@ function Body({ view, q }: { view: Extract<Loaded, { kind: "ok" }>; q: string })
         <div className="kv-card">
           <div className="kv-head">Следващо събрание</div>
           <div style={{ padding: "12px 14px" }}>
-            <div style={{ ...DIM, font: "400 13px/1.45 'IBM Plex Sans'" }}>Общите събрания още не се водят в системата.</div>
+            {/* the api lists no assemblies of an entrance, so there is no "next" to name here — only the way there */}
+            <div style={{ ...DIM, font: "400 13px/1.45 'IBM Plex Sans'" }}>Системата още не изрежда събранията на входа.</div>
+            <Link href={`/entrance/assembly${q}`} className="btn-solid" style={{ marginTop: 10 }}>Общи събрания</Link>
           </div>
         </div>
       </div>

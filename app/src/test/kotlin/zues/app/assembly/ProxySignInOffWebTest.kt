@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.identity_org.Logins
+import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
 import zues.app.policy.Held
 import zues.app.policy.Policy
@@ -45,6 +46,7 @@ class ProxySignInOffWebTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var succession: Succession
 
     @Test
     fun `PM-SEC-001 with sign-in switched off no proxy is appointed - whatever the body says - and the list is still read`() {

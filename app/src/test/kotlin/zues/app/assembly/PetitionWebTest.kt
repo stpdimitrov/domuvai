@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.IssuerKeys
 import zues.app.identity_org.Logins
+import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
 import zues.app.policy.Held
 import zues.app.policy.Policy
@@ -82,6 +83,7 @@ class PetitionWebTest {
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var petitions: PetitionService
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var succession: Succession
 
     private val at = Instant.parse("2026-10-09T09:00:00Z")
     private val base = "/api/assembly/entrances/$entranceId/petitions"

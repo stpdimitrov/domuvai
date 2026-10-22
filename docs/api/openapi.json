@@ -667,7 +667,6 @@
           }
         },
         "required": [
-          "committedBy",
           "sheet"
         ],
         "type": "object"
@@ -2710,8 +2709,7 @@
           }
         },
         "required": [
-          "reason",
-          "revertedBy"
+          "reason"
         ],
         "type": "object"
       },
@@ -5497,15 +5495,30 @@
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
           }
         },
-        "summary": "Dry-run a fee sheet — recompute every bill and compare it with the sheet's own figures",
+        "summary": "Dry-run a fee sheet — recompute every bill and compare it with the sheet's own figures — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)",
         "tags": [
           "intake"
         ],
         "x-rules": [
           "PM-ORG-002",
-          "PM-FEE-014"
+          "PM-FEE-014",
+          "PM-BOOK-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -5556,15 +5569,30 @@
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
           }
         },
-        "summary": "Profile a sheet's columns — propose a mapping onto the domain fields, to confirm",
+        "summary": "Profile a sheet's columns — propose a mapping onto the domain fields, to confirm — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)",
         "tags": [
           "intake"
         ],
         "x-rules": [
           "PM-ORG-002",
-          "PM-BOOK-002"
+          "PM-BOOK-002",
+          "PM-BOOK-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -5616,6 +5644,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5643,12 +5684,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record a source-file import: run the dry-run and store its verdict and content hash",
+        "summary": "Record a source-file import: run the dry-run and store its verdict and content hash — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)",
         "tags": [
           "intake"
         ],
         "x-rules": [
-          "PM-DOC-001"
+          "PM-DOC-001",
+          "PM-BOOK-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -5690,6 +5733,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5717,12 +5773,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why",
+        "summary": "Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise)",
         "tags": [
           "intake"
         ],
         "x-rules": [
-          "PM-DOC-001"
+          "PM-DOC-001",
+          "PM-BOOK-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -5774,6 +5832,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5801,7 +5872,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Ask for a reviewed import to be committed into the registry — units, households and owners; answers COMMITTING, and the record then reads COMMITTED or COMMIT_BLOCKED; what needs a declaration is returned for a person to record, never adopted",
+        "summary": "Ask for a reviewed import to be committed into the registry, by the manager or the board of the entrance of the import — the record names the party of the sign-in — units, households and owners; answers COMMITTING, and the record then reads COMMITTED or COMMIT_BLOCKED; what needs a declaration is returned for a person to record, never adopted",
         "tags": [
           "intake"
         ],
@@ -5815,7 +5886,8 @@
           "PM-ORG-011",
           "PM-BOOK-011",
           "PM-FEE-007",
-          "PM-BOOK-005"
+          "PM-BOOK-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -5867,6 +5939,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5894,12 +5979,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Ask for a committed import to be reverted wholesale, with its reason — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED",
+        "summary": "Ask for a committed import to be reverted wholesale, with its reason, by the manager or the board of the entrance of the import — the record names the party of the sign-in — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED",
         "tags": [
           "intake"
         ],
         "x-rules": [
-          "PM-DOC-001"
+          "PM-DOC-001",
+          "PM-BOOK-005",
+          "PM-SEC-001"
         ]
       }
     },

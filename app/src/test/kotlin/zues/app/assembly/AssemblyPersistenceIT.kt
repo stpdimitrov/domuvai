@@ -372,7 +372,14 @@ class AssemblyPersistenceIT {
         }
         assertThat(read(base, id).get("status").asText()).isEqualTo("DRAFT")
 
-        // 4 · the owner's decision: the successor in the same office carries it on and signs the posting act; the controller still does not
+        // 4 · holding the office today is not having succeeded (PM-GOV-004, the owner's decision of 2026-10-21): a manager in
+        // office since before the convenor took nobody's place, and does not carry it on
+        val beside = manager(entranceId, from = -60, to = 300)
+        signedIn(beside) {
+            mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(owner))).andExpect(status().isForbidden)
+            mvc.perform(post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Още една","itemType":"GENERAL"}""")).andExpect(status().isForbidden)
+        }
+        // 5 · the successor in the same office carries it on and signs the posting act; the controller still does not
         val successor = manager(entranceId, from = 0, to = 300)
         signedIn(controller) { mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(owner))).andExpect(status().isForbidden) }
         val act = signedIn(successor) { created("$base/$id/notice-posting", posting(owner)) }

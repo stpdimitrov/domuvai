@@ -26,9 +26,11 @@ data class ConveneRequest(
  * nothing, not even whether the assembly exists.
  *
  * An assembly convened in an office is run — its agenda, its date and place, its posting act — by that office (the
- * owner's decision of 2026-10-11): by the convenor while they hold the office they convened in, and once they no longer
- * do, by whoever holds that same office in the entrance today — their successor. Another office never touches it:
- * it could otherwise void the notice for ever. An assembly the owners convened on their petition stays with the owner
+ * owner's decisions of 2026-10-11 and 2026-10-21): by the convenor while they hold the office they convened in, and
+ * once they no longer do, by whoever holds that same office today *and* has succeeded the convenor in it, as
+ * `identity_org` reads succession (`Succession`, `Mandate.succeeds`). Another office never touches it: it could
+ * otherwise void the notice for ever. The accepted cost: if nobody has succeeded the convenor, nobody carries the
+ * assembly on, and it is convened anew. An assembly the owners convened on their petition stays with the owner
  * who convened it, while they own. Whoever runs an assembly may also record a written proxy they were handed.
  */
 @Service
@@ -174,10 +176,11 @@ class AssemblyActs(
 
     /**
      * Who is running this assembly, or [ActRefused]. The policy is asked first, about the entrance in the path; only
-     * somebody it allows something reaches the assembly, and then it must be theirs to run: they hold today the office
-     * it was convened in, and the convenor no longer does — or they are the convenor.
+     * somebody it allows something reaches the assembly, and then it must be theirs to run: they are the convenor, or
+     * they hold today the office it was convened in and have succeeded the convenor in it.
      */
     // Rule: PM-GA-002
+    // Rule: PM-GOV-004
     private fun running(who: Asking, entranceId: UUID, assemblyId: UUID): Actor = runningIt(who, entranceId, assemblyId).first
 
     private fun runningIt(who: Asking, entranceId: UUID, assemblyId: UUID): Pair<Actor, Assembly> {
@@ -191,8 +194,8 @@ class AssemblyActs(
             in OFFICES -> {
                 val office = Role.valueOf(assembly.convenedAs)
                 acting.officeHolder(who, entranceId, office)                                           // the office it was convened in, theirs today
-                // while the convenor holds that office the assembly is theirs alone; a successor carries it on only after
-                if (!convenor && acting.holdsToday(assembly.convenedBy, entranceId, office)) throw ActRefused(rule)
+                // a successor carries it on, and only one: while the convenor holds the office nobody has succeeded them
+                if (!convenor && !acting.hasSucceeded(allowed.actor.party, assembly.convenedBy, entranceId, office)) throw ActRefused(rule)
             }
             else -> throw ActRefused(rule)                                                             // a capacity this code does not know runs nothing
         }
