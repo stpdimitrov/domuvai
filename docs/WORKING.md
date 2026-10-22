@@ -63,15 +63,25 @@ The foundation (the A-plan) is built; work is now module slices from `docs/TESTP
 
 Only three of fourteen modules have code, so there is ample non-overlapping surface. Three developers give roughly **50–65%** of single-developer calendar, not a third — integration, review and event-contract coordination eat the rest, and the coordination cost rises with the third person.
 
-## One owner, several sessions
+## Several developers, several sessions
 
-The same rules as for several developers, plus what only shows up when the sessions share one machine and one GitHub account:
+Everything a session needs to take over is in the repository or on its GitHub issues — never only in a conversation. That is what lets the team grow: a developer, a coordinator or a cloud session boots from the same three places.
 
-- **One session coordinates and writes no slice.** It starts the others, each in its own worktree with a brief that names its lane. A question for the owner goes to the coordinator as one message — the options, the recommended one first, and what is blocked meanwhile — and the owner answers there. A session that has merged a slice reports *Done · Still open · what it would propose next* and stops; the coordinator assigns the next slice. Nobody picks their own.
-- **A lane held is a lane held** — see the claim rules above; "it says the lane is mine" is true of every session.
-- **Machine resources are named by the slice**: a scratch database is `domuvai_<slice id>`, created and dropped by the session that needs it; the end-to-end harness's ports (the API's 8081, the web's 3010–3012) belong to one session at a time, named in its brief; the owner's own servers (8080, 3000) are nobody's to stop.
+| What | Its one home | Read by |
+|---|---|---|
+| Who is working where | claim issues (`lane:<lane>`, assigned) — `python3 tools/lanes.py` | every boot; CI (`covers`) refuses a PR touching an unclaimed lane |
+| What each lane last did, and what it left open | its newest entry in `docs/sessionlog/` — the map prints it per lane | every boot |
+| What waits on the owner | issues labelled `owner-question` — `python3 tools/lanes.py ask` opens one | every boot (the map lists them) |
+| What the owner decided | the issue's answer, then the slice's log entry ("the owner's, <date>: …") and, when code may assume it, an ADR | the slice that builds it; the next boot |
+| The whole picture at a point in time | the newest `H-` handover entry in `docs/sessionlog/` | every boot |
+
+- **A question for the owner is an issue, not a chat message.** Options with the recommended one first, what is blocked meanwhile, and the slice that asks — `python3 tools/lanes.py ask --title … --body-file …`. A session that asks builds the strictest reading meanwhile and says so. The answer is a comment on the issue (the owner's, or relayed verbatim by a coordinator); the session that builds it quotes it in its log entry and the issue is closed. Nobody acts on an answer that exists only in a conversation.
+- **A handover (`H-nn`) is written** by whoever coordinates, after each batch of merged slices, before any `/compact`, and at least once a day while sessions run in parallel. It says, per lane: what merged since the last handover, what is in flight (PR, claim), what is open (findings, owner questions by issue number, counsel questions), and the next slice proposed. A handover restates no decision: it links the entry or issue that holds it.
+- **A coordinator** (optional — one per developer, at most one per machine) starts sessions in their own worktrees with briefs that name the lane, routes questions to the owner through `owner-question` issues, assigns the next slice, and writes the handovers. It writes no slice code. Sessions without a coordinator follow the same rules on their own.
+- **Machine resources are named by the slice**: a scratch database is `domuvai_<slice id>`, created and dropped by the session that needs it; the end-to-end harness's ports (the API's 8081, the web's 3010–3012) belong to one session at a time; a developer's own servers are nobody else's to stop.
 - **A decision a session built is recorded where decisions live** — an ADR or an amendment to one (`zues-adr`) — not only in its log entry.
 - **Nobody audits their own work**: after a batch of parallel slices, `zues-audit` runs in a fresh session over what was merged.
+- **Credentials are each developer's own.** A push refused with an account error is checked first against the identity git actually uses (`git credential fill` — the keychain can hold another account's login), and is never worked around by switching accounts in a session.
 
 ## Skills
 

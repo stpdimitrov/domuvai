@@ -22,7 +22,7 @@ Boot from this file. Everything a session needs is in this repo; nothing needed 
 | — | `TRACEABILITY.md` | Rule → test → implementation. Generated locally, not committed: `python3 tools/traceability.py` writes `docs/TRACEABILITY.md` |
 | — | [TESTPLAN.md](TESTPLAN.md) | The remaining rules as ranked slices. Generated |
 | — | [api/openapi.json](api/openapi.json) | The HTTP contract. **Generated from the running code** (ADR-013), each operation citing its rules; validated as OpenAPI 3.1 |
-| — | [sessionlog/](sessionlog/) | Boot here every session — the **newest** file only (names sort by time) |
+| — | [sessionlog/](sessionlog/) | The session log, one file per entry. Boot: `python3 tools/lanes.py` prints each lane's newest entry; read the newest `H-` handover and your lane's newest entry |
 | — | [SESSIONLOG.md](SESSIONLOG.md) | The archive: every entry before 2026-10-10. Takes no new entry |
 
 ## Decisions
