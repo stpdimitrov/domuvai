@@ -82,6 +82,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var petitions: PetitionService
     @MockitoBean lateinit var proxies: ProxyService
     @MockitoBean lateinit var sittings: SittingService
+    @MockitoBean lateinit var yearly: zues.app.assembly.YearlyAssembly
     @MockitoBean lateinit var imports: ImportService
     @MockitoBean lateinit var importGuard: zues.app.intake.ImportGuard
     @MockitoBean lateinit var logins: Logins

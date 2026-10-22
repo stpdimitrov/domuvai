@@ -102,6 +102,8 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings'):
    ('Weigh the quorum of the sitting the assembly is at, once, and open the assembly if it is met — by whoever runs it: the first not before the hour the notice stated, the postponed one an hour after the first fell short at the reduced share, the last on the following day at any share',
     ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015', 'PM-SEC-001']),
+ ('get', '/api/assembly/entrances/{entranceId}/years/{year}'):
+   ('Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first', ['PM-GA-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity
