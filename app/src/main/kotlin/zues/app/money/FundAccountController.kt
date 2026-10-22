@@ -2,6 +2,7 @@ package zues.app.money
 
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import java.util.UUID
 
 data class RegisterFundAccountRequest(
@@ -36,7 +38,7 @@ data class FundAccountView(
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/fund-accounts")
-class FundAccountController(private val fund: FundAccountService) {
+class FundAccountController(private val fund: FundAccountService, private val access: MoneyAccess, private val who: WhoAsks) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -52,10 +54,12 @@ class FundAccountController(private val fund: FundAccountService) {
         )
 
     @GetMapping
-    fun list(@PathVariable entranceId: UUID): List<FundAccountView> =
-        fund.list(entranceId).map {
+    fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<FundAccountView> {
+        access.fund(entranceId, who.of(signedIn))
+        return fund.list(entranceId).map {
             FundAccountView(it.id, it.iban, it.purpose, it.holderName, it.holderKind, it.holderParty)
         }
+    }
 
     /** A malformed IBAN, an unknown purpose or holder kind, or a blank holder → 400. */
     @ExceptionHandler(IllegalArgumentException::class)

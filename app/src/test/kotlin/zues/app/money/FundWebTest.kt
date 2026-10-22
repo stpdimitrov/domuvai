@@ -24,6 +24,8 @@ class FundWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var fund: FundService
+    @MockitoBean lateinit var access: MoneyAccess
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
     private val chair = UUID.randomUUID()

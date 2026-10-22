@@ -75,8 +75,6 @@ class Acting(private val policy: Policy, private val succession: Succession, pri
      * member who later became manager has succeeded nobody on the board by it.
      */
     // Rule: PM-GOV-004
-    // TODO(legal): PM-GOV-004 — `identity_org` reads no succession for the controller: an assembly a controller convened is
-    // carried on by nobody once they leave office (the owner's C-a, its cost); asked of the owner
     fun hasSucceeded(candidate: UUID, predecessor: UUID, entranceId: UUID, office: Role): Boolean =
         succession.successorsOf(predecessor, entranceId, office, today()).any { it.partyId == candidate && it.role == office }
 

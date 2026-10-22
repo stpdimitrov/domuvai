@@ -100,4 +100,37 @@ class MoneyAccessTest {
         assertThatCode { open.unitCharges(flat1, Asking(null, null)); open.entranceArrears(entrance, Asking(null, null)) }.doesNotThrowAnyException()
         refusedBy("PM-SEC-002") { access.unitCharges(flat1, Asking(null, null)) }
     }
+
+    @Test
+    fun `PM-SEC-002 PM-SEC-001 PM-GOV-008 the fund is read by the manager, the board, the controller and the entrance's owners — a report of the condominium`() {
+        for (who in listOf(Held(Role.BM, entrance), Held(Role.MB, entrance), Held(Role.CTL, entrance), Held(Role.OWN, entrance, setOf(flat2)))) {
+            assertThatCode { access.fund(entrance, person(who)) }.describedAs("${who.role}").doesNotThrowAnyException()
+        }
+    }
+
+    @Test
+    fun `PM-SEC-002 nobody else reads the fund — the holder of use, an occupant, the cashier, a firm's staff, an owner or office elsewhere`() {
+        for (role in listOf(Role.USR, Role.OCC, Role.CSH, Role.PMC_STAFF, Role.MUN)) {
+            refusedBy("PM-SEC-002") { access.fund(entrance, person(Held(role, entrance, setOf(flat1)))) }
+        }
+        val elsewhere = UUID.randomUUID()
+        refusedBy("PM-SEC-002") { access.fund(entrance, person(Held(Role.OWN, elsewhere, setOf(UUID.randomUUID())), Held(Role.BM, elsewhere))) }
+        refusedBy("PM-SEC-002") { access.fund(entrance, Asking(Login("https://id.example.test", "nobody-in-the-book"), null)) }
+    }
+
+    @Test
+    fun `PM-BOOK-006 what the book declares of each unit's persons is read as the book is — the offices and the controller, not an owner`() {
+        for (office in listOf(Role.BM, Role.MB, Role.CTL)) {
+            assertThatCode { access.book(entrance, person(Held(office, entrance))) }.describedAs("$office").doesNotThrowAnyException()
+        }
+        for (role in listOf(Role.OWN, Role.USR, Role.CSH)) refusedBy("PM-BOOK-006") { access.book(entrance, person(Held(role, entrance, setOf(flat1)))) }
+        refusedBy("PM-BOOK-006") { access.book(entrance, person(Held(Role.BM, UUID.randomUUID()))) }
+    }
+
+    @Test
+    fun `with sign-in switched off the fund and the headcount are served too — and refused to nobody when it is on`() {
+        assertThatCode { open.fund(entrance, Asking(null, null)); open.book(entrance, Asking(null, null)) }.doesNotThrowAnyException()
+        refusedBy("PM-SEC-002") { access.fund(entrance, Asking(null, null)) }
+        refusedBy("PM-BOOK-006") { access.book(entrance, Asking(null, null)) }
+    }
 }

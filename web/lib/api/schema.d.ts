@@ -245,6 +245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/years/{year}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first */
+        get: operations["get_assembly_entrances_entranceId_years_year"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/identity/entrances/{entranceId}/mandates": {
         parameters: {
             query?: never;
@@ -525,7 +542,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed */
+        /** The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed; for the book's readers */
         get: operations["get_money_entrances_entranceId_charge_runs_period_headcount"];
         put?: never;
         post?: never;
@@ -542,7 +559,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements */
+        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance */
         get: operations["get_money_entrances_entranceId_fund"];
         put?: never;
         post?: never;
@@ -559,7 +576,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the entrance's fund accounts */
+        /** List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners */
         get: operations["get_money_entrances_entranceId_fund_accounts"];
         put?: never;
         /** Register the entrance's repair-fund account */
@@ -628,7 +645,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects */
+        /** The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is */
         get: operations["get_money_entrances_entranceId_fund_handover_statements"];
         put?: never;
         /** Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash */
@@ -646,7 +663,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with */
+        /** A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is */
         get: operations["get_money_entrances_entranceId_fund_handover_statements_statementId"];
         put?: never;
         post?: never;
@@ -680,7 +697,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's account and the cash box; outflows are not recorded yet, and the response says so */
+        /** The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's account and the cash box; outflows are not recorded yet, and the response says so — read as the fund is */
         get: operations["get_money_entrances_entranceId_operating_account"];
         put?: never;
         post?: never;
@@ -1464,6 +1481,20 @@ export interface components {
             difference: "COUNT_DIFFERS" | "NOT_IN_BOOK" | "NOT_BILLED";
             /** Format: uuid */
             unitId: string;
+        };
+        HeldInYearView: {
+            /** Format: uuid */
+            firstAssemblyId?: string;
+            /** Format: date */
+            firstHeldOn?: string;
+            /** Format: int32 */
+            held: number;
+            met: boolean;
+            /** Format: int32 */
+            required: number;
+            requiredSource: string;
+            /** Format: int32 */
+            year: number;
         };
         HouseholdRegisteredResponse: {
             memberIds: string[];
@@ -3222,6 +3253,51 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_years_year: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldInYearView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

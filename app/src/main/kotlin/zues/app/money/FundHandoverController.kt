@@ -2,6 +2,7 @@ package zues.app.money
 
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.util.UUID
@@ -30,7 +32,7 @@ data class IssueHandoverRequest(
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/fund/handover-statements")
-class FundHandoverController(private val handovers: FundHandoverService) {
+class FundHandoverController(private val handovers: FundHandoverService, private val access: MoneyAccess, private val who: WhoAsks) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -49,10 +51,16 @@ class FundHandoverController(private val handovers: FundHandoverService) {
         )
 
     @GetMapping
-    fun list(@PathVariable entranceId: UUID): List<HandoverStatementView> = handovers.list(entranceId)
+    fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<HandoverStatementView> {
+        access.fund(entranceId, who.of(signedIn))
+        return handovers.list(entranceId)
+    }
 
     @GetMapping("/{statementId}")
-    fun find(@PathVariable entranceId: UUID, @PathVariable statementId: UUID): HandoverStatementView = handovers.find(entranceId, statementId)
+    fun find(@PathVariable entranceId: UUID, @PathVariable statementId: UUID, signedIn: JwtAuthenticationToken?): HandoverStatementView {
+        access.fund(entranceId, who.of(signedIn))
+        return handovers.find(entranceId, statementId)
+    }
 
     /** A missing bank balance, a handover date after today, a period starting after it, or one party on both sides → 400. */
     @ExceptionHandler(IllegalArgumentException::class)

@@ -1449,6 +1449,44 @@
         ],
         "type": "object"
       },
+      "HeldInYearView": {
+        "properties": {
+          "firstAssemblyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "firstHeldOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "held": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "met": {
+            "type": "boolean"
+          },
+          "required": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requiredSource": {
+            "type": "string"
+          },
+          "year": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "held",
+          "met",
+          "required",
+          "requiredSource",
+          "year"
+        ],
+        "type": "object"
+      },
       "HouseholdRegisteredResponse": {
         "properties": {
           "memberIds": {
@@ -5094,6 +5132,76 @@
         ]
       }
     },
+    "/api/assembly/entrances/{entranceId}/years/{year}": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_years_year",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeldInYearView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-001"
+        ]
+      }
+    },
     "/api/identity/entrances/{entranceId}/mandates": {
       "get": {
         "operationId": "get_identity_entrances_entranceId_mandates",
@@ -6522,12 +6630,13 @@
             "description": "Not Found"
           }
         },
-        "summary": "The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed",
+        "summary": "The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed; for the book's readers",
         "tags": [
           "money"
         ],
         "x-rules": [
-          "PM-BOOK-012"
+          "PM-BOOK-012",
+          "PM-BOOK-006"
         ]
       }
     },
@@ -6609,13 +6718,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements",
+        "summary": "The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance",
         "tags": [
           "money"
         ],
         "x-rules": [
           "PM-FUND-004",
-          "PM-FUND-009"
+          "PM-FUND-009",
+          "PM-GOV-008",
+          "PM-SEC-002"
         ]
       }
     },
@@ -6687,13 +6798,16 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the entrance's fund accounts",
+        "summary": "List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners",
         "tags": [
           "money"
         ],
         "x-rules": [
           "PM-FUND-001",
-          "PM-FUND-004"
+          "PM-FUND-004",
+          "PM-SEC-001",
+          "PM-GOV-008",
+          "PM-SEC-002"
         ]
       },
       "post": {
@@ -7199,12 +7313,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects",
+        "summary": "The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is",
         "tags": [
           "money"
         ],
         "x-rules": [
-          "PM-FUND-010"
+          "PM-FUND-010",
+          "PM-GOV-008",
+          "PM-SEC-002"
         ]
       },
       "post": {
@@ -7398,12 +7514,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with",
+        "summary": "A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is",
         "tags": [
           "money"
         ],
         "x-rules": [
-          "PM-FUND-010"
+          "PM-FUND-010",
+          "PM-GOV-008",
+          "PM-SEC-002"
         ]
       }
     },
@@ -7572,13 +7690,15 @@
             "description": "Not Found"
           }
         },
-        "summary": "The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's account and the cash box; outflows are not recorded yet, and the response says so",
+        "summary": "The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's account and the cash box; outflows are not recorded yet, and the response says so — read as the fund is",
         "tags": [
           "money"
         ],
         "x-rules": [
           "PM-FUND-004",
-          "PM-FEE-019"
+          "PM-FEE-019",
+          "PM-GOV-008",
+          "PM-SEC-002"
         ]
       }
     },
