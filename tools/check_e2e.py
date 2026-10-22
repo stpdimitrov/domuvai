@@ -29,8 +29,9 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 
 11. WEB-23 (PM-BOOK-003, PM-BOOK-012): the compliance screen shows each entrance's overdue declarations and the month's
     headcount check as the API gives them, says so where no run was issued, and nothing of the design's sample.
-12. WEB-25 (PM-GA-002, PM-GA-012, PM-GOV-005): the entrance's assembly screen — in CI, an assembly convened through the
-    page's own form and shown as the API stored it, its quorum meter in the API's figures, an office not held refused.
+12. WEB-25, WEB-26 (PM-GA-001, PM-GA-002, PM-GA-012, PM-GOV-005): the entrance's assembly screen — whether this year's
+    assembly was held, in the API's count; in CI, an assembly convened through the page's own form, listed among the
+    entrance's assemblies and shown as the API stored it, its quorum meter in the API's figures, an office not held refused.
 13. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
     httpOnly cookie and no token; every screen above is then read signed in, from an api that is closed; the console
     names the person, with the login the api read from the web's bearer; sign-out ends the session at the web and at
@@ -70,6 +71,11 @@ DEMO_BASIS = [
     {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": "GA-2026-03-12-4", "totalMinor": 60_000},
 ]
 
+def sofia_year():
+    """The calendar year Sofia is in — the one the assembly screen asks about (PM-GA-001)."""
+    return datetime.datetime.now(ZoneInfo("Europe/Sofia")).year
+
+
 # (method, contract path) → how the live screens call it for the seeded entrance: the URL and the body.
 # The operations about one assembly need an assembly, and the seed convenes none: assembly_screen convenes one
 # through the page and validates these itself, signed in (WEB-25). Here they are listed so that the web calls nothing
@@ -103,6 +109,8 @@ CALLS = {
     ("GET", "/api/money/entrances/{entranceId}/fund/handover-statements"): lambda e: (
         f"/api/money/entrances/{e}/fund/handover-statements", None),
     ("GET", "/api/money/entrances/{entranceId}/arrears"): lambda e: (f"/api/money/entrances/{e}/arrears?asOf=2026-09-30", None),
+    ("GET", "/api/assembly/entrances/{entranceId}/assemblies"): lambda e: (f"/api/assembly/entrances/{e}/assemblies", None),
+    ("GET", "/api/assembly/entrances/{entranceId}/years/{year}"): lambda e: (f"/api/assembly/entrances/{e}/years/{sofia_year()}", None),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -782,6 +790,14 @@ def assembly_screen(api, web, entrance, signed_in):
     text = visible_text(page)
     if status != 200 or "Свикване на общо събрание" not in text or 'name="convenedAs"' not in page:
         return [f"{path}: HTTP {status}, or no form to convene"]
+    # WEB-26 (PM-GA-001): whether this year's assembly was held, in the API's own count against the law's
+    status, raw = fetch(api, f"/api/assembly/entrances/{entrance}/years/{sofia_year()}")
+    if status == 200:
+        y = json.loads(raw)
+        line = f"През {y['year']} проведени {y['held']} от {y['required']} по {y['requiredSource']} " + ("годишното е проведено" if y["met"] else "годишното не е проведено")
+        failures += [] if line in text else [f"{path}: does not show {line!r}"]
+    elif (refusal_words(raw) or f"HTTP {status}") not in text:
+        failures.append(f"{path}: the year is refused (HTTP {status}) and the page does not say the API's words")
     if not signed_in:
         print("—   /entrance/assembly  read; convening, and the five operations on an assembly, NOT checked: nobody is signed in on this run")
         return failures
@@ -811,6 +827,19 @@ def assembly_screen(api, web, entrance, signed_in):
         return failures + [f"{path}: convening through the page's form answers HTTP {status} → {location or 'nowhere'} — expected the new assembly's page"]
     shown = visible_text(fetch(web, location.removeprefix(web))[1])
     of = f"/api/assembly/entrances/{entrance}/assemblies/{made.group(1)}"
+    # WEB-26 (PM-GA-002): the new assembly is among the entrance's, as the API lists them, marked as the one open —
+    # and on the screen with no assembly asked for, it is a link to its own page
+    status, raw = fetch(api, f"/api/assembly/entrances/{entrance}/assemblies")
+    listed = json.loads(raw) if status == 200 else []
+    failures += [] if any(a["id"] == made.group(1) for a in listed) else [f"GET …/assemblies: HTTP {status} — the new assembly is not listed"]
+    errors = list(Draft202012Validator(response_schema("GET", "/api/assembly/entrances/{entranceId}/assemblies", 200),
+                                       format_checker=Draft202012Validator.FORMAT_CHECKER).iter_errors(listed))   # with one in it, unlike the seed's
+    failures += [f"GET …/assemblies: {'/'.join(map(str, e.absolute_path)) or '(root)'} — {e.message}" for e in errors]
+    row = f"{date(str(day))} 18:30 чернова — поканата не е обявена член на управителния съвет отворено"
+    failures += [] if row in shown else [f"{path}: the list does not show the new assembly as {row!r}"]
+    _, again = fetch(web, path)
+    failures += [] if html.escape(f"/entrance/assembly?entrance={entrance}&assembly={made.group(1)}", quote=True) in again else [
+        f"{path}: the list does not link to the new assembly"]
     for suffix, path_ in (("", ""), ("/attendance", "/attendance"), ("/proxies", "/proxies"), ("/quorum", "/quorum")):
         status, raw = fetch(api, of + suffix)
         if status != 200:
@@ -845,8 +874,8 @@ def assembly_screen(api, web, entrance, signed_in):
     kept = f'value="{html.escape(place + " (отказано)", quote=True)}"' in refused_page        # the field itself, not the page's script payload
     if status != 200 or location or "Нямате право да свикате общо събрание" not in said or not kept:
         failures.append(f"{path}: convening as an office not held answers HTTP {status} → {location or 'the page'} — expected the API's refusal, the form kept")
-    print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; convened through the form and shown as "
-          f"stored; the meter in the API's figures; an office not held refused in the API's words")
+    print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; this year's assembly in the API's count; "
+          f"convened through the form, listed and shown as stored; the meter in the API's figures; an office not held refused in the API's words")
     return failures
 
 
