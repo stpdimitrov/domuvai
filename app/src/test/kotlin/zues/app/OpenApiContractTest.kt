@@ -76,6 +76,7 @@ class OpenApiContractTest {
 
     @MockitoBean lateinit var acting: Acting
     @MockitoBean lateinit var assemblyActs: AssemblyActs
+    @MockitoBean lateinit var assemblyReads: zues.app.assembly.AssemblyReads
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var attendance: AttendanceService
     @MockitoBean lateinit var notices: NoticeService

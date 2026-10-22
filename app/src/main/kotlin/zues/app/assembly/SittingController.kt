@@ -48,29 +48,38 @@ data class QuorumView(
     val met: Boolean,
     val cannotWeigh: List<String>,
     val derivedParts: Boolean,
-    /** Where one owner held more than the law's share at the notice date, who and how much: the threshold is the higher one (PM-GA-015). */
+    /**
+     * Where one owner held more than the law's share at the notice date, who and how much: the threshold is the higher one
+     * (PM-GA-015). Who it is, only to the manager, the board and the controller (PM-SEC-002); how much, to every reader.
+     */
     val concentratedBy: UUID?,
     val concentratedPct: String?,
     val sittings: List<SittingView>,
 )
 
 /**
- * Quorum and the sittings of a general assembly (PM-GA-012). The meter is read by anybody; a sitting is weighed and
+ * Quorum and the sittings of a general assembly (PM-GA-012). The meter is read as the assembly is; a sitting is weighed and
  * opened by whoever runs the assembly, signed in — anybody else is a 403 naming the rule (PM-SEC-001).
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}")
-class SittingController(private val acts: AssemblyActs, private val sittings: SittingService, private val who: WhoAsks) {
+class SittingController(private val acts: AssemblyActs, private val sittings: SittingService, private val reads: AssemblyReads, private val who: WhoAsks) {
 
     // Rule: PM-GA-012
     // Rule: PM-GA-013
     // Rule: PM-GA-014
     // Rule: PM-GA-015
+    // Rule: PM-SEC-001
+    // Rule: PM-SEC-002
     @GetMapping("/quorum")
-    fun quorum(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): QuorumView =
-        sittings.read(entranceId, assemblyId).let { (q, weighed, n, opensFrom) ->
-            QuorumView(n, opensFrom, q.on, q.representedPct.percent(), q.thresholdPct.percent(), q.thresholdSource, q.thresholdVerified, q.met, q.cannotWeigh, q.derivedParts, q.concentratedBy, q.concentratedPct?.percent(), weighed.map(::view))
+    fun quorum(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, signedIn: JwtAuthenticationToken?): QuorumView {
+        val asking = who.of(signedIn)
+        reads.require(entranceId, asking)
+        val named = reads.seesConcentration(entranceId, asking)        // who holds the share is another person's holding: not every reader's
+        return sittings.read(entranceId, assemblyId).let { (q, weighed, n, opensFrom) ->
+            QuorumView(n, opensFrom, q.on, q.representedPct.percent(), q.thresholdPct.percent(), q.thresholdSource, q.thresholdVerified, q.met, q.cannotWeigh, q.derivedParts, q.concentratedBy?.takeIf { named }, q.concentratedPct?.percent(), weighed.map(::view))
         }
+    }
 
     // Rule: PM-GA-012
     // Rule: PM-GA-013

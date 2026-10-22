@@ -79,7 +79,7 @@ RUNNING = {
    ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown',
     ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
-   ('List the proxies registered for an assembly', ['PM-GA-009']),
+   ('List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-009', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions'):
    ('Open a petition to convene an assembly — by the signed-in owner, who signs it; anybody else is a 403', ['PM-GA-003', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures'):
@@ -95,19 +95,19 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification'):
    ('Record that a remote participant was reliably identified, and how — from then on their presence counts', ['PM-GA-016', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
-   ('Read the register of the sitting — each line, whether it counts, and whom it makes present', ['PM-GA-012', 'PM-GA-016']),
+   ('Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum'):
-   ('The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting\'s threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far',
-    ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015', 'PM-ORG-005', 'PM-ORG-011']),
+   ('The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting\'s threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. Who owns the share behind a higher quorum is named to the manager, the board and the controller only',
+    ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015', 'PM-ORG-005', 'PM-ORG-011', 'PM-SEC-001', 'PM-SEC-002']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings'):
    ('Weigh the quorum of the sitting the assembly is at, once, and open the assembly if it is met — by whoever runs it: the first not before the hour the notice stated, the postponed one an hour after the first fell short at the reduced share, the last on the following day at any share',
     ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies'):
-   ('List an entrance\'s assemblies, the one meeting latest first — each one\'s status, hour and the capacity it was convened in, read as one assembly is', ['PM-GA-002']),
+   ('List an entrance\'s assemblies, the one meeting latest first — each one\'s status, hour and the capacity it was convened in, read as one assembly is', ['PM-GA-002', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/years/{year}'):
-   ('Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first', ['PM-GA-001']),
+   ('Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first — read as an assembly is', ['PM-GA-001', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
-   ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
+   ('Read an assembly with its agenda — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-002', 'PM-GA-005', 'PM-SEC-001']),
  # ---- identity
  ('get', '/api/identity/me'):
    ("Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do", ['PM-SEC-001']),

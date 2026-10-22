@@ -34,11 +34,12 @@ data class AttendanceView(
 
 /**
  * The register of who is present at an assembly (PM-GA-012, PM-GA-016). It is kept by whoever runs the assembly, signed
- * in — never by a field of the request — and anybody else is a 403 naming the rule (PM-SEC-001).
+ * in — never by a field of the request — and anybody else is a 403 naming the rule (PM-SEC-001). It is read as the
+ * assembly is.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance")
-class AttendanceController(private val acts: AssemblyActs, private val attendance: AttendanceService, private val who: WhoAsks) {
+class AttendanceController(private val acts: AssemblyActs, private val attendance: AttendanceService, private val reads: AssemblyReads, private val who: WhoAsks) {
 
     // Rule: PM-GA-012
     // Rule: PM-SEC-001
@@ -57,9 +58,12 @@ class AttendanceController(private val acts: AssemblyActs, private val attendanc
         signedIn: JwtAuthenticationToken?,
     ): AttendanceView = view(acts.verifyIdentity(who.of(signedIn), entranceId, assemblyId, attendanceId, request.how))
 
+    // Rule: PM-SEC-001
     @GetMapping
-    fun register(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): List<AttendanceView> =
-        attendance.register(entranceId, assemblyId).map(::view)
+    fun register(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, signedIn: JwtAuthenticationToken?): List<AttendanceView> {
+        reads.require(entranceId, who.of(signedIn))
+        return attendance.register(entranceId, assemblyId).map(::view)
+    }
 
     private fun view(p: Present) = p.attendance.let {
         AttendanceView(it.id, it.sessionNo, it.attendeePartyId, it.channel, p.identityVerified, p.identityVerifiedAt, p.counted, p.represented.sortedBy { id -> id.toString() }, it.recordedBy, it.recordedAt)

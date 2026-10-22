@@ -62,7 +62,7 @@ private const val AUDIENCE = "domuvai-api"
  * that the office stated is one they hold, and that whoever may not gets a 403 and reaches nothing.
  */
 @WebMvcTest(AssemblyController::class, properties = ["domuvai.auth.issuer-uri=$ISSUER", "domuvai.auth.audience=$AUDIENCE", "domuvai.auth.mode="])
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class)
 class AssemblyWebTest {
 
     companion object {
@@ -243,6 +243,24 @@ class AssemblyWebTest {
     }
 
     @Test
+    fun `PM-SEC-001 an assembly and the entrance's list are read by those holding a role in it - a stranger, a login tied to nobody and an office elsewhere are a 403 naming the rule, and nothing is read`() {
+        val assembly = draft(manager, "BM")
+        for (subject in listOf("login-stranger", "login-tied-to-nobody")) {
+            for (path in listOf(base, "$base/${assembly.id}")) {
+                mvc.perform(get(path).by(subject)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+            }
+        }
+        mvc.perform(get("/api/assembly/entrances/${UUID.randomUUID()}/assemblies").by("login-manager")).andExpect(status().isForbidden)   // the manager here is nobody there
+        verifyNoInteractions(assemblies)
+        whenever(assemblies.read(entranceId, assembly.id)).thenReturn(assembly to emptyList())
+        whenever(assemblies.list(entranceId)).thenReturn(listOf(assembly))
+        for (subject in listOf("login-owner", "login-controller", "login-cashier", "login-manager")) {
+            mvc.perform(get(base).by(subject)).andExpect(status().isOk).andExpect(jsonPath("$[0].id").value(assembly.id.toString()))
+            mvc.perform(get("$base/${assembly.id}").by(subject)).andExpect(status().isOk).andExpect(jsonPath("$.id").value(assembly.id.toString()))
+        }
+    }
+
+    @Test
     fun `PM-GA-002 an entrance's assemblies are listed as the service orders them - the one meeting latest first, with what finds and opens one, and nothing more`() {
         person("login-owner-reads", Role.OWN)
         val later = draft(manager, "BM").copy(scheduledAt = at.plusSeconds(86_400), status = "NOTICED")
@@ -398,7 +416,7 @@ class AssemblyWebTest {
         mvc.perform(post("$base/${assembly.id}/schedule").by("login-manager").content("""{"scheduledAt":"$at","place":"двора"}""")).andExpect(status().isBadRequest)
 
         whenever(assemblies.read(entranceId, assembly.id)).thenReturn(assembly to emptyList())
-        mvc.perform(get("$base/${assembly.id}").by("login-stranger")).andExpect(status().isOk).andExpect(jsonPath("$.place").value("фоайето"))
+        mvc.perform(get("$base/${assembly.id}").by("login-cashier")).andExpect(status().isOk).andExpect(jsonPath("$.place").value("фоайето"))
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(convening("BM"))).andExpect(status().isUnauthorized)   // no token
     }
 }

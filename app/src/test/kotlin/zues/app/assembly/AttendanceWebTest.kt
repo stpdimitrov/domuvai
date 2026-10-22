@@ -53,7 +53,7 @@ private const val AUDIENCE = "domuvai-api"
  * Proves the register is kept by whoever runs the assembly, signed in, and that anybody else gets a 403 and reaches nothing.
  */
 @WebMvcTest(AttendanceController::class, properties = ["domuvai.auth.issuer-uri=$ISSUER", "domuvai.auth.audience=$AUDIENCE", "domuvai.auth.mode="])
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class)
 class AttendanceWebTest {
 
     companion object {
@@ -162,6 +162,19 @@ class AttendanceWebTest {
             .andExpect(jsonPath("$.counted").value(true))
             .andExpect(jsonPath("$.represents[0]").value(attendee.toString()))
         verify(attendance).verifyIdentity(entranceId, assemblyId, id, keeper, "лична карта пред камерата")
+    }
+
+    @Test
+    fun `PM-SEC-001 the register is read by those holding a role in the entrance - a stranger, an occupant and a login tied to nobody are a 403 naming the rule, and nothing is read`() {
+        person("login-stranger-5")
+        person("login-occupant-5", Role.OCC)
+        for (subject in listOf("login-stranger-5", "login-occupant-5", "login-tied-to-nobody")) {
+            mvc.perform(get(base).by(subject)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+        }
+        verifyNoInteractions(attendance)
+        person("login-owner-5", Role.OWN)
+        whenever(attendance.register(entranceId, assemblyId)).thenReturn(emptyList())
+        mvc.perform(get(base).by("login-owner-5")).andExpect(status().isOk)
     }
 
     @Test

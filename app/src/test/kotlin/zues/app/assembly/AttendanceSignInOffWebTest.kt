@@ -31,7 +31,7 @@ import java.util.UUID
  * source of roles that would make anybody everything; the register is still read.
  */
 @WebMvcTest(AttendanceController::class)
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class, AttendanceSignInOffWebTest.Generous::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class, AttendanceSignInOffWebTest.Generous::class)
 class AttendanceSignInOffWebTest {
 
     class Generous {
