@@ -173,6 +173,10 @@ class SittingPersistenceIT {
         assertThat(year.get("held").asInt()).isEqualTo(1)
         assertThat(year.get("met").asBoolean()).isTrue()
         assertThat(year.get("firstAssemblyId").asText()).isEqualTo(base.substringAfterLast("/"))
+        val thisYear = toSofiaDate(Instant.now()).take(4)
+        val elsewhere = json.readTree(mvc.perform(get("/api/assembly/entrances/${entrance()}/years/$thisYear")).andExpect(status().isOk).andReturn().response.contentAsString)
+        assertThat(elsewhere.get("held").asInt()).isZero()                           // another entrance's sitting is not its own
+        mvc.perform(get("/api/assembly/entrances/$entranceId/years/1900")).andExpect(status().isNotFound)   // no law in force that year
         open(base).andExpect(status().isConflict)                                    // once
         assertThat(meter(base).get("sittings")).hasSize(1)
         present(base, vera).andExpect(status().isCreated)                            // the register goes on being kept in an open sitting

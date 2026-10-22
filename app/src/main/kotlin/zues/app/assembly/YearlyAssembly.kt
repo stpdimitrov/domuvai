@@ -34,6 +34,8 @@ data class HeldInYear(
 class YearlyAssembly(private val sittings: SittingRepository) {
 
     // Rule: PM-GA-001
+    // Not built: the acceptance's red flag on 1 January — a stored compliance task and a worker run in Sofia on that day,
+    // `compliance`'s and the worker's (see the session log of S-G2-02e). This only answers.
     @Transactional(readOnly = true)
     fun heldIn(entranceId: UUID, year: Int): HeldInYear {
         val opened = sittings.findByEntranceIdAndQuorumMetTrue(entranceId)

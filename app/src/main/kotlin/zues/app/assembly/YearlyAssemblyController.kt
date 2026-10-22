@@ -33,6 +33,11 @@ class YearlyAssemblyController(private val yearly: YearlyAssembly) {
         return yearly.heldIn(entranceId, year).let { HeldInYearView(it.year, it.held, it.required, it.requiredSource, it.met, it.firstAssemblyId, it.firstHeldOn) }
     }
 
+    /** A year no law of the catalogue was in force for: there is nothing to have held an assembly against. */
+    @ExceptionHandler(NoSuchElementException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    fun onNoLaw(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "no law in force for that year"))
+
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onBadYear(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "bad request"))

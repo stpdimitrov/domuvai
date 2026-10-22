@@ -27,7 +27,7 @@ class YearlyAssemblyTest {
     ).also { weighed += it }
 
     @Test
-    fun `PM-GA-001 a year's assembly is held when a sitting opened on its quorum in it - none held is the flag's case`() {
+    fun `PM-GA-001 a year's assembly is held when a sitting opened on its quorum in it - none held is not met`() {
         val required = constantOn("GA_ASSEMBLIES_PER_YEAR", "2026-12-31")
         assertThat(listOf(required.value, required.verified, required.source)).containsExactly("1", true, "чл. 12 ЗУЕС")
         assertThat(yearly.heldIn(entranceId, 2026).met).isFalse()                    // nothing on record: not held
