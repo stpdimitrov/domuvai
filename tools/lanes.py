@@ -13,6 +13,10 @@ list of names up to date.
     python3 tools/lanes.py check <lane> [--mine <n>]   exit 1 if <lane> is held — unless by claim #<n>, the one this session opened
     python3 tools/lanes.py claim <lane> [--also <lane> …] --title "S-nn …" --body-file contract.md
     python3 tools/lanes.py covers <pr>                 exit 1 if PR <pr> touches a lane its closing claim does not name (CI runs it)
+    python3 tools/lanes.py ask --title "…" --body-file q.md   put a question to the owner, where every session sees it
+
+The map also prints each lane's newest log entry (docs/sessionlog/) and the owner's open questions (issues
+labelled `owner-question`): with several sessions at once, the newest log file alone is one lane's state, not all.
 
 A claim belongs to the session that opened it, not to a GitHub account: one owner's sessions all sign in as the
 same person, so an open claim is never taken for "mine" unless the session names it (`--mine`).
@@ -29,6 +33,8 @@ sys.path.insert(0, str(ROOT / 'tools'))
 from testplan import MODULE   # domain → owning module: the one home of the module map
 
 LABEL = 'lane:'
+QUESTION = 'owner-question'
+LOG = ROOT / 'docs/sessionlog'
 APP = ROOT / 'app/src/main/kotlin/zues/app'
 # Every module that owns rules, every module with code (intake owns none), and the web deployable.
 LANES = sorted(set(MODULE.values()) | {p.name.replace('_', '-') for p in APP.iterdir() if p.is_dir()} | {'web'})
@@ -91,6 +97,35 @@ def claims_of(issues: list[dict]) -> list[tuple[dict, list[str]]]:
     return sorted(held, key=lambda c: c[0]['number'])
 
 
+def latest_entries() -> dict[str, str]:
+    """lane → the newest log entry naming it, as `file — header`; work in no lane (tooling, docs, handovers) under '—'.
+    An entry's header is `## <id> · <date> · <lanes> — <what>`: its third part names the lanes it touched."""
+    out: dict[str, str] = {}
+    for f in sorted(LOG.glob('*.md')):
+        head = next((l for l in f.read_text().splitlines() if l.startswith('## ')), '')
+        parts = head[3:].split(' · ', 2)
+        where = parts[2].split(' — ', 1)[0] if len(parts) == 3 else ''
+        named = [lane for lane in LANES if re.search(rf'(?<![\w-]){re.escape(lane)}(?![\w-])', where)] or ['—']
+        for lane in named:
+            out[lane] = f'{f.name} — {head[3:][:100]}'
+    return out
+
+
+def questions() -> list[dict]:
+    """The owner's open questions: issues labelled owner-question, oldest first."""
+    return sorted(json.loads(gh('issue', 'list', '--state', 'open', '--label', QUESTION, '--limit', '100',
+                                '--json', 'number,title,createdAt')), key=lambda i: i['number'])
+
+
+def ask(title: str, body_file: str) -> int:
+    """Put a question to the owner as an issue every session's boot lists — options, the recommended one first,
+    and what is blocked meanwhile, in the body. The answer is a comment on it; the issue is closed once answered."""
+    gh('label', 'create', QUESTION, '--force', '--color', 'd93f0b',
+       '--description', "a decision only the owner makes — open until answered (tools/lanes.py)")
+    print(gh('issue', 'create', '--title', title, '--label', QUESTION, '--body-file', body_file).strip())
+    return 0
+
+
 def show() -> int:
     issues = lane_issues()
     touched: dict[str, list[dict]] = {}
@@ -132,6 +167,14 @@ def show() -> int:
         print(f'{mark} {lane.ljust(width)}{status:8}{holder:24}{detail}')
     for w in warnings:
         print(f'⚠ {w}')
+
+    print('\n  newest log entry per lane (docs/sessionlog/)')
+    for lane, entry in sorted(latest_entries().items(), key=lambda kv: kv[1], reverse=True):
+        print(f'  {lane.ljust(width)}{entry}')
+    open_questions = questions()
+    print(f'\n  the owner\'s open questions ({QUESTION}): {len(open_questions) or "none"}')
+    for q in open_questions:
+        print(f'  #{q["number"]}  {q["title"]}')
     return 0
 
 
@@ -201,6 +244,9 @@ def main() -> int:
     checking.add_argument('lane', choices=LANES)
     checking.add_argument('--mine', type=int, metavar='N', help='the claim issue this session opened itself')
     sub.add_parser('covers').add_argument('pr', type=int)
+    asking = sub.add_parser('ask')
+    asking.add_argument('--title', required=True, help='the question, in one line')
+    asking.add_argument('--body-file', required=True, help='options (recommended first), and what is blocked meanwhile')
     claiming = sub.add_parser('claim')
     claiming.add_argument('lane', choices=LANES)
     claiming.add_argument('--also', action='append', default=[], choices=LANES, metavar='LANE',
@@ -210,6 +256,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == 'check':
         return check(args.lane, args.mine)
+    if args.command == 'ask':
+        return ask(args.title, args.body_file)
     if args.command == 'covers':
         return covers(args.pr)
     if args.command == 'claim':
