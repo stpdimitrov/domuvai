@@ -852,7 +852,7 @@
   min-width: 720px;
 }
 /* /entrance/assembly (WEB-25) */
-.as-mandates, .as-agenda, .as-register {
+.as-mandates, .as-agenda, .as-register, .as-list {
   display: grid;
   column-gap: 14px;
   align-items: center;
@@ -862,6 +862,8 @@
 .as-mandates { grid-template-columns: 220px 120px 96px 96px minmax(0, 1fr); }
 .as-agenda { grid-template-columns: 40px minmax(0, 1fr) 160px 160px; }
 .as-register { grid-template-columns: 120px 90px minmax(0, 1fr) 90px minmax(0, 1fr); }
+.as-list { grid-template-columns: 150px minmax(0, 1fr) 220px 90px; }
+.as-list.picked { background: #f4f3ef; }
 .as-facts {
   display: grid;
   gap: 8px;

@@ -22,7 +22,10 @@ type Shown = {
   proxies: Part<Schemas["ProxyView"][]>;
 };
 type Loaded =
-  | { kind: "ok"; entrance: Entrance; mandates: Part<Schemas["StandingMandate"][]>; shown: Shown | null; asked: string | null }
+  | {
+      kind: "ok"; entrance: Entrance; mandates: Part<Schemas["StandingMandate"][]>; shown: Shown | null; asked: string | null;
+      listed: Part<Schemas["AssemblySummaryView"][]>; year: Part<Schemas["HeldInYearView"]>;
+    }
   | Exclude<EntranceAt, { kind: "ok" }>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,8 +34,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * One screen, one server-side aggregation (ADR-011): the entrance's offices in force today and how each stands
  * (identity, PM-GOV-005), and — opened by its link — one assembly: what it is, its agenda, the quorum meter of the
  * sitting it is at (PM-GA-012) and the register and proxies behind it. Every figure is the API's: the page computes
- * no deadline, no share, no threshold and no majority. Each answer fails alone. The API lists no assemblies of an
- * entrance, so the page cannot offer them; it offers convening, which answers with the new assembly's link.
+ * no deadline, no share, no threshold and no majority. Each answer fails alone. The entrance's assemblies are listed
+ * as the API orders them, each a link (PM-GA-002), under whether this year's was held (PM-GA-001) — the year Sofia's
+ * calendar is in; whether it was held is the API's to say.
  */
 async function load(entranceId: string | undefined, assemblyId: string | undefined): Promise<Loaded> {
   const at = await entranceAt(entranceId);
@@ -50,15 +54,20 @@ async function load(entranceId: string | undefined, assemblyId: string | undefin
     ]);
     return { assembly: part(assembly), quorum: part(quorum), attendance: part(attendance), proxies: part(proxies) };
   };
-  const [mandates, shown] = await Promise.all([
+  const year = Number(sofiaTime(new Date().toISOString()).slice(6, 10));   // the calendar year in Sofia (PM-SYS-004), not this server's
+  const [mandates, shown, listed, held] = await Promise.all([
     reach(() => api.GET("/api/identity/entrances/{entranceId}/mandates", { params: { path } })),   // "today" is the api's own: Sofia's, not this server's clock
     asked && UUID.test(asked) ? shownFor(asked) : Promise.resolve(null),
+    reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies", { params: { path } })),
+    reach(() => api.GET("/api/assembly/entrances/{entranceId}/years/{year}", { params: { path: { ...path, year } } })),
   ]);
-  return { kind: "ok", entrance, mandates: part(mandates), shown, asked };
+  return { kind: "ok", entrance, mandates: part(mandates), shown, asked, listed: part(listed), year: part(held) };
 }
 
 // The words for the API's codes. Any code not here is shown as it came, never guessed.
 const OFFICE: Record<string, string> = { MB: "член на управителния съвет", BM: "управител", CTL: "контролен съвет / контрольор", CSH: "касиер" };
+/** Who convened: an office, or the owners on their petition (PM-GA-003). */
+const CONVENED: Record<string, string> = { ...OFFICE, OWNERS: "собствениците по искане" };
 const STATUS: Record<string, { text: string; kind: "calm" | "warn" | "crit" }> = {
   DRAFT: { text: "чернова — поканата не е обявена", kind: "warn" },
   NOTICED: { text: "обявено", kind: "calm" },
@@ -119,7 +128,7 @@ export default async function AssemblyPage({ searchParams }: { searchParams: Pro
 }
 
 function Body({ view }: { view: Extract<Loaded, { kind: "ok" }> }) {
-  const { entrance, mandates, shown, asked } = view;
+  const { entrance, mandates, shown, asked, listed, year } = view;
   return (
     <div style={{ padding: "0 24px 24px" }}>
       <div style={{ margin: "20px 0 0", ...HEADING }}>Управа на входа днес</div>
@@ -142,21 +151,61 @@ function Body({ view }: { view: Extract<Loaded, { kind: "ok" }> }) {
         ))}
       </div>
 
+      <Listed entrance={entrance.id} listed={listed} year={year} asked={asked} />
       {asked && !shown && (
         <div className="as-note" style={FAILED}>„{asked}“ не е събрание — връзката към събранието съдържа неговия идентификатор.</div>
       )}
       {shown && <Assembly shown={shown} />}
-      {!asked && (
-        <div className="as-note" style={DIM}>
-          Системата още не изрежда събранията на входа — събрание се отваря по връзката му. Новото събрание се отваря веднага след свикването.
-        </div>
-      )}
 
       <div style={{ margin: "24px 0 0", ...HEADING }}>Свикване на общо събрание</div>
       <div className="co-card" style={{ marginTop: 12 }}>
         <ConveneForm entrance={entrance.id} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Rule: PM-GA-002 — the entrance's assemblies, as the API orders them (the one meeting latest first), each opening by
+ * its link; above them, whether this year's was held (PM-GA-001), in the API's count against the law's.
+ */
+function Listed({ entrance, listed, year, asked }: {
+  entrance: string; listed: Part<Schemas["AssemblySummaryView"][]>; year: Part<Schemas["HeldInYearView"]>; asked: string | null;
+}) {
+  const link = (id: string) => `/entrance/assembly?entrance=${encodeURIComponent(entrance)}&assembly=${encodeURIComponent(id)}`;
+  return (
+    <>
+      <div style={{ margin: "24px 0 0", ...HEADING }}>Общи събрания на входа</div>
+      <div className="co-card as-facts" style={{ marginTop: 12 }}>
+        {!year.ok ? (
+          <div style={FAILED}>{unanswered(year.by, "дали годишното събрание е проведено")}</div>
+        ) : (
+          <div>
+            <span className="k">През {year.data.year}</span>
+            проведени <b className="mono">{year.data.held}</b> от <b className="mono">{year.data.required}</b> по <span className="mono">{year.data.requiredSource}</span>{" "}
+            <span className={`badge ${year.data.met ? "calm" : "warn"}`}>{year.data.met ? "годишното е проведено" : "годишното не е проведено"}</span>
+            {year.data.firstAssemblyId && year.data.firstHeldOn && (
+              <> · първото — <Link href={link(year.data.firstAssemblyId)}>{date(year.data.firstHeldOn)}</Link></>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="pf-card cp-card" style={{ margin: "12px 0 0" }}>
+        <div className="as-list pf-head"><div>Кога</div><div>Състояние</div><div>Свикано от</div><div></div></div>
+        {!listed.ok && <div className="as-list pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{unanswered(listed.by, "събранията на входа")}</div></div>}
+        {listed.ok && listed.data.length === 0 && (
+          <div className="as-list pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма свикано събрание. Новото се отваря веднага след свикването.</div></div>
+        )}
+        {listed.ok && listed.data.map((a) => (
+          <div key={a.id} className={`as-list pf-row${a.id === asked ? " picked" : ""}`}>
+            <div className="num">{sofiaTime(a.scheduledAt)}</div>
+            <div>{(STATUS[a.status] ?? { text: a.status }).text}</div>
+            <div>{word(CONVENED, a.convenedAs)}</div>
+            <div>{a.id === asked ? <span style={DIM}>отворено</span> : <Link href={link(a.id)}>отвори</Link>}</div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -175,7 +224,7 @@ function Assembly({ shown }: { shown: Shown }) {
         <div><span className="k">Кога</span>{sofiaTime(a.scheduledAt)}</div>
         <div><span className="k">Къде</span>{a.place}</div>
         <div><span className="k">Начин</span>{word(MODE, a.mode)}</div>
-        <div><span className="k">Свикано от</span>{word(OFFICE, a.convenedAs)} · <Party id={a.convenedBy} /></div>
+        <div><span className="k">Свикано от</span>{word(CONVENED, a.convenedAs)} · <Party id={a.convenedBy} /></div>
         <div><span className="k">Покана</span>{a.noticePostedAt ? <>обявена на {sofiaTime(a.noticePostedAt)}</> : <span style={DIM}>не е обявена</span>}</div>
         <div><span className="k">Неотложно</span>{a.urgent ? <>да — {a.urgencyReason ?? <span style={FAILED}>без записана причина</span>}</> : "не"}</div>
       </div>
@@ -223,8 +272,12 @@ function Quorum({ quorum }: { quorum: Shown["quorum"] }) {
               <span className="mono">{quorum.data.thresholdSource}</span>
               {!quorum.data.thresholdVerified && <span style={{ color: "#7A5210" }}> · числото чака потвърждение от юрист</span>} · към {date(quorum.data.weighedOn)}
             </div>
-            {quorum.data.concentratedBy && (
-              <div><span className="k">Концентрация</span><Party id={quorum.data.concentratedBy} /> притежава {quorum.data.concentratedPct}%</div>
+            {quorum.data.concentratedPct && (
+              <div>
+                <span className="k">Концентрация</span>
+                {quorum.data.concentratedBy ? <Party id={quorum.data.concentratedBy} /> : <>един собственик</>} притежава {quorum.data.concentratedPct}%
+                {!quorum.data.concentratedBy && <span style={DIM}> · кой е — виждат управителят, управителният и контролният съвет</span>}
+              </div>
             )}
             {quorum.data.derivedParts && <div style={{ color: "#7A5210" }}>Част от тежестта стои на идеални части, изведени от площта.</div>}
             {quorum.data.cannotWeigh.map((why) => <div key={why} style={FAILED}>Не може да се претегли: {why}</div>)}
