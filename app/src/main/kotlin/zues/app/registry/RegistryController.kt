@@ -204,8 +204,8 @@ class RegistryController(private val registry: RegistryService, private val book
         book.endAnimalStay(entranceId, unitId, animalId, request.on, who.of(signedIn))
 
     @GetMapping("/{entranceId}/units")
-    fun listUnits(@PathVariable entranceId: UUID): List<UnitView> =
-        registry.listUnits(entranceId).map {
+    fun listUnits(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<UnitView> =
+        book.listUnits(entranceId, who.of(signedIn)).map {
             UnitView(it.id, it.designation, it.unitType, it.areaM2, it.idealPartsPct, it.separateEntrance, it.businessUse, it.idealPartsSource)
         }
 

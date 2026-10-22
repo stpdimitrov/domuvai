@@ -75,6 +75,9 @@ enum class Action(val governedBy: String) {
 
     /** the entrance's accounts kept: a charge run issued or previewed, a payment recorded, the fund's account registered, a disbursement signed off, paid or cancelled, a handover statement issued */
     KEEP_ACCOUNTS("PM-SEC-001"),
+
+    /** an entrance's units: their designations, types, areas and ideal parts */
+    READ_UNITS("PM-SEC-001"),
 }
 
 /**
@@ -153,7 +156,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 16
+        const val MATRIX_VERSION = 17
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -244,6 +247,12 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.READ_FUND, Role.OWN, "PM-SEC-002"),
             Permit(Action.KEEP_ACCOUNTS, Role.BM, "PM-SEC-001"),
             Permit(Action.KEEP_ACCOUNTS, Role.MB, "PM-SEC-001"),
+            Permit(Action.READ_UNITS, Role.OWN, "PM-SEC-001"),
+            Permit(Action.READ_UNITS, Role.USR, "PM-SEC-001"),
+            Permit(Action.READ_UNITS, Role.BM, "PM-SEC-001"),
+            Permit(Action.READ_UNITS, Role.MB, "PM-SEC-001"),
+            Permit(Action.READ_UNITS, Role.CTL, "PM-SEC-001"),
+            Permit(Action.READ_UNITS, Role.CSH, "PM-SEC-001"),
         )
     }
 }

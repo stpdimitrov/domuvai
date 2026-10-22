@@ -33,7 +33,7 @@ RUNNING = {
    ('Add units with their ideal parts — declared, or derived from area and marked DERIVED — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403',
     ['PM-ORG-002', 'PM-ORG-003', 'PM-ORG-009', 'PM-BOOK-005']),
  ('get', '/api/registry/entrances/{entranceId}/units'):
-   ('List the units of an entrance', ['PM-ORG-001', 'PM-ORG-002', 'PM-ORG-003']),
+   ('List the units of an entrance — for anyone holding a role in it: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-ORG-001', 'PM-ORG-002', 'PM-ORG-003', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household'):
    ("Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403", ['PM-FEE-005', 'PM-FEE-008', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals'):

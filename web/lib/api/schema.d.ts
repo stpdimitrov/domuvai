@@ -902,7 +902,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the units of an entrance */
+        /** List the units of an entrance — for anyone holding a role in it: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
         get: operations["get_registry_entrances_entranceId_units"];
         put?: never;
         /** Add units with their ideal parts — declared, or derived from area and marked DERIVED — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */

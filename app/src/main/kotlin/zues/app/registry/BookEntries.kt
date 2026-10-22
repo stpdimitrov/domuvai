@@ -60,11 +60,20 @@ class BookEntries(
     fun endAnimalStay(entranceId: UUID, unitId: UUID, animalId: UUID, on: String, who: Asking): StayEnded =
         entered(entranceId, who) { LocalDate.parse(on).let { day -> registry.endAnimalStay(entranceId, unitId, animalId, day).let { StayEnded(it.id, it.validFrom, day) } } }
 
-    private fun <T> entered(entranceId: UUID, who: Asking, entry: () -> T): T {
+    /**
+     * An entrance's units, read by anyone holding a role in it — an owner, a holder of use, the manager, the board, the
+     * controller, the cashier (the owner's decision of 2026-10-21, #251) — and decided before the list is read.
+     */
+    // Rule: PM-SEC-001
+    fun listUnits(entranceId: UUID, who: Asking): List<PropertyUnit> = decided(Action.READ_UNITS, entranceId, who) { registry.listUnits(entranceId) }
+
+    private fun <T> entered(entranceId: UUID, who: Asking, entry: () -> T): T = decided(Action.ENTER_BOOK, entranceId, who, entry)
+
+    private fun <T> decided(action: Action, entranceId: UUID, who: Asking, then: () -> T): T {
         if (!(open && who.login == null && who.party == null)) {
-            val decision = policy.decide(who, Action.ENTER_BOOK, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(clock.instant())))
+            val decision = policy.decide(who, action, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(clock.instant())))
             if (!decision.allowed) throw BookReadForbidden(decision.ruleId)
         }
-        return entry()
+        return then()
     }
 }
