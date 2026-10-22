@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **80** (34%) |
-| Remaining | **153** |
+| Proved by a test named after the rule | **81** (35%) |
+| Remaining | **152** |
 | Proposed slices at ~10 rules each | **19** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,13 +51,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-60 rule(s) remaining across 7 slice(s).
+59 rule(s) remaining across 7 slice(s).
 
-### S-G2-01 · `assembly` · GA · 10 rule(s)
+### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-GA-001` | MUST | If no GA is held by 31 December, a red compliance flag is raised on 1 January. |
 | `PM-GA-017` | MUST | Only agenda items tagged `ABSENTEE_ELIGIBLE` accept post-meeting ballots; the tally reopens until day 7. |
 | `PM-GA-018` | MUST | A plain portal click is rejected unless a QES is attached. |
 | `PM-GA-019` | MUST | Day 8 without minutes raises an overdue compliance task. |
@@ -67,12 +66,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GA-023` | MUST | Decision shows a countdown; after 30 days status becomes `FINAL`. |
 | `PM-GA-024` | MUST | Litigation flag does not pause the execution clock; a court stay does. |
 | `PM-GA-025` | MUST | Every decision creates an execution task with a computed due date. |
+| `PM-VOTE-001` | MUST | An unbound item cannot be put to a vote. |
 
 ### S-G2-02 · `assembly` · VOTE · 10 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-VOTE-001` | MUST | An unbound item cannot be put to a vote. |
 | `PM-VOTE-002` | MUST | An item with no explicit threshold resolves to >50% of represented ideal parts and states the denominator used. |
 | `PM-VOTE-003` | MUST | Item type `EXTENSION` cannot pass at 99.9%. |
 | `PM-VOTE-005` | MUST | An item typed USEFUL_EXPENSE or CREDIT fails at 74.9% and passes at 75%. |
@@ -82,12 +81,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-VOTE-009` | MUST | A standing authorisation with a monetary cap unlocks the manager's emergency-spend path. |
 | `PM-VOTE-010` | MUST | Each is a distinct agenda item type. |
 | `PM-VOTE-011` | MUST | Result line reads e.g. "62.41% of 78.10% represented; threshold 51% of total — NOT PASSED". |
+| `PM-VOTE-012` | MUST | Explicit `denominator` field per majority rule: `TOTAL` or `REPRESENTED`. |
 
-### S-G2-03 · `assembly` · GA · VOTE · 8 rule(s) · ⚠ 1 unconfirmed
+### S-G2-03 · `assembly` · GA · VOTE · 7 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-VOTE-012` | MUST | Explicit `denominator` field per majority rule: `TOTAL` or `REPRESENTED`. |
 | `PM-VOTE-013` | MUST | Provisional result is labelled `PROVISIONAL` until day 7 closes. |
 | `PM-VOTE-014` | MUST NOT | Vote records are append-only. |
 | `PM-VOTE-016` | MUST | Reproducible from the audit trail years later. |
