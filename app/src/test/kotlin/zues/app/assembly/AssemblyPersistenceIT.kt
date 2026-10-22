@@ -158,6 +158,26 @@ class AssemblyPersistenceIT {
     }
 
     @Test
+    fun `PM-GOV-004 an assembly a controller convened is carried on by the controller elected on or after their term ended - not by one in office beside them`() {
+        val entranceId = entrance()
+        val base = "/api/assembly/entrances/$entranceId/assemblies"
+        val id = created(base, convening(manager(entranceId))).get("id").asText()
+        val convenor = manager(entranceId, body = "CTL", from = -400, to = -10)      // the controller who convened; their term ended ten days ago
+        jdbc.update(
+            "UPDATE assembly.assembly SET convened_by = ?, convened_as = 'CTL', convened_login_subject = ? WHERE id = ?::uuid",
+            convenor, "login-$convenor", id,
+        )
+        val beside = manager(entranceId, body = "CTL", from = -200, to = 300)       // a controller since before the convenor's term ended
+        val elected = manager(entranceId, body = "CTL", from = -10, to = 300)       // elected on the day it ended: the successor (#241)
+        val item = """{"text":"Отчет на контрольора","itemType":"GENERAL"}"""
+        for (who in listOf(convenor, beside)) {
+            signedIn(who) { mvc.perform(post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content(item)).andExpect(status().isForbidden) }
+        }
+        signedIn(elected) { created("$base/$id/agenda", item) }
+        assertThat(read(base, id).get("agenda").map { it.get("text").asText() }).containsExactly("Отчет на контрольора")
+    }
+
+    @Test
     fun `PM-GA-005 the justification of an urgent assembly is stored, and the database refuses urgency without one`() {
         val entranceId = entrance()
         val convenor = manager(entranceId)
