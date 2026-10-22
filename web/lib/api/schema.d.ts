@@ -29,7 +29,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read an assembly with its agenda */
+        /** Read an assembly with its agenda — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId"];
         put?: never;
         post?: never;
@@ -63,7 +63,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the register of the sitting — each line, whether it counts, and whom it makes present */
+        /** Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
         put?: never;
         /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly */
@@ -115,7 +115,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the proxies registered for an assembly */
+        /** List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         put?: never;
         /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown */
@@ -133,7 +133,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far */
+        /** The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. Who owns the share behind a higher quorum is named to the manager, the board and the controller only */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_quorum"];
         put?: never;
         post?: never;
@@ -252,7 +252,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first */
+        /** Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first — read as an assembly is */
         get: operations["get_assembly_entrances_entranceId_years_year"];
         put?: never;
         post?: never;
@@ -3287,6 +3287,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

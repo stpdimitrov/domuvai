@@ -55,7 +55,7 @@ private const val API = "domuvai-api"
  * Proves a sitting is weighed and opened by whoever runs the assembly, signed in, and by nobody else; the meter is read.
  */
 @WebMvcTest(SittingController::class, properties = ["domuvai.auth.issuer-uri=$REALM", "domuvai.auth.audience=$API", "domuvai.auth.mode="])
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class)
 class SittingWebTest {
 
     companion object {
@@ -143,7 +143,7 @@ class SittingWebTest {
     }
 
     @Test
-    fun `PM-GA-012 the meter is read by anybody signed in - what is represented against the threshold and its source, and why it cannot be weighed`() {
+    fun `PM-GA-012 the meter is read by an owner - what is represented against the threshold and its source, and why it cannot be weighed`() {
         person("login-owner-2", Role.OWN)
         val quorum = Quorum(
             LocalDate.parse("2026-10-09"), BigDecimal("50.9900000000"), BigDecimal("51"), "чл. 15 ал. 1 ЗУЕС", true, "GA_QUORUM_PCT@2009-01-01",
@@ -160,6 +160,36 @@ class SittingWebTest {
             .andExpect(jsonPath("$.cannotWeigh[0]").value("unit X has both an owner and a holder of a right of use"))
             .andExpect(jsonPath("$.derivedParts").value(true))
             .andExpect(jsonPath("$.sittings").isEmpty)
+    }
+
+    @Test
+    fun `PM-SEC-002 who holds the share behind a higher quorum is named to the manager, the board and the controller - to an owner, a holder of use and the cashier only how much`() {
+        val concentrated = UUID.randomUUID()
+        val quorum = Quorum(
+            LocalDate.parse("2026-10-09"), BigDecimal("80"), BigDecimal("75"), "чл. 15 ал. 4 ЗУЕС", true, "GA_QUORUM_CONCENTRATED_PCT@2009-01-01",
+            emptyList(), false, "basis", concentratedBy = concentrated, concentratedPct = BigDecimal("60.5000000000"),
+        )
+        whenever(sittings.read(entranceId, assemblyId)).thenReturn(QuorumRead(quorum, emptyList(), 1, Instant.parse("2026-10-09T08:00:00Z")))
+        for ((n, role) in listOf(Role.BM, Role.MB, Role.CTL).withIndex()) {
+            person("login-office-$n", role)
+            mvc.perform(get("$base/quorum").by("login-office-$n")).andExpect(status().isOk)
+                .andExpect(jsonPath("$.concentratedBy").value(concentrated.toString())).andExpect(jsonPath("$.concentratedPct").value("60.5"))
+        }
+        for ((n, role) in listOf(Role.OWN, Role.USR, Role.CSH).withIndex()) {
+            person("login-reader-$n", role)
+            mvc.perform(get("$base/quorum").by("login-reader-$n")).andExpect(status().isOk)
+                .andExpect(jsonPath("$.concentratedBy").doesNotExist()).andExpect(jsonPath("$.concentratedPct").value("60.5")).andExpect(jsonPath("$.thresholdPct").value("75"))
+        }
+    }
+
+    @Test
+    fun `PM-SEC-001 the meter is read by those holding a role in the entrance - a stranger and a login tied to nobody are a 403 naming the rule, and nothing is weighed`() {
+        person("login-stranger-4")
+        person("login-occupant-4", Role.OCC)
+        for (subject in listOf("login-stranger-4", "login-occupant-4", "login-tied-to-nobody")) {
+            mvc.perform(get("$base/quorum").by(subject)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+        }
+        verifyNoInteractions(sittings)
     }
 
     @Test

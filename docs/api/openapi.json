@@ -3463,7 +3463,8 @@
           "assembly"
         ],
         "x-rules": [
-          "PM-GA-002"
+          "PM-GA-002",
+          "PM-SEC-001"
         ]
       },
       "post": {
@@ -3678,13 +3679,14 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Read an assembly with its agenda",
+        "summary": "Read an assembly with its agenda — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-002",
-          "PM-GA-005"
+          "PM-GA-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -3899,13 +3901,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Read the register of the sitting — each line, whether it counts, and whom it makes present",
+        "summary": "Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-012",
-          "PM-GA-016"
+          "PM-GA-016",
+          "PM-SEC-001"
         ]
       },
       "post": {
@@ -4333,12 +4336,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the proxies registered for an assembly",
+        "summary": "List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
         "tags": [
           "assembly"
         ],
         "x-rules": [
-          "PM-GA-009"
+          "PM-GA-009",
+          "PM-SEC-001"
         ]
       },
       "post": {
@@ -4510,7 +4514,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far",
+        "summary": "The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. Who owns the share behind a higher quorum is named to the manager, the board and the controller only",
         "tags": [
           "assembly"
         ],
@@ -4520,7 +4524,9 @@
           "PM-GA-014",
           "PM-GA-015",
           "PM-ORG-005",
-          "PM-ORG-011"
+          "PM-ORG-011",
+          "PM-SEC-001",
+          "PM-SEC-002"
         ]
       }
     },
@@ -5179,6 +5185,19 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -5193,12 +5212,13 @@
             "description": "Not Found"
           }
         },
-        "summary": "Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first",
+        "summary": "Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first — read as an assembly is",
         "tags": [
           "assembly"
         ],
         "x-rules": [
-          "PM-GA-001"
+          "PM-GA-001",
+          "PM-SEC-001"
         ]
       }
     },

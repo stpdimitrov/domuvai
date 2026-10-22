@@ -78,6 +78,12 @@ enum class Action(val governedBy: String) {
 
     /** an entrance's units: their designations, types, areas and ideal parts */
     READ_UNITS("PM-SEC-001"),
+
+    /** an entrance's assemblies: their list, one with its agenda, its quorum meter, its register, its proxies, whether a year's was held */
+    READ_ASSEMBLY("PM-SEC-001"),
+
+    /** who holds more than the law's share of an entrance's ideal parts, behind a higher quorum — another person's holding */
+    READ_CONCENTRATION("PM-SEC-002"),
 }
 
 /**
@@ -156,7 +162,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 17
+        const val MATRIX_VERSION = 18
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -253,6 +259,15 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.READ_UNITS, Role.MB, "PM-SEC-001"),
             Permit(Action.READ_UNITS, Role.CTL, "PM-SEC-001"),
             Permit(Action.READ_UNITS, Role.CSH, "PM-SEC-001"),
+            Permit(Action.READ_ASSEMBLY, Role.OWN, "PM-SEC-002"),
+            Permit(Action.READ_ASSEMBLY, Role.USR, "PM-SEC-001"),
+            Permit(Action.READ_ASSEMBLY, Role.BM, "PM-SEC-001"),
+            Permit(Action.READ_ASSEMBLY, Role.MB, "PM-SEC-001"),
+            Permit(Action.READ_ASSEMBLY, Role.CTL, "PM-GOV-008"),
+            Permit(Action.READ_ASSEMBLY, Role.CSH, "PM-SEC-001"),
+            Permit(Action.READ_CONCENTRATION, Role.BM, "PM-SEC-001"),
+            Permit(Action.READ_CONCENTRATION, Role.MB, "PM-SEC-001"),
+            Permit(Action.READ_CONCENTRATION, Role.CTL, "PM-GOV-008"),
         )
     }
 }

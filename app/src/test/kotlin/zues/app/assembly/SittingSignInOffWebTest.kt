@@ -32,7 +32,7 @@ import java.util.UUID
  * source of roles that would make anybody everything; the meter is still read.
  */
 @WebMvcTest(SittingController::class)
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class, SittingSignInOffWebTest.Generous::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class, SittingSignInOffWebTest.Generous::class)
 class SittingSignInOffWebTest {
 
     class Generous {

@@ -47,11 +47,12 @@ data class AppointProxyRequest(
  * Proxies for a general assembly (PM-GA-009, PM-GA-010). A proxy is appointed by the one it represents, signed in —
  * an owner or a holder of use in the entrance today — or recorded by whoever runs the assembly from a written
  * authorisation they were handed, with the document's SHA-256 (PM-SEC-001). Anybody else naming a principal is a 403.
+ * The proxies are read as the assembly is.
  * A body that cannot be read is a 400 for anyone.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies")
-class ProxyController(private val acts: AssemblyActs, private val proxies: ProxyService, private val who: WhoAsks) {
+class ProxyController(private val acts: AssemblyActs, private val proxies: ProxyService, private val reads: AssemblyReads, private val who: WhoAsks) {
 
     // Rule: PM-GA-009
     // Rule: PM-SEC-001
@@ -61,9 +62,12 @@ class ProxyController(private val acts: AssemblyActs, private val proxies: Proxy
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: AppointProxyRequest, signedIn: JwtAuthenticationToken?,
     ): ProxyView = view(acts.registerProxy(who.of(signedIn), entranceId, assemblyId, request))
 
+    // Rule: PM-SEC-001
     @GetMapping
-    fun list(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): List<ProxyView> =
-        proxies.forAssembly(entranceId, assemblyId).map(::view)
+    fun list(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, signedIn: JwtAuthenticationToken?): List<ProxyView> {
+        reads.require(entranceId, who.of(signedIn))
+        return proxies.forAssembly(entranceId, assemblyId).map(::view)
+    }
 
     private fun view(p: Proxy) = ProxyView(
         p.id, p.principalPartyId, p.agentPartyId, p.agentKind, p.scope,

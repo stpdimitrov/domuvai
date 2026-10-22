@@ -30,7 +30,7 @@ import java.util.UUID
  * nobody is represented — even under a source of roles that would make anybody an owner; the list is still read.
  */
 @WebMvcTest(ProxyController::class)
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class, ProxySignInOffWebTest.Generous::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class, ProxySignInOffWebTest.Generous::class)
 class ProxySignInOffWebTest {
 
     class Generous {

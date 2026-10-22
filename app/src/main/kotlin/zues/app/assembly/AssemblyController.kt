@@ -77,11 +77,12 @@ data class AssemblySummaryView(val id: UUID, val status: String, val scheduledAt
 /**
  * Convening a general assembly, its agenda and its notice (PM-GA-002, PM-GA-004 … PM-GA-007, PM-VOTE-004). Who acts is
  * the party the sign-in is tied to — never a field of the request — and the policy says whether they may (PM-SEC-001):
- * anybody else is a 403 naming the rule. A body that cannot be read is a 400 for anyone.
+ * anybody else is a 403 naming the rule. An assembly is read by anyone holding a role in its entrance, and by nobody
+ * else. A body that cannot be read is a 400 for anyone.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies")
-class AssemblyController(private val acts: AssemblyActs, private val assemblies: AssemblyService, private val who: WhoAsks) {
+class AssemblyController(private val acts: AssemblyActs, private val assemblies: AssemblyService, private val reads: AssemblyReads, private val who: WhoAsks) {
 
     // Rule: PM-GA-002
     // Rule: PM-SEC-001
@@ -119,15 +120,21 @@ class AssemblyController(private val acts: AssemblyActs, private val assemblies:
             NoticePostingView(it.id, it.postedAt, it.convenorPartyId, it.coSignatoryPartyId, it.photoHash, it.statedScheduledAt, it.statedPlace, it.statedAgenda)
         }
 
-    /** An entrance's assemblies, the one meeting latest first: enough to find one and open it. */
+    /** An entrance's assemblies, the one meeting latest first: enough to find one and open it — for anyone holding a role in it. */
     // Rule: PM-GA-002
+    // Rule: PM-SEC-001
     @GetMapping
-    fun list(@PathVariable entranceId: UUID): List<AssemblySummaryView> =
-        assemblies.list(entranceId).map { AssemblySummaryView(it.id, it.status, it.scheduledAt, it.convenedAs) }
+    fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<AssemblySummaryView> {
+        reads.require(entranceId, who.of(signedIn))
+        return assemblies.list(entranceId).map { AssemblySummaryView(it.id, it.status, it.scheduledAt, it.convenedAs) }
+    }
 
+    // Rule: PM-SEC-001
     @GetMapping("/{assemblyId}")
-    fun read(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): AssemblyView =
-        assemblies.read(entranceId, assemblyId).let { (assembly, agenda) -> view(assembly, agenda) }
+    fun read(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, signedIn: JwtAuthenticationToken?): AssemblyView {
+        reads.require(entranceId, who.of(signedIn))
+        return assemblies.read(entranceId, assemblyId).let { (assembly, agenda) -> view(assembly, agenda) }
+    }
 
     private fun view(a: Assembly, agenda: List<AgendaItem>) = AssemblyView(
         a.id, a.entranceId, a.convenedBy, a.convenedAs, a.scheduledAt, a.place, a.mode, a.status, a.urgent, a.urgencyReason, a.noticePostedAt,
