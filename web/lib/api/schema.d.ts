@@ -11,7 +11,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List an entrance's assemblies, the one meeting latest first — each one's status, hour and the capacity it was convened in, read as one assembly is */
+        get: operations["get_assembly_entrances_entranceId_assemblies"];
         put?: never;
         /** Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked */
         post: operations["post_assembly_entrances_entranceId_assemblies"];
@@ -1068,6 +1069,14 @@ export interface components {
             principalPartyId?: string;
             scope: string;
         };
+        AssemblySummaryView: {
+            convenedAs: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            scheduledAt: string;
+            status: string;
+        };
         AssemblyView: {
             agenda: components["schemas"]["AgendaItemView"][];
             convenedAs: string;
@@ -2023,6 +2032,83 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_assembly_entrances_entranceId_assemblies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssemblySummaryView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     post_assembly_entrances_entranceId_assemblies: {
         parameters: {
             query?: never;

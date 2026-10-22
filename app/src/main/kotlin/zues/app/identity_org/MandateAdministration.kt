@@ -139,9 +139,10 @@ class MandateAdministration(
 ) {
     /**
      * Records a mandate, and ends the ones it succeeds on its first day (Rule: PM-GOV-004 — the incumbent continues
-     * until a successor). Which those are is [Mandate.succeeds]' to say: a manager succeeds every open executive
-     * mandate before it; a board member an earlier manager, and earlier board members whose own dates have run out —
-     * never a fellow member still in term.
+     * until a successor). Which those are is [Mandate.succeeds]' to say, among the manager and the board only: a manager
+     * succeeds every open executive mandate before it; a board member an earlier manager, and earlier board members whose
+     * own dates have run out — never a fellow member still in term. A controller ends nobody: a controller does not
+     * continue, so their end is the one on record.
      */
     // Rule: PM-SEC-001
     // Rule: PM-GOV-004

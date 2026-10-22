@@ -156,4 +156,20 @@ class SuccessionTest {
         assertThat(succession.successorsOf(ivan, block, Role.BM, day("2022-06-01")).map { it.partyId }).containsExactly(maria)
         assertThat(succession.successorsOf(ivan, block, Role.BM, day("2023-06-01"))).isEmpty()     // the office is empty that day
     }
+
+    @Test
+    fun `PM-GOV-007 the controller who took a controller's place is named — nobody while the first sits, nor a controller seated beside them`() {
+        val first = mandate("CTL", ivan, "2024-01-01", "2026-01-01")
+        val next = mandate("CTL", maria, "2026-01-01", "2028-01-01")
+        record(first, next)
+        assertThat(succession.successorsOf(ivan, block, Role.CTL, day("2025-06-01"))).isEmpty()
+        assertThat(succession.successorsOf(ivan, block, Role.CTL, day("2026-06-01"))).containsExactly(Successor(maria, Role.CTL, next.id, day("2026-01-01")))
+        assertThat(succession.hasSucceeded(maria, ivan, block, Role.CTL, day("2026-06-01"))).isTrue()
+        // a controller elected while the first still sat holds a seat beside them, and takes nobody's place
+        record(first, mandate("CTL", petar, "2025-06-01", "2027-06-01"))
+        assertThat(succession.successorsOf(ivan, block, Role.CTL, day("2026-02-01"))).isEmpty()
+        // a manager is nobody's controller
+        record(first, mandate("BM", elena, "2026-01-01", "2028-01-01"))
+        assertThat(succession.successorsOf(ivan, block, Role.CTL, day("2026-06-01"))).isEmpty()
+    }
 }

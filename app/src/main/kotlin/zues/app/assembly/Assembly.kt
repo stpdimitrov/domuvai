@@ -61,6 +61,8 @@ interface AssemblyRepository : ListCrudRepository<Assembly, UUID> {
     fun lock(id: UUID, entranceId: UUID): Assembly?
 
     fun findByPetitionId(petitionId: UUID): Assembly?
+
+    fun findByEntranceIdOrderByScheduledAtDescIdAsc(entranceId: UUID): List<Assembly>
 }
 
 interface AgendaItemRepository : ListCrudRepository<AgendaItem, UUID> {
