@@ -24,6 +24,7 @@ class PaymentWebTest {
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var payments: PaymentService
+    @MockitoBean lateinit var access: MoneyAccess
     @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()

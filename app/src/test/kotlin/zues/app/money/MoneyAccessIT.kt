@@ -177,4 +177,30 @@ class MoneyAccessIT {
             mvc.perform(get(headcount).by(nobody)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-006"))
         }
     }
+
+    @Test
+    fun `PM-SEC-001 the entrance's accounts are kept by its manager and its board — the controller, the cashier and an owner are refused`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 11", "А", "GA")).entranceId
+        val (flat1) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "k-owner"), "OWN", validFrom = "2020-01-01"))
+        mandate(entrance, "BM", person("Мария Иванова", "k-manager"))
+        mandate(entrance, "MB", person("Петър Колев", "k-board"))
+        mandate(entrance, "CTL", person("Елена Колева", "k-controller"))
+        mandate(entrance, "CSH", person("Стефан Илиев", "k-cashier"))
+        val run = json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000))))
+        fun issue() = post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(run)
+        fun pay(key: String) = post("/api/money/entrances/$entrance/payments").header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON)
+            .content("""{"unitId":"$flat1","amountMinor":1000,"valueDate":"2026-05-20","receivedInto":"CASH"}""")
+        fun account() = post("/api/money/entrances/$entrance/fund-accounts").contentType(MediaType.APPLICATION_JSON)
+            .content("""{"iban":"BG80BNBG96611020345678","purpose":"REPAIR_RENEWAL","holderName":"Мария Иванова","holderKind":"MANAGER"}""")
+
+        for (nobody in listOf("k-controller", "k-cashier", "k-owner", "a-login-tied-to-nobody")) {
+            mvc.perform(issue().by(nobody)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+            mvc.perform(pay("k-$nobody").by(nobody)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+            mvc.perform(account().by(nobody)).andExpect(status().isForbidden)
+        }
+        mvc.perform(issue().by("k-manager")).andExpect(status().isCreated)
+        mvc.perform(pay("k-1").by("k-board")).andExpect(status().isCreated)
+        mvc.perform(account().by("k-board")).andExpect(status().isCreated)
+    }
 }

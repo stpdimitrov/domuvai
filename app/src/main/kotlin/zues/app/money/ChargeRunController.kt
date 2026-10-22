@@ -1,12 +1,14 @@
 package zues.app.money
 
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 
 /**
  * The money module's charge-run calculator. Stateless: it computes a run and returns it —
@@ -16,12 +18,14 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 @RequestMapping("/api/money/charge-runs")
-class ChargeRunController {
+class ChargeRunController(private val access: MoneyAccess, private val who: WhoAsks) {
 
     /** Compute the charges for a period without storing them — a live "what would this bill?". */
     @PostMapping("/preview")
-    fun preview(@RequestBody request: ChargeRunRequest): ChargeRunResponse =
-        ChargeCalculator.run(request)
+    fun preview(@RequestBody request: ChargeRunRequest, signedIn: JwtAuthenticationToken?): ChargeRunResponse {
+        access.keep(request.entranceId, who.of(signedIn))                       // the entrance the run is for
+        return ChargeCalculator.run(request)
+    }
 
     /**
      * The engine rejects an unlawful run by throwing — a tariff line with no GA decision

@@ -40,8 +40,10 @@ class FundHandoverController(private val handovers: FundHandoverService, private
         @PathVariable entranceId: UUID,
         @RequestHeader("Idempotency-Key") idempotencyKey: String,
         @RequestBody request: IssueHandoverRequest,
-    ): HandoverStatementView =
-        handovers.issue(
+        signedIn: JwtAuthenticationToken?,
+    ): HandoverStatementView {
+        access.keep(entranceId, who.of(signedIn))
+        return handovers.issue(
             entranceId, idempotencyKey,
             IssueHandover(
                 LocalDate.parse(request.handoverOn), request.from?.let(LocalDate::parse),
@@ -49,6 +51,7 @@ class FundHandoverController(private val handovers: FundHandoverService, private
                 requireNotNull(request.bankBalanceMinor) { "bankBalanceMinor is the balance on the bank's own statement for the handover date — required" },
             ),
         )
+    }
 
     @GetMapping
     fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<HandoverStatementView> {

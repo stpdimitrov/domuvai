@@ -45,13 +45,16 @@ class FundAccountController(private val fund: FundAccountService, private val ac
     fun register(
         @PathVariable entranceId: UUID,
         @RequestBody request: RegisterFundAccountRequest,
-    ): FundAccountRegistered =
-        fund.register(
+        signedIn: JwtAuthenticationToken?,
+    ): FundAccountRegistered {
+        access.keep(entranceId, who.of(signedIn))
+        return fund.register(
             entranceId,
             RegisterFundAccount(
                 request.iban, request.purpose, request.holderName, request.holderKind, request.holderPartyId,
             ),
         )
+    }
 
     @GetMapping
     fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<FundAccountView> {

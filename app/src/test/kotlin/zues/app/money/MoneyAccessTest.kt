@@ -133,4 +133,37 @@ class MoneyAccessTest {
         refusedBy("PM-SEC-002") { access.fund(entrance, Asking(null, null)) }
         refusedBy("PM-BOOK-006") { access.book(entrance, Asking(null, null)) }
     }
+
+    private fun keepingRefused(block: () -> Unit) =
+        assertThatThrownBy(block).isInstanceOfSatisfying(MoneyWriteForbidden::class.java) { assert(it.ruleId == "PM-SEC-001") { it.ruleId } }
+
+    @Test
+    fun `PM-SEC-001 the entrance's accounts are kept by its manager and its board`() {
+        for (office in listOf(Role.BM, Role.MB)) {
+            val who = person(Held(office, entrance))
+            assertThatCode { access.keep(entrance, who); access.keep(entrance.toString(), who) }.describedAs("$office").doesNotThrowAnyException()
+        }
+    }
+
+    @Test
+    fun `PM-SEC-001 nobody else keeps them — not the controller, the cashier, an owner, a holder of use, an occupant, a firm's staff, nor an office elsewhere`() {
+        for (role in listOf(Role.CTL, Role.CSH, Role.OWN, Role.USR, Role.OCC, Role.PMC_STAFF, Role.MUN)) {
+            val who = person(Held(role, entrance, setOf(flat1)))
+            keepingRefused { access.keep(entrance, who) }
+            keepingRefused { access.keep(entrance.toString(), who) }
+        }
+        keepingRefused { access.keep(entrance, person(Held(Role.BM, UUID.randomUUID()))) }
+        keepingRefused { access.keep(entrance, Asking(Login("https://id.example.test", "nobody-in-the-book"), null)) }
+    }
+
+    @Test
+    fun `PM-SEC-001 a run previewed for a body that names no entrance is kept by nobody — not even a manager`() {
+        keepingRefused { access.keep("entrance-1", person(Held(Role.BM, entrance))) }
+    }
+
+    @Test
+    fun `with sign-in switched off the accounts are kept as before — any label previewed — and refused to nobody when it is on`() {
+        assertThatCode { open.keep(entrance, Asking(null, null)); open.keep("entrance-1", Asking(null, null)) }.doesNotThrowAnyException()
+        keepingRefused { access.keep(entrance, Asking(null, null)) }
+    }
 }

@@ -21,6 +21,8 @@ class ChargeRunStoreWebTest {
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var store: ChargeRunStore
+    @MockitoBean lateinit var access: MoneyAccess
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
     private val body = StoredChargeRunRequest(

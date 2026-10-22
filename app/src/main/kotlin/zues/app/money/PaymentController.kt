@@ -19,12 +19,12 @@ import java.util.UUID
 /**
  * Records a payment for a unit and reads back how it was allocated (Rule: PM-DEBT-008). The
  * `Idempotency-Key` makes a retry safe: the same key returns the payment already recorded, with
- * the same response. Reading one back is for those who may read its unit's charges (Rule: PM-SEC-002); recording is
- * not yet guarded (ADR-002, #164).
+ * the same response. Reading one back is for those who may read its unit's charges (Rule: PM-SEC-002); recording one is
+ * for the manager and the board (Rule: PM-SEC-001).
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/payments")
-class PaymentController(private val payments: PaymentService, private val who: WhoAsks) {
+class PaymentController(private val payments: PaymentService, private val access: MoneyAccess, private val who: WhoAsks) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -32,7 +32,11 @@ class PaymentController(private val payments: PaymentService, private val who: W
         @PathVariable entranceId: UUID,
         @RequestHeader("Idempotency-Key") idempotencyKey: String,
         @RequestBody request: RecordPaymentRequest,
-    ): PaymentView = payments.record(entranceId, idempotencyKey, request)
+        signedIn: JwtAuthenticationToken?,
+    ): PaymentView {
+        access.keep(entranceId, who.of(signedIn))
+        return payments.record(entranceId, idempotencyKey, request)
+    }
 
     @GetMapping("/{paymentId}")
     fun find(@PathVariable entranceId: UUID, @PathVariable paymentId: UUID, signedIn: JwtAuthenticationToken?): PaymentView =

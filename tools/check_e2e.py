@@ -81,6 +81,8 @@ ON_AN_ASSEMBLY = {
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
+# The calls that keep an entrance's accounts — for the manager and the board only (G-3, PM-SEC-001).
+KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/preview")}
 CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
@@ -504,7 +506,7 @@ def charges_multiple(api, web):
     if not entrance:
         return [f"PM-FEE-010: the seed's business entrance ({BUSINESS_LABEL}) is not registered — nothing was checked"]
     body = {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}
-    preview = lambda extra: fetch(api, f"/api/money/entrances/{entrance}/charge-runs/preview", {**body, **extra})
+    preview = lambda extra: fetch(api, f"/api/money/entrances/{entrance}/charge-runs/preview", {**body, **extra}, headers=as_board())
     previews = {m: preview({"businessMultiplier": m}) for m in range(1, 10)}
     accepted = {m: json.loads(raw) for m, (status, raw) in previews.items() if status == 200}
     refused = {m: json.loads(raw).get("error", "") for m, (status, raw) in previews.items() if status == 400}
@@ -621,6 +623,13 @@ def demo_request(web, without_address, contact, next_dir):
 # What this check holds once it is signed in: per server, the headers its requests carry — the session cookie for the
 # web, a bearer for the api. Never printed.
 CARRIED = {}
+
+
+def as_board():
+    """G-3 (PM-SEC-001): an entrance's accounts — a charge run previewed or issued — are kept by its manager or its board,
+    so the check keeps them with the board's token (E2E_MANAGER_TOKEN); its own is the controller's. None with no sign-in."""
+    manager = os.environ.get("E2E_MANAGER_TOKEN")
+    return {"Authorization": f"Bearer {manager}"} if manager else None
 
 
 def fetch(base, url, body=None, method=None, headers=None):
@@ -898,7 +907,11 @@ def main():
         if path in ("/api/identity/me", "/api/identity/entrances/{entranceId}/mandates") and api not in CARRIED:
             print(f"—   {method:4} {path}  NOT checked: it answers only a request with a token, and this run has none")
             continue
-        status, raw = fetch(api, url, body)
+        board = as_board() if (method, path) in KEPT_BY_THE_BOARD else None
+        if board:                                       # the check's own token is the controller's: refused (G-3, PM-SEC-001)
+            refused, _ = fetch(api, url, body)
+            failures += [] if refused == 403 else [f"{method} {path}: the controller kept the accounts (HTTP {refused}), not refused (PM-SEC-001)"]
+        status, raw = fetch(api, url, body, headers=board)
         if status not in (200, 201):
             failures.append(f"{method} {path}: HTTP {status} {raw[:200]}")
             continue

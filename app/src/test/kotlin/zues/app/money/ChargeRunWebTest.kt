@@ -20,6 +20,9 @@ class ChargeRunWebTest {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean lateinit var access: MoneyAccess
+    @org.springframework.test.context.bean.override.mockito.MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
+
     private val validRequest = ChargeRunRequest(
         entranceId = "entrance-1", period = "2026-05", legalDate = "2026-05-01",
         lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", decisionId = "GA-2026-1", rateMinor = 500)),

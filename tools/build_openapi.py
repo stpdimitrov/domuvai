@@ -127,12 +127,12 @@ RUNNING = {
  # ---- money
  ('post', '/api/money/charge-runs/preview'):
    ('Compute a charge run from a stated basis, metered consumption included — nothing is stored',
-    ['PM-FEE-001', 'PM-FEE-010', 'PM-FEE-012', 'PM-FEE-017', 'PM-ORG-002']),
+    ['PM-FEE-001', 'PM-FEE-010', 'PM-FEE-012', 'PM-FEE-017', 'PM-ORG-002', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/charge-runs/preview'):
-   ("Compute a charge run from the entrance's registered units and the stated meter readings — nothing is stored", ['PM-FEE-001', 'PM-FEE-014', 'PM-FEE-017']),
+   ("Compute a charge run from the entrance's registered units and the stated meter readings — nothing is stored", ['PM-FEE-001', 'PM-FEE-014', 'PM-FEE-017', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/charge-runs'):
    ('Issue a charge run — stored with its basis, meter readings included, never altered afterwards',
-    ['PM-FEE-012', 'PM-FEE-014', 'PM-FEE-015', 'PM-FEE-016', 'PM-FEE-017']),
+    ['PM-FEE-012', 'PM-FEE-014', 'PM-FEE-015', 'PM-FEE-016', 'PM-FEE-017', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/charge-runs/{period}/headcount'):
    ("The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed; for the book's readers", ['PM-BOOK-012', 'PM-BOOK-006']),
  ('get', '/api/money/units/{unitId}/statement'):
@@ -143,7 +143,7 @@ RUNNING = {
    ("The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day "
     "its oldest open debt fell due — and their total", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/fund-accounts'):
-   ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005']),
+   ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/journal'):
@@ -157,22 +157,22 @@ RUNNING = {
    ('The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance', ['PM-FUND-004', 'PM-FUND-009', 'PM-GOV-008', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements'):
    ('Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two',
-    ['PM-FUND-006', 'PM-FUND-007', 'PM-FUND-008']),
+    ['PM-FUND-006', 'PM-FUND-007', 'PM-FUND-008', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay'):
    ("Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account",
-    ['PM-FUND-007', 'PM-FUND-009']),
+    ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel'):
-   ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason", ['PM-FUND-007', 'PM-FUND-009']),
+   ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason", ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/handover-statements'):
    ("Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash",
-    ['PM-FUND-010']),
+    ['PM-FUND-010', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund/handover-statements'):
    ("The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is", ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/fund/handover-statements/{statementId}'):
    ('A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is', ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/payments'):
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
-    ['PM-DEBT-008']),
+    ['PM-DEBT-008', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/payments/{paymentId}'):
    ("A payment's allocation — the rule applied and what each debt received", ['PM-DEBT-008', 'PM-SEC-002']),
  # ---- intake

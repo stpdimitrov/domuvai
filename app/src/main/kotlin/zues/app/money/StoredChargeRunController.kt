@@ -1,6 +1,7 @@
 package zues.app.money
 
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import java.util.UUID
 
 /**
@@ -16,13 +18,17 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/charge-runs")
-class StoredChargeRunController(private val service: ChargeRunService) {
+class StoredChargeRunController(private val service: ChargeRunService, private val access: MoneyAccess, private val who: WhoAsks) {
 
     @PostMapping("/preview")
     fun preview(
         @PathVariable entranceId: UUID,
         @RequestBody request: StoredChargeRunRequest,
-    ): ChargeRunResponse = service.preview(entranceId, request)
+        signedIn: JwtAuthenticationToken?,
+    ): ChargeRunResponse {
+        access.keep(entranceId, who.of(signedIn))
+        return service.preview(entranceId, request)
+    }
 
     /** An unlawful run, an unknown allocation key, or PER_PERSON before occupancy exists → 400. */
     @ExceptionHandler(IllegalStateException::class, IllegalArgumentException::class)
