@@ -53,6 +53,7 @@ data class Sitting(
 
 interface SittingRepository : ListCrudRepository<Sitting, UUID> {
     fun findByAssemblyIdOrderBySessionNo(assemblyId: UUID): List<Sitting>
+    fun findByEntranceIdAndQuorumMetTrue(entranceId: UUID): List<Sitting>
 }
 
 /**

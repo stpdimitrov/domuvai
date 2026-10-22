@@ -104,6 +104,8 @@ RUNNING = {
     ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies'):
    ('List an entrance\'s assemblies, the one meeting latest first — each one\'s status, hour and the capacity it was convened in, read as one assembly is', ['PM-GA-002']),
+ ('get', '/api/assembly/entrances/{entranceId}/years/{year}'):
+   ('Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first', ['PM-GA-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda', ['PM-GA-002', 'PM-GA-005']),
  # ---- identity

@@ -168,6 +168,15 @@ class SittingPersistenceIT {
         assertThat(sitting.get("weighedBy").asText()).isEqualTo("$manager")
         assertThat(sitting.hasNonNull("openedAt")).isTrue()
         assertThat(jdbc.queryForObject("SELECT status FROM assembly.assembly WHERE entrance_id = ?", String::class.java, entranceId)).isEqualTo("OPEN")
+        // PM-GA-001: this year's assembly is held, and it is this one
+        val year = json.readTree(mvc.perform(get("/api/assembly/entrances/$entranceId/years/${toSofiaDate(Instant.now()).take(4)}")).andExpect(status().isOk).andReturn().response.contentAsString)
+        assertThat(year.get("held").asInt()).isEqualTo(1)
+        assertThat(year.get("met").asBoolean()).isTrue()
+        assertThat(year.get("firstAssemblyId").asText()).isEqualTo(base.substringAfterLast("/"))
+        val thisYear = toSofiaDate(Instant.now()).take(4)
+        val elsewhere = json.readTree(mvc.perform(get("/api/assembly/entrances/${entrance()}/years/$thisYear")).andExpect(status().isOk).andReturn().response.contentAsString)
+        assertThat(elsewhere.get("held").asInt()).isZero()                           // another entrance's sitting is not its own
+        mvc.perform(get("/api/assembly/entrances/$entranceId/years/1900")).andExpect(status().isNotFound)   // no law in force that year
         open(base).andExpect(status().isConflict)                                    // once
         assertThat(meter(base).get("sittings")).hasSize(1)
         present(base, vera).andExpect(status().isCreated)                            // the register goes on being kept in an open sitting
@@ -206,6 +215,10 @@ class SittingPersistenceIT {
         assertThat(sitting.get("quorumMet").asBoolean()).isFalse()
         assertThat(sitting.hasNonNull("openedAt")).isFalse()
         assertThat(jdbc.queryForObject("SELECT status FROM assembly.assembly WHERE entrance_id = ?", String::class.java, entranceId)).isEqualTo("NOTICED")
+        // PM-GA-001: a sitting weighed short holds no assembly
+        val year = json.readTree(mvc.perform(get("/api/assembly/entrances/$entranceId/years/${toSofiaDate(Instant.now()).take(4)}")).andExpect(status().isOk).andReturn().response.contentAsString)
+        assertThat(year.get("held").asInt()).isZero()
+        assertThat(year.get("met").asBoolean()).isFalse()
         open(base).andExpect(status().isConflict)
         assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.session WHERE entrance_id = ?", Int::class.java, entranceId)).isEqualTo(1)
     }
