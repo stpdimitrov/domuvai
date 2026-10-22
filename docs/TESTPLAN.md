@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **81** (35%) |
-| Remaining | **152** |
+| Proved by a test named after the rule | **84** (36%) |
+| Remaining | **149** |
 | Proposed slices at ~10 rules each | **19** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-59 rule(s) remaining across 7 slice(s).
+56 rule(s) remaining across 7 slice(s).
 
 ### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s)
 
@@ -95,16 +95,13 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GA-026` | SHOULD | Zero re-keying between notice and protocol. |
 | `PM-VOTE-015` | SHOULD | Debt does not disable the ballot; it may be displayed as context. |
 
-### S-G2-04 · `evidence` · DOC · 9 rule(s)
+### S-G2-04 · `evidence` · DOC · 6 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-DOC-001` | MUST | Re-upload creates a new version; nothing is overwritten. |
-| `PM-DOC-002` | MUST | Untyped uploads are not accepted for statutory slots. |
 | `PM-DOC-003` | MUST | Signature requirements adapt to the governance configuration. |
 | `PM-DOC-004` | MUST | Validation blocks submission with missing elements. |
 | `PM-DOC-005` | MUST | Retention policy per document kind, configurable. |
-| `PM-DOC-007` | MUST | Archive location is a mandatory field on protocols. |
 | `PM-DOC-009` | MUST | The original bytes are what a court sees; the resized copy is only for the screen. |
 | `PM-DOC-006` | SHOULD | "Export case file" for arrears or expulsion. |
 | `PM-DOC-008` | SHOULD | Signature validity report is stored at signing time, not recomputed later. |
