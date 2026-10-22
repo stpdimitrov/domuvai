@@ -35,11 +35,21 @@ data class Mandate(
      * it: a board is several seats, and a member elected while another's term runs succeeds nobody (the owner's
      * decision, 2026-10-11). A firm's mandate counts as a board member's does. A successor that has itself ended, or
      * names no party, is a successor still: the office passed on the day it began.
+     *
+     * A controller succeeds an earlier controller as a board member does a fellow member — on or after the day that
+     * one's term ends — since a control board is several seats too (PM-GOV-007; the owner's decision of 2026-10-21 that
+     * a later controller succeeds the earlier, read by the board's seat rule). No office crosses between the executive
+     * and the controller, and the cashier succeeds nobody. This names who took a controller's place, and changes nothing
+     * about continuing: a controller does not continue past their dates ([inForceOn]).
      */
     // Rule: PM-GOV-004
+    // Rule: PM-GOV-007
     fun succeeds(earlier: Mandate): Boolean =
-        entranceId == earlier.entranceId && executive && earlier.executive && validFrom.isAfter(earlier.validFrom) &&
-            (body == MANAGER || earlier.body == MANAGER || !validFrom.isBefore(earlier.validTo))
+        entranceId == earlier.entranceId && validFrom.isAfter(earlier.validFrom) && when {
+            executive && earlier.executive -> body == MANAGER || earlier.body == MANAGER || !validFrom.isBefore(earlier.validTo)
+            body == CONTROLLER && earlier.body == CONTROLLER -> !validFrom.isBefore(earlier.validTo)
+            else -> false
+        }
 
     /**
      * Whether the mandate counts on [date], given every mandate of its entrance. It runs from `validFrom` up to and not
@@ -99,6 +109,7 @@ data class Mandate(
         val CONTINUING = setOf(Role.BM, Role.MB)
         val EXECUTIVE = setOf("BM", "MB", "PMC")
         const val MANAGER = "BM"
+        const val CONTROLLER = "CTL"
     }
 }
 

@@ -145,7 +145,13 @@ class MandateTest {
         for (office in listOf("CTL", "CSH")) {
             assertThat(later(office, "2026-03-01").succeeds(earlier("BM"))).isFalse()
             assertThat(later("BM", "2026-03-01").succeeds(earlier(office))).isFalse()
+            assertThat(later("MB", "2026-03-01").succeeds(earlier(office))).isFalse()
+            assertThat(later("PMC", "2026-03-01").succeeds(earlier(office))).isFalse()
         }
+        for (executive in listOf("BM", "MB", "PMC")) assertThat(later("CTL", "2026-03-01").succeeds(earlier(executive))).isFalse()
+        assertThat(later("CTL", "2026-03-01").succeeds(earlier("CSH"))).isFalse()
+        assertThat(later("CSH", "2026-03-01").succeeds(earlier("CTL"))).isFalse()
+        assertThat(later("CSH", "2026-03-01").succeeds(earlier("CSH"))).isFalse()                  // the cashier: nobody decided
     }
 
     @Test
@@ -153,5 +159,20 @@ class MandateTest {
         assertThat(listOf("BM", "MB", "CTL", "CSH").map { mandate(it).role }).containsExactly(Role.BM, Role.MB, Role.CTL, Role.CSH)
         assertThat(mandate("PMC").role).isNull()
         assertThat(mandate("PMC").inForceOn(to)).isFalse()                              // and it does not continue either
+    }
+
+    @Test
+    fun `PM-GOV-007 a controller succeeds an earlier one from the day that one's term ends — a control board is several seats, as the board is`() {
+        val first = mandate("CTL", from = day("2024-01-01"), to = day("2026-01-01"))
+        assertThat(mandate("CTL", from = day("2026-01-01"), to = day("2028-01-01")).succeeds(first)).isTrue()
+        assertThat(mandate("CTL", from = day("2026-04-01"), to = day("2028-04-01")).succeeds(first)).isTrue()   // after a gap
+        assertThat(mandate("CTL", from = day("2025-03-01"), to = day("2027-03-01")).succeeds(first)).isFalse()  // elected while the first sat: a seat beside them
+        assertThat(mandate("CTL", from = day("2024-01-01"), to = day("2026-01-01")).succeeds(first)).isFalse()  // the same day
+        assertThat(mandate("CTL", from = day("2023-01-01"), to = day("2025-01-01")).succeeds(first)).isFalse()  // before
+        assertThat(mandate("CTL", from = day("2026-01-01"), to = day("2028-01-01"), at = UUID.randomUUID()).succeeds(first)).isFalse()
+        assertThat(first.succeeds(mandate("BM", from = day("2022-01-01"), to = day("2024-01-01")))).isFalse()
+        // and nothing about continuing changes: a controller is not in force past their dates, successor or none
+        assertThat(first.inForceOn(day("2026-01-01"), listOf(first))).isFalse()
+        assertThat(first.inForceOn(day("2025-12-31"), listOf(first, mandate("CTL", from = day("2025-03-01"), to = day("2027-03-01"))))).isTrue()   // a later controller ends nobody within their dates
     }
 }

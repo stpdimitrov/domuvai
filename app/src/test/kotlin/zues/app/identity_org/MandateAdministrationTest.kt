@@ -124,6 +124,15 @@ class MandateAdministrationTest {
     }
 
     @Test
+    fun `PM-GOV-007 recording a controller ends nobody — not the controller before them, whose end is a recorded one`() {
+        val sitting = held("CTL", "2025-05-10", "2027-05-10")
+        val ranOut = held("CTL", "2024-01-01", "2026-01-01")
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(ranOut, sitting))
+        assertThat((administration.record(operator, entrance, aMandate("CTL")) as MandateAnswer.Done).value.succeeded).isEmpty()
+        verify(store, never()).end(any(), any())
+    }
+
+    @Test
     fun `PM-GOV-004 a new board member ends an earlier manager, and board members whose dates have run out — never a fellow member still in term`() {
         // the new member's first day is 2026-05-10
         val oldManager = held("BM", "2024-01-01", "2026-01-01")
