@@ -83,6 +83,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var proxies: ProxyService
     @MockitoBean lateinit var sittings: SittingService
     @MockitoBean lateinit var imports: ImportService
+    @MockitoBean lateinit var importGuard: zues.app.intake.ImportGuard
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var loginAdministration: LoginAdministration
     @MockitoBean lateinit var mandateAdministration: MandateAdministration

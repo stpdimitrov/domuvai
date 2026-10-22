@@ -21,7 +21,10 @@ import java.util.UUID
  * surfaces as 409, not 400. The adoption itself is proved by the Docker-gated IT.
  */
 @WebMvcTest(ImportController::class)
+@org.springframework.context.annotation.Import(ImportGuard::class, zues.app.identity_org.WhoAsks::class, zues.app.policy.Policy::class, IntakeTestClock::class)
 class ImportCommitWebTest {
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean lateinit var logins: zues.app.identity_org.Logins
 
     @Autowired lateinit var mvc: MockMvc
 
@@ -51,7 +54,21 @@ class ImportCommitWebTest {
     }
 
     @Test
+    fun `with sign-in switched off nobody is asking — the body says who commits and who reverts, and one that says nobody is a 400`() {
+        whenever(imports.find(importId)).thenReturn(ImportRow(importId, UUID.randomUUID(), "REPRODUCED", "sha", 2, 0, 0))
+        val stated = UUID.randomUUID()
+        whenever(imports.commit(eq(importId), any(), any())).thenReturn(CommitResult(importId, 2, 0, emptyList()))
+        mvc.perform(post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON)
+            .content(commitBody.replace(Regex("\"committedBy\":\"[^\"]+\""), "\"committedBy\":\"$stated\""))).andExpect(status().is2xxSuccessful)
+        org.mockito.kotlin.verify(imports).commit(eq(importId), eq(stated), any())
+        mvc.perform(post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON)
+            .content("""{"sheet":{"period":"2026-05","legalDate":"2026-05-01","lines":[],"csv":"designation,ideal_parts,occupants,fee_minor"}}""")).andExpect(status().isBadRequest)
+        mvc.perform(post("/api/intake/imports/$importId/revert").contentType(MediaType.APPLICATION_JSON).content("""{"reason":"x"}""")).andExpect(status().isBadRequest)
+    }
+
+    @Test
     fun `committing an import in the wrong state is a 409`() {
+        whenever(imports.find(importId)).thenReturn(ImportRow(importId, UUID.randomUUID(), "NEEDS_REVIEW", "sha", 2, 1, 0))
         whenever(imports.commit(any(), any(), any())).thenThrow(ImportStateException("import is NEEDS_REVIEW"))
         mvc.perform(post("/api/intake/imports/$importId/commit").contentType(MediaType.APPLICATION_JSON).content(commitBody))
             .andExpect(status().isConflict)

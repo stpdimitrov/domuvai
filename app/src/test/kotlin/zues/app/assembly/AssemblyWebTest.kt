@@ -31,6 +31,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.IssuerKeys
 import zues.app.identity_org.Logins
+import zues.app.identity_org.Succession
+import zues.app.identity_org.Successor
 import zues.app.identity_org.WhoAsks
 import zues.app.policy.Held
 import zues.app.policy.Policy
@@ -92,6 +94,7 @@ class AssemblyWebTest {
     @MockitoBean lateinit var attendance: AttendanceService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var succession: Succession
 
     private val at = Instant.parse("2026-11-20T17:00:00Z")
     private val base = "/api/assembly/entrances/$entranceId/assemblies"
@@ -217,6 +220,9 @@ class AssemblyWebTest {
         verifyNoInteractions(assemblies, notices)
 
         held[manager] = setOf(Role.CTL)                                               // the convenor is the manager no more — the controller now, another office
+        // holding the office today is not enough: only who has succeeded the convenor in it, as identity_org reads it
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-successor").content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-002"))
+        whenever(succession.successorsOf(manager, entranceId, Role.BM, LocalDate.parse("2026-10-09"))).thenReturn(listOf(Successor(successor, Role.BM, UUID.randomUUID(), LocalDate.parse("2026-10-09"))))
         val majority = MajorityRule("GENERAL", "50", Comparison.MORE_THAN, Denominator.REPRESENTED, "2009-01-01", "чл. 17 ЗУЕС", true, "PM-VOTE-002")
         whenever(assemblies.addAgendaItem(entranceId, assembly.id, "Отчет", "GENERAL"))
             .thenReturn(AgendaItemBound(AgendaItem(UUID.randomUUID(), entranceId, assembly.id, 1, "Отчет", "GENERAL", majority.id), majority, false))
@@ -237,10 +243,32 @@ class AssemblyWebTest {
     }
 
     @Test
+    fun `PM-GOV-004 who carries on a convened assembly is who succeeded its convenor - another holder of the office today does not, and with no successor nobody does`() {
+        val assembly = stored(draft(manager, "BM"))
+        held[manager] = emptySet()                                                    // the convenor has left the office
+        val agenda = """{"text":"Отчет","itemType":"GENERAL"}"""
+        val beside = person("login-beside", Role.BM)                                 // holds the office today, but took nobody's place on record
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-beside").content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-002"))
+        verify(succession).successorsOf(manager, entranceId, Role.BM, LocalDate.parse("2026-10-09"))
+        // succeeded in the office, but holding another today: an office runs only what it convened
+        val moved = person("login-moved", Role.CTL)
+        whenever(succession.successorsOf(manager, entranceId, Role.BM, LocalDate.parse("2026-10-09"))).thenReturn(listOf(Successor(moved, Role.CTL, UUID.randomUUID(), LocalDate.parse("2026-10-09"))))
+        mvc.perform(post("$base/${assembly.id}/agenda").by("login-moved").content(agenda)).andExpect(status().isForbidden)
+        // a board member alongside the convenor who later became manager too: succeeded as manager, not on the board
+        val promoted = person("login-promoted", Role.MB, Role.BM)
+        val boardAssembly = stored(draft(manager, "MB"))
+        held[manager] = emptySet()
+        whenever(succession.successorsOf(manager, entranceId, Role.MB, LocalDate.parse("2026-10-09"))).thenReturn(listOf(Successor(promoted, Role.BM, UUID.randomUUID(), LocalDate.parse("2026-10-09"))))
+        mvc.perform(post("$base/${boardAssembly.id}/agenda").by("login-promoted").content(agenda)).andExpect(status().isForbidden)
+        verifyNoInteractions(assemblies)
+    }
+
+    @Test
     fun `PM-GA-007 whoever signs the posting act held the office on the day of posting - a successor does not certify a posting from before their time`() {
         val assembly = stored(draft(manager, "BM"))
         held[manager] = emptySet()
         val newcomer = person("login-newcomer", Role.BM).also { since[it] = LocalDate.parse("2026-10-09") }       // in office from today
+        whenever(succession.successorsOf(manager, entranceId, Role.BM, LocalDate.parse("2026-10-09"))).thenReturn(listOf(Successor(newcomer, Role.BM, UUID.randomUUID(), LocalDate.parse("2026-10-09"))))
         val photo = "ab".repeat(32)
         fun posting(at: Instant) = """{"postedAt":"$at","coSignatoryPartyId":"$owner","photoHash":"$photo"}"""
         val yesterday = Instant.parse("2026-10-08T08:00:00Z")

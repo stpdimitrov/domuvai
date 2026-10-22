@@ -339,7 +339,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Dry-run a fee sheet — recompute every bill and compare it with the sheet's own figures */
+        /** Dry-run a fee sheet — recompute every bill and compare it with the sheet's own figures — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise) */
         post: operations["post_intake_entrances_entranceId_fee_sheet_dry_run"];
         delete?: never;
         options?: never;
@@ -356,7 +356,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Profile a sheet's columns — propose a mapping onto the domain fields, to confirm */
+        /** Profile a sheet's columns — propose a mapping onto the domain fields, to confirm — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise) */
         post: operations["post_intake_entrances_entranceId_fee_sheet_profile"];
         delete?: never;
         options?: never;
@@ -373,7 +373,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a source-file import: run the dry-run and store its verdict and content hash */
+        /** Record a source-file import: run the dry-run and store its verdict and content hash — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise) */
         post: operations["post_intake_entrances_entranceId_imports"];
         delete?: never;
         options?: never;
@@ -388,7 +388,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why */
+        /** Read an import record — its verdict, content hash and, when a commit or a revert was blocked, why — by the manager or the board of the entrance, as the sign-in says who is asking (403 otherwise) */
         get: operations["get_intake_imports_id"];
         put?: never;
         post?: never;
@@ -407,7 +407,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ask for a reviewed import to be committed into the registry — units, households and owners; answers COMMITTING, and the record then reads COMMITTED or COMMIT_BLOCKED; what needs a declaration is returned for a person to record, never adopted */
+        /** Ask for a reviewed import to be committed into the registry, by the manager or the board of the entrance of the import — the record names the party of the sign-in — units, households and owners; answers COMMITTING, and the record then reads COMMITTED or COMMIT_BLOCKED; what needs a declaration is returned for a person to record, never adopted */
         post: operations["post_intake_imports_id_commit"];
         delete?: never;
         options?: never;
@@ -424,7 +424,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ask for a committed import to be reverted wholesale, with its reason — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED */
+        /** Ask for a committed import to be reverted wholesale, with its reason, by the manager or the board of the entrance of the import — the record names the party of the sign-in — answers REVERTING; the record then reads REVERTED or REVERT_BLOCKED */
         post: operations["post_intake_imports_id_revert"];
         delete?: never;
         options?: never;
@@ -1212,7 +1212,7 @@ export interface components {
         };
         CommitRequest: {
             /** Format: uuid */
-            committedBy: string;
+            committedBy?: string;
             sheet: components["schemas"]["FeeSheetDryRunRequest"];
         };
         CommitResult: {
@@ -1833,7 +1833,7 @@ export interface components {
         RevertRequest: {
             reason: string;
             /** Format: uuid */
-            revertedBy: string;
+            revertedBy?: string;
         };
         SittingView: {
             basisHash: string;
@@ -3525,6 +3525,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
         };
     };
     post_intake_entrances_entranceId_fee_sheet_profile: {
@@ -3562,6 +3573,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
         };
     };
     post_intake_entrances_entranceId_imports: {
@@ -3590,6 +3612,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3645,6 +3678,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3713,6 +3757,17 @@ export interface operations {
                     };
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3763,6 +3818,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

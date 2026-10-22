@@ -430,7 +430,7 @@ class SittingServiceTest {
     }
 
     @Test
-    fun `PM-GA-015 the higher quorum holds at every sitting - the postponed one and the following day's too, pending counsel`() {
+    fun `PM-GA-015 the higher quorum holds at the first and the postponed sittings - the following day's opens at any share`() {
         val big = owner("60")
         owner("40")
         present(big)
@@ -440,8 +440,9 @@ class SittingServiceTest {
         assertThat(second.quorumMet).isFalse()
         present(big, sitting = 3)
         val third = service(meets.plusSeconds(86_400)).open(entranceId, assembly.id, keeper)
-        assertThat(third.thresholdPct).isEqualByComparingTo("75")
-        assertThat(third.quorumMet).isFalse()
+        assertThat(third.thresholdPct).isEqualByComparingTo("0")                     // the owner's decision (Q4c): PM-GA-014 as it reads
+        assertThat(third.thresholdConstant).startsWith("GA_LAST_SITTING_QUORUM_PCT@")
+        assertThat(third.quorumMet).isTrue()                                         // the owner of more than half cannot keep it from being held
     }
 
     @Test
@@ -475,5 +476,22 @@ class SittingServiceTest {
         present(owner("51"))
         owner("49")
         assertThat(service().open(entranceId, assembly.id, keeper).basis.lines().first()).contains("no owner over 51% at the notice on 2026-11-10")
+    }
+
+    @Test
+    fun `PM-GA-014 the following day's sitting is held at any share even when the concentration at the notice could not be told - and says the raise is not applied`() {
+        val unit = UUID.randomUUID()
+        owner("60", unit = unit)
+        owner("60", unit = unit)                                                     // booked twice over at the notice
+        overHeld += unit
+        val p = owner("40")
+        present(p)
+        assertThatThrownBy { service().open(entranceId, assembly.id, keeper) }.isInstanceOf(QuorumNotWeighable::class.java)   // the first: unknowable
+        stored += Sitting(UUID.randomUUID(), entranceId, assembly.id, 1, null, BigDecimal.ZERO, false, meets, sittingDay, BigDecimal("75"), "c", true, "b", "ab".repeat(32), "v", "e", keeper.party, keeper.loginIssuer, keeper.loginSubject)
+        stored += stored.last().copy(id = UUID.randomUUID(), sessionNo = 2, weighedAt = meets.plusSeconds(postponed))
+        present(p, sitting = 3)                                                      // the double booking still stands: only the raise is unknowable, and it is not applied
+        val third = service(meets.plusSeconds(86_400)).open(entranceId, assembly.id, keeper)
+        assertThat(third.quorumMet).isTrue()
+        assertThat(third.thresholdPct).isEqualByComparingTo("0")
     }
 }
