@@ -61,6 +61,22 @@ class MoneyAccess(
         require(Action.READ_ENTRANCE_ARREARS, Resource.OfEntrance(entranceId), who)
     }
 
+    /**
+     * Rule: PM-SEC-002 — an entrance's fund, its accounts, its handover statements and its operating account: reports of
+     * the condominium, read by the manager and the board (PM-SEC-001: by their role, in their entrance), the controller
+     * (PM-GOV-008) and the entrance's owners (the owner's decision of 2026-10-21).
+     */
+    fun fund(entranceId: UUID, who: Asking) {
+        if (unasked(who)) return
+        require(Action.READ_FUND, Resource.OfEntrance(entranceId), who)
+    }
+
+    /** Rule: PM-BOOK-006 — what the book declares of each unit's persons, beside what a period billed: read as the book is. */
+    fun book(entranceId: UUID, who: Asking) {
+        if (unasked(who)) return
+        require(Action.READ_BOOK, Resource.OfEntrance(entranceId), who)
+    }
+
     private fun unasked(who: Asking) = open && who.login == null && who.party == null
 
     private fun require(action: Action, resource: Resource, who: Asking) {
@@ -75,5 +91,12 @@ class MoneyRefusals {
     @ExceptionHandler(MoneyReadForbidden::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onForbidden(e: MoneyReadForbidden): Map<String, String> =
-        mapOf("error" to "a unit's charges are for its owner, the manager, the board and the controller; an entrance's arrears for the manager, the board and the controller", "rule" to e.ruleId)
+        mapOf("error" to (REFUSED[e.ruleId] ?: REFUSED.getValue("PM-SEC-002")), "rule" to e.ruleId)
+
+    private companion object {
+        val REFUSED = mapOf(
+            "PM-SEC-002" to "a unit's charges are for its owner, the manager, the board and the controller; an entrance's arrears for the manager, the board and the controller; its fund for those and its owners",
+            "PM-BOOK-006" to "what the book declares of a unit's persons is for the manager, the board and the controller",
+        )
+    }
 }

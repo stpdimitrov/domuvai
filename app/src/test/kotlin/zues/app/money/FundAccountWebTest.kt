@@ -21,6 +21,8 @@ class FundAccountWebTest {
     @Autowired lateinit var json: ObjectMapper
 
     @MockitoBean lateinit var fund: FundAccountService
+    @MockitoBean lateinit var access: MoneyAccess
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
     private val body = RegisterFundAccountRequest("BG80BNBG96611020345678", "REPAIR_RENEWAL", "Иван Петров", "MANAGER")

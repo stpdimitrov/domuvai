@@ -33,6 +33,8 @@ class WireFormatTest {
     @Autowired lateinit var shared: ObjectMapper
     @Autowired lateinit var adapter: RequestMappingHandlerAdapter
     @MockitoBean lateinit var fund: FundService
+    @MockitoBean lateinit var access: zues.app.money.MoneyAccess
+    @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val open = DisbursementView(UUID.randomUUID(), 20_000, "WORKS", "GA-2026-7", null, null, UUID.randomUUID(), "COMMITTED", LocalDate.parse("2026-09-30"))
 

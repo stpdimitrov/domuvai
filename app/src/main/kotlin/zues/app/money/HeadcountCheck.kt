@@ -2,6 +2,7 @@ package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.WhoAsks
 import zues.app.registry.Units
 import java.time.LocalDate
 import java.util.UUID
@@ -88,10 +90,13 @@ class HeadcountCheckService(
 /** The period's headcount exception report (Rule: PM-BOOK-012) — a read; it changes nothing. */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/charge-runs/{period}/headcount")
-class HeadcountCheckController(private val headcount: HeadcountCheckService) {
+class HeadcountCheckController(private val headcount: HeadcountCheckService, private val access: MoneyAccess, private val who: WhoAsks) {
 
     @GetMapping
-    fun check(@PathVariable entranceId: UUID, @PathVariable period: String): HeadcountCheck = headcount.check(entranceId, period)
+    fun check(@PathVariable entranceId: UUID, @PathVariable period: String, signedIn: JwtAuthenticationToken?): HeadcountCheck {
+        access.book(entranceId, who.of(signedIn))
+        return headcount.check(entranceId, period)
+    }
 
     /** No run issued for the period, or no such entrance → 404. */
     @ExceptionHandler(NoSuchElementException::class)
