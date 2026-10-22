@@ -18,6 +18,9 @@ import java.util.UUID
 /** A read of money's personal data the policy refuses — a 403, naming the rule (ADR-002). */
 class MoneyReadForbidden(val ruleId: String) : RuntimeException("refused by $ruleId")
 
+/** A write to an entrance's accounts the policy refuses — a 403, naming the rule (ADR-002). */
+class MoneyWriteForbidden(val ruleId: String) : RuntimeException("refused by $ruleId")
+
 /**
  * Who may read money's personal data (Rule: PM-SEC-002, ADR-002): asked of the policy as at today in Sofia, for the
  * person the sign-in says is asking — never a parameter. A unit's entrance is money's own record of it, stamped on every
@@ -77,6 +80,26 @@ class MoneyAccess(
         require(Action.READ_BOOK, Resource.OfEntrance(entranceId), who)
     }
 
+    /**
+     * Rule: PM-SEC-001 — the entrance's accounts are kept by the manager and the board (the owner's decision of
+     * 2026-10-21, #250): a charge run issued or previewed, a payment recorded, the fund's account registered, a
+     * disbursement signed off, paid or cancelled, a handover statement issued. Asked before anything is read or written.
+     */
+    fun keep(entranceId: UUID, who: Asking) {
+        if (unasked(who)) return
+        val decision = policy.decide(who, Action.KEEP_ACCOUNTS, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(clock.instant())))
+        if (!decision.allowed) throw MoneyWriteForbidden(decision.ruleId)
+    }
+
+    /**
+     * Rule: PM-SEC-001 — a run previewed from a stated basis, for the entrance its body names. With somebody asking, a
+     * body that names no entrance is kept by nobody: there is nothing to decide on, so it is refused.
+     */
+    fun keep(entranceNamed: String, who: Asking) {
+        if (unasked(who)) return
+        keep(runCatching { UUID.fromString(entranceNamed) }.getOrNull() ?: throw MoneyWriteForbidden(Action.KEEP_ACCOUNTS.governedBy), who)
+    }
+
     private fun unasked(who: Asking) = open && who.login == null && who.party == null
 
     private fun require(action: Action, resource: Resource, who: Asking) {
@@ -92,6 +115,11 @@ class MoneyRefusals {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onForbidden(e: MoneyReadForbidden): Map<String, String> =
         mapOf("error" to (REFUSED[e.ruleId] ?: REFUSED.getValue("PM-SEC-002")), "rule" to e.ruleId)
+
+    @ExceptionHandler(MoneyWriteForbidden::class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    fun onWriteForbidden(e: MoneyWriteForbidden): Map<String, String> =
+        mapOf("error" to "an entrance's accounts are kept by its manager and its board", "rule" to e.ruleId)
 
     private companion object {
         val REFUSED = mapOf(

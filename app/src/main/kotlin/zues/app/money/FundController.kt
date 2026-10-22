@@ -55,30 +55,39 @@ class FundController(private val fund: FundService, private val access: MoneyAcc
         @PathVariable entranceId: UUID,
         @RequestHeader("Idempotency-Key") idempotencyKey: String,
         @RequestBody request: CommitDisbursementRequest,
-    ): DisbursementView =
-        fund.commit(
+        signedIn: JwtAuthenticationToken?,
+    ): DisbursementView {
+        access.keep(entranceId, who.of(signedIn))
+        return fund.commit(
             entranceId, idempotencyKey,
             CommitDisbursement(
                 request.amountMinor, request.purpose, request.authorisedBy,
                 request.decisionId, request.emergencyJustification, request.passportMeasure,
             ),
         )
+    }
 
     @PostMapping("/disbursements/{disbursementId}/pay")
     fun pay(
         @PathVariable entranceId: UUID, @PathVariable disbursementId: UUID,
         @RequestHeader("Idempotency-Key") idempotencyKey: String,
         @RequestBody request: PayDisbursementRequest,
-    ): DisbursementView =
-        fund.pay(entranceId, disbursementId, idempotencyKey, PayDisbursement(LocalDate.parse(request.paidOn), request.paidBy))
+        signedIn: JwtAuthenticationToken?,
+    ): DisbursementView {
+        access.keep(entranceId, who.of(signedIn))
+        return fund.pay(entranceId, disbursementId, idempotencyKey, PayDisbursement(LocalDate.parse(request.paidOn), request.paidBy))
+    }
 
     @PostMapping("/disbursements/{disbursementId}/cancel")
     fun cancel(
         @PathVariable entranceId: UUID, @PathVariable disbursementId: UUID,
         @RequestHeader("Idempotency-Key") idempotencyKey: String,
         @RequestBody request: CancelDisbursementRequest,
-    ): DisbursementView =
-        fund.cancel(entranceId, disbursementId, idempotencyKey, CancelDisbursement(request.cancelledBy, request.reason))
+        signedIn: JwtAuthenticationToken?,
+    ): DisbursementView {
+        access.keep(entranceId, who.of(signedIn))
+        return fund.cancel(entranceId, disbursementId, idempotencyKey, CancelDisbursement(request.cancelledBy, request.reason))
+    }
 
     /** An unknown purpose, a missing basis, measure or reason, a date out of bounds, or a party who does not hold the account → 400. */
     @ExceptionHandler(IllegalArgumentException::class)

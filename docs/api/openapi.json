@@ -6308,7 +6308,8 @@
           "PM-FEE-010",
           "PM-FEE-012",
           "PM-FEE-017",
-          "PM-ORG-002"
+          "PM-ORG-002",
+          "PM-SEC-001"
         ]
       }
     },
@@ -6480,7 +6481,8 @@
           "PM-FEE-014",
           "PM-FEE-015",
           "PM-FEE-016",
-          "PM-FEE-017"
+          "PM-FEE-017",
+          "PM-SEC-001"
         ]
       }
     },
@@ -6566,7 +6568,8 @@
         "x-rules": [
           "PM-FEE-001",
           "PM-FEE-014",
-          "PM-FEE-017"
+          "PM-FEE-017",
+          "PM-SEC-001"
         ]
       }
     },
@@ -6891,7 +6894,8 @@
         "x-rules": [
           "PM-FUND-001",
           "PM-FUND-004",
-          "PM-FUND-005"
+          "PM-FUND-005",
+          "PM-SEC-001"
         ]
       }
     },
@@ -6998,7 +7002,8 @@
         "x-rules": [
           "PM-FUND-006",
           "PM-FUND-007",
-          "PM-FUND-008"
+          "PM-FUND-008",
+          "PM-SEC-001"
         ]
       }
     },
@@ -7113,7 +7118,8 @@
         ],
         "x-rules": [
           "PM-FUND-007",
-          "PM-FUND-009"
+          "PM-FUND-009",
+          "PM-SEC-001"
         ]
       }
     },
@@ -7228,7 +7234,8 @@
         ],
         "x-rules": [
           "PM-FUND-007",
-          "PM-FUND-009"
+          "PM-FUND-009",
+          "PM-SEC-001"
         ]
       }
     },
@@ -7423,7 +7430,8 @@
           "money"
         ],
         "x-rules": [
-          "PM-FUND-010"
+          "PM-FUND-010",
+          "PM-SEC-001"
         ]
       }
     },
@@ -7803,7 +7811,8 @@
           "money"
         ],
         "x-rules": [
-          "PM-DEBT-008"
+          "PM-DEBT-008",
+          "PM-SEC-001"
         ]
       }
     },
