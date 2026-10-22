@@ -71,6 +71,9 @@ data class AssemblyView(
     val agenda: List<AgendaItemView>,
 )
 
+/** One assembly in an entrance's list: which it is, where it stands, when it meets, in what capacity it was convened. */
+data class AssemblySummaryView(val id: UUID, val status: String, val scheduledAt: Instant, val convenedAs: String)
+
 /**
  * Convening a general assembly, its agenda and its notice (PM-GA-002, PM-GA-004 … PM-GA-007, PM-VOTE-004). Who acts is
  * the party the sign-in is tied to — never a field of the request — and the policy says whether they may (PM-SEC-001):
@@ -115,6 +118,12 @@ class AssemblyController(private val acts: AssemblyActs, private val assemblies:
         acts.recordPosting(who.of(signedIn), entranceId, assemblyId, request.postedAt, request.coSignatoryPartyId, request.photoHash).let {
             NoticePostingView(it.id, it.postedAt, it.convenorPartyId, it.coSignatoryPartyId, it.photoHash, it.statedScheduledAt, it.statedPlace, it.statedAgenda)
         }
+
+    /** An entrance's assemblies, the one meeting latest first: enough to find one and open it. */
+    // Rule: PM-GA-002
+    @GetMapping
+    fun list(@PathVariable entranceId: UUID): List<AssemblySummaryView> =
+        assemblies.list(entranceId).map { AssemblySummaryView(it.id, it.status, it.scheduledAt, it.convenedAs) }
 
     @GetMapping("/{assemblyId}")
     fun read(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID): AssemblyView =

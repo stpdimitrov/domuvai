@@ -179,6 +179,31 @@
         ],
         "type": "object"
       },
+      "AssemblySummaryView": {
+        "properties": {
+          "convenedAs": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "convenedAs",
+          "id",
+          "scheduledAt",
+          "status"
+        ],
+        "type": "object"
+      },
       "AssemblyView": {
         "properties": {
           "agenda": {
@@ -3302,6 +3327,107 @@
   "openapi": "3.1.0",
   "paths": {
     "/api/assembly/entrances/{entranceId}/assemblies": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssemblySummaryView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List an entrance's assemblies, the one meeting latest first — each one's status, hour and the capacity it was convened in, read as one assembly is",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-002"
+        ]
+      },
       "post": {
         "operationId": "post_assembly_entrances_entranceId_assemblies",
         "parameters": [
