@@ -8809,14 +8809,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the units of an entrance",
+        "summary": "List the units of an entrance — for anyone holding a role in it: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-ORG-001",
           "PM-ORG-002",
-          "PM-ORG-003"
+          "PM-ORG-003",
+          "PM-SEC-001"
         ]
       },
       "post": {

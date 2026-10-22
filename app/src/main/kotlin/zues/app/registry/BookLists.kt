@@ -55,6 +55,7 @@ class BookRefusals {
             "PM-BOOK-010" to "what is past its retention window is anonymised by the manager and the board of this entrance",
             "PM-BOOK-003" to "a declaration is filed by its declarant, an owner or a user of the unit, or recorded in their name by the manager or the board",
             "PM-BOOK-005" to "the book is entered by the manager or the board of this entrance, from its declarant's declaration",
+            "PM-SEC-001" to "an entrance's units are for those who hold a role in it",
         )
     }
 }

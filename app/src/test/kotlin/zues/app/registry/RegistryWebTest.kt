@@ -70,4 +70,18 @@ class RegistryWebTest {
             .andExpect(jsonPath("$[0].label").value("А"))
             .andExpect(jsonPath("$[0].managementForm").value("GA"))
     }
+
+    @Test
+    fun `PM-SEC-001 GET units asks about the entrance in the path for the person signed in, and a refusal is a 403 naming the rule — the list not read`() {
+        val entrance = UUID.randomUUID()
+        val asking = zues.app.policy.Asking(null, UUID.randomUUID())
+        whenever(who.of(any())).thenReturn(asking)                                       // only the sign-in's person: none is null
+        whenever(book.listUnits(entrance, asking)).thenThrow(BookReadForbidden("PM-SEC-001"))
+        mvc.perform(get("/api/registry/entrances/$entrance/units").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()))
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+            .andExpect(jsonPath("$.error").value("an entrance's units are for those who hold a role in it"))
+        verify(book).listUnits(entrance, asking)
+        org.mockito.kotlin.verifyNoInteractions(registry)
+    }
 }

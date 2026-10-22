@@ -14,6 +14,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActions
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -233,5 +234,26 @@ class BookEntriesIT {
         )
         assertThat(naming).contains("title", "household_member", "animal", "absence_declaration", "book_declaration")
         assertThat(held.map { it.removePrefix("registry.") }).containsExactlyInAnyOrderElementsOf(naming)
+    }
+
+    @Test
+    fun `PM-SEC-001 an entrance's units are read by anyone holding a role in it — and by nobody else`() {
+        val (entrance, flat) = entrance("ул. Витоша 18")
+        val (elsewhere, flatElsewhere) = entrance("ул. Витоша 20")
+        person("Иван Петров", "u-owner").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
+        person("Анна Петрова", "u-user").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
+        for ((body, subject) in listOf("BM" to "u-manager", "MB" to "u-board", "CTL" to "u-controller", "CSH" to "u-cashier")) {
+            person(subject, subject).also { mandate(entrance, body, it) }
+        }
+        person("Георги Стоянов", "u-owner-elsewhere").also { ownership.assignTitle(elsewhere, flatElsewhere, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
+        person("Мария Иванова", "u-manager-elsewhere").also { mandate(elsewhere, "BM", it) }
+
+        val list = { by: String -> mvc.perform(get("/api/registry/entrances/$entrance/units").with(jwt().jwt { it.subject(by).issuer(realm) })) }
+        for (by in listOf("u-owner", "u-user", "u-manager", "u-board", "u-controller", "u-cashier")) {
+            list(by).andExpect(status().isOk).andExpect(jsonPath("$[0].id").value(flat.toString()))
+        }
+        for (by in listOf("u-owner-elsewhere", "u-manager-elsewhere", "u-a-login-tied-to-nobody")) {
+            list(by).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+        }
     }
 }
