@@ -86,7 +86,7 @@ class AssemblyPersistenceIT {
     /** The entrance's manager, with the mandate in force — and signed in from here on. */
     private fun manager(entranceId: UUID, body: String = "BM", from: Int = -30, to: Int = 300): UUID = person().also {
         jdbc.update(
-            "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)",
+            sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)"),
             entranceId, body, it, from, to,
         )
         signedInAs = "login-$it"
@@ -317,13 +317,13 @@ class AssemblyPersistenceIT {
         val stranger = person()
         val formerManager = person().also {
             jdbc.update(
-                "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to, succeeded_at) " +
-                    "VALUES (gen_random_uuid(), ?, 'BM', ?, current_date - 800, current_date - 100, current_date - 100)",
+                sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to, succeeded_at) " +
+                    "VALUES (gen_random_uuid(), ?, 'BM', ?, current_date - 800, current_date - 100, current_date - 100)"),
                 entranceId, it,
             )
         }
         val cashier = person().also {
-            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CSH', ?, current_date - 30, current_date + 300)", entranceId, it)
+            jdbc.update(sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CSH', ?, current_date - 30, current_date + 300)"), entranceId, it)
         }
 
         // 1 · nobody convenes by naming the manager: not a login tied to no party, a stranger, an owner, the cashier, a former manager, nor nobody at all
@@ -350,8 +350,8 @@ class AssemblyPersistenceIT {
         // 2 · finding 3: a former owner does not co-sign, nor does somebody who is no owner; an owner does
         val formerOwner = person().also {
             jdbc.update(
-                "INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) " +
-                    "SELECT gen_random_uuid(), entrance_id, unit_id, ?, 'OWN', 0.25, current_date - 400, current_date - 1 FROM registry.title WHERE party_id = ?",
+                sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) " +
+                    "SELECT gen_random_uuid(), entrance_id, unit_id, ?, 'OWN', 0.25, current_date - 400, current_date - 1 FROM registry.title WHERE party_id = ?"),
                 it, owner,
             )
         }
@@ -362,7 +362,7 @@ class AssemblyPersistenceIT {
         }
         // the act is the convenor's: not an owner's to record, and not another office's
         val controller = person().also {
-            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)", entranceId, it)
+            jdbc.update(sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)"), entranceId, it)
         }
         for (who in listOf(owner, controller)) {
             signedIn(who) { mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(owner))).andExpect(status().isForbidden) }
@@ -385,7 +385,7 @@ class AssemblyPersistenceIT {
         assertThat(after.get("agenda")).hasSize(1)
         // the convenor adds an item, and that does void the notice; once their mandate has ended they run it no more
         assertThat(signedIn(manager) { created("$base/$id/agenda", """{"text":"Избор на касиер","itemType":"GENERAL"}""") }.get("noticeVoided").asBoolean()).isTrue()
-        jdbc.update("UPDATE identity_org.management_mandate SET succeeded_at = current_date WHERE party_id = ?", manager)       // a successor took office today
+        jdbc.update(sofiaDated("UPDATE identity_org.management_mandate SET succeeded_at = current_date WHERE party_id = ?"), manager)       // a successor took office today
         signedIn(manager) {
             mvc.perform(post("$base/$id/notice-posting").contentType(MediaType.APPLICATION_JSON).content(posting(owner))).andExpect(status().isForbidden)
             mvc.perform(post("$base/$id/agenda").contentType(MediaType.APPLICATION_JSON).content("""{"text":"Още една","itemType":"GENERAL"}""")).andExpect(status().isForbidden)
