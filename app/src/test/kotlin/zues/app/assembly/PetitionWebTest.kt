@@ -55,7 +55,7 @@ private const val AUDIENCE = "domuvai-api"
  * login to — never a field of the request — and that whoever the policy does not allow gets a 403 and reaches nothing.
  */
 @WebMvcTest(PetitionController::class, properties = ["domuvai.auth.issuer-uri=$ISSUER", "domuvai.auth.audience=$AUDIENCE", "domuvai.auth.mode="])
-@Import(WhoAsks::class, Acting::class, Policy::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class)
 class PetitionWebTest {
 
     companion object {
@@ -206,6 +206,23 @@ class PetitionWebTest {
         whenever(petitions.convene(eq(entranceId), eq(opened.id), eq(actor(ana, "login-ana-4")), any())).thenThrow(PetitionLocked("the petition cannot be weighed: $why"))
         mvc.perform(post("$base/${opened.id}/assembly").by("login-ana-4").contentType(MediaType.APPLICATION_JSON).content("{$meeting}"))
             .andExpect(status().isConflict).andExpect(jsonPath("$.error").value("the petition cannot be weighed: $why"))
+    }
+
+    @Test
+    fun `PM-SEC-001 a petition is read as an assembly is - by an owner or an office of the entrance - a stranger, a login tied to nobody and an owner elsewhere are a 403 naming the rule, and nothing is read`() {
+        val ana = person("login-ana-6", owner = true)
+        person("login-manager-6", manager = true)
+        person("login-stranger-6")
+        val opened = petition(ana)
+        for (subject in listOf("login-stranger-6", "login-tied-to-nobody")) {
+            mvc.perform(get("$base/${opened.id}").by(subject)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+        }
+        mvc.perform(get("/api/assembly/entrances/${UUID.randomUUID()}/petitions/${opened.id}").by("login-ana-6")).andExpect(status().isForbidden)
+        verifyNoInteractions(petitions)
+        whenever(petitions.read(entranceId, opened.id)).thenReturn(weighed(opened, "8.5", emptyList()))
+        for (subject in listOf("login-ana-6", "login-manager-6")) {
+            mvc.perform(get("$base/${opened.id}").by(subject)).andExpect(status().isOk).andExpect(jsonPath("$.signatories[0]").value(ana.toString()))
+        }
     }
 
     @Test

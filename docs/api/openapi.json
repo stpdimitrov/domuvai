@@ -4923,14 +4923,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed",
+        "summary": "Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed — read as an assembly is: for anyone holding a role in the entrance; anybody else is a 403",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-003",
           "PM-ORG-005",
-          "PM-ORG-011"
+          "PM-ORG-011",
+          "PM-SEC-001"
         ]
       }
     },

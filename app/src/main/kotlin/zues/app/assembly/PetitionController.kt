@@ -47,11 +47,13 @@ data class PetitionConvened(val assemblyId: UUID, val status: String, val conven
  * The owners' petition to convene a general assembly, and convening on it (PM-GA-003). Who opens, signs and convenes
  * is the party the sign-in is tied to — never a field of the request — and only an owner of the entrance on the day
  * may (PM-SEC-001): anybody else is a 403 naming the rule, told nothing of the petition. A person signs for themselves
- * only. A body that cannot be read is a 400 for anyone — it is read before anybody is asked who they are.
+ * only. A petition is read as an assembly is: by anyone holding a role in the entrance (the owner's decision of
+ * 2026-10-23, P1), and by nobody else. A body that cannot be read is a 400 for anyone — it is read before anybody is
+ * asked who they are.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/petitions")
-class PetitionController(private val petitions: PetitionService, private val who: WhoAsks, private val acting: Acting) {
+class PetitionController(private val petitions: PetitionService, private val who: WhoAsks, private val acting: Acting, private val reads: AssemblyReads) {
 
     // Rule: PM-GA-003
     // Rule: PM-SEC-001
@@ -71,8 +73,12 @@ class PetitionController(private val petitions: PetitionService, private val who
         return view(petitions.read(entranceId, petitionId))
     }
 
+    // Rule: PM-SEC-001
     @GetMapping("/{petitionId}")
-    fun read(@PathVariable entranceId: UUID, @PathVariable petitionId: UUID): PetitionView = view(petitions.read(entranceId, petitionId))
+    fun read(@PathVariable entranceId: UUID, @PathVariable petitionId: UUID, signedIn: JwtAuthenticationToken?): PetitionView {
+        reads.require(entranceId, who.of(signedIn))
+        return view(petitions.read(entranceId, petitionId))
+    }
 
     // Rule: PM-GA-003
     // Rule: PM-SEC-001
