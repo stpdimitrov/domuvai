@@ -4,6 +4,7 @@ import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, reach, type EntranceAt } from "@/lib/console";
 import { refused, unanswered, type Refused } from "@/lib/refusal";
 import { sofiaTime } from "@/lib/sofia";
+import AgendaForm from "./AgendaForm";
 import ConveneForm from "./ConveneForm";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
@@ -93,7 +94,7 @@ function Standing({ s }: { s: Schemas["Standing"] }) {
   return <>{s.kind}</>;
 }
 
-export default async function AssemblyPage({ searchParams }: { searchParams: Promise<{ entrance?: string | string[]; assembly?: string | string[] }> }) {
+export default async function AssemblyPage({ searchParams }: { searchParams: Promise<{ entrance?: string | string[]; assembly?: string | string[]; voided?: string | string[] }> }) {
   const query = await searchParams;
   const view = await load(
     typeof query.entrance === "string" ? query.entrance : undefined,
@@ -121,13 +122,13 @@ export default async function AssemblyPage({ searchParams }: { searchParams: Pro
           </div>
         </div>
       ) : (
-        <Body view={view} />
+        <Body view={view} voided={query.voided === "1"} />
       )}
     </>
   );
 }
 
-function Body({ view }: { view: Extract<Loaded, { kind: "ok" }> }) {
+function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided: boolean }) {
   const { entrance, mandates, shown, asked, listed, year } = view;
   return (
     <div style={{ padding: "0 24px 24px" }}>
@@ -155,7 +156,7 @@ function Body({ view }: { view: Extract<Loaded, { kind: "ok" }> }) {
       {asked && !shown && (
         <div className="as-note" style={FAILED}>„{asked}“ не е събрание — връзката към събранието съдържа неговия идентификатор.</div>
       )}
-      {shown && <Assembly shown={shown} />}
+      {shown && <Assembly shown={shown} entrance={entrance.id} voided={voided} />}
 
       <div style={{ margin: "24px 0 0", ...HEADING }}>Свикване на общо събрание</div>
       <div className="co-card" style={{ marginTop: 12 }}>
@@ -209,7 +210,7 @@ function Listed({ entrance, listed, year, asked }: {
   );
 }
 
-function Assembly({ shown }: { shown: Shown }) {
+function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: boolean }) {
   const { assembly, quorum, attendance, proxies } = shown;
   if (!assembly.ok) return <div className="as-note" style={FAILED}>{unanswered(assembly.by, "събранието")}</div>;
   const a = assembly.data;
@@ -242,6 +243,16 @@ function Assembly({ shown }: { shown: Shown }) {
           </div>
         ))}
       </div>
+      {voided && a.status === "DRAFT" && (   // the api answered noticeVoided: the assembly is a draft again; a typed ?voided=1 on a noticed one says nothing
+        <div className="as-note" style={{ color: "#7A5210" }}>
+          Точката е добавена след обявяването на поканата — поканата отпада и събранието трябва да се обяви отново.
+        </div>
+      )}
+      {(a.status === "DRAFT" || a.status === "NOTICED") && (   // the agenda the api keeps open; adding after notice voids it (PM-GA-006)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <AgendaForm entrance={entrance} assembly={a.id} />
+        </div>
+      )}
 
       <Quorum quorum={quorum} />
       <Register attendance={attendance} proxies={proxies} />
