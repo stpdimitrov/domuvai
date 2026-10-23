@@ -85,8 +85,8 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures'):
    ('Sign a petition — the signed-in owner, for themselves, once; anybody else is a 403', ['PM-GA-003', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}'):
-   ("Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed",
-    ['PM-GA-003', 'PM-ORG-005', 'PM-ORG-011']),
+   ("Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed — read as an assembly is: for anyone holding a role in the entrance; anybody else is a 403",
+    ['PM-GA-003', 'PM-ORG-005', 'PM-ORG-011', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly'):
    ('The owners convene on their petition — once, by the signed-in signatory, when it is unlocked and the demand was not met', ['PM-GA-003', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):

@@ -79,7 +79,7 @@ enum class Action(val governedBy: String) {
     /** an entrance's units: their designations, types, areas and ideal parts */
     READ_UNITS("PM-SEC-001"),
 
-    /** an entrance's assemblies: their list, one with its agenda, its quorum meter, its register, its proxies, whether a year's was held */
+    /** an entrance's assemblies: their list, one with its agenda, its quorum meter, its register, its proxies, whether a year's was held — and the owners' petitions to convene one */
     READ_ASSEMBLY("PM-SEC-001"),
 
     /** who holds more than the law's share of an entrance's ideal parts, behind a higher quorum — another person's holding */
@@ -186,7 +186,11 @@ class Policy(private val sources: List<RoleSource>) {
          * entered the same way, by the manager or the board (PM-BOOK-005, PM-BOOK-002): an owner or a user changes them by
          * declaring (PM-BOOK-003), never by writing the book, nor recording their own title, themselves. An entrance's
          * mandates and how each stands: the manager and the board, whose election comes due (PM-GOV-005), the controller,
-         * who reads everything (PM-GOV-008), and the administrator, who records them — no owner as such.
+         * who reads everything (PM-GOV-008), and the administrator, who records them — no owner as such. An entrance's
+         * assemblies and the owners' petitions to convene one: anyone holding a role in it — an owner, for whom they are
+         * condominium-level matters (PM-SEC-002), a holder of use, the offices and the cashier; who owns more than the
+         * law's share behind a higher quorum is another person's holding, for the manager, the board and the controller
+         * only (the owner's decisions R1 on #247, 2026-10-22, and P1, 2026-10-23).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource

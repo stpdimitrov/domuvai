@@ -33,7 +33,7 @@ import java.util.UUID
  * that would give anybody everything; a petition is still read, as everything is in that mode.
  */
 @WebMvcTest(PetitionController::class)
-@Import(WhoAsks::class, Acting::class, Policy::class, PetitionSignInOffWebTest.Generous::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, PetitionSignInOffWebTest.Generous::class)
 class PetitionSignInOffWebTest {
 
     class Generous {

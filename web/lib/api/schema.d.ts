@@ -201,7 +201,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed */
+        /** Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed — read as an assembly is: for anyone holding a role in the entrance; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_petitions_petitionId"];
         put?: never;
         post?: never;
