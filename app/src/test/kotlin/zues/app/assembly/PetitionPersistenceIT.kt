@@ -202,7 +202,7 @@ class PetitionPersistenceIT {
         // the manager of the entrance is not, as such, an owner; nor is an owner of another entrance
         val manager = party().also {
             jdbc.update(
-                "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'BM', ?, current_date - 30, current_date + 300)",
+                sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'BM', ?, current_date - 30, current_date + 300)"),
                 entranceId, it,
             )
         }
@@ -216,8 +216,8 @@ class PetitionPersistenceIT {
         // a former owner: the title ended yesterday
         val former = party().also {
             jdbc.update(
-                "INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) " +
-                    "SELECT gen_random_uuid(), entrance_id, unit_id, ?, 'OWN', 0.000001, current_date - 400, current_date - 1 FROM registry.title WHERE party_id = ?",
+                sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) " +
+                    "SELECT gen_random_uuid(), entrance_id, unit_id, ?, 'OWN', 0.000001, current_date - 400, current_date - 1 FROM registry.title WHERE party_id = ?"),
                 it, first,
             )
         }

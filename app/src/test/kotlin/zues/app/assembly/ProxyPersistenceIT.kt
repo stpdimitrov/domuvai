@@ -88,7 +88,7 @@ class ProxyPersistenceIT {
     /** The entrance's manager, with the mandate in force — and signed in from here on. */
     private fun manager(entranceId: UUID, body: String = "BM", from: Int = -30, to: Int = 300): UUID = person().also {
         jdbc.update(
-            "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)",
+            sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)"),
             entranceId, body, it, from, to,
         )
         signedInAs = "login-$it"
@@ -195,7 +195,7 @@ class ProxyPersistenceIT {
         // nobody appoints for the owner by naming them: a stranger, a login tied to no party, nobody at all, an owner next door, another owner,
         // the controller — with a document or without
         val controller = person().also {
-            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)", entranceId, it)
+            jdbc.update(sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)"), entranceId, it)
         }
         val document = "5d".repeat(32)
         val withDocument = naming.replace("{", """{"authorisationHash":"$document",""")
@@ -212,7 +212,7 @@ class ProxyPersistenceIT {
         signedIn(null) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming)).andExpect(status().isForbidden) }
         // a former owner is no principal
         val former = person().also {
-            jdbc.update("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date - 400, current_date - 1)", entranceId, unit, it)
+            jdbc.update(sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date - 400, current_date - 1)"), entranceId, unit, it)
         }
         appoint(proxies, former, agent).andExpect(status().isForbidden)
         assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.proxy WHERE entrance_id = ?", Int::class.java, entranceId)).isZero()
@@ -223,20 +223,20 @@ class ProxyPersistenceIT {
         val member = """"agentKind":"HOUSEHOLD_MEMBER","scope":"WHOLE_AGENDA","form":"WRITTEN""""
         appoint(proxies, owner, stranger, member).andExpect(status().isBadRequest)                             // lives nowhere the book knows
         val resident = "INSERT INTO registry.household_member (id, entrance_id, unit_id, party_id, is_child_under_6, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, false, current_date - 100, NULL)"
-        val atHome = person().also { jdbc.update(resident, entranceId, unit, it) }
+        val atHome = person().also { jdbc.update(sofiaDated(resident), entranceId, unit, it) }
         appoint(proxies, owner, atHome, member).andExpect(status().isBadRequest)                               // the owner is not in the book as living there
-        jdbc.update(resident, entranceId, unit, owner)
+        jdbc.update(sofiaDated(resident), entranceId, unit, owner)
         val movedOut = person().also {
-            jdbc.update(resident.replace("current_date - 100, NULL", "current_date - 100, current_date - 1"), entranceId, unit, it)
+            jdbc.update(sofiaDated(resident.replace("current_date - 100, NULL", "current_date - 100, current_date - 1")), entranceId, unit, it)
         }
         appoint(proxies, owner, movedOut, member).andExpect(status().isBadRequest)
         // a resident of another unit of the entrance is not of this household; an owner next door is not "another owner" here
-        val acrossTheLanding = person().also { jdbc.update(resident, entranceId, otherUnit, it) }
+        val acrossTheLanding = person().also { jdbc.update(sofiaDated(resident), entranceId, otherUnit, it) }
         appoint(proxies, owner, acrossTheLanding, member).andExpect(status().isBadRequest)
         appoint(proxies, owner, owner(entrance())).andExpect(status().isBadRequest)
         // somebody whose title begins tomorrow is not an owner today: neither appoints nor is "another owner"
         val buyer = person().also {
-            jdbc.update("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date + 1)", entranceId, unit, it)
+            jdbc.update(sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date + 1)"), entranceId, unit, it)
         }
         appoint(proxies, buyer, agent).andExpect(status().isForbidden)
         appoint(proxies, owner, buyer).andExpect(status().isBadRequest)
