@@ -2,8 +2,7 @@
 
 -- Rule: PM-DOC-005 — documents are retained for a statutory or contractual period, then deleted with a logged reason.
 -- [retention_until] is when deletion may occur; null = retention policy not yet applied. Once set, deletion is by a
--- background job (not in this slice) that writes the log and removes the row.
-ALTER TABLE evidence.document ADD COLUMN retention_until date;
+-- background job (not in this slice) that writes the log and removes the row. The column exists since V1__init.sql:430.
 
 -- Rule: PM-DOC-005 — the deletion log, immutable: who deleted what when and why. Written by the deletion job; the
 -- document row and its bytes are both gone by then, so the log keeps what is needed to answer "where did it go".
