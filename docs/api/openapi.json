@@ -2602,6 +2602,25 @@
         ],
         "type": "object"
       },
+      "RecordVoteRequest": {
+        "properties": {
+          "choice": {
+            "type": "string"
+          },
+          "correction": {
+            "type": "string"
+          },
+          "ownerPartyId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice",
+          "ownerPartyId"
+        ],
+        "type": "object"
+      },
       "RegisterAbsencesRequest": {
         "properties": {
           "absences": {
@@ -3339,6 +3358,62 @@
         ],
         "type": "object"
       },
+      "VoteView": {
+        "properties": {
+          "castAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "choice": {
+            "type": "string"
+          },
+          "correction": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ownerPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "recordedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reverses": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sessionNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "weight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "castAt",
+          "channel",
+          "choice",
+          "id",
+          "ownerPartyId",
+          "recordedBy",
+          "sessionNo",
+          "unitId",
+          "weight"
+        ],
+        "type": "object"
+      },
       "WhoIsAsking": {
         "properties": {
           "partyId": {
@@ -3807,6 +3882,127 @@
         "x-rules": [
           "PM-VOTE-004",
           "PM-GA-006",
+          "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordVoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VoteView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-001",
+          "PM-VOTE-014",
+          "PM-ORG-005",
           "PM-SEC-001"
         ]
       }
