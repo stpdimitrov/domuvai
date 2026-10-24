@@ -62,20 +62,20 @@ Then deliver it. **The owner never merges a PR, and is never asked to watch for 
 2. **Open the PR** — the slice contract is its description, and it says `Closes #n` — and **switch auto-merge on (squash) at once**. The ruleset on `main` requires `gates`, so GitHub merges only when CI is green. If GitHub refuses auto-merge with "clean status", CI is already green: merge it now, `gh pr merge <n> --squash`. Turn the app's CI monitor on (auto-fix) for the PR.
 3. **Keep it moving until it merges.** A failing check or a conflict wakes the session through the CI monitor: fix it, run the gates, push. A draft waiting on the review is marked ready (`gh pr ready <n>`) with auto-merge on as soon as the findings are applied. Nothing is left for the owner to do.
 4. **Never poll CI** — no watch loops, no scheduled checks. The session is not woken when a PR merges, so whenever it is next woken — the owner's message, a CI event, a subagent's report — it looks at the open PR once (`gh pr view <n>`) and carries on: merged → step 5; green and still open → merge it; failing → fix it. It never asks the owner to report that a PR merged.
-5. **After the merge:** sync `main` (`git switch main && git merge --ff-only origin/main`), confirm the claim issue closed — then **start the next slice in a new session, and end this one**. The next slice boots from the repo (§1): the handover and the log entries carry everything; a session carried on re-reads its whole growing context on every call. Nothing is stacked on unmerged work.
+5. **After the merge:** sync `main` (`git switch main && git merge --ff-only origin/main`), confirm the claim issue closed — then, when the chain-at-close conditions below hold, **start the next slice in a new session; end this one either way**. The next slice boots from the repo (§1): the handover and the log entries carry everything; a session carried on re-reads its whole growing context on every call. Nothing is stacked on unmerged work.
 
-   **Chain at close** (owner, 2026-10-24). Call the claude-code-remote `create_session` tool — `source_url` the repo, `outcome_branch` `slice/<next>` — with this prompt, filled in:
+   **Chain at close** (owner, 2026-10-24). Call the claude-code-remote `create_session` tool — `source_url` the repo, `outcome_branch` `slice/<next>` (the next slice's id and name, from the handover) — with this prompt, filled in:
 
-   > Boot per CLAUDE.md; lane `<lane>`; next slice per the newest H- handover, docs/TESTPLAN.md and the open owner-question issues; quote any owner decision it relies on; work cheaply; record a Cost line.
+   > Boot per CLAUDE.md; lane `<lane>`; next slice per the newest H- handover, docs/TESTPLAN.md and the open owner-question issues; quote any owner decision it relies on; work cheaply; record a Cost line. Owner decisions already recorded: `<quote + where, or "none — confirm the contract with the owner">`.
 
    Only when all hold — otherwise start nothing and say why in the log entry's **Open**:
-   - (a) no open `owner-question` issue blocks the next slice. If one does, or a decision is missing, open it (§7a) and stop.
-   - (b) at most one successor per closing session, and never past the platform's session lineage depth limit (8): `get_session` → start one only while `lineage.depth` < `lineage.limit`.
+   - (a) no open `owner-question` issue blocks the next slice. If one does, or a decision is missing, open it as an `owner-question` issue (§7a) and stop.
+   - (b) at most one successor per closing session, and never past the platform's session lineage depth limit (8): `get_session` → start one only while `lineage.depth` < `lineage.limit`; unreadable → start none.
    - (c) the successor confirms its slice contract with the owner before code, unless every decision it needs is already recorded — the prompt then quotes where (log entry, ADR, or closed owner-question issue).
-   - (d) no `create_session` (a local, non-cloud session): print the filled prompt for the owner to paste instead.
+   - (d) `create_session` unavailable (e.g. a local session): print the filled prompt for the owner to paste instead.
    - (e) the next slice's lane is free — no other open claim holds it (`python3 tools/lanes.py check <lane>`, or the open issues labelled `lane:<lane>`).
 
-   Name the successor (session id) or the reason for none in the log entry.
+   The log entry, committed before the merge, says whether a successor is planned; after starting it, name its session id in a comment on the closed claim issue.
 
 Repository settings (auto-merge, rulesets) and Claude's own permissions stay the owner's to change.
 
