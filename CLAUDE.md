@@ -112,7 +112,7 @@ Add the slice's entry as a new file in `docs/sessionlog/` and commit it with the
 
 ### Working cheaply
 
-Every tool call re-reads the whole context — one session's eight slices cost $36, 98% of it that re-read (T-05).
+Every tool call re-reads the whole context; a long session pays for it on every call (why: the T-05 log entry).
 
 - Search (`grep`, line ranges) before reading a whole file; trim output (`tail`, `grep`), never paste raw logs — `tools/ci_failure.py <pr>` for a red PR.
 - No wait or poll loops: PR and CI notifications wake the session. Batch independent calls in one turn.

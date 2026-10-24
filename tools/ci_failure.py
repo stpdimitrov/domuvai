@@ -9,7 +9,7 @@ failing gate's error lines there as an annotation — and the script says the lo
 """
 import json, re, subprocess, sys
 
-REPO = 'repos/stpdimitrov/domuvai'
+REPO = 'repos/{owner}/{repo}'   # gh fills these from the checkout's remote
 ERR = re.compile(r'FAILED|✗|[Ee]rror|What went wrong|Traceback|AssertionError|expected:|NO RAW')
 NOISE = re.compile(r'Node\.js 20|deprecated|ubuntu-latest label|^\s+at ')
 
@@ -42,8 +42,10 @@ def main() -> int:
         try:
             lines = [l for l in api(f"{REPO}/actions/jobs/{r['id']}/logs", raw=True).splitlines()
                      if ERR.search(l) and not NOISE.search(l)]
-            print('\n'.join('  ' + re.sub(r'^\S+Z ', '', l) for l in lines[:30]))
-            continue
+            if lines:
+                print('\n'.join('  ' + re.sub(r'^\S+Z ', '', l) for l in lines[:30]))
+                continue
+            print('  (no error line matched in the job log; reading annotations)')
         except RuntimeError as e:
             print(f'  (job log unreachable from here — {str(e)[:60]}…; reading annotations instead)')
         notes = [a for a in api(f"{REPO}/check-runs/{r['id']}/annotations")

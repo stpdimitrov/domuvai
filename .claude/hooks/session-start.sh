@@ -32,7 +32,7 @@ python3 -c 'import openapi_spec_validator, jsonschema, markdown, yaml, rfc3339_v
 
 # Docker. Docker 29 rejects the API version Testcontainers speaks; without the floor, every *IT silently SKIPS.
 if ! docker info >/dev/null 2>&1; then
-  DOCKER_MIN_API_VERSION=1.24 nohup dockerd >>"$log" 2>&1 &
+  DOCKER_MIN_API_VERSION=1.24 nohup dockerd </dev/null >>"$log" 2>&1 & disown
   for _ in $(seq 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
   docker info >/dev/null 2>&1 || warn "dockerd did not start"
 fi

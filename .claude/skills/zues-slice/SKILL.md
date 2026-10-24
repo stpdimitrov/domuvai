@@ -53,7 +53,7 @@ Write the entry as a new file, `docs/sessionlog/<yyyyMMddHHmm>-<slice id>.md` (t
 **Decisions** — ADR-nnn, or "none"
 **Open** — what the next session must pick up
 **Read first next time** — two or three documents
-**Cost** — $x · context yk   (the session's own figures: `get_session` → usage.cost_usd, context_usage)
+**Cost** — $x · context yk   (the session's own figures: `get_session` → `usage.cost_usd`, `external_metadata.context_usage.used_tokens`)
 ```
 
 Then deliver it. **The owner never merges a PR, and is never asked to watch for one: from the push to the next slice, delivery is the session's job.**

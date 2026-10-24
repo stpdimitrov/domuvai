@@ -13,11 +13,12 @@ Each mutant is applied alone, its tests run, the file restored — even on error
 KILLED = a test failed · SURVIVED = all passed · COMPILE-ERROR = the mutant did not build (not a kill).
 Exit 0 only when every mutant is KILLED.
 """
-import json, os, re, subprocess, sys
+import json, os, re, signal, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV = {**os.environ, 'LC_ALL': 'C.UTF-8', 'LANG': 'C.UTF-8', 'TESTCONTAINERS_RYUK_DISABLED': 'true'}
+TIMEOUT = 1800   # a mutant that loops forever is a kill, not a hang holding the file mutated
 COMPILE = re.compile(r"compile\w*Kotlin' FAILED|Compilation (error|failed)|^e: ", re.M)
 
 
@@ -31,7 +32,9 @@ def run(m: dict) -> str:
         cmd += ['--tests', m['tests']]
     try:
         path.write_text(original.replace(m['old'], m['new']), encoding='utf-8')
-        p = subprocess.run(cmd, cwd=ROOT, env=ENV, capture_output=True, text=True)
+        p = subprocess.run(cmd, cwd=ROOT, env=ENV, capture_output=True, text=True, timeout=TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return 'KILLED (timeout)'
     finally:
         path.write_text(original, encoding='utf-8')
     out = p.stdout + p.stderr
@@ -45,6 +48,7 @@ def run(m: dict) -> str:
 
 
 def main() -> int:
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))   # SIGTERM unwinds through `finally` too
     mutants = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
     results = [run(m) for m in mutants]
     for m, r in zip(mutants, results):
