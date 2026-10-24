@@ -108,6 +108,17 @@ Review the diff against the rule texts as if someone else wrote it. Re-reading y
 
 Add the slice's entry as a new file in `docs/sessionlog/` and commit it with the slice. Never edit an earlier entry.
 
+**One slice per session.** After the merge and `main` synced, the session ends; the next slice boots fresh from the repo (`.claude/skills/zues-slice/SKILL.md` §7.5).
+
+### Working cheaply
+
+Every tool call re-reads the whole context; a long session pays for it on every call (why: the T-05 log entry).
+
+- Search (`grep`, line ranges) before reading a whole file; trim output (`tail`, `grep`), never paste raw logs — `tools/ci_failure.py <pr>` for a red PR.
+- No wait or poll loops: PR and CI notifications wake the session. Batch independent calls in one turn.
+- `tools/check.sh <lane>` before any push — one validated push per round. `tools/mutate.py` to prove a test kills its bug.
+- Per person, once: switch off the claude.ai connectors this project does not use (their tools are re-sent every turn); pick the model per session — Opus for design and rule slices, a cheaper one for mechanical ones.
+
 ## Working in parallel (multiple developers)
 
 Up to three developers build here at once, each in their own Claude Code session. Sessions share nothing but this repo, so every rule below is enforced by the repo, not by anyone's memory.
