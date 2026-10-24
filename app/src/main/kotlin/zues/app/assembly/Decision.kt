@@ -24,8 +24,9 @@ import java.util.UUID
 
 /**
  * What an item of the agenda decided, as it was closed (Rule: PM-VOTE-016): the majority applied, the tally, the
- * represented share it was counted against, the sitting, the outcome and the status — and [basis], the result line and
- * every vote counted, so it can be recomputed years later. Never edited.
+ * represented share it was counted against — the register re-weighed at the close (#283) — the sitting, the outcome and
+ * the status — and [basis], the result line, every vote counted and every holding weighed present ("present …"), so it
+ * can be recomputed years later. Never edited.
  */
 @Table("decision")
 data class Decision(
@@ -104,6 +105,7 @@ class DecisionService(
     private val assemblies: AssemblyRepository,
     private val agenda: AgendaItemRepository,
     private val sittings: SittingRepository,
+    private val sittingService: SittingService,
     private val votes: VoteRepository,
     private val decisions: DecisionRepository,
     private val holdings: Holdings,
@@ -113,10 +115,12 @@ class DecisionService(
     /**
      * Closes [itemId], by whoever runs the assembly ([by]), at the sitting that opened, on its day: the votes in effect
      * are tallied against the majority the item was bound to, and the decision is stored, PROVISIONAL — PM-VOTE-013 and
-     * PM-GA-023 make it final only later. After this no vote on the item is taken or corrected (PM-VOTE-014).
+     * PM-GA-023 make it final only later. "Represented" is the register re-weighed now, as quorum is: an owner who arrived
+     * after the opening counts, and their vote with them. After this no vote on the item is taken or corrected (PM-VOTE-014).
      */
     // Rule: PM-VOTE-016
     // Rule: PM-VOTE-014
+    // Rule: PM-VOTE-011
     @Transactional
     fun close(entranceId: UUID, assemblyId: UUID, itemId: UUID, by: Actor): Decision {
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
@@ -130,22 +134,24 @@ class DecisionService(
         val all = votes.findByAgendaItemId(itemId)
         val reversed = all.mapNotNull { it.reverses }.toSet()
         val inEffect = all.filter { it.id !in reversed }
-        // "represented" is the opened sitting's own weighing: its basis names every owner and unit it counted
-        val weighed = sitting.basis.lines().drop(1).map { it.split(" ").let { (party, unit) -> party to unit } }.toSet()
+        // "represented" is the register as it stands at the close, weighed as quorum is (the owner's answer to #283)
+        val present = sittingService.reweigh(assembly, sitting)
+        val weighed = present.basis.lines().drop(1).map { it.split(" ").let { (party, unit) -> party to unit } }.toSet()
         check(inEffect.all { (it.partyId.toString() to it.unitId.toString()) in weighed }) {
-            "a vote comes from an owner who was not weighed when the sitting opened: the represented share does not hold it (owner question #283)"
+            "a vote comes from an owner the register does not make present at the close: the represented share does not hold it"
         }
         val rule = majorities.on(item.itemType, item.majorityRuleId.substringAfter('@'))
         check(rule.id == item.majorityRuleId) { "the item was bound to ${item.majorityRuleId}, the law now names ${rule.id}" }
         val unitParts = holdings.inForce(entranceId, sitting.weighedOn, TitleRole.OWN).holdings.associate { it.unitId to BigDecimal(it.unitIdealParts) }
         val casts = inEffect.map { Cast(it.id, it.partyId, it.unitId, it.weight, VoteChoice.valueOf(it.choice)) }
-        val result = tally(casts, unitParts, sitting.represented, rule)
-        val basis = (listOf("item ${item.id} at sitting ${sitting.sessionNo}: ${result.line}") +
-            casts.map { "${it.partyId} ${it.unitId} ${it.weight.stripTrailingZeros().toPlainString()} ${it.choice} by ${it.voteId}" }.sorted()).joinToString("\n")
+        val result = tally(casts, unitParts, present.representedPct, rule)
+        val basis = (listOf("item ${item.id} at sitting ${sitting.sessionNo}, ${present.representedPct.stripTrailingZeros().toPlainString()} represented at the close: ${result.line}") +
+            casts.map { "${it.partyId} ${it.unitId} ${it.weight.stripTrailingZeros().toPlainString()} ${it.choice} by ${it.voteId}" }.sorted() +
+            present.basis.lines().drop(1).map { "present $it" }).joinToString("\n")
         return aggregates.insert(
             Decision(
                 UUID.randomUUID(), entranceId, assemblyId, item.id, sitting.sessionNo, rule.id, rule.denominator.name, rule.comparison.name,
-                BigDecimal(rule.thresholdPct), sitting.represented, result.forParts, result.againstParts, result.abstainParts,
+                BigDecimal(rule.thresholdPct), present.representedPct, result.forParts, result.againstParts, result.abstainParts,
                 if (result.passed) "PASSED" else "NOT_PASSED", "PROVISIONAL", basis,
                 MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) },
                 CATALOGUE_VERSION, ENGINE_VERSION, clock.instant(), by.party, by.loginIssuer, by.loginSubject,

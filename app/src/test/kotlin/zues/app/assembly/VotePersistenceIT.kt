@@ -244,8 +244,9 @@ class VotePersistenceIT {
         assertThat(listOf(stored["law_version"], stored["engine_version"], (stored["session_no"] as Number).toInt())).containsExactly(zues.law.CATALOGUE_VERSION, zues.law.ENGINE_VERSION, 1)
         // every vote in effect, and only those, is in the basis by its id
         val inEffect = jdbc.queryForList("SELECT id FROM assembly.vote v WHERE agenda_item_id = ?::uuid AND NOT EXISTS (SELECT 1 FROM assembly.vote r WHERE r.reverses = v.id)", UUID::class.java, m.item)
-        assertThat(basis.lines().drop(1).map { it.substringAfterLast(" by ") }).containsExactlyInAnyOrderElementsOf(inEffect.map { it.toString() })
-        assertThat(basis.lines().drop(1)).hasSize(2).anyMatch { it.startsWith("$boris ${m.unit} 25 AGAINST") }
+        val counted = basis.lines().drop(1).filterNot { it.startsWith("present ") }
+        assertThat(counted.map { it.substringAfterLast(" by ") }).containsExactlyInAnyOrderElementsOf(inEffect.map { it.toString() })
+        assertThat(counted).hasSize(2).anyMatch { it.startsWith("$boris ${m.unit} 25 AGAINST") }
         assertThat(jdbc.update("UPDATE assembly.decision SET outcome = 'NOT_PASSED' WHERE agenda_item_id = ?::uuid", m.item)).isZero()
         assertThat(jdbc.update("DELETE FROM assembly.decision WHERE agenda_item_id = ?::uuid", m.item)).isZero()
         assertThat(decisions(m).single()["basis_hash"]).isEqualTo(stored["basis_hash"])
@@ -267,13 +268,31 @@ class VotePersistenceIT {
     }
 
     @Test
-    fun `PM-VOTE-011 a vote of an owner the opened sitting did not weigh has no place in its represented share - the close is refused`() {
+    fun `PM-VOTE-011 a late arrival's vote counts against the represented share re-weighed at the close - the opened sitting keeps the share it was weighed on`() {
+        val m = opened()
+        val vera = m.owners[2]
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            created("${m.base}/attendance", """{"attendeePartyId":"$vera","channel":"IN_PERSON"}""")        // Vera arrives after the opening
+            vote(m, vera, "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.represented").value("100")).andExpect(jsonPath("$.tallyFor").value("75"))
+                .andExpect(jsonPath("$.result").value("FOR 75.00% of represented (75.00% of total, 100.00% represented); threshold more than 50% of represented (GENERAL@2009-01-01) — PASSED"))
+        }
+        val basis = decisions(m).single()["basis"] as String
+        assertThat(basis.lines().first()).contains(", 100 represented at the close: ")
+        assertThat(basis.lines().filter { it.startsWith("present ") }.map { it.split(" ")[1] }).containsExactlyInAnyOrderElementsOf(m.owners.map { it.toString() })
+        assertThat(jdbc.queryForObject("SELECT represented FROM assembly.session WHERE assembly_id = ?::uuid", java.math.BigDecimal::class.java, m.base.substringAfterLast("/")))
+            .isEqualByComparingTo("75")
+    }
+
+    @Test
+    fun `PM-VOTE-011 a close whose represented share cannot be weighed is refused, as the opening would be - nothing is stored`() {
         val m = opened()
         signedIn(m.manager) {
             vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
-            created("${m.base}/attendance", """{"attendeePartyId":"${m.owners[2]}","channel":"IN_PERSON"}""")        // Vera arrives after the opening
-            vote(m, m.owners[2], "FOR").andExpect(status().isCreated)
-            close(m).andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("#283")))
+            created("/api/registry/entrances/${m.entranceId}/units/${m.unit}/titles", """{"partyId":"${person()}","titleRole":"USR","share":"1","validFrom":"2025-01-01"}""")
+            close(m).andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("right of use")))
         }
         assertThat(decisions(m)).isEmpty()
     }
