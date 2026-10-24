@@ -72,6 +72,9 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes'):
    ("Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
     ['PM-VOTE-001', 'PM-VOTE-014', 'PM-ORG-005', 'PM-SEC-001']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision'):
+   ("Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+    ['PM-VOTE-002', 'PM-VOTE-011', 'PM-VOTE-012', 'PM-VOTE-014', 'PM-VOTE-016', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule'):
    ('Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again',
     ['PM-GA-004', 'PM-GA-006', 'PM-SEC-001']),
@@ -207,9 +210,9 @@ PLANNED = [
   'Generate the notice document and send the electronic notification beside the posting', ['PM-GA-008', 'PM-SYS-013']),
  ('post', '/agenda-items/{agenda_item_id}/votes', 'assembly',
   'Cast or record a vote', ['PM-GA-009', 'PM-GA-018', 'PM-VOTE-014', 'PM-ORG-005']),
- ('post', '/agenda-items/{agenda_item_id}/close', 'assembly',
-  'Close the item and compute the tally on its stated denominator',
-  ['PM-VOTE-011', 'PM-VOTE-012', 'PM-VOTE-013', 'PM-VOTE-016']),
+ ('post', '/agenda-items/{agenda_item_id}/absentee-merge', 'assembly',
+  'Merge the absentee votes of the window into the tally and declare the result final',
+  ['PM-VOTE-013']),
  ('post', '/assemblies/{assembly_id}/protocol', 'assembly',
   'Draw up the protocol and announce it, starting the appeal clock',
   ['PM-GA-019', 'PM-GA-020', 'PM-GA-021', 'PM-GA-023']),

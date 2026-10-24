@@ -216,4 +216,80 @@ class VotePersistenceIT {
         vote(m, m.owners[0], "FOR").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))   // nobody signed in records nothing
         assertThat(rows(m)).isEmpty()
     }
+
+    private fun close(m: Meeting): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/decision", ""))
+
+    private fun decisions(m: Meeting) = jdbc.queryForList("SELECT * FROM assembly.decision WHERE agenda_item_id = ?::uuid", m.item)
+
+    @Test
+    fun `PM-VOTE-016 closing an item stores the majority applied, the tally of the votes in effect, the sitting and the status - reproducible from its basis`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        signedIn(m.manager) {
+            vote(m, ana, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "AGAINST", correction = "пълномощникът гласува против").andExpect(status().isCreated)    // the reversed FOR is not counted
+            close(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.majorityRuleId").value("GENERAL@2009-01-01")).andExpect(jsonPath("$.denominator").value("REPRESENTED"))
+                .andExpect(jsonPath("$.comparison").value("MORE_THAN")).andExpect(jsonPath("$.thresholdPct").value("50"))
+                .andExpect(jsonPath("$.represented").value("75")).andExpect(jsonPath("$.sessionNo").value(1))
+                .andExpect(jsonPath("$.tallyFor").value("50")).andExpect(jsonPath("$.tallyAgainst").value("25")).andExpect(jsonPath("$.tallyAbstain").value("0"))
+                .andExpect(jsonPath("$.result").value("FOR 66.67% of represented (50.00% of total, 75.00% represented); threshold more than 50% of represented (GENERAL@2009-01-01) — PASSED"))
+                .andExpect(jsonPath("$.outcome").value("PASSED")).andExpect(jsonPath("$.status").value("PROVISIONAL"))
+                .andExpect(jsonPath("$.closedBy").value(m.manager.toString()))
+        }
+        val stored = decisions(m).single()
+        val basis = stored["basis"] as String
+        assertThat(stored["basis_hash"]).isEqualTo(java.security.MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) })
+        assertThat(listOf(stored["law_version"], stored["engine_version"], (stored["session_no"] as Number).toInt())).containsExactly(zues.law.CATALOGUE_VERSION, zues.law.ENGINE_VERSION, 1)
+        // every vote in effect, and only those, is in the basis by its id
+        val inEffect = jdbc.queryForList("SELECT id FROM assembly.vote v WHERE agenda_item_id = ?::uuid AND NOT EXISTS (SELECT 1 FROM assembly.vote r WHERE r.reverses = v.id)", UUID::class.java, m.item)
+        assertThat(basis.lines().drop(1).map { it.substringAfterLast(" by ") }).containsExactlyInAnyOrderElementsOf(inEffect.map { it.toString() })
+        assertThat(basis.lines().drop(1)).hasSize(2).anyMatch { it.startsWith("$boris ${m.unit} 25 AGAINST") }
+        assertThat(jdbc.update("UPDATE assembly.decision SET outcome = 'NOT_PASSED' WHERE agenda_item_id = ?::uuid", m.item)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.decision WHERE agenda_item_id = ?::uuid", m.item)).isZero()
+        assertThat(decisions(m).single()["basis_hash"]).isEqualTo(stored["basis_hash"])
+    }
+
+    @Test
+    fun `PM-VOTE-014 once an item is closed no vote on it is taken or corrected, and it is closed once`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        signedIn(m.manager) {
+            vote(m, ana, "AGAINST").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated).andExpect(jsonPath("$.outcome").value("NOT_PASSED"))
+            vote(m, boris, "FOR").andExpect(status().isConflict)
+            vote(m, ana, "FOR", correction = "късно").andExpect(status().isConflict)
+            close(m).andExpect(status().isConflict)
+        }
+        assertThat(rows(m)).hasSize(1)
+        assertThat(decisions(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-VOTE-011 a vote of an owner the opened sitting did not weigh has no place in its represented share - the close is refused`() {
+        val m = opened()
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            created("${m.base}/attendance", """{"attendeePartyId":"${m.owners[2]}","channel":"IN_PERSON"}""")        // Vera arrives after the opening
+            vote(m, m.owners[2], "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("#283")))
+        }
+        assertThat(decisions(m)).isEmpty()
+    }
+
+    @Test
+    fun `PM-SEC-001 an item is closed by whoever runs the assembly - an owner, another office and a stranger are a 403 naming the rule`() {
+        val m = opened()
+        val controller = person()
+        jdbc.update(
+            sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)"),
+            m.entranceId, controller,
+        )
+        for (who in listOf(m.owners[0], controller, person())) {
+            signedIn(who) { close(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        }
+        close(m).andExpect(status().isForbidden)
+        assertThat(decisions(m)).isEmpty()
+    }
 }
