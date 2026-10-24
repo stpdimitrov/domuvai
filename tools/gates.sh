@@ -10,16 +10,20 @@ fail=0
 # GATES_TESTS overrides the test command (check.sh runs one lane's tests).
 run() {
   local name=$1; shift
-  if [ -z "${GATES_QUIET:-}" ]; then
-    printf '\n\033[1m▸ %s\033[0m\n' "$name"; "$@" || { fail=1; printf '\033[31m  ✗ failed\033[0m\n'; }; return
-  fi
   local out; out=$(mktemp)
-  if "$@" >"$out" 2>&1; then echo "✓ $name"; else
-    fail=1; echo "✗ $name"
-    { grep -E 'FAILED|✗|[Ee]rror|What went wrong|> |Traceback|^E ' "$out" | grep -vE '^\s+at ' | head -25; } || tail -15 "$out"
+  if [ -z "${GATES_QUIET:-}" ]; then
+    printf '\n\033[1m▸ %s\033[0m\n' "$name"
+    "$@" 2>&1 | tee "$out"; [ "${PIPESTATUS[0]}" -eq 0 ] && { rm -f "$out"; return; }
+    fail=1; printf '\033[31m  ✗ failed\033[0m\n'
+    # In CI the failing gate's error lines become a check-run annotation: tools/ci_failure.py reads them when
+    # the job log itself is unreachable (it is, from a Claude Code session).
+    [ -n "${GITHUB_ACTIONS:-}" ] && echo "::error title=gate $name::$(errors "$out" | head -10 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
+  elif "$@" >"$out" 2>&1; then echo "✓ $name"
+  else fail=1; echo "✗ $name"; errors "$out"
   fi
   rm -f "$out"
 }
+errors() { { grep -E 'FAILED|✗|[Ee]rror|What went wrong|> |Traceback|^E |NO RAW' "$1" | grep -vE '^\s+at ' | head -25; } || tail -15 "$1"; }
 
 run "1/11  tests"               ${GATES_TESTS:-./gradlew test --console=plain}
 run "2/11  event contracts"     bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
