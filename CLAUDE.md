@@ -108,7 +108,7 @@ Review the diff against the rule texts as if someone else wrote it. Re-reading y
 
 Add the slice's entry as a new file in `docs/sessionlog/` and commit it with the slice. Never edit an earlier entry.
 
-**One slice per session.** After the merge and `main` synced, the session ends; the next slice boots fresh from the repo (`.claude/skills/zues-slice/SKILL.md` §7.5).
+**One slice per session.** After the merge and `main` synced, the session starts its successor under the chain-at-close safeguards and ends; the next slice boots fresh from the repo (`.claude/skills/zues-slice/SKILL.md` §7.5).
 
 ### Working cheaply
 
