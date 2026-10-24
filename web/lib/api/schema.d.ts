@@ -63,7 +63,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404 */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
         put?: never;
         /** Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
@@ -80,7 +81,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002 */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
         put?: never;
         /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
@@ -2121,6 +2123,7 @@ export interface components {
             correction?: string;
             /** Format: uuid */
             id: string;
+            inEffect: boolean;
             /** Format: uuid */
             ownerPartyId: string;
             /** Format: uuid */
@@ -2465,6 +2468,63 @@ export interface operations {
             };
         };
     };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision: {
         parameters: {
             query?: never;
@@ -2485,6 +2545,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoteView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Forbidden */

@@ -3457,6 +3457,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "inEffect": {
+            "type": "boolean"
+          },
           "ownerPartyId": {
             "format": "uuid",
             "type": "string"
@@ -3486,6 +3489,7 @@
           "channel",
           "choice",
           "id",
+          "inEffect",
           "ownerPartyId",
           "recordedBy",
           "sessionNo",
@@ -3967,6 +3971,99 @@
       }
     },
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-011",
+          "PM-VOTE-016",
+          "PM-SEC-001",
+          "PM-SEC-002"
+        ]
+      },
       "post": {
         "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision",
         "parameters": [
@@ -4064,6 +4161,115 @@
       }
     },
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VoteView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-014",
+          "PM-SEC-001",
+          "PM-SEC-002",
+          "PM-GOV-008"
+        ]
+      },
       "post": {
         "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes",
         "parameters": [

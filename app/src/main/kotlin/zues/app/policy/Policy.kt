@@ -85,6 +85,9 @@ enum class Action(val governedBy: String) {
     /** recording how an owner present at a sitting voted on an item of the agenda, or correcting it — by whoever runs the assembly */
     RECORD_VOTE("PM-SEC-001"),
 
+    /** how each owner voted on an item, row by row — another person's vote: the manager, the board and the controller only; everyone else reads the result (the owner's decision of 2026-10-24) */
+    READ_VOTES("PM-SEC-002"),
+
     /** who holds more than the law's share of an entrance's ideal parts, behind a higher quorum — another person's holding */
     READ_CONCENTRATION("PM-SEC-002"),
 }
@@ -165,7 +168,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 19
+        const val MATRIX_VERSION = 20
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -281,6 +284,9 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.RECORD_VOTE, Role.MB, "PM-SEC-001"),
             Permit(Action.RECORD_VOTE, Role.CTL, "PM-SEC-001"),
             Permit(Action.RECORD_VOTE, Role.OWN, "PM-SEC-001"),
+            Permit(Action.READ_VOTES, Role.BM, "PM-SEC-001"),
+            Permit(Action.READ_VOTES, Role.MB, "PM-SEC-001"),
+            Permit(Action.READ_VOTES, Role.CTL, "PM-GOV-008"),
         )
     }
 }
