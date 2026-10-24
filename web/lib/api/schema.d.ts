@@ -56,6 +56,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes": {
         parameters: {
             query?: never;
@@ -1300,6 +1317,30 @@ export interface components {
             urgencyReason?: string;
             urgent: boolean;
         };
+        DecisionView: {
+            /** Format: uuid */
+            agendaItemId: string;
+            basisHash: string;
+            /** Format: uuid */
+            closedBy: string;
+            comparison: string;
+            /** Format: date-time */
+            decidedAt: string;
+            denominator: string;
+            /** Format: uuid */
+            id: string;
+            majorityRuleId: string;
+            outcome: string;
+            represented: string;
+            result: string;
+            /** Format: int32 */
+            sessionNo: number;
+            status: string;
+            tallyAbstain: string;
+            tallyAgainst: string;
+            tallyFor: string;
+            thresholdPct: string;
+        };
         DeclarationFiled: {
             /** Format: date */
             filedOn: string;
@@ -2413,6 +2454,63 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

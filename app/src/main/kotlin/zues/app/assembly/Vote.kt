@@ -54,6 +54,7 @@ class VoteService(
     private val sittings: SittingRepository,
     private val attendance: AttendanceService,
     private val votes: VoteRepository,
+    private val decisions: DecisionRepository,
     private val holdings: Holdings,
     private val clock: Clock,
 ) {
@@ -75,6 +76,7 @@ class VoteService(
         val item = agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
         check(assembly.status == AssemblyStatus.OPEN.name) { "votes are taken at a sitting that opened on its quorum; this assembly is ${assembly.status}" }
+        check(!decisions.existsByAgendaItemId(itemId)) { "this item is closed: no vote on it is taken or corrected (PM-VOTE-014)" }
         val sitting = sittings.findByAssemblyIdOrderBySessionNo(assemblyId).single { it.quorumMet }
         val today = LocalDate.parse(toSofiaDate(clock.instant()))                                         // a Sofia calendar day (PM-SYS-004)
         check(today == sitting.weighedOn) { "the votes of sitting ${sitting.sessionNo} are taken on ${sitting.weighedOn}" }

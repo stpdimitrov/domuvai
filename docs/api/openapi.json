@@ -839,6 +839,86 @@
         ],
         "type": "object"
       },
+      "DecisionView": {
+        "properties": {
+          "agendaItemId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "basisHash": {
+            "type": "string"
+          },
+          "closedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "comparison": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "denominator": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "majorityRuleId": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "represented": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "sessionNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tallyAbstain": {
+            "type": "string"
+          },
+          "tallyAgainst": {
+            "type": "string"
+          },
+          "tallyFor": {
+            "type": "string"
+          },
+          "thresholdPct": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agendaItemId",
+          "basisHash",
+          "closedBy",
+          "comparison",
+          "decidedAt",
+          "denominator",
+          "id",
+          "majorityRuleId",
+          "outcome",
+          "represented",
+          "result",
+          "sessionNo",
+          "status",
+          "tallyAbstain",
+          "tallyAgainst",
+          "tallyFor",
+          "thresholdPct"
+        ],
+        "type": "object"
+      },
       "DeclarationFiled": {
         "properties": {
           "filedOn": {
@@ -3882,6 +3962,103 @@
         "x-rules": [
           "PM-VOTE-004",
           "PM-GA-006",
+          "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-002",
+          "PM-VOTE-011",
+          "PM-VOTE-012",
+          "PM-VOTE-014",
+          "PM-VOTE-016",
           "PM-SEC-001"
         ]
       }
