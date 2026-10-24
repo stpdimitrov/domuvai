@@ -102,7 +102,9 @@ class VoteService(
         check(theirs.none { it.unitId in bothRoles || it.unitId in owned.overHeldUnitIds }) {
             "a unit of this owner has both an owner and a holder of a right of use, or is owned for more than the whole of it: it is not weighed, so not voted on (TODO(legal): PM-GA-012, PM-ORG-005)"
         }
-        // one row per unit: a co-owner weighs their share of it and no more, and never twice (vote_first_once)
+        // one row per unit: a co-owner weighs their share of it and no more, and never twice (vote_first_once). Co-owners'
+        // rounded shares may add up to a hair over the unit (within Holdings' tolerance): the tally caps a unit at its
+        // ideal parts, as quorum weighing does — a row records the owner's share exactly as the book gives it.
         return theirs.groupBy { it.unitId }.map { (unit, held) ->
             aggregates.insert(row(unit, held.fold(BigDecimal.ZERO) { sum, h -> sum + BigDecimal(h.idealParts) }, reverses = null))
         }

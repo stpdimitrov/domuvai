@@ -117,7 +117,7 @@ class VotePersistenceIT {
     private fun vote(m: Meeting, owner: UUID, choice: String, correction: String? = null, item: String = m.item): ResultActions =
         mvc.perform(post("${m.base}/agenda/$item/votes", """{"ownerPartyId":"$owner","choice":"$choice"${correction?.let { ""","correction":"$it"""" }.orEmpty()}}"""))
 
-    private fun rows(m: Meeting) = jdbc.queryForList("SELECT party_id, weight, choice, channel, reverses, correction FROM assembly.vote WHERE agenda_item_id = ?::uuid ORDER BY cast_at, id", m.item)
+    private fun rows(m: Meeting) = jdbc.queryForList("SELECT id, party_id, weight, choice, channel, reverses, correction FROM assembly.vote WHERE agenda_item_id = ?::uuid ORDER BY cast_at, id", m.item)
 
     @Test
     fun `PM-ORG-005 a vote weighs the owner's title share of the unit's ideal parts - in person or by proxy, once, and only for an owner present`() {
@@ -134,9 +134,13 @@ class VotePersistenceIT {
             vote(m, vera, "FOR").andExpect(status().isBadRequest)                                                    // not present: no vote
             vote(m, ana, "AGAINST").andExpect(status().isConflict)                                                    // once — a second is a correction
             vote(m, ana, "MAYBE").andExpect(status().isBadRequest)
+            // Vera arrives, and votes against: half the unit for, half against — they cancel out
+            created("${m.base}/attendance", """{"attendeePartyId":"$vera","channel":"IN_PERSON"}""")
+            vote(m, vera, "AGAINST").andExpect(status().isCreated).andExpect(jsonPath("$[0].weight").value("25"))
         }
-        // what was cast is the represented owners' share of the unit, counted once each
-        assertThat(rows(m).sumOf { it["weight"] as java.math.BigDecimal }.stripTrailingZeros().toPlainString()).isEqualTo("75")
+        // what was cast is the unit's ideal parts, each owner counted once by their share
+        fun cast(choice: String?) = rows(m).filter { choice == null || it["choice"] == choice }.sumOf { it["weight"] as java.math.BigDecimal }.stripTrailingZeros().toPlainString()
+        assertThat(listOf(cast("FOR"), cast("AGAINST"), cast(null))).containsExactly("50", "50", "100")
         assertThatThrownBy {
             jdbc.update(
                 "INSERT INTO assembly.vote (id, entrance_id, assembly_id, agenda_item_id, session_no, party_id, unit_id, weight, choice, channel, cast_at, recorded_by, login_issuer, login_subject) " +
@@ -162,7 +166,7 @@ class VotePersistenceIT {
         }
         val kept = rows(m)
         assertThat(kept.map { it["choice"] }).containsExactly("FOR", "AGAINST", "ABSTAIN")
-        assertThat(kept[2]["reverses"]).isNotEqualTo(kept[1]["reverses"])
+        assertThat(listOf(kept[1]["reverses"], kept[2]["reverses"])).containsExactly(UUID.fromString(first.get("id").asText()), kept[1]["id"])
         // nothing is edited or removed, whoever asks the database
         assertThat(jdbc.update("UPDATE assembly.vote SET choice = 'FOR' WHERE party_id = ?", ana)).isZero()
         assertThat(jdbc.update("DELETE FROM assembly.vote WHERE party_id = ?", ana)).isZero()
