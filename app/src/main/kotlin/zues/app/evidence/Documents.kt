@@ -173,7 +173,7 @@ internal class DocumentStore(private val jdbc: JdbcClient) {
 
     private companion object {
         const val COLUMNS = "id, entrance_id, entity_ref, kind, content_hash, media_type, author_party_id, stored_at, " +
-            "document_key, version_no, supersedes, paper_location, paper_custodian, retention_until, signature_validation_report, " +
+            "document_key, version_no, supersedes, paper_location, paper_custodian, retention_until, signature_validation_report::text, " +
             "captured_at, display_copy_hash, breach_party_id, breach_description, breach_occurred_at, breach_location"
     }
 }
