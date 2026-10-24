@@ -113,7 +113,7 @@ internal class DocumentStore(private val jdbc: JdbcClient) {
             "INSERT INTO evidence.document (id, entrance_id, entity_ref, kind, content_hash, media_type, author_party_id, stored_at, " +
                 "document_key, version_no, supersedes, paper_location, paper_custodian, retention_until, signature_validation_report, " +
                 "captured_at, display_copy_hash, breach_party_id, breach_description, breach_occurred_at, breach_location) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?)",
         ).params(
             d.id, d.entranceId, d.entityRef, d.kind.name, d.contentHash, d.mediaType, d.authorPartyId, Timestamp.from(d.storedAt),
             d.documentKey, d.versionNo, d.supersedes, d.paperOriginal?.location, d.paperOriginal?.custodian,
