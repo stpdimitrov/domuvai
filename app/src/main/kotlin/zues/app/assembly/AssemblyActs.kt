@@ -147,6 +147,16 @@ class AssemblyActs(
         return sittings.open(entranceId, assemblyId, by)
     }
 
+    /** The policy's [action] first, then: is this assembly theirs to run — refused under [action]'s rule either way. */
+    internal fun runBy(who: Asking, entranceId: UUID, assemblyId: UUID, action: Action): Actor {
+        acting.actor(who, action, entranceId)
+        return try {
+            running(who, entranceId, assemblyId)
+        } catch (e: ActRefused) {
+            throw ActRefused(action.governedBy)
+        }
+    }
+
     /** The policy's own line first, then: is this assembly theirs to run — refused under the register's rule either way. */
     private fun keepingTheRegister(who: Asking, entranceId: UUID, assemblyId: UUID): Actor {
         acting.actor(who, Action.KEEP_REGISTER, entranceId)

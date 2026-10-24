@@ -56,6 +56,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance": {
         parameters: {
             query?: never;
@@ -1826,6 +1843,12 @@ export interface components {
             /** Format: date-time */
             postedAt: string;
         };
+        RecordVoteRequest: {
+            choice: string;
+            correction?: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+        };
         RegisterAbsencesRequest: {
             absences: components["schemas"]["NewAbsenceRequest"][];
         };
@@ -2048,6 +2071,26 @@ export interface components {
         };
         VerifyIdentityRequest: {
             how: string;
+        };
+        VoteView: {
+            /** Format: date-time */
+            castAt: string;
+            channel: string;
+            choice: string;
+            correction?: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+            /** Format: uuid */
+            recordedBy: string;
+            /** Format: uuid */
+            reverses?: string;
+            /** Format: int32 */
+            sessionNo: number;
+            /** Format: uuid */
+            unitId: string;
+            weight: string;
         };
         WhoIsAsking: {
             /** Format: uuid */
@@ -2370,6 +2413,78 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordVoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoteView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

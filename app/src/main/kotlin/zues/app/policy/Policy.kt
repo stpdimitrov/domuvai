@@ -82,6 +82,9 @@ enum class Action(val governedBy: String) {
     /** an entrance's assemblies: their list, one with its agenda, its quorum meter, its register, its proxies, whether a year's was held — and the owners' petitions to convene one */
     READ_ASSEMBLY("PM-SEC-001"),
 
+    /** recording how an owner present at a sitting voted on an item of the agenda, or correcting it — by whoever runs the assembly */
+    RECORD_VOTE("PM-SEC-001"),
+
     /** who holds more than the law's share of an entrance's ideal parts, behind a higher quorum — another person's holding */
     READ_CONCENTRATION("PM-SEC-002"),
 }
@@ -162,7 +165,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 18
+        const val MATRIX_VERSION = 19
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -190,7 +193,9 @@ class Policy(private val sources: List<RoleSource>) {
          * assemblies and the owners' petitions to convene one: anyone holding a role in it — an owner, for whom they are
          * condominium-level matters (PM-SEC-002), a holder of use, the offices and the cashier; who owns more than the
          * law's share behind a higher quorum is another person's holding, for the manager, the board and the controller
-         * only (the owner's decisions R1 on #247, 2026-10-22, and P1, 2026-10-23).
+         * only (the owner's decisions R1 on #247, 2026-10-22, and P1, 2026-10-23). A vote at a sitting is recorded by
+         * whoever runs the assembly, as its register is kept — an office, or the owner who convened on a petition (the
+         * owner's decision of 2026-10-24).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -272,6 +277,10 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.READ_CONCENTRATION, Role.BM, "PM-SEC-001"),
             Permit(Action.READ_CONCENTRATION, Role.MB, "PM-SEC-001"),
             Permit(Action.READ_CONCENTRATION, Role.CTL, "PM-GOV-008"),
+            Permit(Action.RECORD_VOTE, Role.BM, "PM-SEC-001"),
+            Permit(Action.RECORD_VOTE, Role.MB, "PM-SEC-001"),
+            Permit(Action.RECORD_VOTE, Role.CTL, "PM-SEC-001"),
+            Permit(Action.RECORD_VOTE, Role.OWN, "PM-SEC-001"),
         )
     }
 }
