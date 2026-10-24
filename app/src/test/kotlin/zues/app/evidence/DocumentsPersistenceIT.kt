@@ -200,4 +200,135 @@ class DocumentsPersistenceIT {
         refused("document_paper_whole") { insert(entranceId, author, "PROTOCOL", "архивът", null) }
         refused("document_paper_said") { insert(entranceId, author, "PROTOCOL", " ", "председателят на УС") }
     }
+
+    @Test
+    fun `PM-DOC-003 PM-DOC-004 the table refuses a constative protocol without breach details - who, what, when, where`() {
+        val entranceId = entrance()
+        val author = party()
+        val breacher = party()
+        val occurred = java.sql.Timestamp.from(java.time.Instant.now())
+        // a complete constative protocol is stored
+        val id = UUID.randomUUID()
+        val bytes = "констативен протокол".toByteArray()
+        val hash = jdbc.queryForObject("SELECT encode(sha256(?), 'hex')", String::class.java, bytes)!!
+        jdbc.update("INSERT INTO evidence.blob (content_hash, bytes) VALUES (?, ?)", hash, bytes)
+        jdbc.update(
+            "INSERT INTO evidence.document (id, entrance_id, entity_ref, kind, content_hash, media_type, author_party_id, " +
+                "document_key, version_no, breach_party_id, breach_description, breach_occurred_at, breach_location) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            id, entranceId, "party:$breacher", "CONSTATIVE_PROTOCOL", hash, "application/pdf", author,
+            id, 1, breacher, "използване на общи части за лични нужди", occurred, "вход 1, етаж 3",
+        )
+        // missing any required field is refused
+        refused("document_constative_complete") {
+            jdbc.update(
+                "INSERT INTO evidence.document (id, entrance_id, entity_ref, kind, content_hash, media_type, author_party_id, " +
+                    "document_key, version_no, breach_description, breach_occurred_at, breach_location) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                UUID.randomUUID(), entranceId, "party:$breacher", "CONSTATIVE_PROTOCOL", hash, "application/pdf", author,
+                UUID.randomUUID(), 1, "нарушение", occurred, "място",
+            )
+        }
+        refused("document_constative_complete") {
+            jdbc.update(
+                "INSERT INTO evidence.document (id, entrance_id, entity_ref, kind, content_hash, media_type, author_party_id, " +
+                    "document_key, version_no, breach_party_id, breach_description, breach_occurred_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                UUID.randomUUID(), entranceId, "party:$breacher", "CONSTATIVE_PROTOCOL", hash, "application/pdf", author,
+                UUID.randomUUID(), 1, breacher, "нарушение", occurred,
+            )
+        }
+    }
+
+    @Test
+    fun `PM-DOC-005 retention policy - a document is marked for deletion, the deletion is logged`() {
+        val entranceId = entrance()
+        val author = party()
+        val entity = "assembly:${UUID.randomUUID()}"
+        val stored = protocol(entranceId, author, entity, "протокол".toByteArray())
+
+        // initially no retention date
+        assertThat(stored.retentionUntil).isNull()
+        // mark for deletion at a future date
+        val retentionDate = java.time.LocalDate.now().plusYears(5)
+        documents.markForDeletion(entranceId, stored.id, retentionDate)
+        assertThat(documents.find(entranceId, stored.id)!!.retentionUntil).isEqualTo(retentionDate)
+        // clear the mark
+        documents.markForDeletion(entranceId, stored.id, null)
+        assertThat(documents.find(entranceId, stored.id)!!.retentionUntil).isNull()
+        // the deletion log table exists and is immutable
+        val logId = UUID.randomUUID()
+        jdbc.update(
+            "INSERT INTO evidence.deletion_log (id, document_id, entrance_id, entity_ref, kind, content_hash, deleted_by, reason) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            logId, stored.id, entranceId, entity, "PROTOCOL", stored.contentHash, author, "statutory retention period elapsed",
+        )
+        assertThatThrownBy { jdbc.update("UPDATE evidence.deletion_log SET reason = 'changed' WHERE id = ?", logId) }
+            .isInstanceOf(DataAccessException::class.java).hasMessageContaining("neither changed nor removed")
+        assertThatThrownBy { jdbc.update("DELETE FROM evidence.deletion_log WHERE id = ?", logId) }
+            .isInstanceOf(DataAccessException::class.java).hasMessageContaining("neither changed nor removed")
+    }
+
+    @Test
+    fun `PM-DOC-006 case file export - documents for a matter are returned chronologically`() {
+        val entranceId = entrance()
+        val author = party()
+        val matter = "arrear:${UUID.randomUUID()}"
+        // store three documents for the matter, out of order
+        Thread.sleep(10)  // ensure different stored_at
+        val second = documents.store(StoreDocument(entranceId, matter, "NOTICE", "application/pdf", "покана".toByteArray(), author))
+        Thread.sleep(10)
+        val first = documents.store(StoreDocument(entranceId, matter, "FILING", "application/pdf", "заявление".toByteArray(), author))
+        Thread.sleep(10)
+        val third = documents.store(StoreDocument(entranceId, matter, "CERTIFICATE", "application/pdf", "сертификат".toByteArray(), author))
+        // export returns them chronologically
+        val exported = documents.exportCaseFile(entranceId, "arrears", matter)
+        assertThat(exported.map { it.id }).containsExactly(second.id, first.id, third.id)
+        assertThat(exported.map { it.kind }).containsExactly(DocumentKind.NOTICE, DocumentKind.FILING, DocumentKind.CERTIFICATE)
+        // another matter has no documents
+        assertThat(documents.exportCaseFile(entranceId, "expulsion", "unit:${UUID.randomUUID()}")).isEmpty()
+    }
+
+    @Test
+    fun `PM-DOC-008 signature validation report is stored at signing time`() {
+        val entranceId = entrance()
+        val author = party()
+        val validationReport = """{"signer":"Иван Петров","signedAt":"2026-10-22T14:00:00Z","valid":true}"""
+        val stored = documents.store(
+            StoreDocument(
+                entranceId, "assembly:${UUID.randomUUID()}", "PROTOCOL", "application/pdf",
+                "протокол с КЕП".toByteArray(), author, paper, null, null, validationReport,
+            ),
+        )
+        assertThat(stored.signatureValidationReport).isEqualTo(validationReport)
+        assertThat(documents.find(entranceId, stored.id)!!.signatureValidationReport).isEqualTo(validationReport)
+    }
+
+    @Test
+    fun `PM-DOC-009 photographic evidence retains capture timestamp and display copy - original bytes unmodified`() {
+        val entranceId = entrance()
+        val author = party()
+        val captured = java.time.Instant.parse("2026-10-22T14:30:00Z")
+        val originalBytes = "original photo bytes".toByteArray()
+        val displayBytes = "resized photo".toByteArray()
+        val displayHash = jdbc.queryForObject("SELECT encode(sha256(?), 'hex')", String::class.java, displayBytes)!!
+        // store the display copy in blob first
+        jdbc.update("INSERT INTO evidence.blob (content_hash, bytes) VALUES (?, ?)", displayHash, displayBytes)
+        // store the photo with metadata
+        val stored = documents.store(
+            StoreDocument(
+                entranceId, "posting_act:${UUID.randomUUID()}", "POSTING_ACT", "image/jpeg",
+                originalBytes, author, null, null, null, null, PhotoMetadata(captured, displayHash),
+            ),
+        )
+        assertThat(stored.photoMetadata).isNotNull
+        assertThat(stored.photoMetadata!!.capturedAt).isEqualTo(captured)
+        assertThat(stored.photoMetadata!!.displayCopyHash).isEqualTo(displayHash)
+        // original bytes are unmodified
+        assertThat(documents.content(entranceId, stored.id)).isEqualTo(originalBytes)
+        // read back from database
+        val read = documents.find(entranceId, stored.id)!!
+        assertThat(read.photoMetadata!!.capturedAt).isEqualTo(captured)
+        assertThat(read.photoMetadata!!.displayCopyHash).isEqualTo(displayHash)
+    }
 }

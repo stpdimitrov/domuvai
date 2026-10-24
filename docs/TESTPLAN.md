@@ -6,9 +6,9 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **86** (37%) |
-| Remaining | **147** |
-| Proposed slices at ~10 rules each | **19** |
+| Proved by a test named after the rule | **92** (39%) |
+| Remaining | **141** |
+| Proposed slices at ~10 rules each | **18** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
@@ -51,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-54 rule(s) remaining across 7 slice(s).
+48 rule(s) remaining across 6 slice(s).
 
 ### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s)
 
@@ -93,18 +93,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GA-026` | SHOULD | Zero re-keying between notice and protocol. |
 | `PM-VOTE-015` | SHOULD | Debt does not disable the ballot; it may be displayed as context. |
 
-### S-G2-04 · `evidence` · DOC · 6 rule(s)
-
-| Rule | | Test must prove |
-|---|---|---|
-| `PM-DOC-003` | MUST | Signature requirements adapt to the governance configuration. |
-| `PM-DOC-004` | MUST | Validation blocks submission with missing elements. |
-| `PM-DOC-005` | MUST | Retention policy per document kind, configurable. |
-| `PM-DOC-009` | MUST | The original bytes are what a court sees; the resized copy is only for the screen. |
-| `PM-DOC-006` | SHOULD | "Export case file" for arrears or expulsion. |
-| `PM-DOC-008` | SHOULD | Signature validity report is stored at signing time, not recomputed later. |
-
-### S-G2-05 · `identity-org` · GOV · 10 rule(s) · ⚠ 1 unconfirmed
+### S-G2-04 · `identity-org` · GOV · 10 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
@@ -119,7 +108,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-013` | MUST | Document generator produces the agreement from stored data. |
 | `PM-GOV-014` | MUST | Protocol picker forces selection of the deciding body. |
 
-### S-G2-06 · `identity-org` · GOV · 5 rule(s)
+### S-G2-05 · `identity-org` · GOV · 5 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
@@ -129,7 +118,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-009` | SHOULD | Declining a nomination requires a reason code. |
 | `PM-GOV-017` | SHOULD | Violation records cite the rule version in force on the incident date. |
 
-### S-G2-07 · `policy` · SEC · 8 rule(s) · ⚠ 1 unconfirmed
+### S-G2-06 · `policy` · SEC · 8 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
