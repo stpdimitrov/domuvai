@@ -22,7 +22,10 @@ class AdmitTest {
 
     @Test
     fun `PM-DOC-002 untyped uploads are not accepted for statutory slots - each of the six kinds the rule names is, and nothing else`() {
-        assertThat(DocumentKind.entries.map { admit(request(it.name)) }).containsExactlyElementsOf(DocumentKind.entries)
+        val breach = BreachRecord(UUID.randomUUID(), "test breach", java.time.Instant.now(), "test location")
+        assertThat(DocumentKind.entries.map { kind ->
+            admit(request(kind.name, breach = if (kind == DocumentKind.CONSTATIVE_PROTOCOL) breach else null))
+        }).containsExactlyElementsOf(DocumentKind.entries)
         assertThat(DocumentKind.entries.map { it.name })
             .containsExactlyInAnyOrder("PROTOCOL", "NOTICE", "POSTING_ACT", "CONSTATIVE_PROTOCOL", "FILING", "CERTIFICATE")
         for (untyped in listOf(null, "", "OTHER", "protocol", "SCAN")) {
