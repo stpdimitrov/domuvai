@@ -23,7 +23,10 @@ run() {
   fi
   rm -f "$out"
 }
-errors() { { grep -E 'FAILED|✗|[Ee]rror|What went wrong|> |Traceback|^E |NO RAW' "$1" | grep -vE '^\s+at ' | head -25; } || tail -15 "$1"; }
+errors() {
+  local hit; hit=$(grep -E 'FAILED|✗|[Ee]rror|What went wrong|> |Traceback|^E |NO RAW' "$1" | grep -vE '^\s+at ' | head -25)
+  if [ -n "$hit" ]; then echo "$hit"; else tail -15 "$1"; fi
+}
 
 run "1/11  tests"               ${GATES_TESTS:-./gradlew test --console=plain}
 run "2/11  event contracts"     bash -c 'cd tools && python3 build_events.py && python3 validate_events.py'
