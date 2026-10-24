@@ -56,6 +56,7 @@ data class Decision(
 
 interface DecisionRepository : ListCrudRepository<Decision, UUID> {
     fun existsByAgendaItemId(agendaItemId: UUID): Boolean
+    fun findByAgendaItemId(agendaItemId: UUID): Decision?
 }
 
 /** One vote in effect, as the tally counts it. */

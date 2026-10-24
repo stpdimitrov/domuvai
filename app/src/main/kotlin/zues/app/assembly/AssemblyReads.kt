@@ -28,11 +28,12 @@ class AssemblyReads(
     /**
      * Rule: PM-SEC-001 — anyone holding a role in the entrance reads its assemblies (the owner's decision of 2026-10-22,
      * R1 on #247); an owner, as condominium-level matters (PM-SEC-002); the controller, as all of its documentation
-     * (PM-GOV-008). Anybody else is [ActRefused], naming the rule.
+     * (PM-GOV-008). Anybody else is [ActRefused], naming the rule. A narrower read names its own [action] — how each
+     * owner voted is [Action.READ_VOTES]: the manager, the board and the controller only (PM-SEC-002).
      */
-    fun require(entranceId: UUID, who: Asking) {
+    fun require(entranceId: UUID, who: Asking, action: Action = Action.READ_ASSEMBLY) {
         if (unasked(who)) return
-        val decision = decide(Action.READ_ASSEMBLY, entranceId, who)
+        val decision = decide(action, entranceId, who)
         if (!decision.allowed) throw ActRefused(decision.ruleId)
     }
 

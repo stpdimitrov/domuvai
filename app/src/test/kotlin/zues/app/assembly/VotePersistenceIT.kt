@@ -292,4 +292,70 @@ class VotePersistenceIT {
         close(m).andExpect(status().isForbidden)
         assertThat(decisions(m)).isEmpty()
     }
+
+    private fun read(path: String): ResultActions =
+        mvc.perform(get(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } })
+
+    private fun mandated(m: Meeting, body: String): UUID = person().also {
+        jdbc.update(
+            sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date - 30, current_date + 300)"),
+            m.entranceId, body, it,
+        )
+    }
+
+    @Test
+    fun `PM-VOTE-016 a closed item's decision is read back - the majority, the tally, the result line and the status, by an owner too - before the close a 404`() {
+        val m = opened()
+        signedIn(m.owners[2]) { read("${m.base}/agenda/${m.item}/decision").andExpect(status().isNotFound) }
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+        }
+        val stored = decisions(m).single()
+        signedIn(m.owners[2]) {
+            read("${m.base}/agenda/${m.item}/decision").andExpect(status().isOk)
+                .andExpect(jsonPath("$.id").value(stored["id"].toString())).andExpect(jsonPath("$.majorityRuleId").value("GENERAL@2009-01-01"))
+                .andExpect(jsonPath("$.denominator").value("REPRESENTED")).andExpect(jsonPath("$.sessionNo").value(1))
+                .andExpect(jsonPath("$.tallyFor").value("50")).andExpect(jsonPath("$.represented").value("75"))
+                .andExpect(jsonPath("$.result").value("FOR 66.67% of represented (50.00% of total, 75.00% represented); threshold more than 50% of represented (GENERAL@2009-01-01) — PASSED"))
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.basisHash").value(stored["basis_hash"] as String))
+                .andExpect(jsonPath("$.basis").doesNotExist())                                               // the basis names how each owner voted
+            read("${m.base}/agenda/${UUID.randomUUID()}/decision").andExpect(status().isNotFound)
+        }
+        val elsewhere = opened()                                                                             // another entrance's closed item, asked through this one
+        signedIn(elsewhere.manager) { close(elsewhere).andExpect(status().isCreated) }
+        signedIn(m.owners[2]) { read("${m.base}/agenda/${elsewhere.item}/decision").andExpect(status().isNotFound) }
+        signedIn(person()) { read("${m.base}/agenda/${m.item}/decision").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+    }
+
+    @Test
+    fun `PM-SEC-002 how each owner voted is read by the manager, the board and the controller only - an owner and a stranger are a 403 naming the rule`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        signedIn(m.manager) {
+            vote(m, ana, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "AGAINST", correction = "пълномощникът гласува против").andExpect(status().isCreated)
+        }
+        val stored = rows(m)
+        for (reader in listOf(m.manager, mandated(m, "MB"), mandated(m, "CTL"))) {
+            signedIn(reader) {
+                read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk)
+                    .andExpect(jsonPath("$.length()").value(3))
+                    .andExpect(jsonPath("$[*].id").value(org.hamcrest.Matchers.contains(*stored.map { it["id"].toString() }.toTypedArray())))
+                    .andExpect(jsonPath("$[2].ownerPartyId").value(boris.toString())).andExpect(jsonPath("$[2].choice").value("AGAINST"))
+                    .andExpect(jsonPath("$[2].reverses").value(stored[1]["id"].toString())).andExpect(jsonPath("$[2].correction").value("пълномощникът гласува против"))
+                    .andExpect(jsonPath("$[*].inEffect").value(org.hamcrest.Matchers.contains(true, false, true)))
+            }
+        }
+        for (who in listOf(ana, boris, m.owners[2], person())) {
+            signedIn(who) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002")) }
+        }
+        val elsewhere = opened()                                                                             // another entrance's votes, asked through this one
+        signedIn(elsewhere.manager) { vote(elsewhere, elsewhere.owners[0], "FOR").andExpect(status().isCreated) }
+        signedIn(m.manager) {
+            read("${m.base}/agenda/${UUID.randomUUID()}/votes").andExpect(status().isNotFound)
+            read("${m.base}/agenda/${elsewhere.item}/votes").andExpect(status().isNotFound)
+        }
+    }
 }
