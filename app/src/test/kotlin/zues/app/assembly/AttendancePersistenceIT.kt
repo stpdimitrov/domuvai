@@ -88,7 +88,7 @@ class AttendancePersistenceIT {
     /** The entrance's manager, with the mandate in force — and signed in from here on. */
     private fun manager(entranceId: UUID, body: String = "BM", from: Int = -30, to: Int = 300): UUID = person().also {
         jdbc.update(
-            "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)",
+            sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date + ?, current_date + ?)"),
             entranceId, body, it, from, to,
         )
         signedInAs = "login-$it"
@@ -167,7 +167,7 @@ class AttendancePersistenceIT {
 
         // nobody but whoever runs the assembly keeps the register or verifies: an owner, the controller, nobody at all
         val controller = person().also {
-            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)", entranceId, it)
+            jdbc.update(sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)"), entranceId, it)
         }
         val verify = "$base/attendance/${remote.get("id").asText()}/identity-verification"
         for (who in listOf(ana, controller, null)) {

@@ -47,3 +47,28 @@ export async function convene(_: ConveneState, form: FormData): Promise<ConveneS
   }
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${answer.data.id}`);
 }
+
+export type AgendaState = { refused?: string; values?: Record<string, string> };
+
+/**
+ * Putting an item on the agenda (Rule: PM-GA-006, PM-VOTE-004) — the api's act, asked with the signed-in person's
+ * bearer. Whether this person runs the assembly, whether its agenda is still open and which majority the item's type
+ * is bound to are all the api's; a refusal is shown in its words, the form kept as filled. An item added after the
+ * notice was posted voids it (PM-GA-006): the api says so, and the page says it on the assembly it returns to.
+ */
+export async function addAgendaItem(_: AgendaState, form: FormData): Promise<AgendaState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const values = Object.fromEntries(["entrance", "assembly", "text", "itemType"].map((n) => [n, text(n)]));
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda", {
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly } },
+      body: { text: values.text, itemType: values.itemType },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "добавите точка в дневния ред") : unknownOutcome("добавянето на точката"), values };
+  }
+  redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}${answer.data.noticeVoided ? "&voided=1" : ""}`);
+}

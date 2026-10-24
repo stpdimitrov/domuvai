@@ -34,7 +34,7 @@ import java.util.UUID
  * accountable — even under a source of roles that would give anybody every office; an assembly is still read.
  */
 @WebMvcTest(AssemblyController::class)
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class, AssemblySignInOffWebTest.Generous::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class, AssemblySignInOffWebTest.Generous::class)
 class AssemblySignInOffWebTest {
 
     class Generous {

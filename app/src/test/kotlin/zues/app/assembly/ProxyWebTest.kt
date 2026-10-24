@@ -54,7 +54,7 @@ private const val AUDIENCE = "domuvai-api"
  * the login to — never a field of the request — and that whoever may not appoint gets a 403 and reaches nothing.
  */
 @WebMvcTest(ProxyController::class, properties = ["domuvai.auth.issuer-uri=$ISSUER", "domuvai.auth.audience=$AUDIENCE", "domuvai.auth.mode="])
-@Import(WhoAsks::class, Acting::class, Policy::class, AssemblyActs::class)
+@Import(WhoAsks::class, Acting::class, AssemblyReads::class, Policy::class, AssemblyActs::class)
 class ProxyWebTest {
 
     companion object {
@@ -233,6 +233,19 @@ class ProxyWebTest {
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.limit").value(3))
             .andExpect(jsonPath("$.error").value("one person represents at most 3 principals at an assembly (чл. 14 ЗУЕС) — PM-GA-010"))
+    }
+
+    @Test
+    fun `PM-SEC-001 the proxies are read by those holding a role in the entrance - a stranger, an occupant and a login tied to nobody are a 403 naming the rule, and nothing is read`() {
+        person("login-stranger-6")
+        person("login-occupant-6", Role.OCC)
+        for (subject in listOf("login-stranger-6", "login-occupant-6", "login-tied-to-nobody")) {
+            mvc.perform(get(base).by(subject)).andExpect(status().isForbidden).andExpect(jsonPath("$.error").value("not allowed (PM-SEC-001)"))
+        }
+        verifyNoInteractions(proxies)
+        person("login-holder-6", Role.USR)
+        whenever(proxies.forAssembly(entranceId, assemblyId)).thenReturn(emptyList())
+        mvc.perform(get(base).by("login-holder-6")).andExpect(status().isOk)
     }
 
     @Test

@@ -29,7 +29,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read an assembly with its agenda */
+        /** Read an assembly with its agenda — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId"];
         put?: never;
         post?: never;
@@ -56,6 +56,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance": {
         parameters: {
             query?: never;
@@ -63,7 +80,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the register of the sitting — each line, whether it counts, and whom it makes present */
+        /** Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
         put?: never;
         /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly */
@@ -115,7 +132,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the proxies registered for an assembly */
+        /** List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         put?: never;
         /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown */
@@ -133,7 +150,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far */
+        /** The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting's threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. Who owns the share behind a higher quorum is named to the manager, the board and the controller only */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_quorum"];
         put?: never;
         post?: never;
@@ -201,7 +218,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed */
+        /** Read a petition as weighed today — the share its signatories own against the threshold, or why it cannot be weighed — read as an assembly is: for anyone holding a role in the entrance; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_petitions_petitionId"];
         put?: never;
         post?: never;
@@ -252,7 +269,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first */
+        /** Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first — read as an assembly is */
         get: operations["get_assembly_entrances_entranceId_years_year"];
         put?: never;
         post?: never;
@@ -1826,6 +1843,12 @@ export interface components {
             /** Format: date-time */
             postedAt: string;
         };
+        RecordVoteRequest: {
+            choice: string;
+            correction?: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+        };
         RegisterAbsencesRequest: {
             absences: components["schemas"]["NewAbsenceRequest"][];
         };
@@ -2048,6 +2071,26 @@ export interface components {
         };
         VerifyIdentityRequest: {
             how: string;
+        };
+        VoteView: {
+            /** Format: date-time */
+            castAt: string;
+            channel: string;
+            choice: string;
+            correction?: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+            /** Format: uuid */
+            recordedBy: string;
+            /** Format: uuid */
+            reverses?: string;
+            /** Format: int32 */
+            sessionNo: number;
+            /** Format: uuid */
+            unitId: string;
+            weight: string;
         };
         WhoIsAsking: {
             /** Format: uuid */
@@ -2370,6 +2413,78 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordVoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoteView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3287,6 +3402,17 @@ export interface operations {
             };
             /** @description Bad Request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
