@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **84** (36%) |
-| Remaining | **149** |
+| Proved by a test named after the rule | **86** (37%) |
+| Remaining | **147** |
 | Proposed slices at ~10 rules each | **19** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-56 rule(s) remaining across 7 slice(s).
+54 rule(s) remaining across 7 slice(s).
 
 ### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s)
 
@@ -66,13 +66,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GA-023` | MUST | Decision shows a countdown; after 30 days status becomes `FINAL`. |
 | `PM-GA-024` | MUST | Litigation flag does not pause the execution clock; a court stay does. |
 | `PM-GA-025` | MUST | Every decision creates an execution task with a computed due date. |
-| `PM-VOTE-001` | MUST | An unbound item cannot be put to a vote. |
+| `PM-VOTE-002` | MUST | An item with no explicit threshold resolves to >50% of represented ideal parts and states the denominator used. |
 
 ### S-G2-02 · `assembly` · VOTE · 10 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-VOTE-002` | MUST | An item with no explicit threshold resolves to >50% of represented ideal parts and states the denominator used. |
 | `PM-VOTE-003` | MUST | Item type `EXTENSION` cannot pass at 99.9%. |
 | `PM-VOTE-005` | MUST | An item typed USEFUL_EXPENSE or CREDIT fails at 74.9% and passes at 75%. |
 | `PM-VOTE-006` | MUST | The respondent's ideal parts are removed from both numerator and denominator. |
@@ -82,13 +81,12 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-VOTE-010` | MUST | Each is a distinct agenda item type. |
 | `PM-VOTE-011` | MUST | Result line reads e.g. "62.41% of 78.10% represented; threshold 51% of total — NOT PASSED". |
 | `PM-VOTE-012` | MUST | Explicit `denominator` field per majority rule: `TOTAL` or `REPRESENTED`. |
+| `PM-VOTE-013` | MUST | Provisional result is labelled `PROVISIONAL` until day 7 closes. |
 
-### S-G2-03 · `assembly` · GA · VOTE · 7 rule(s) · ⚠ 1 unconfirmed
+### S-G2-03 · `assembly` · GA · VOTE · 5 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-VOTE-013` | MUST | Provisional result is labelled `PROVISIONAL` until day 7 closes. |
-| `PM-VOTE-014` | MUST NOT | Vote records are append-only. |
 | `PM-VOTE-016` | MUST | Reproducible from the audit trail years later. |
 | `PM-GA-011` | SHOULD ⚠ | Proxy form type drives the validation path. |
 | `PM-GA-008` | SHOULD | Sending email alone leaves the assembly in `DRAFT`. |
