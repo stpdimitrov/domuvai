@@ -4,10 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -26,8 +30,13 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import zues.app.identity_org.Logins
 import zues.kernel.toSofiaDate
+import java.security.MessageDigest
+import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
@@ -60,6 +69,24 @@ class VotePersistenceIT {
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var jdbc: JdbcTemplate
     @Autowired lateinit var logins: Logins
+    @Autowired lateinit var clock: ShiftedClock
+
+    /** The app's clock, moved forward by a test that needs a later day — and back, after it. */
+    class ShiftedClock(var by: Duration = Duration.ZERO) : Clock() {
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: ZoneId?): Clock = this
+        override fun instant(): Instant = Instant.now().plus(by)
+    }
+
+    @TestConfiguration
+    class Clocks {
+        @Bean
+        @Primary
+        fun shiftedClock(): ShiftedClock = ShiftedClock()
+    }
+
+    @AfterEach
+    fun clockBack() { clock.by = Duration.ZERO }
 
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
     private var signedInAs: String? = null
@@ -442,8 +469,8 @@ class VotePersistenceIT {
 
     private val scan = "ab".repeat(32)
 
-    private fun ballot(m: Meeting, owner: UUID, received: String, signature: String = "HANDWRITTEN", hash: String = scan): ResultActions =
-        mvc.perform(post("${m.base}/agenda/${m.item}/absentee-ballots", """{"ownerPartyId":"$owner","choice":"FOR","signature":"$signature","documentRef":"декларация 1","documentSha256":"$hash","receivedOn":"$received"}"""))
+    private fun ballot(m: Meeting, owner: UUID, received: String, signature: String = "HANDWRITTEN", hash: String = scan, choice: String = "FOR"): ResultActions =
+        mvc.perform(post("${m.base}/agenda/${m.item}/absentee-ballots", """{"ownerPartyId":"$owner","choice":"$choice","signature":"$signature","documentRef":"декларация 1","documentSha256":"$hash","receivedOn":"$received"}"""))
 
     @Test
     fun `PM-GA-017 only an item tagged ABSENTEE_ELIGIBLE accepts an absent owner's ballot, after its sitting closes - once, weighed by their share, never edited`() {
@@ -483,5 +510,59 @@ class VotePersistenceIT {
             ballot(m, m.owners[2], today, hash = "").andExpect(status().isBadRequest)
         }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", Long::class.java, m.item)).isZero()
+    }
+
+    private fun merge(m: Meeting): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/absentee-merge", ""))
+
+    @Test
+    fun `PM-VOTE-013 the absentee ballots are merged after day 7 into a decision superseding the provisional one - once, never edited, and only then FINAL`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)           // 50% for, the proxy's 25% votes AGAINST
+            vote(m, m.owners[1], "AGAINST").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated).andExpect(jsonPath("$.outcome").value("PASSED"))        // 50 of 75 represented
+            postProtocol(m, today).andExpect(status().isCreated)
+            ballot(m, m.owners[2], today, choice = "AGAINST").andExpect(status().isCreated)
+            merge(m).andExpect(status().isConflict)                                    // day 7 is not over
+        }
+        clock.by = Duration.ofDays(12)
+        signedIn(m.owners[0]) { merge(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        val provisional = decisions(m).single()["id"].toString()
+        signedIn(m.manager) {
+            merge(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.supersedes").value(provisional)).andExpect(jsonPath("$.represented").value("100"))
+                .andExpect(jsonPath("$.tallyFor").value("50")).andExpect(jsonPath("$.tallyAgainst").value("50"))
+                .andExpect(jsonPath("$.outcome").value("NOT_PASSED")).andExpect(jsonPath("$.result").value(org.hamcrest.Matchers.endsWith("NOT PASSED")))   // 50 of 100: the ballot turns it
+                .andExpect(jsonPath("$.mergedBy").value(m.manager.toString()))
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.finalOn").isNotEmpty)
+            merge(m).andExpect(status().isConflict)                                    // once
+        }
+        val row = jdbc.queryForMap("SELECT * FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item)
+        val basis = row["basis"].toString()
+        assertThat(basis).contains("supersedes $provisional ${decisions(m).single()["basis_hash"]}").contains("absentee ${m.owners[2]}")
+        assertThat(row["basis_hash"]).isEqualTo(MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) })
+        assertThat(decisions(m).single()["outcome"]).isEqualTo("PASSED")                       // the provisional one stays as it was
+        jdbc.update("UPDATE assembly.merged_decision SET outcome = 'PASSED' WHERE agenda_item_id = ?::uuid", m.item)
+        jdbc.update("DELETE FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item)
+        assertThat(jdbc.queryForList("SELECT outcome FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item).single()["outcome"]).isEqualTo("NOT_PASSED")
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.merged_decision") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        clock.by = Duration.ofDays(45)
+        signedIn(m.manager) { read("${m.base}/agenda/${m.item}/decision").andExpect(jsonPath("$.status").value("FINAL")).andExpect(jsonPath("$.supersedes").value(provisional)) }
+    }
+
+    @Test
+    fun `PM-GA-017 an eligible item not merged stays PROVISIONAL past the 30 days - an untagged item has nothing to merge`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val untagged = opened()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated); postProtocol(m, today).andExpect(status().isCreated) }
+        signedIn(untagged.manager) { close(untagged).andExpect(status().isCreated) }
+        clock.by = Duration.ofDays(45)
+        signedIn(m.manager) {
+            read("${m.base}/agenda/${m.item}/decision").andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.finalOn").doesNotExist())
+            merge(m).andExpect(status().isCreated).andExpect(jsonPath("$.represented").value("75")).andExpect(jsonPath("$.status").value("FINAL"))   // no ballot: merged all the same
+        }
+        signedIn(untagged.manager) { merge(untagged).andExpect(status().isConflict) }
     }
 }

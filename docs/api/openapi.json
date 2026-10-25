@@ -977,6 +977,14 @@
           "majorityRuleId": {
             "type": "string"
           },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "mergedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
           "outcome": {
             "type": "string"
           },
@@ -994,6 +1002,10 @@
             "type": "integer"
           },
           "status": {
+            "type": "string"
+          },
+          "supersedes": {
+            "format": "uuid",
             "type": "string"
           },
           "tallyAbstain": {
@@ -4215,6 +4227,100 @@
         ]
       }
     },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_merge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-013",
+          "PM-GA-017",
+          "PM-SEC-001"
+        ]
+      }
+    },
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision": {
       "get": {
         "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision",
@@ -4298,7 +4404,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
+        "summary": "An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — an item tagged for absentee ballots only once they are merged, then shown as the merged decision naming the one it supersedes — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
         "tags": [
           "assembly"
         ],
