@@ -377,4 +377,33 @@ class VotePersistenceIT {
             read("${m.base}/agenda/${elsewhere.item}/votes").andExpect(status().isNotFound)
         }
     }
+
+    @Test
+    fun `PM-SEC-004 every read of how each owner voted is entered - served or refused, who and when - and no role deletes an entry`() {
+        val m = opened()
+        signedIn(m.manager) { vote(m, m.owners[0], "FOR").andExpect(status().isCreated) }
+        val entries = { jdbc.queryForList("SELECT actor, login_subject, agenda_item_id, outcome, rule_id, at FROM assembly.vote_read WHERE entrance_id = ?::uuid ORDER BY at, id", m.entranceId) }
+        assertThat(entries()).isEmpty()                                                                      // recording a vote reads nothing
+        val stranger = person()
+        signedIn(m.manager) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk) }
+        signedIn(m.owners[1]) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isForbidden) }
+        signedIn(stranger) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isForbidden) }
+        signedIn(m.manager) { read("${m.base}/agenda/${UUID.randomUUID()}/votes").andExpect(status().isNotFound) }   // nothing there, nothing served, nothing entered
+        val unknown = UUID.randomUUID()
+        signedIn(stranger) { read("${m.base}/agenda/$unknown/votes").andExpect(status().isForbidden) }       // refused before anything is looked up: entered as asked
+        read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk)                                   // sign-in switched off: given to nobody, and entered so
+        val log = entries()
+        assertThat(log.map { listOf(it["actor"], it["login_subject"], it["agenda_item_id"], it["outcome"], it["rule_id"]) }).containsExactly(
+            listOf(m.manager, "login-${m.manager}", UUID.fromString(m.item), "SERVED", "PM-SEC-001"),
+            listOf(m.owners[1], "login-${m.owners[1]}", UUID.fromString(m.item), "REFUSED", "PM-SEC-002"),
+            listOf(stranger, "login-$stranger", UUID.fromString(m.item), "REFUSED", "PM-SEC-002"),
+            listOf(stranger, "login-$stranger", unknown, "REFUSED", "PM-SEC-002"),
+            listOf(null, null, UUID.fromString(m.item), "OPEN", null),
+        )
+        assertThat(log.map { it["at"] as java.sql.Timestamp }).allSatisfy { assertThat(it.toInstant()).isBetween(Instant.now().minusSeconds(60), Instant.now()) }
+        assertThat(jdbc.update("UPDATE assembly.vote_read SET outcome = 'REFUSED', rule_id = 'PM-SEC-002' WHERE entrance_id = ?::uuid", m.entranceId)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_read WHERE entrance_id = ?::uuid", m.entranceId)).isZero()
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.vote_read") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThat(entries()).isEqualTo(log)
+    }
 }

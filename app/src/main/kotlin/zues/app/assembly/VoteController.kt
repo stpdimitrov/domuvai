@@ -1,5 +1,6 @@
 package zues.app.assembly
 
+import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
@@ -16,7 +17,9 @@ import zues.app.identity_org.WhoAsks
 import zues.app.policy.Action
 import zues.app.policy.Asking
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /** How [ownerPartyId] voted, as whoever runs the assembly records it; [correction] says why a recorded vote is corrected. */
@@ -46,6 +49,8 @@ class VoteActs(
     private val reads: AssemblyReads,
     private val agenda: AgendaItemRepository,
     private val recorded: VoteRepository,
+    private val aggregates: JdbcAggregateTemplate,
+    private val clock: Clock,
 ) {
     // Rule: PM-SEC-001
     @Transactional
@@ -57,15 +62,32 @@ class VoteActs(
     /**
      * Every row of [itemId]'s vote record, in the order recorded — corrections and what they reverse included. How each
      * owner voted is another person's: the manager, the board and the controller only, asked before anything is read.
+     * Every answer is entered (Rule: PM-SEC-004): a refusal, kept though the read fails; a served read, before the
+     * votes are read — no entry, no votes; with sign-in switched off, as given to nobody. An item that is not there
+     * serves nothing and enters nothing.
      */
     // Rule: PM-SEC-002
     // Rule: PM-GOV-008
-    @Transactional(readOnly = true)
+    // Rule: PM-SEC-004
+    @Transactional(noRollbackFor = [ActRefused::class])
     fun read(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID): List<Vote> {
-        reads.require(entranceId, who, Action.READ_VOTES)
+        val decision = reads.decided(entranceId, who, Action.READ_VOTES)
+        if (decision != null && !decision.allowed) {
+            entered(entranceId, itemId, who, VoteReadOutcome.REFUSED, decision.ruleId)
+            throw ActRefused(decision.ruleId)
+        }
         agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
+        if (decision == null) entered(entranceId, itemId, who, VoteReadOutcome.OPEN, null)
+        else entered(entranceId, itemId, who, VoteReadOutcome.SERVED, decision.ruleId)
         return recorded.findByAgendaItemId(itemId).sortedWith(compareBy({ it.castAt }, { it.id.toString() }))   // as Postgres orders a uuid: by its hex
+    }
+
+    // Rule: PM-SEC-004
+    private fun entered(entranceId: UUID, itemId: UUID, who: Asking, outcome: VoteReadOutcome, ruleId: String?) {
+        aggregates.insert(
+            VoteRead(UUID.randomUUID(), entranceId, itemId, who.party, who.login?.issuer, who.login?.subject, clock.instant().truncatedTo(ChronoUnit.MICROS), outcome.name, ruleId),
+        )
     }
 }
 
