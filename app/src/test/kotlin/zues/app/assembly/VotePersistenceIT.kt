@@ -83,7 +83,7 @@ class VotePersistenceIT {
     private class Meeting(val entranceId: UUID, val base: String, val item: String, val manager: UUID, val owners: List<UUID>, val unit: UUID)
 
     /** Convened by the manager, noticed a month ahead, then made to meet today; the second owner's proxy names the first, who is present; the sitting opened. */
-    private fun opened(): Meeting {
+    private fun opened(absenteeEligible: Boolean = false): Meeting {
         val entranceId = UUID.fromString(created("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText())
         val unit = UUID.fromString(
             created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
@@ -104,7 +104,7 @@ class VotePersistenceIT {
         }
         val of = "$base/$id"
         val item = signedIn(manager) {
-            created("$of/agenda", """{"text":"Ремонт на покрива","itemType":"GENERAL"}""").get("id").asText()
+            created("$of/agenda", """{"text":"Ремонт на покрива","itemType":"GENERAL","absenteeEligible":$absenteeEligible}""").get("id").asText()
                 .also { created("$of/notice-posting", """{"postedAt":"${Instant.now()}","coSignatoryPartyId":"${owners[0]}","photoHash":"${"3f".repeat(32)}"}""") }
         }
         jdbc.update("UPDATE assembly.assembly SET scheduled_at = now() WHERE id = ?::uuid", id)
@@ -438,5 +438,50 @@ class VotePersistenceIT {
         assertThat(jdbc.update("DELETE FROM assembly.vote_read WHERE entrance_id = ?::uuid", m.entranceId)).isZero()
         assertThatThrownBy { jdbc.execute("TRUNCATE assembly.vote_read") }.isInstanceOf(DataIntegrityViolationException::class.java)
         assertThat(entries()).isEqualTo(log)
+    }
+
+    private val scan = "ab".repeat(32)
+
+    private fun ballot(m: Meeting, owner: UUID, received: String, signature: String = "HANDWRITTEN", hash: String = scan): ResultActions =
+        mvc.perform(post("${m.base}/agenda/${m.item}/absentee-ballots", """{"ownerPartyId":"$owner","choice":"FOR","signature":"$signature","documentRef":"декларация 1","documentSha256":"$hash","receivedOn":"$received"}"""))
+
+    @Test
+    fun `PM-GA-017 only an item tagged ABSENTEE_ELIGIBLE accepts an absent owner's ballot, after its sitting closes - once, weighed by their share, never edited`() {
+        val today = toSofiaDate(Instant.now())
+        val untagged = opened()
+        signedIn(untagged.manager) {
+            close(untagged).andExpect(status().isCreated)
+            ballot(untagged, untagged.owners[2], today).andExpect(status().isConflict)                       // not tagged
+        }
+        val m = opened(absenteeEligible = true)
+        val absent = m.owners[2]
+        signedIn(m.manager) {
+            ballot(m, absent, today).andExpect(status().isConflict)                                          // the item is not closed yet
+            close(m).andExpect(status().isCreated)
+            ballot(m, m.owners[1], today).andExpect(status().isBadRequest)                                   // represented by proxy at the sitting
+            ballot(m, absent, LocalDate.parse(today).plusDays(1).toString()).andExpect(status().isBadRequest) // not received yet
+            ballot(m, absent, today).andExpect(status().isCreated)
+                .andExpect(jsonPath("$[0].weight").value("25")).andExpect(jsonPath("$[0].choice").value("FOR")).andExpect(jsonPath("$[0].signature").value("HANDWRITTEN"))
+            ballot(m, absent, today).andExpect(status().isConflict)                                          // entered once
+        }
+        val item = m.item
+        jdbc.update("UPDATE assembly.absentee_ballot SET choice = 'AGAINST' WHERE agenda_item_id = ?::uuid", item)
+        jdbc.update("DELETE FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", item)
+        assertThat(jdbc.queryForList("SELECT choice, weight FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", item).single()["choice"]).isEqualTo("FOR")
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.absentee_ballot") }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `PM-GA-018 an absentee ballot is a signed declaration entered by whoever runs the assembly - the owner's own click is a 403, a QES a 409, no hash a 400`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        signedIn(m.owners[2]) { ballot(m, m.owners[2], today).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        signedIn(m.manager) {
+            ballot(m, m.owners[2], today, signature = "QES").andExpect(status().isConflict)
+            ballot(m, m.owners[2], today, signature = "CLICK").andExpect(status().isBadRequest)
+            ballot(m, m.owners[2], today, hash = "").andExpect(status().isBadRequest)
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", Long::class.java, m.item)).isZero()
     }
 }

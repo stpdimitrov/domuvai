@@ -48,8 +48,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice */
+        /** Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice; tagged, or not, as accepting the ballots of absent owners */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1092,7 +1109,26 @@ export interface components {
         AbsencesRegisteredResponse: {
             absenceIds: string[];
         };
+        AbsenteeBallotView: {
+            choice: string;
+            documentRef: string;
+            documentSha256: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+            receivedOn: string;
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: uuid */
+            recordedBy: string;
+            signature: string;
+            /** Format: uuid */
+            unitId: string;
+            weight: string;
+        };
         AddAgendaItemRequest: {
+            absenteeEligible?: boolean;
             itemType: string;
             text: string;
         };
@@ -1102,6 +1138,7 @@ export interface components {
             band: string;
         };
         AgendaItemAdded: {
+            absenteeEligible: boolean;
             /** Format: uuid */
             id: string;
             itemType: string;
@@ -1112,6 +1149,7 @@ export interface components {
             text: string;
         };
         AgendaItemView: {
+            absenteeEligible: boolean;
             /** Format: uuid */
             id: string;
             itemType: string;
@@ -1191,6 +1229,15 @@ export interface components {
             represents: string[];
             /** Format: int32 */
             sessionNo: number;
+        };
+        BallotRequest: {
+            choice: string;
+            documentRef: string;
+            documentSha256: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+            receivedOn: string;
+            signature: string;
         };
         BookAccessView: {
             /** Format: uuid */
@@ -2482,6 +2529,78 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BallotRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbsenteeBallotView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
