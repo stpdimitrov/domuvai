@@ -15,7 +15,8 @@ import zues.law.MajorityRule
 import java.time.Instant
 import java.util.UUID
 
-data class AddAgendaItemRequest(val text: String, val itemType: String)
+/** [absenteeEligible]: the item accepts absent owners' ballots after its sitting (PM-GA-017) — the drafter's call, false unless said. */
+data class AddAgendaItemRequest(val text: String, val itemType: String, val absenteeEligible: Boolean = false)
 
 /** The majority an item was bound to, with the rule and the article it comes from (PM-VOTE-004). */
 data class MajorityView(
@@ -36,6 +37,7 @@ data class AgendaItemAdded(
     val itemType: String,
     val majority: MajorityView,
     val noticeVoided: Boolean,
+    val absenteeEligible: Boolean,
 )
 
 data class RescheduleRequest(val scheduledAt: Instant, val place: String)
@@ -54,7 +56,7 @@ data class NoticePostingView(
     val statedAgenda: String,
 )
 
-data class AgendaItemView(val id: UUID, val ordinal: Int, val text: String, val itemType: String, val majorityRuleId: String)
+data class AgendaItemView(val id: UUID, val ordinal: Int, val text: String, val itemType: String, val majorityRuleId: String, val absenteeEligible: Boolean)
 
 data class AssemblyView(
     val id: UUID,
@@ -97,8 +99,8 @@ class AssemblyController(private val acts: AssemblyActs, private val assemblies:
     fun addAgendaItem(
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: AddAgendaItemRequest, signedIn: JwtAuthenticationToken?,
     ): AgendaItemAdded =
-        acts.addAgendaItem(who.of(signedIn), entranceId, assemblyId, request.text, request.itemType).let { (item, majority, noticeVoided) ->
-            AgendaItemAdded(item.id, item.ordinal, item.text, item.itemType, view(majority), noticeVoided)
+        acts.addAgendaItem(who.of(signedIn), entranceId, assemblyId, request.text, request.itemType, request.absenteeEligible).let { (item, majority, noticeVoided) ->
+            AgendaItemAdded(item.id, item.ordinal, item.text, item.itemType, view(majority), noticeVoided, item.absenteeEligible)
         }
 
     // Rule: PM-SEC-001
@@ -138,7 +140,7 @@ class AssemblyController(private val acts: AssemblyActs, private val assemblies:
 
     private fun view(a: Assembly, agenda: List<AgendaItem>) = AssemblyView(
         a.id, a.entranceId, a.convenedBy, a.convenedAs, a.scheduledAt, a.place, a.mode, a.status, a.urgent, a.urgencyReason, a.noticePostedAt,
-        agenda.map { AgendaItemView(it.id, it.ordinal, it.text, it.itemType, it.majorityRuleId) },
+        agenda.map { AgendaItemView(it.id, it.ordinal, it.text, it.itemType, it.majorityRuleId, it.absenteeEligible) },
     )
 
     private fun view(m: MajorityRule) =

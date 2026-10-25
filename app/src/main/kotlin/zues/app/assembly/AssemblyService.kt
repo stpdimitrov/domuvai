@@ -119,7 +119,7 @@ class AssemblyService(
     // Rule: PM-VOTE-004
     // Rule: PM-GA-006
     @Transactional
-    fun addAgendaItem(entranceId: UUID, assemblyId: UUID, text: String, itemType: String): AgendaItemBound {
+    fun addAgendaItem(entranceId: UUID, assemblyId: UUID, text: String, itemType: String, absenteeEligible: Boolean = false): AgendaItemBound {
         require(text.isNotBlank()) { "an agenda item needs its text" }
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
         check(assembly.status in AGENDA_OPEN) { "the agenda of an assembly that is ${assembly.status} is closed" }
@@ -131,7 +131,7 @@ class AssemblyService(
         }
         val ordinal = (agenda.findByAssemblyIdOrderByOrdinal(assemblyId).maxOfOrNull { it.ordinal } ?: 0) + 1
         val item = aggregates.insert(
-            AgendaItem(UUID.randomUUID(), entranceId, assemblyId, ordinal, text.trim(), majority.itemType, majority.id),
+            AgendaItem(UUID.randomUUID(), entranceId, assemblyId, ordinal, text.trim(), majority.itemType, majority.id, absenteeEligible),
         )
         return AgendaItemBound(item, majority, noticeVoided = noticeContentChanged(assembly))
     }
