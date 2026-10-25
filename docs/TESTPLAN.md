@@ -6,8 +6,8 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **90** (39%) |
-| Remaining | **143** |
+| Proved by a test named after the rule | **92** (39%) |
+| Remaining | **141** |
 | Proposed slices at ~10 rules each | **18** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
@@ -51,7 +51,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-50 rule(s) remaining across 6 slice(s).
+48 rule(s) remaining across 6 slice(s).
 
 ### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s)
 
@@ -63,22 +63,20 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GA-020` | MUST | `announced_at` sets `appeal_deadline = announced_at + 30 days`. |
 | `PM-GA-021` | MUST | Generated PDF fails validation if attendance percentages are missing. |
 | `PM-GA-022` | MUST | Each protocol records the physical archive location. |
-| `PM-GA-023` | MUST | Decision shows a countdown; after 30 days status becomes `FINAL`. |
 | `PM-GA-024` | MUST | Litigation flag does not pause the execution clock; a court stay does. |
 | `PM-GA-025` | MUST | Every decision creates an execution task with a computed due date. |
 | `PM-VOTE-003` | MUST | Item type `EXTENSION` cannot pass at 99.9%. |
+| `PM-VOTE-005` | MUST | An item typed USEFUL_EXPENSE or CREDIT fails at 74.9% and passes at 75%. |
 
-### S-G2-02 · `assembly` · GA · VOTE · 11 rule(s) · ⚠ 1 unconfirmed
+### S-G2-02 · `assembly` · GA · VOTE · 9 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-VOTE-005` | MUST | An item typed USEFUL_EXPENSE or CREDIT fails at 74.9% and passes at 75%. |
 | `PM-VOTE-006` | MUST | The respondent's ideal parts are removed from both numerator and denominator. |
 | `PM-VOTE-007` | MUST | An item typed MAJOR_REPAIR, MAJOR_RENEWAL or ENERGY_EFFICIENCY fails at 50.9% and passes at 51%. |
 | `PM-VOTE-008` | MUST | A vote rejecting a `NECESSARY` work order is flagged unlawful and blocked from becoming a decision. |
 | `PM-VOTE-009` | MUST | A standing authorisation with a monetary cap unlocks the manager's emergency-spend path. |
 | `PM-VOTE-010` | MUST | Each is a distinct agenda item type. |
-| `PM-VOTE-013` | MUST | Provisional result is labelled `PROVISIONAL` until day 7 closes. |
 | `PM-GA-011` | SHOULD ⚠ | Proxy form type drives the validation path. |
 | `PM-GA-008` | SHOULD | Sending email alone leaves the assembly in `DRAFT`. |
 | `PM-GA-026` | SHOULD | Zero re-keying between notice and protocol. |
