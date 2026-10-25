@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import zues.app.policy.Action
 import zues.app.policy.Asking
+import zues.app.policy.Decision
 import zues.app.policy.Policy
 import zues.app.policy.Resource
 import zues.kernel.toSofiaDate
@@ -32,10 +33,13 @@ class AssemblyReads(
      * owner voted is [Action.READ_VOTES]: the manager, the board and the controller only (PM-SEC-002).
      */
     fun require(entranceId: UUID, who: Asking, action: Action = Action.READ_ASSEMBLY) {
-        if (unasked(who)) return
-        val decision = decide(action, entranceId, who)
+        val decision = decided(entranceId, who, action) ?: return
         if (!decision.allowed) throw ActRefused(decision.ruleId)
     }
+
+    /** The policy's answer on [action] for [who], or null when nobody is asking — sign-in switched off, nothing to decide. */
+    // Rule: PM-SEC-001
+    fun decided(entranceId: UUID, who: Asking, action: Action): Decision? = if (unasked(who)) null else decide(action, entranceId, who)
 
     /** Rule: PM-SEC-002 — whether the owner behind a higher quorum is named to this reader: the manager, the board and the controller only. */
     fun seesConcentration(entranceId: UUID, who: Asking): Boolean = unasked(who) || decide(Action.READ_CONCENTRATION, entranceId, who).allowed

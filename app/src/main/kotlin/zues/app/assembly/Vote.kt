@@ -42,6 +42,30 @@ data class Vote(
 
 enum class VoteChoice { FOR, AGAINST, ABSTAIN }
 
+/**
+ * One read of how each owner voted on an item (Rule: PM-SEC-004): who asked — the sign-in's party and login, either
+ * may be missing on a refusal — which item, when, and how it was decided. Insert-only: the table refuses to change.
+ */
+@Table("vote_read")
+data class VoteRead(
+    @Id val id: UUID,
+    val entranceId: UUID,
+    val agendaItemId: UUID,
+    val actor: UUID?,
+    val loginIssuer: String?,
+    val loginSubject: String?,
+    val at: Instant,
+    val outcome: String,            // VoteReadOutcome
+    val ruleId: String?,
+)
+
+enum class VoteReadOutcome {
+    SERVED,
+    REFUSED,
+    /** sign-in switched off: given to nobody, and entered so */
+    OPEN,
+}
+
 interface VoteRepository : ListCrudRepository<Vote, UUID> {
     fun findByAgendaItemId(agendaItemId: UUID): List<Vote>
 }
