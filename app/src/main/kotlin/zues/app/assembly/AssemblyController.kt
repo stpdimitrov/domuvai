@@ -94,6 +94,7 @@ class AssemblyController(private val acts: AssemblyActs, private val assemblies:
         view(acts.convene(who.of(signedIn), entranceId, request), emptyList())
 
     // Rule: PM-SEC-001
+    // Rule: PM-GA-017
     @PostMapping("/{assemblyId}/agenda")
     @ResponseStatus(HttpStatus.CREATED)
     fun addAgendaItem(

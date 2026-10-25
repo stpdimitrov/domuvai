@@ -58,6 +58,7 @@ class AssemblyActs(
 
     // Rule: PM-GA-002
     // Rule: PM-GA-006
+    // Rule: PM-GA-017
     @Transactional
     fun addAgendaItem(who: Asking, entranceId: UUID, assemblyId: UUID, text: String, itemType: String, absenteeEligible: Boolean = false): AgendaItemBound {
         running(who, entranceId, assemblyId)

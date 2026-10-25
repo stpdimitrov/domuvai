@@ -85,6 +85,7 @@ fun signedDeclaration(signature: String, documentRef: String, documentSha256: St
 @Service
 class AbsenteeBallotService(
     private val acts: AssemblyActs,
+    private val assemblies: AssemblyRepository,
     private val agenda: AgendaItemRepository,
     private val sittings: SittingRepository,
     private val attendance: AttendanceService,
@@ -108,6 +109,7 @@ class AbsenteeBallotService(
         val chose = VoteChoice.entries.firstOrNull { it.name == request.choice } ?: throw IllegalArgumentException("a ballot is FOR, AGAINST or ABSTAIN, not \"${request.choice}\"")
         signedDeclaration(request.signature, request.documentRef, request.documentSha256)
         val receivedOn = runCatching { LocalDate.parse(request.receivedOn) }.getOrElse { throw IllegalArgumentException("receivedOn is a day, yyyy-MM-dd") }
+        assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")   // one ballot per owner, never two at once
         val item = agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
         check(item.absenteeEligible) { "this item is not tagged for absentee ballots (PM-GA-017)" }

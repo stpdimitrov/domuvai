@@ -118,6 +118,7 @@ class AssemblyService(
      */
     // Rule: PM-VOTE-004
     // Rule: PM-GA-006
+    // Rule: PM-GA-017
     @Transactional
     fun addAgendaItem(entranceId: UUID, assemblyId: UUID, text: String, itemType: String, absenteeEligible: Boolean = false): AgendaItemBound {
         require(text.isNotBlank()) { "an agenda item needs its text" }
