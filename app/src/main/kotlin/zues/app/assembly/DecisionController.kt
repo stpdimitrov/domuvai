@@ -49,6 +49,12 @@ data class DecisionView(
     val basisHash: String,
     val decidedAt: Instant,
     val closedBy: UUID,
+    /** Once an eligible item's absentee ballots are merged (PM-VOTE-013): the provisional decision this one supersedes — the
+     *  tally, represented share, result, outcome and basis hash above are then the merged decision's. None before. */
+    val supersedes: UUID? = null,
+    /** When, and by whom, the absentee ballots were merged — none before. */
+    val mergedAt: Instant? = null,
+    val mergedBy: UUID? = null,
 )
 
 /** The day an assembly's protocol was posted, as entered (PM-GA-023). */
@@ -63,6 +69,7 @@ class DecisionActs(
     private val agenda: AgendaItemRepository,
     private val stored: DecisionRepository,
     private val postings: ProtocolPostingRepository,
+    private val merged: MergedDecisionRepository,
     private val clock: Clock,
 ) {
     // Rule: PM-SEC-001
@@ -83,12 +90,26 @@ class DecisionActs(
         return stored.findByAgendaItemId(itemId) ?: throw NoSuchElementException("item $itemId is not closed: it has no decision yet")
     }
 
-    /** Where [decision] stands today, and the day its protocol was posted, if that is entered. */
+    /**
+     * [decision] as it stands today: superseded by its merged decision once the absentee ballots are merged, and FINAL —
+     * on an eligible item — only then (PM-VOTE-013); the day its protocol was posted, if that is entered.
+     */
     // Rule: PM-VOTE-013
     // Rule: PM-GA-023
-    fun standingOf(decision: Decision): Pair<Standing, LocalDate?> {
+    fun view(decision: Decision): DecisionView {
         val posted = postings.findByAssemblyId(decision.assemblyId)?.postedOn
-        return standing(toSofiaDate(decision.decidedAt), posted?.toString(), toSofiaDate(clock.instant())) to posted
+        val eligible = agenda.findById(decision.agendaItemId).map { it.absenteeEligible }.orElse(false)
+        val merge = if (eligible) merged.findBySupersedes(decision.id) else null
+        val standing = standing(toSofiaDate(decision.decidedAt), posted?.toString(), toSofiaDate(clock.instant()), eligible, merge?.let { toSofiaDate(it.mergedAt) })
+        fun BigDecimal.plain() = stripTrailingZeros().toPlainString()
+        val (represented, tally, basis) = merge?.let { Triple(it.represented, listOf(it.tallyFor, it.tallyAgainst, it.tallyAbstain), it.basis) }
+            ?: Triple(decision.represented, listOf(decision.tallyFor, decision.tallyAgainst, decision.tallyAbstain), decision.basis)
+        return DecisionView(
+            merge?.id ?: decision.id, decision.agendaItemId, decision.sessionNo, decision.majorityRuleId, decision.denominator, decision.comparison,
+            decision.thresholdPct.plain(), represented.plain(), tally[0].plain(), tally[1].plain(), tally[2].plain(), basis.lines().first().substringAfter(": "),
+            merge?.outcome ?: decision.outcome, standing.status, standing.absenteeCloses, posted?.toString(), standing.annulmentCloses, standing.finalOn,
+            merge?.basisHash ?: decision.basisHash, decision.decidedAt, decision.closedBy, merge?.let { decision.id }, merge?.mergedAt, merge?.mergedBy,
+        )
     }
 }
 
@@ -111,7 +132,7 @@ class DecisionController(private val acts: DecisionActs, private val who: WhoAsk
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun close(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): DecisionView =
-        view(acts.close(who.of(signedIn), entranceId, assemblyId, itemId))
+        acts.view(acts.close(who.of(signedIn), entranceId, assemblyId, itemId))
 
     // Rule: PM-VOTE-011
     // Rule: PM-VOTE-013
@@ -121,18 +142,7 @@ class DecisionController(private val acts: DecisionActs, private val who: WhoAsk
     // Rule: PM-SEC-002
     @GetMapping
     fun read(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): DecisionView =
-        view(acts.read(who.of(signedIn), entranceId, assemblyId, itemId))
-
-    private fun view(it: Decision): DecisionView {
-        val (standing, posted) = acts.standingOf(it)
-        return DecisionView(
-            it.id, it.agendaItemId, it.sessionNo, it.majorityRuleId, it.denominator, it.comparison, it.thresholdPct.plain(), it.represented.plain(),
-            it.tallyFor.plain(), it.tallyAgainst.plain(), it.tallyAbstain.plain(), it.basis.lines().first().substringAfter(": "),
-            it.outcome, standing.status, standing.absenteeCloses, posted?.toString(), standing.annulmentCloses, standing.finalOn, it.basisHash, it.decidedAt, it.closedBy,
-        )
-    }
-
-    private fun BigDecimal.plain() = stripTrailingZeros().toPlainString()
+        acts.view(acts.read(who.of(signedIn), entranceId, assemblyId, itemId))
 
     @ExceptionHandler(ActRefused::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
@@ -143,6 +153,37 @@ class DecisionController(private val acts: DecisionActs, private val who: WhoAsk
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
     /** Not open, not the sitting's day, already closed, a vote from an owner the sitting did not weigh. */
+    @ExceptionHandler(IllegalStateException::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))
+}
+
+/**
+ * The absent owners' ballots on an item tagged for them, merged into its tally after day 7 (PM-VOTE-013, PM-GA-017): a
+ * decision of its own, superseding the provisional one, read back as the item's decision. Entered once, by whoever runs
+ * the assembly (PM-SEC-001); anybody else is a 403 naming the rule.
+ */
+@RestController
+@RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge")
+class AbsenteeMergeController(private val merges: AbsenteeMergeService, private val acts: DecisionActs, private val who: WhoAsks) {
+
+    // Rule: PM-VOTE-013
+    // Rule: PM-GA-017
+    // Rule: PM-SEC-001
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    fun merge(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): DecisionView =
+        acts.view(merges.merge(who.of(signedIn), entranceId, assemblyId, itemId).first)
+
+    @ExceptionHandler(ActRefused::class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    fun onRefused(e: ActRefused): Map<String, String> = mapOf("error" to (e.message ?: "not allowed"), "rule" to e.ruleId)
+
+    @ExceptionHandler(NoSuchElementException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
+
+    /** An item not tagged or not closed, day 7 not over, already merged. */
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))

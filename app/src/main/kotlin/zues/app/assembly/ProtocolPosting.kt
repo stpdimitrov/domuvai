@@ -43,17 +43,21 @@ interface ProtocolPostingRepository : ListCrudRepository<ProtocolPosting, UUID> 
  * posted (PM-GA-023); FINAL from the day after both closed. A protocol is posted no earlier than its sitting, so the
  * time to seek annulment always outlasts the absentee window. A protocol not yet posted starts no countdown: the decision stays PROVISIONAL. Each window's last day is the one deadline utility's (PM-SYS-005), under the law in
  * force on the day of the decision. The decision's day is its sitting's: an item is closed on the sitting's day only.
+ * An item tagged for absentee ballots ([eligible]) is FINAL only once they are merged ([mergedOn], after day 7): on the
+ * later of the day after the 30 days and the merge's day (the owner's, 2026-10-25); unmerged, it has no final day.
  */
 data class Standing(val status: String, val absenteeCloses: CivilDate, val annulmentCloses: CivilDate?, val finalOn: CivilDate?)
 
 // Rule: PM-VOTE-013
 // Rule: PM-GA-017
 // Rule: PM-GA-023
-fun standing(decidedOn: CivilDate, protocolPostedOn: CivilDate?, today: CivilDate): Standing {
+fun standing(decidedOn: CivilDate, protocolPostedOn: CivilDate?, today: CivilDate, eligible: Boolean = false, mergedOn: CivilDate? = null): Standing {
     require(protocolPostedOn == null || protocolPostedOn >= decidedOn) { "a protocol is posted no earlier than its sitting, $decidedOn" }
     val absentee = statutoryDeadline(decidedOn, numberOn("GA_ABSENTEE_DAYS", decidedOn).toInt(), decidedOn)
+    require(mergedOn == null || (eligible && mergedOn > absentee)) { "absentee ballots are merged on an eligible item, after day 7, $absentee" }
     val annulment = protocolPostedOn?.let { statutoryDeadline(it, numberOn("GA_ANNULMENT_DAYS", decidedOn).toInt(), decidedOn) }
-    val finalOn = annulment?.let { LocalDate.parse(it).plusDays(1).toString() }
+    val afterAnnulment = annulment?.let { LocalDate.parse(it).plusDays(1).toString() }
+    val finalOn = if (!eligible) afterAnnulment else afterAnnulment?.let { after -> mergedOn?.let { maxOf(after, it) } }
     return Standing(if (finalOn != null && today >= finalOn) "FINAL" else "PROVISIONAL", absentee, annulment, finalOn)
 }
 
