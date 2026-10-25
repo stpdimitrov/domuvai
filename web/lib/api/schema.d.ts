@@ -63,7 +63,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404 */
+        /** An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
         put?: never;
         /** Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
@@ -138,6 +138,23 @@ export interface paths {
         put?: never;
         /** Record the posting act with its photograph — signed by whoever runs the assembly (the convenor, or their successor in the office), co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_notice_posting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1320,8 +1337,10 @@ export interface components {
             urgent: boolean;
         };
         DecisionView: {
+            absenteeCloses: string;
             /** Format: uuid */
             agendaItemId: string;
+            annulmentCloses?: string;
             basisHash: string;
             /** Format: uuid */
             closedBy: string;
@@ -1329,10 +1348,12 @@ export interface components {
             /** Format: date-time */
             decidedAt: string;
             denominator: string;
+            finalOn?: string;
             /** Format: uuid */
             id: string;
             majorityRuleId: string;
             outcome: string;
+            protocolPostedOn?: string;
             represented: string;
             result: string;
             /** Format: int32 */
@@ -1798,6 +1819,10 @@ export interface components {
             unlocked: boolean;
             /** Format: date */
             weighedOn: string;
+        };
+        PostProtocol: {
+            /** Format: date */
+            postedOn: string;
         };
         ProfileRequest: {
             csv: string;
@@ -3003,6 +3028,68 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostProtocol"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
