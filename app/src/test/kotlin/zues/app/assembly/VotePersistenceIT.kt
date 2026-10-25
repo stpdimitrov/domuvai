@@ -25,7 +25,9 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import zues.app.identity_org.Logins
+import zues.kernel.toSofiaDate
 import java.time.Instant
+import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
@@ -345,6 +347,37 @@ class VotePersistenceIT {
         signedIn(elsewhere.manager) { close(elsewhere).andExpect(status().isCreated) }
         signedIn(m.owners[2]) { read("${m.base}/agenda/${elsewhere.item}/decision").andExpect(status().isNotFound) }
         signedIn(person()) { read("${m.base}/agenda/${m.item}/decision").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+    }
+
+    private fun postProtocol(m: Meeting, on: String): ResultActions =
+        mvc.perform(post("${m.base}/protocol-posting", """{"postedOn":"$on"}"""))
+
+    @Test
+    fun `PM-GA-023 the protocol's posting starts the countdown - entered once by whoever runs the assembly, never edited - and the decision reads PROVISIONAL with its final day`() {
+        val m = opened()
+        val today = toSofiaDate(Instant.now())
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.absenteeCloses").value(standing(today, null, today).absenteeCloses))
+                .andExpect(jsonPath("$.protocolPostedOn").doesNotExist()).andExpect(jsonPath("$.finalOn").doesNotExist())
+        }
+        signedIn(m.owners[0]) { postProtocol(m, today).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        signedIn(m.manager) {
+            postProtocol(m, LocalDate.parse(today).plusDays(1).toString()).andExpect(status().isConflict)        // not a day to come
+            postProtocol(m, today).andExpect(status().isCreated)
+            postProtocol(m, today).andExpect(status().isConflict)                                                // entered once
+        }
+        val expected = standing(today, today, today)
+        signedIn(m.owners[2]) {
+            read("${m.base}/agenda/${m.item}/decision").andExpect(status().isOk)
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.protocolPostedOn").value(today))
+                .andExpect(jsonPath("$.annulmentCloses").value(expected.annulmentCloses!!)).andExpect(jsonPath("$.finalOn").value(expected.finalOn!!))
+        }
+        jdbc.update("UPDATE assembly.protocol_posting SET posted_on = posted_on - 60 WHERE assembly_id = ?::uuid", m.base.substringAfterLast('/'))
+        jdbc.update("DELETE FROM assembly.protocol_posting WHERE assembly_id = ?::uuid", m.base.substringAfterLast('/'))
+        assertThat(jdbc.queryForObject("SELECT posted_on::text FROM assembly.protocol_posting WHERE assembly_id = ?::uuid", String::class.java, m.base.substringAfterLast('/'))).isEqualTo(today)
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.protocol_posting") }.isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
     @Test

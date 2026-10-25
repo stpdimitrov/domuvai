@@ -138,6 +138,11 @@ private val CONSTANTS: List<Constant> = listOf(
     Constant("GA_CONCENTRATED_QUORUM_PCT", "75", "2009-01-01", "чл. 15 ал. 4 ЗУЕС", true, rule = "PM-GA-015"),
     // PM-GA-001 — a general assembly at least once in every calendar year.
     Constant("GA_ASSEMBLIES_PER_YEAR", "1", "2009-01-01", "чл. 12 ЗУЕС", true, rule = "PM-GA-001"),
+    // PM-GA-017 — an absent owner may vote within 7 days after the meeting; PM-VOTE-013 keeps the result provisional
+    // until that window closes.
+    Constant("GA_ABSENTEE_DAYS", "7", "2009-01-01", "чл. 17а ЗУЕС", true, rule = "PM-GA-017"),
+    // PM-GA-023 — an owner may seek annulment within 30 days of receiving the decision under чл. 16 ал. 7.
+    Constant("GA_ANNULMENT_DAYS", "30", "2009-01-01", "чл. 40 ал. 1–2 ЗУЕС", true, rule = "PM-GA-023"),
 )
 
 /** The value in force on the legal date — never today's value. Rule: PM-SYS-002 */

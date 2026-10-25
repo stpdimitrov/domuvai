@@ -76,8 +76,8 @@ RUNNING = {
    ("Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
     ['PM-VOTE-002', 'PM-VOTE-011', 'PM-VOTE-012', 'PM-VOTE-014', 'PM-VOTE-016', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision'):
-   ("An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
-    ['PM-VOTE-011', 'PM-VOTE-016', 'PM-SEC-001', 'PM-SEC-002']),
+   ("An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
+    ['PM-VOTE-011', 'PM-VOTE-013', 'PM-VOTE-016', 'PM-GA-023', 'PM-SEC-001', 'PM-SEC-002']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes'):
    ("How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002",
     ['PM-VOTE-014', 'PM-SEC-001', 'PM-SEC-002', 'PM-GOV-008']),
@@ -87,6 +87,9 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting'):
    ('Record the posting act with its photograph — signed by whoever runs the assembly (the convenor, or their successor in the office), co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
     ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013', 'PM-SEC-001']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting'):
+   ("Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+    ['PM-GA-023', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
    ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown',
     ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001']),

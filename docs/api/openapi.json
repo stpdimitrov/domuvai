@@ -841,8 +841,14 @@
       },
       "DecisionView": {
         "properties": {
+          "absenteeCloses": {
+            "type": "string"
+          },
           "agendaItemId": {
             "format": "uuid",
+            "type": "string"
+          },
+          "annulmentCloses": {
             "type": "string"
           },
           "basisHash": {
@@ -862,6 +868,9 @@
           "denominator": {
             "type": "string"
           },
+          "finalOn": {
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -870,6 +879,9 @@
             "type": "string"
           },
           "outcome": {
+            "type": "string"
+          },
+          "protocolPostedOn": {
             "type": "string"
           },
           "represented": {
@@ -899,6 +911,7 @@
           }
         },
         "required": [
+          "absenteeCloses",
           "agendaItemId",
           "basisHash",
           "closedBy",
@@ -2373,6 +2386,18 @@
           "thresholdVerified",
           "unlocked",
           "weighedOn"
+        ],
+        "type": "object"
+      },
+      "PostProtocol": {
+        "properties": {
+          "postedOn": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "postedOn"
         ],
         "type": "object"
       },
@@ -4053,13 +4078,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
+        "summary": "An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-VOTE-011",
+          "PM-VOTE-013",
           "PM-VOTE-016",
+          "PM-GA-023",
           "PM-SEC-001",
           "PM-SEC-002"
         ]
@@ -4833,6 +4860,101 @@
           "PM-GA-006",
           "PM-GA-007",
           "PM-SYS-013",
+          "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProtocol"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-023",
           "PM-SEC-001"
         ]
       }
