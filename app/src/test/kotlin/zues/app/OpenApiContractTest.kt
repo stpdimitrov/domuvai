@@ -80,6 +80,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var voteActs: zues.app.assembly.VoteActs
     @MockitoBean lateinit var decisionActs: zues.app.assembly.DecisionActs
     @MockitoBean lateinit var protocolPostings: zues.app.assembly.ProtocolPostingService
+    @MockitoBean lateinit var absenteeBallots: zues.app.assembly.AbsenteeBallotService
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var attendance: AttendanceService
     @MockitoBean lateinit var notices: NoticeService

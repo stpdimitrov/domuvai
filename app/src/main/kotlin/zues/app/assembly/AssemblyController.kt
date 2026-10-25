@@ -16,7 +16,7 @@ import java.time.Instant
 import java.util.UUID
 
 /** [absenteeEligible]: the item accepts absent owners' ballots after its sitting (PM-GA-017) — the drafter's call, false unless said. */
-data class AddAgendaItemRequest(val text: String, val itemType: String, val absenteeEligible: Boolean = false)
+data class AddAgendaItemRequest(val text: String, val itemType: String, val absenteeEligible: Boolean? = null)
 
 /** The majority an item was bound to, with the rule and the article it comes from (PM-VOTE-004). */
 data class MajorityView(
@@ -100,7 +100,7 @@ class AssemblyController(private val acts: AssemblyActs, private val assemblies:
     fun addAgendaItem(
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: AddAgendaItemRequest, signedIn: JwtAuthenticationToken?,
     ): AgendaItemAdded =
-        acts.addAgendaItem(who.of(signedIn), entranceId, assemblyId, request.text, request.itemType, request.absenteeEligible).let { (item, majority, noticeVoided) ->
+        acts.addAgendaItem(who.of(signedIn), entranceId, assemblyId, request.text, request.itemType, request.absenteeEligible ?: false).let { (item, majority, noticeVoided) ->
             AgendaItemAdded(item.id, item.ordinal, item.text, item.itemType, view(majority), noticeVoided, item.absenteeEligible)
         }
 

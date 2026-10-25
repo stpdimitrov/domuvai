@@ -16,8 +16,67 @@
         ],
         "type": "object"
       },
+      "AbsenteeBallotView": {
+        "properties": {
+          "choice": {
+            "type": "string"
+          },
+          "documentRef": {
+            "type": "string"
+          },
+          "documentSha256": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ownerPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "receivedOn": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "recordedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "weight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice",
+          "documentRef",
+          "documentSha256",
+          "id",
+          "ownerPartyId",
+          "receivedOn",
+          "recordedAt",
+          "recordedBy",
+          "signature",
+          "unitId",
+          "weight"
+        ],
+        "type": "object"
+      },
       "AddAgendaItemRequest": {
         "properties": {
+          "absenteeEligible": {
+            "type": "boolean"
+          },
           "itemType": {
             "type": "string"
           },
@@ -49,6 +108,9 @@
       },
       "AgendaItemAdded": {
         "properties": {
+          "absenteeEligible": {
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -71,6 +133,7 @@
           }
         },
         "required": [
+          "absenteeEligible",
           "id",
           "itemType",
           "majority",
@@ -82,6 +145,9 @@
       },
       "AgendaItemView": {
         "properties": {
+          "absenteeEligible": {
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -101,6 +167,7 @@
           }
         },
         "required": [
+          "absenteeEligible",
           "id",
           "itemType",
           "majorityRuleId",
@@ -344,6 +411,38 @@
           "recordedBy",
           "represents",
           "sessionNo"
+        ],
+        "type": "object"
+      },
+      "BallotRequest": {
+        "properties": {
+          "choice": {
+            "type": "string"
+          },
+          "documentRef": {
+            "type": "string"
+          },
+          "documentSha256": {
+            "type": "string"
+          },
+          "ownerPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "receivedOn": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice",
+          "documentRef",
+          "documentSha256",
+          "ownerPartyId",
+          "receivedOn",
+          "signature"
         ],
         "type": "object"
       },
@@ -3984,13 +4083,134 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice",
+        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice; tagged, or not, as accepting the ballots of absent owners",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-VOTE-004",
           "PM-GA-006",
+          "PM-GA-017",
+          "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BallotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AbsenteeBallotView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-017",
+          "PM-GA-018",
           "PM-SEC-001"
         ]
       }

@@ -67,7 +67,7 @@ RUNNING = {
    ('Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked',
     ['PM-GA-002', 'PM-GA-004', 'PM-GA-005', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda'):
-   ('Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice; tagged, or not, as accepting absent owners' ballots',
+   ('Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice; tagged, or not, as accepting the ballots of absent owners',
     ['PM-VOTE-004', 'PM-GA-006', 'PM-GA-017', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes'):
    ("Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
