@@ -348,3 +348,33 @@ export async function mergeBallots(_: MergeState, form: FormData): Promise<Merge
   }
   redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
 }
+
+export type ProtocolState = { refused?: string; values?: Record<string, string> };
+
+/**
+ * Entering the day the assembly's protocol was posted (Rule: PM-GA-023, PM-SEC-001) — the api's act: the 30 days to
+ * seek annulment of its decisions run from it. Whether this person runs the assembly, whether a sitting opened, whether
+ * the day is from the sitting's to today and whether it is already entered are all the api's; so are the windows it
+ * opens. The one thing asked here is that the person confirms it: the posting is entered once. A refusal is shown in
+ * its words, the form kept.
+ */
+// Rule: PM-GA-023
+// Rule: PM-SEC-001
+export async function postProtocol(_: ProtocolState, form: FormData): Promise<ProtocolState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const values = Object.fromEntries(["entrance", "assembly", "postedOn"].map((n) => [n, text(n)]));
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values };
+  if (!values.postedOn) return { refused: "Посочете деня, в който протоколът е обявен.", values };
+  if (form.get("final") !== "on") return { refused: "Потвърдете деня — обявяването се вписва веднъж.", values };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting", {
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly } },
+      body: { postedOn: values.postedOn },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "впишете обявяването на протокола") : unknownOutcome("вписването на обявяването"), values };
+  }
+  redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
+}

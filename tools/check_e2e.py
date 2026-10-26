@@ -103,6 +103,7 @@ ON_AN_ASSEMBLY = {
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
@@ -985,6 +986,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     failures += votes_before_open(api, web, here, of, owner_party)
     failures += decision_before_open(api, web, here, of)
     failures += absentee_before_open(api, web, here, of)
+    failures += protocol_before_open(api, web, here, of)
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
@@ -1115,6 +1117,25 @@ def absentee_before_open(api, web, here, of):
         status, said = fetch(api, path, body=body, headers=as_board())
         if status != 403 or "PM-SEC-001" not in said:
             failures.append(f"{path}: PM-SEC-001 — {what} by a board member who does not run the assembly answers HTTP {status} {said[:120]!r} — expected the API's 403 naming PM-SEC-001")
+    return failures
+
+
+def protocol_before_open(api, web, here, of):
+    """
+    WEB-34 (PM-GA-023, PM-SEC-001) on the same noticed assembly: no sitting opened, so the page offers no protocol
+    posting; a posting by the board's other member (not the person who convened it) is the API's 403 naming PM-SEC-001.
+    The convener's own 409 (no sitting opened) is not asked: the convener signs in only through the web, and the API asks
+    the policy before the state, so every bearer this check holds is a 403. A posting after an opened sitting cannot be
+    reached here (the API's clock is real); it is the assembly lane's rule-named tests (DecisionStandingTest,
+    VotePersistenceIT).
+    """
+    if 'name="postedOn"' in fetch(web, here)[1]:
+        return [f"{here}: PM-GA-023 — the noticed assembly offers to enter its protocol's posting before any sitting opened"]
+    path, body = f"{of}/protocol-posting", {"postedOn": datetime.datetime.now(ZoneInfo("Europe/Sofia")).date().isoformat()}
+    failures = []
+    status, said = fetch(api, path, body=body, headers=as_board())
+    if status != 403 or "PM-SEC-001" not in said:
+        failures.append(f"{path}: PM-SEC-001 — a posting by a board member who does not run the assembly answers HTTP {status} {said[:120]!r} — expected the API's 403 naming PM-SEC-001")
     return failures
 
 

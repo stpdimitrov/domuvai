@@ -7,6 +7,7 @@ import { sofiaLocal, sofiaTime } from "@/lib/sofia";
 import AgendaForm from "./AgendaForm";
 import BallotForm from "./BallotForm";
 import MergeForm from "./MergeForm";
+import ProtocolForm from "./ProtocolForm";
 import AttendanceForm from "./AttendanceForm";
 import CloseForm from "./CloseForm";
 import ConveneForm from "./ConveneForm";
@@ -241,6 +242,8 @@ function Listed({ entrance, listed, year, asked }: {
   );
 }
 
+// Rule: PM-GA-023
+// Rule: PM-SEC-001
 function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: Voided }) {
   const { assembly, quorum, attendance, proxies, votes, decisions } = shown;
   if (!assembly.ok) return <div className="as-note" style={FAILED}>{unanswered(assembly.by, "събранието")}</div>;
@@ -318,6 +321,11 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
       {a.status === "OPEN" && [...a.agenda].sort((x, y) => x.ordinal - y.ordinal).map((i) => (
         <Votes key={i.id} item={i} votes={votes[i.id]} decision={decisions[i.id]} entrance={entrance} assembly={a.id} />
       ))}
+      {a.status === "OPEN" && !Object.values(decisions).some((d) => d.ok && d.data.protocolPostedOn) && (   // the posting is entered once; on which day and by whom are the api's (PM-GA-023, PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <ProtocolForm entrance={entrance} assembly={a.id} />
+        </div>
+      )}
     </>
   );
 }
