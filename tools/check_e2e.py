@@ -1072,7 +1072,7 @@ def decision_before_open(api, web, here, of):
     API's clock is real); its tally and status are the assembly lane's rule-named tests.
     """
     page = fetch(web, here)[1]
-    if 'name="final"' in page or "Решение" in visible_text(page):
+    if 'name="final"' in page or "Гласуване неприсъствено до" in visible_text(page):   # the close form's checkbox; a line only a decision shows
         return [f"{here}: PM-VOTE-014 — the noticed assembly offers to close an item, or shows a decision, before its sitting opens"]
     st, raw = fetch(api, of)
     agenda = json.loads(raw).get("agenda", []) if st == 200 else []

@@ -415,7 +415,9 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
  * on the item (its 404), the forms to record a vote and to close the item; once closed, the decision instead.
  */
 // Rule: PM-VOTE-014
+// Rule: PM-VOTE-016
 // Rule: PM-ORG-005
+// Rule: PM-SEC-001
 // Rule: PM-SEC-002
 function Votes({ item, votes, decision, entrance, assembly }: {
   item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; decision: Part<Schemas["DecisionView"]> | undefined; entrance: string; assembly: string;
