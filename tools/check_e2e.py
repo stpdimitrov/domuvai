@@ -99,6 +99,8 @@ ON_AN_ASSEMBLY = {
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision"),
+    ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
@@ -978,6 +980,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     failures += sitting_too_soon(api, web, here, of)
     failures += register_too_soon(api, web, here, of, owner_party)
     failures += votes_before_open(api, web, here, of, owner_party)
+    failures += decision_before_open(api, web, here, of)
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
@@ -1057,6 +1060,30 @@ def votes_before_open(api, web, here, of, owner_party):
     if status != 403 or "PM-SEC-001" not in said or record != []:
         return [f"{votes}: PM-SEC-001 — a vote by a board member who does not run the assembly answers HTTP {status} {said[:120]!r}; "
                 f"the record {record if st == 200 else f'unread (HTTP {st})'} — expected the API's 403 naming PM-SEC-001 and an empty record"]
+    return []
+
+
+def decision_before_open(api, web, here, of):
+    """
+    WEB-32 (PM-VOTE-014, PM-VOTE-016, PM-SEC-001) on the same noticed assembly: the page offers no close and shows no
+    decision before the sitting opens; closing its agenda item, posted by the board's other member (the same office, not
+    the person who convened it), is refused by the API naming PM-SEC-001, and the item, read as the check's controller,
+    has no decision — the API's 404 for an item not closed. A close at an opened sitting cannot be reached here (the
+    API's clock is real); its tally and status are the assembly lane's rule-named tests.
+    """
+    page = fetch(web, here)[1]
+    if 'name="final"' in page or "Гласуване неприсъствено до" in visible_text(page):   # the close form's checkbox; a line only a decision shows
+        return [f"{here}: PM-VOTE-014 — the noticed assembly offers to close an item, or shows a decision, before its sitting opens"]
+    st, raw = fetch(api, of)
+    agenda = json.loads(raw).get("agenda", []) if st == 200 else []
+    if not agenda:
+        return [f"{of}: the noticed assembly has no agenda item to close (HTTP {st})"]
+    decision = f"{of}/agenda/{agenda[0]['id']}/decision"
+    status, said = fetch(api, decision, body={}, headers=as_board())
+    read = fetch(api, decision)[0]
+    if status != 403 or "PM-SEC-001" not in said or read != 404:
+        return [f"{decision}: PM-SEC-001 — closing by a board member who does not run the assembly answers HTTP {status} {said[:120]!r}; "
+                f"the decision reads HTTP {read} — expected the API's 403 naming PM-SEC-001 and a 404 (not closed)"]
     return []
 
 

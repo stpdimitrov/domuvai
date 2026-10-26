@@ -6,6 +6,7 @@ import { refused, unanswered, type Refused } from "@/lib/refusal";
 import { sofiaLocal, sofiaTime } from "@/lib/sofia";
 import AgendaForm from "./AgendaForm";
 import AttendanceForm from "./AttendanceForm";
+import CloseForm from "./CloseForm";
 import ConveneForm from "./ConveneForm";
 import NoticeForm from "./NoticeForm";
 import ScheduleForm from "./ScheduleForm";
@@ -29,6 +30,8 @@ type Shown = {
   proxies: Part<Schemas["ProxyView"][]>;
   /** Each agenda item's vote record, by item id — read on an OPEN assembly only: before it opens there is none. */
   votes: Record<string, Part<Schemas["VoteView"][]>>;
+  /** Each agenda item's decision, by item id — read on an OPEN assembly only; the API's 404 is an item not closed yet. */
+  decisions: Record<string, Part<Schemas["DecisionView"]>>;
 };
 type Loaded =
   | {
@@ -62,12 +65,15 @@ async function load(entranceId: string | undefined, assemblyId: string | undefin
       reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies", of)),
     ]);
     const items = assembly?.data?.status === "OPEN" ? assembly.data.agenda : [];
-    const votes = await Promise.all(items.map((i) =>
-      reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", { params: { path: { ...of.params.path, itemId: i.id } } })),
-    ));
+    const ofItem = (itemId: string) => ({ params: { path: { ...of.params.path, itemId } } });
+    const [votes, decisions] = await Promise.all([
+      Promise.all(items.map((i) => reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", ofItem(i.id))))),
+      Promise.all(items.map((i) => reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision", ofItem(i.id))))),
+    ]);
     return {
       assembly: part(assembly), quorum: part(quorum), attendance: part(attendance), proxies: part(proxies),
       votes: Object.fromEntries(items.map((i, n) => [i.id, part(votes[n])])),
+      decisions: Object.fromEntries(items.map((i, n) => [i.id, part(decisions[n])])),
     };
   };
   const year = Number(sofiaTime(new Date().toISOString()).slice(6, 10));   // the calendar year in Sofia (PM-SYS-004), not this server's
@@ -91,6 +97,10 @@ const STATUS: Record<string, { text: string; kind: "calm" | "warn" | "crit" }> =
 };
 const MODE: Record<string, string> = { IN_PERSON: "присъствено", VIDEO: "видеоконферентно", HYBRID: "смесено" };
 const CHANNEL: Record<string, string> = { IN_PERSON: "лично", VIDEO: "видео", PROXY: "чрез пълномощник" };
+const OUTCOME: Record<string, { text: string; kind: "calm" | "warn" | "crit" }> = { PASSED: { text: "прието", kind: "calm" }, NOT_PASSED: { text: "неприето", kind: "crit" } };
+const STANDING: Record<string, string> = { PROVISIONAL: "предварително", FINAL: "окончателно" };
+const DENOMINATOR: Record<string, string> = { REPRESENTED: "от представените идеални части", TOTAL: "от всички идеални части" };
+const COMPARISON: Record<string, string> = { MORE_THAN: "повече от", AT_LEAST: "поне" };
 const CHOICE: Record<string, string> = { FOR: "за", AGAINST: "против", ABSTAIN: "въздържал се" };
 const SCOPE: Record<string, string> = { WHOLE_AGENDA: "целия дневен ред", LISTED_ITEMS: "точки" };
 const FORM: Record<string, string> = { WRITTEN: "писмено", NOTARISED: "с нотариална заверка", LAWYER_AUTHORISATION: "адвокатско пълномощно" };
@@ -230,7 +240,7 @@ function Listed({ entrance, listed, year, asked }: {
 }
 
 function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: Voided }) {
-  const { assembly, quorum, attendance, proxies, votes } = shown;
+  const { assembly, quorum, attendance, proxies, votes, decisions } = shown;
   if (!assembly.ok) return <div className="as-note" style={FAILED}>{unanswered(assembly.by, "събранието")}</div>;
   const a = assembly.data;
   const status = STATUS[a.status] ?? { text: a.status, kind: "warn" as const };
@@ -304,7 +314,7 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
         </div>
       )}
       {a.status === "OPEN" && [...a.agenda].sort((x, y) => x.ordinal - y.ordinal).map((i) => (
-        <Votes key={i.id} item={i} votes={votes[i.id]} entrance={entrance} assembly={a.id} />
+        <Votes key={i.id} item={i} votes={votes[i.id]} decision={decisions[i.id]} entrance={entrance} assembly={a.id} />
       ))}
     </>
   );
@@ -401,12 +411,18 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
 /**
  * One item's vote record as the API serves it, row by row in its order:
  * each row's weight is the API's, a correction shows what it reverses and why, a reversed row is marked not in
- * effect. Who may read it is the API's; a refusal stands in place of the rows. Below it, the form to record a vote.
+ * effect. Who may read it is the API's; a refusal stands in place of the rows. Below it, while the API has no decision
+ * on the item (its 404), the forms to record a vote and to close the item; once closed, the decision instead.
  */
 // Rule: PM-VOTE-014
+// Rule: PM-VOTE-016
 // Rule: PM-ORG-005
+// Rule: PM-SEC-001
 // Rule: PM-SEC-002
-function Votes({ item, votes, entrance, assembly }: { item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; entrance: string; assembly: string }) {
+function Votes({ item, votes, decision, entrance, assembly }: {
+  item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; decision: Part<Schemas["DecisionView"]> | undefined; entrance: string; assembly: string;
+}) {
+  const open = decision !== undefined && !decision.ok && decision.by?.status === 404;   // the API's word for an item not closed yet
   return (
     <>
       <div style={{ margin: "20px 0 0", ...HEADING }}>Гласуване — точка {item.ordinal}</div>
@@ -425,8 +441,51 @@ function Votes({ item, votes, entrance, assembly }: { item: Schemas["AgendaItemV
           </div>
         ))}
       </div>
-      <div className="co-card" style={{ marginTop: 12 }}>
-        <VoteForm entrance={entrance} assembly={assembly} item={item.id} />
+      {open && (   // once closed, no vote is taken and no second close (PM-VOTE-014); who may do either is the API's (PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <VoteForm entrance={entrance} assembly={assembly} item={item.id} />
+          <CloseForm entrance={entrance} assembly={assembly} item={item.id} />
+        </div>
+      )}
+      {decision && !open && <Decided decision={decision} />}
+    </>
+  );
+}
+
+/**
+ * An item's decision as the API stored and derives it: the majority rule applied, its denominator and threshold, the
+ * represented share, the tally on ideal parts and the result line to 2 decimals, as written by the API — the page
+ * computes none of them — and the status on the API's legal today, PROVISIONAL or FINAL, with the last day of each
+ * window. A decision merged with absentee ballots names the one it supersedes. A refusal stands in its place.
+ */
+// Rule: PM-VOTE-011
+// Rule: PM-VOTE-012
+// Rule: PM-VOTE-013
+// Rule: PM-VOTE-016
+// Rule: PM-GA-023
+function Decided({ decision }: { decision: Part<Schemas["DecisionView"]> }) {
+  if (!decision.ok) return <div className="as-note" style={FAILED}>{unanswered(decision.by, "решението по точката")}</div>;
+  const d = decision.data;
+  const outcome = OUTCOME[d.outcome] ?? { text: d.outcome, kind: "warn" as const };
+  return (
+    <>
+      <div style={{ margin: "16px 0 0", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={HEADING}>Решение</span>
+        <span className={`badge ${outcome.kind}`}>{outcome.text}</span>
+        <span className={`badge ${d.status === "FINAL" ? "calm" : "warn"}`}>{word(STANDING, d.status)}</span>
+      </div>
+      <div className="co-card as-facts" style={{ marginTop: 12 }}>
+        <div className="mono" style={{ gridColumn: "1 / -1" }}>{d.result}</div>
+        <div><span className="k">Мнозинство</span>{word(COMPARISON, d.comparison)} {d.thresholdPct}% {word(DENOMINATOR, d.denominator)} · <span className="mono">{d.majorityRuleId}</span></div>
+        <div><span className="k">Представени</span><span className="num">{d.represented}%</span> · заседание {d.sessionNo}</div>
+        <div><span className="k">За · против · възд.</span><span className="num">{d.tallyFor}% · {d.tallyAgainst}% · {d.tallyAbstain}%</span></div>
+        <div><span className="k">Приключено</span>{sofiaTime(d.decidedAt)} · <Party id={d.closedBy} /></div>
+        <div><span className="k">Гласуване неприсъствено до</span>{date(d.absenteeCloses)}</div>
+        <div><span className="k">Протокол обявен</span>{d.protocolPostedOn ? date(d.protocolPostedOn) : <span style={DIM}>не е обявен — срокът за обжалване не тече</span>}</div>
+        {d.annulmentCloses && <div><span className="k">Обжалване до</span>{date(d.annulmentCloses)}</div>}
+        {d.finalOn && <div><span className="k">Окончателно от</span>{date(d.finalOn)}</div>}
+        {d.supersedes && <div><span className="k">Слято с неприсъствените</span>{d.mergedAt && sofiaTime(d.mergedAt)} · <Party id={d.mergedBy} /> · заменя <Party id={d.supersedes} /></div>}
+        <div><span className="k">Основание</span><span className="mono" title={d.basisHash}>{d.basisHash.slice(0, 12)}</span></div>
       </div>
     </>
   );
