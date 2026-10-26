@@ -5,10 +5,12 @@ import { entranceAt, reach, type EntranceAt } from "@/lib/console";
 import { refused, unanswered, type Refused } from "@/lib/refusal";
 import { sofiaLocal, sofiaTime } from "@/lib/sofia";
 import AgendaForm from "./AgendaForm";
+import AttendanceForm from "./AttendanceForm";
 import ConveneForm from "./ConveneForm";
 import NoticeForm from "./NoticeForm";
 import ScheduleForm from "./ScheduleForm";
 import SittingForm from "./SittingForm";
+import VerifyForm from "./VerifyForm";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -284,7 +286,12 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
           <SittingForm entrance={entrance} assembly={a.id} at={quorum.ok ? quorum.data : undefined} />
         </div>
       )}
-      <Register attendance={attendance} proxies={proxies} />
+      <Register attendance={attendance} proxies={proxies} entrance={entrance} assembly={a.id} />
+      {(a.status === "NOTICED" || a.status === "OPEN") && (   // the register is kept for these; on which day, for which sitting and by whom are the api's (PM-GA-012, PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} />
+        </div>
+      )}
     </>
   );
 }
@@ -334,7 +341,8 @@ function Quorum({ quorum }: { quorum: Shown["quorum"] }) {
   );
 }
 
-function Register({ attendance, proxies }: { attendance: Shown["attendance"]; proxies: Shown["proxies"] }) {
+/** Rule: PM-GA-012, PM-GA-016 — the register as the API serves it: whether a line counts is its `counted`; an unverified video line offers the verification. */
+function Register({ attendance, proxies, entrance, assembly }: { attendance: Shown["attendance"]; proxies: Shown["proxies"]; entrance: string; assembly: string }) {
   return (
     <>
       <div style={{ margin: "20px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -352,6 +360,9 @@ function Register({ attendance, proxies }: { attendance: Shown["attendance"]; pr
             <div>{word(CHANNEL, l.channel)}{l.channel === "VIDEO" && (l.identityVerified ? " · самоличността е проверена" : " · самоличността не е проверена")}</div>
             <div>{l.counted ? "да" : <span style={DIM}>не</span>}</div>
             <div>{l.represents.length ? l.represents.map((p, i) => <span key={p}>{i > 0 && ", "}<Party id={p} /></span>) : "—"}</div>
+            {l.channel === "VIDEO" && !l.identityVerified && (   // Rule: PM-GA-016 — counted only once the api records the verification
+              <VerifyForm entrance={entrance} assembly={assembly} attendance={l.id} />
+            )}
           </div>
         ))}
       </div>

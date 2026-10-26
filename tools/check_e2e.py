@@ -93,6 +93,8 @@ ON_AN_ASSEMBLY = {
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
@@ -972,6 +974,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     failures += [] if f"Покана обявена на {date(posted[:10])} {posted[11:16]}" in shown and "Обявяване на поканата" not in shown else [
         f"{here}: the noticed assembly does not show the posting at {posted}, or still offers to post it"]
     failures += sitting_too_soon(api, web, here, of)
+    failures += register_too_soon(api, web, here, of, owner_party)
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
@@ -981,6 +984,8 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
         failures.append(f"{back}: the page does not say the notice is void")
     elif 'name="weigh"' in fetch(web, here)[1]:
         failures.append(f"{here}: PM-GA-012 — the draft again still offers to weigh a sitting")
+    elif 'name="attendeePartyId"' in fetch(web, here)[1]:
+        failures.append(f"{here}: PM-GA-012 — the draft again still offers to enter a person in the register")
     return failures
 
 
@@ -1006,6 +1011,23 @@ def sitting_too_soon(api, web, here, of):
     if status != 200 or back or "Системата не прие това:" not in said or "does not open before" not in said or weighed != [] or kept != "NOTICED":
         return [f"{here}: PM-GA-013 — weighing the first sitting weeks before its hour answers HTTP {status} → {back or 'the page'}; "
                 f"sittings {weighed}, the assembly {kept} — expected the API's refusal, nothing weighed, still NOTICED"]
+    return []
+
+
+def register_too_soon(api, web, here, of, owner_party):
+    """
+    WEB-30 (PM-GA-012, PM-GA-016, PM-SEC-001) on the same noticed assembly, weeks out: entering an owner in the register
+    through the page's own form is refused in the API's words — the register is kept on the sitting's day — the
+    party id kept in the form, the register still empty. A line on the day, and its identity verified, cannot be
+    reached here: the API's clock is real.
+    """
+    status, back, refused_page = submit_form(web, here, fetch(web, here)[1], 'name="attendeePartyId"', {"attendeePartyId": owner_party, "channel": "IN_PERSON"})
+    said = visible_text(refused_page)
+    st, raw = fetch(api, of + "/attendance")
+    register = json.loads(raw) if st == 200 else None
+    if status != 200 or back or "Системата не прие това:" not in said or "is kept on" not in said or f'value="{owner_party}"' not in refused_page or register != []:
+        return [f"{here}: PM-GA-012 — entering an owner in the register weeks before the day answers HTTP {status} → {back or 'the page'}; "
+                f"the register {register if st == 200 else f'unread (HTTP {st})'} — expected the API's refusal, the form kept, nobody entered"]
     return []
 
 
