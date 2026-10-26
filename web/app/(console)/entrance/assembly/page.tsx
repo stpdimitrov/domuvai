@@ -3,9 +3,11 @@ import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, reach, type EntranceAt } from "@/lib/console";
 import { refused, unanswered, type Refused } from "@/lib/refusal";
-import { sofiaTime } from "@/lib/sofia";
+import { sofiaLocal, sofiaTime } from "@/lib/sofia";
 import AgendaForm from "./AgendaForm";
 import ConveneForm from "./ConveneForm";
+import NoticeForm from "./NoticeForm";
+import ScheduleForm from "./ScheduleForm";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -94,7 +96,7 @@ function Standing({ s }: { s: Schemas["Standing"] }) {
   return <>{s.kind}</>;
 }
 
-export default async function AssemblyPage({ searchParams }: { searchParams: Promise<{ entrance?: string | string[]; assembly?: string | string[]; voided?: string | string[] }> }) {
+export default async function AssemblyPage({ searchParams }: { searchParams: Promise<{ entrance?: string | string[]; assembly?: string | string[]; voided?: string | string[]; moved?: string | string[] }> }) {
   const query = await searchParams;
   const view = await load(
     typeof query.entrance === "string" ? query.entrance : undefined,
@@ -122,13 +124,16 @@ export default async function AssemblyPage({ searchParams }: { searchParams: Pro
           </div>
         </div>
       ) : (
-        <Body view={view} voided={query.voided === "1"} />
+        <Body view={view} voided={query.voided === "1" ? "agenda" : query.moved === "1" ? "moved" : null} />
       )}
     </>
   );
 }
 
-function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided: boolean }) {
+/** Why the api voided a posted notice, as the act that did it answered (PM-GA-006): an item added, or the meeting moved. */
+type Voided = "agenda" | "moved" | null;
+
+function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided: Voided }) {
   const { entrance, mandates, shown, asked, listed, year } = view;
   return (
     <div style={{ padding: "0 24px 24px" }}>
@@ -210,7 +215,7 @@ function Listed({ entrance, listed, year, asked }: {
   );
 }
 
-function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: boolean }) {
+function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: Voided }) {
   const { assembly, quorum, attendance, proxies } = shown;
   if (!assembly.ok) return <div className="as-note" style={FAILED}>{unanswered(assembly.by, "събранието")}</div>;
   const a = assembly.data;
@@ -243,15 +248,33 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
           </div>
         ))}
       </div>
-      {voided && a.status === "DRAFT" && (   // the api answered noticeVoided: the assembly is a draft again; a typed ?voided=1 on a noticed one says nothing
+      {voided && a.status === "DRAFT" && (   // the api answered with the notice void: the assembly is a draft again; a typed ?voided=1 on a noticed one says nothing
         <div className="as-note" style={{ color: "#7A5210" }}>
-          Точката е добавена след обявяването на поканата — поканата отпада и събранието трябва да се обяви отново.
+          {voided === "agenda" ? "Точката е добавена след обявяването на поканата" : "Събранието е преместено след обявяването на поканата"} — поканата
+          отпада и събранието трябва да се обяви отново.
         </div>
       )}
       {(a.status === "DRAFT" || a.status === "NOTICED") && (   // the agenda the api keeps open; adding after notice voids it (PM-GA-006)
         <div className="co-card" style={{ marginTop: 12 }}>
           <AgendaForm entrance={entrance} assembly={a.id} />
         </div>
+      )}
+
+      {(a.status === "DRAFT" || a.status === "NOTICED") && (   // the acts the api allows before the meeting opens; who may do them is the api's (PM-SEC-001)
+        <>
+          {a.status === "DRAFT" && (   // only a recorded posting act makes it NOTICED (PM-GA-007, PM-SYS-013)
+            <>
+              <div style={{ margin: "20px 0 0", ...HEADING }}>Обявяване на поканата</div>
+              <div className="co-card" style={{ marginTop: 12 }}>
+                <NoticeForm entrance={entrance} assembly={a.id} />
+              </div>
+            </>
+          )}
+          <div style={{ margin: "20px 0 0", ...HEADING }}>Преместване</div>
+          <div className="co-card" style={{ marginTop: 12 }}>
+            <ScheduleForm entrance={entrance} assembly={a.id} noticed={a.status === "NOTICED"} scheduledAt={sofiaLocal(a.scheduledAt)} place={a.place} />
+          </div>
+        </>
       )}
 
       <Quorum quorum={quorum} />

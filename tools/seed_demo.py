@@ -2,7 +2,8 @@
 """
 Seed the demo entrance through the public API only, never SQL, so every write it makes is exercised as a client
 makes it (E2E-01 D2). The end-to-end check (tools/check_e2e.py) expects exactly this entrance; a local run uses it
-to have something true on screen. Prints the entrance id.
+to have something true on screen. Prints the entrance id; with SEED_OWNERS_FILE set, writes there the party id of
+each owner it registered, by name — no API read serves them (#249), and a posting act is co-signed by one (WEB-28).
 
 A second, small entrance holds a business unit reached through the common parts (WEB-16, PM-FEE-010): the charges
 screen needs the assembly's multiple for it. No run is issued for it and no figure is seeded — the multiple is the
@@ -14,6 +15,7 @@ second copy could not be made anyway). To seed again, recreate the database.
 Usage: seed_demo.py [API_URL]   (default http://localhost:8080)
 """
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -137,4 +139,7 @@ call("POST", f"/api/money/entrances/{entrance}/fund/handover-statements", {
     "handoverOn": last["committedOn"], "from": "2026-01-01", "outgoingPartyId": manager, "incomingPartyId": incoming,
     "bankBalanceMinor": fund["balanceMinor"]}, {"Idempotency-Key": str(uuid.uuid4())})
 
+if os.environ.get("SEED_OWNERS_FILE"):
+    with open(os.environ["SEED_OWNERS_FILE"], "w") as out:
+        json.dump({name: parties[name] for names in OWNERS for name in names}, out, ensure_ascii=False)
 print(entrance)

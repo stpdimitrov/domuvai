@@ -67,8 +67,10 @@ jobs:
           DOMUVAI_AUTH=off nohup java -jar app/build/libs/app.jar > api-seed.log 2>&1 &
           echo $! > api.pid
           curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
-          entrance=$(python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
+          entrance=$(SEED_OWNERS_FILE=owners.json python3 tools/seed_demo.py http://localhost:8080)   # an assignment, so a failed seed fails the step
           echo "ENTRANCE=$entrance" >> "$GITHUB_ENV"
+          # an owner of the seeded entrance, to co-sign a posting act through the page (WEB-28, PM-GA-007): no API read names one
+          echo "OWNER_PARTY=$(python3 -c 'import json; print(json.load(open("owners.json"))["Стефан Димов"])')" >> "$GITHUB_ENV"
           kill "$(cat api.pid)"
           while kill -0 "$(cat api.pid)" 2>/dev/null; do sleep 1; done
 
@@ -183,7 +185,7 @@ jobs:
           echo "::add-mask::$token"; echo "::add-mask::$manager"
           E2E_API_TOKEN="$token" E2E_MANAGER_TOKEN="$manager" python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
             --open-web http://localhost:3003 --closed-web http://localhost:3001 --bad-contact-web http://localhost:3002 \
-            --contact demo@example.test --issuer "$ISSUER" --user ivan --subject "$SUBJECT" --entrance "$ENTRANCE"
+            --contact demo@example.test --issuer "$ISSUER" --user ivan --subject "$SUBJECT" --entrance "$ENTRANCE" --owner-party "$OWNER_PARTY"
 
       - name: Logs
         if: failure()
