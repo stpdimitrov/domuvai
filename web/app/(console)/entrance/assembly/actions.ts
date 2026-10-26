@@ -224,3 +224,34 @@ export async function verifyIdentity(_: VerifyState, form: FormData): Promise<Ve
   }
   redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
 }
+
+export type VoteState = { refused?: string; values?: Record<string, string> };
+
+/**
+ * Recording how an owner present at the sitting voted on an item, or correcting it (Rule: PM-VOTE-001, PM-VOTE-014,
+ * PM-ORG-005) — the api's act. Whether this person runs the assembly (PM-SEC-001), whether the sitting is open and it
+ * is its day, whether the owner is present, which units they vote for and with what weight, and whether the item is
+ * closed are all the api's. A second vote for the same owner is a correction: it carries the why the form asks for,
+ * and the api records it as a reversal — the web edits nothing. A refusal is shown in its words, the form kept.
+ */
+// Rule: PM-VOTE-001
+// Rule: PM-VOTE-014
+// Rule: PM-ORG-005
+// Rule: PM-SEC-001
+export async function castVote(_: VoteState, form: FormData): Promise<VoteState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const values = Object.fromEntries(["entrance", "assembly", "item", "ownerPartyId", "choice", "correction"].map((n) => [n, text(n)]));
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item)) return { refused: "Точката от дневния ред не е посочена.", values };
+  if (!UUID.test(values.ownerPartyId)) return { refused: "Посочете идентификатора на собственика, чийто глас записвате.", values };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", {
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item } },
+      body: { ownerPartyId: values.ownerPartyId, choice: values.choice, correction: values.correction || undefined },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "запишете гласа") : unknownOutcome("записването на гласа"), values };
+  }
+  redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
+}

@@ -97,6 +97,8 @@ ON_AN_ASSEMBLY = {
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes"),
+    ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
@@ -917,7 +919,7 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None):
         failures.append(f"{path}: convening as an office not held answers HTTP {status} → {location or 'the page'} — expected the API's refusal, the form kept")
     print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; this year's assembly in the API's count; "
           f"convened through the form, listed and shown as stored; an agenda item put on it and one awaiting counsel refused; the meter in the API's figures; "
-          f"an office not held refused in the API's words; moved, a notice refused and one posted, its sitting weighed too soon refused, moved again and void")
+          f"an office not held refused in the API's words; moved, a notice refused and one posted, its sitting weighed, its register kept and no vote offered before the opening, one by who does not run it refused, moved again and void")
     return failures
 
 
@@ -975,6 +977,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
         f"{here}: the noticed assembly does not show the posting at {posted}, or still offers to post it"]
     failures += sitting_too_soon(api, web, here, of)
     failures += register_too_soon(api, web, here, of, owner_party)
+    failures += votes_before_open(api, web, here, of, owner_party)
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
@@ -1028,6 +1031,32 @@ def register_too_soon(api, web, here, of, owner_party):
     if status != 200 or back or "Системата не прие това:" not in said or "is kept on" not in said or f'value="{owner_party}"' not in refused_page or register != []:
         return [f"{here}: PM-GA-012 — entering an owner in the register weeks before the day answers HTTP {status} → {back or 'the page'}; "
                 f"the register {register if st == 200 else f'unread (HTTP {st})'} — expected the API's refusal, the form kept, nobody entered"]
+    return []
+
+
+def votes_before_open(api, web, here, of, owner_party):
+    """
+    WEB-31 (PM-VOTE-001, PM-SEC-001, PM-GOV-008) on the same noticed assembly: the page offers no vote and reads no
+    record before the sitting opens; a vote posted on its agenda item by a member of the board who did not convene it
+    is refused by the API naming PM-SEC-001 — a vote is recorded by whoever runs the assembly — and the item's record,
+    read as the check's controller (PM-GOV-008), is empty. A vote at an opened sitting cannot be reached here: the
+    API's clock is real, and only the person signed in to the web runs this assembly.
+    """
+    page = fetch(web, here)[1]
+    if 'name="choice"' in page or "Гласуване — точка" in visible_text(page):
+        return [f"{here}: PM-VOTE-001 — the noticed assembly offers a vote, or a vote record, before its sitting opens"]
+    st, raw = fetch(api, of)
+    agenda = json.loads(raw).get("agenda", []) if st == 200 else []
+    if not agenda:
+        return [f"{of}: the noticed assembly has no agenda item to vote on (HTTP {st})"]
+    votes = f"{of}/agenda/{agenda[0]['id']}/votes"
+    # posted as the board's other member (E2E_MANAGER_TOKEN): of the same office, but not the person who convened it
+    status, said = fetch(api, votes, body={"ownerPartyId": owner_party, "choice": "FOR"}, headers=as_board())
+    st, raw = fetch(api, votes)
+    record = json.loads(raw) if st == 200 else None
+    if status != 403 or "PM-SEC-001" not in said or record != []:
+        return [f"{votes}: PM-SEC-001 — a vote by a board member who does not run the assembly answers HTTP {status} {said[:120]!r}; "
+                f"the record {record if st == 200 else f'unread (HTTP {st})'} — expected the API's 403 naming PM-SEC-001 and an empty record"]
     return []
 
 
