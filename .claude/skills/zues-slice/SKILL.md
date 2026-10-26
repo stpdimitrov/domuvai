@@ -19,6 +19,7 @@ If a boot document is missing, say so and stop. Do not reconstruct context from 
 
 - Run `python3 tools/lanes.py`. Work only in a **free** lane — nobody is assigned one — and heed its warnings (a PR working in a lane nobody holds).
 - Write the slice contract (§3) to a file, then claim the lane with it: `python3 tools/lanes.py claim <lane> --title "S-nn <name> (<lane> · <rule ids>)" --body-file <contract.md>`. If it names another holder, or says you lost the race, stop and pick another lane.
+- **Claim only in a session whose first act was the boot.** Enforced, not advised: the `PreToolUse` hook `.claude/hooks/claim-gate.sh` refuses (exit 2) a second claim in one session and any claim once the transcript is past the size of a fresh boot (a long or forked session), and prints the boot prompt for a fresh one (§7.5). Once the claim issue closes, its `Stop` hook reminds the session to end.
 - `git fetch && git switch -c slice/S-nn-<name> origin/main`. Never work on `main`. The PR says `Closes #n`, so merging it frees the lane.
 
 ## 3. State the slice contract — before writing code
