@@ -29,14 +29,15 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 
 11. WEB-23 (PM-BOOK-003, PM-BOOK-012): the compliance screen shows each entrance's overdue declarations and the month's
     headcount check as the API gives them, says so where no run was issued, and nothing of the design's sample.
-12. WEB-25 … WEB-28 (PM-GA-001, PM-GA-002, PM-GA-004, PM-GA-006, PM-GA-007, PM-GA-012, PM-GOV-005, PM-VOTE-004): the entrance's assembly
+12. WEB-25 … WEB-29 (PM-GA-001, PM-GA-002, PM-GA-004, PM-GA-006, PM-GA-007, PM-GA-012, PM-GA-013, PM-GA-014, PM-GOV-005, PM-VOTE-004): the entrance's assembly
     screen — whether this year's assembly was held, in the API's count; in CI, an assembly convened through the page's
     own form, listed among the entrance's assemblies and shown as the API stored it, an agenda item put on it through
     the page's own form and shown bound to the API's majority, one whose majority waits on counsel refused in the API's
     words, its quorum meter in the API's figures, an office not held refused; the draft moved through the page's own
     form and shown as stored; a posting act co-signed by no owner refused in the API's words, the form kept; the notice
-    posted through the form with its photograph, the assembly NOTICED; the noticed assembly moved, a draft again whose
-    notice the page says is void.
+    posted through the form with its photograph, the assembly NOTICED; its first sitting weighed through the page's form
+    weeks before its hour, refused in the API's words, nothing weighed; the noticed assembly moved, a draft again whose
+    notice the page says is void and which offers no weighing.
 13. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
     httpOnly cookie and no token; every screen above is then read signed in, from an api that is closed; the console
     names the person, with the login the api read from the web's bearer; sign-out ends the session at the web and at
@@ -913,7 +914,7 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None):
         failures.append(f"{path}: convening as an office not held answers HTTP {status} → {location or 'the page'} — expected the API's refusal, the form kept")
     print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; this year's assembly in the API's count; "
           f"convened through the form, listed and shown as stored; an agenda item put on it and one awaiting counsel refused; the meter in the API's figures; "
-          f"an office not held refused in the API's words; moved, a notice refused and one posted, moved again and void")
+          f"an office not held refused in the API's words; moved, a notice refused and one posted, its sitting weighed too soon refused, moved again and void")
     return failures
 
 
@@ -969,6 +970,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     shown = visible_text(fetch(web, here)[1])
     failures += [] if f"Покана обявена на {date(posted[:10])} {posted[11:16]}" in shown and "Обявяване на поканата" not in shown else [
         f"{here}: the noticed assembly does not show the posting at {posted}, or still offers to post it"]
+    failures += sitting_too_soon(api, web, here, of)
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
@@ -976,7 +978,34 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
         failures.append(f"{here}: PM-GA-006 — moving the noticed assembly answers HTTP {status} → {back or 'nowhere'}; the API keeps it {a.get('status', 'unread')} — expected a draft whose notice is void (PM-GA-006)")
     elif "Събранието е преместено след обявяването на поканата" not in visible_text(fetch(web, back)[1]):
         failures.append(f"{back}: the page does not say the notice is void")
+    elif 'name="weigh"' in fetch(web, here)[1]:
+        failures.append(f"{here}: PM-GA-012 — the draft again still offers to weigh a sitting")
     return failures
+
+
+def sitting_too_soon(api, web, here, of):
+    """
+    WEB-29 (PM-GA-012, PM-GA-013, PM-GA-014) on the assembly moved_and_noticed has just noticed, weeks out: weighing its
+    first sitting through the page's own form is refused in the API's words — not before the hour its notice stated —
+    nothing weighed, the assembly still NOTICED. An opened sitting cannot be reached here: the API's clock is real.
+    """
+    page = fetch(web, here)[1]
+    status, raw = fetch(api, of + "/quorum")
+    at_hand = json.loads(raw).get("sessionNo") if status == 200 else None
+    if f"открий заседание № {at_hand}" not in visible_text(page):
+        return [f"{here}: PM-GA-012 — the noticed assembly does not offer to weigh sitting № {at_hand} (the meter's, HTTP {status})"]
+    status, back, refused_page = submit_form(web, here, page, 'name="weigh"', {})
+    said = visible_text(refused_page)
+    status_q, raw = fetch(api, of + "/quorum")
+    if status_q != 200:
+        return [f"{here}: GET …/quorum after the refused weighing: HTTP {status_q} — cannot tell whether a sitting was weighed"]
+    weighed = json.loads(raw).get("sittings")
+    st, raw = fetch(api, of)
+    kept = json.loads(raw).get("status") if st == 200 else None
+    if status != 200 or back or "Системата не прие това:" not in said or "does not open before" not in said or weighed != [] or kept != "NOTICED":
+        return [f"{here}: PM-GA-013 — weighing the first sitting weeks before its hour answers HTTP {status} → {back or 'the page'}; "
+                f"sittings {weighed}, the assembly {kept} — expected the API's refusal, nothing weighed, still NOTICED"]
+    return []
 
 
 def visible_text(page):

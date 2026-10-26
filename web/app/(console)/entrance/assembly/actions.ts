@@ -143,3 +143,30 @@ export async function reschedule(_: ScheduleState, form: FormData): Promise<Sche
   const voided = values.wasNoticed === "1" && answer.data.status === "DRAFT";
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}${voided ? "&moved=1" : ""}`);
 }
+
+export type SittingState = { refused?: string };
+
+/**
+ * Weighing the quorum of the sitting the assembly is at, and opening it if met (Rule: PM-GA-012, PM-GA-013, PM-GA-014)
+ * — the api's act, once per sitting. Which sitting is at hand, whether its hour has come, the threshold in force and
+ * the share the register makes present are all the api's; so is who may weigh it (PM-SEC-001). A refusal is shown in
+ * its words; a sitting weighed short is the api's answer too, shown among the sittings on the page it returns to.
+ */
+// Rule: PM-GA-012
+// Rule: PM-GA-013
+// Rule: PM-GA-014
+// Rule: PM-SEC-001
+export async function openSitting(_: SittingState, form: FormData): Promise<SittingState> {
+  const entrance = String(form.get("entrance") ?? ""), assembly = String(form.get("assembly") ?? "");
+  if (!UUID.test(entrance) || !UUID.test(assembly)) return { refused: "Събранието не е посочено." };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings", {
+      params: { path: { entranceId: entrance, assemblyId: assembly } },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "претеглите кворума") : unknownOutcome("претеглянето на кворума") };
+  }
+  redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
+}

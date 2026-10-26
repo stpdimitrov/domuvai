@@ -8,6 +8,7 @@ import AgendaForm from "./AgendaForm";
 import ConveneForm from "./ConveneForm";
 import NoticeForm from "./NoticeForm";
 import ScheduleForm from "./ScheduleForm";
+import SittingForm from "./SittingForm";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -278,6 +279,11 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
       )}
 
       <Quorum quorum={quorum} />
+      {a.status === "NOTICED" && (   // a sitting is weighed only on a noticed assembly; which one, when and who may weigh it are the api's (PM-GA-013, PM-GA-014, PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <SittingForm entrance={entrance} assembly={a.id} at={quorum.ok ? quorum.data : undefined} />
+        </div>
+      )}
       <Register attendance={attendance} proxies={proxies} />
     </>
   );
@@ -318,7 +324,7 @@ function Quorum({ quorum }: { quorum: Shown["quorum"] }) {
             {quorum.data.sittings.map((s) => (
               <div key={s.id}>
                 <span className="k">Заседание № {s.sessionNo}</span>
-                {s.quorumMet ? "открито" : "без кворум"} · {s.representedPct}% при праг {s.thresholdPct}% · претеглено {sofiaTime(s.weighedAt)}
+                {s.quorumMet ? <>открито{s.openedAt && <> в {sofiaTime(s.openedAt)}</>}</> : "без кворум"} · {s.representedPct}% при праг {s.thresholdPct}% · претеглено {sofiaTime(s.weighedAt)}
               </div>
             ))}
           </>
