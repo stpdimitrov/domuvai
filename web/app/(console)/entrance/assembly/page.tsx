@@ -11,6 +11,7 @@ import NoticeForm from "./NoticeForm";
 import ScheduleForm from "./ScheduleForm";
 import SittingForm from "./SittingForm";
 import VerifyForm from "./VerifyForm";
+import VoteForm from "./VoteForm";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -26,6 +27,8 @@ type Shown = {
   quorum: Part<Schemas["QuorumView"]>;
   attendance: Part<Schemas["AttendanceView"][]>;
   proxies: Part<Schemas["ProxyView"][]>;
+  /** Each agenda item's vote record, by item id — read on an OPEN assembly only: before it opens there is none. */
+  votes: Record<string, Part<Schemas["VoteView"][]>>;
 };
 type Loaded =
   | {
@@ -58,7 +61,14 @@ async function load(entranceId: string | undefined, assemblyId: string | undefin
       reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance", of)),
       reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies", of)),
     ]);
-    return { assembly: part(assembly), quorum: part(quorum), attendance: part(attendance), proxies: part(proxies) };
+    const items = assembly?.data?.status === "OPEN" ? assembly.data.agenda : [];
+    const votes = await Promise.all(items.map((i) =>
+      reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", { params: { path: { ...of.params.path, itemId: i.id } } })),
+    ));
+    return {
+      assembly: part(assembly), quorum: part(quorum), attendance: part(attendance), proxies: part(proxies),
+      votes: Object.fromEntries(items.map((i, n) => [i.id, part(votes[n])])),
+    };
   };
   const year = Number(sofiaTime(new Date().toISOString()).slice(6, 10));   // the calendar year in Sofia (PM-SYS-004), not this server's
   const [mandates, shown, listed, held] = await Promise.all([
@@ -80,7 +90,8 @@ const STATUS: Record<string, { text: string; kind: "calm" | "warn" | "crit" }> =
   OPEN: { text: "открито", kind: "calm" },
 };
 const MODE: Record<string, string> = { IN_PERSON: "присъствено", VIDEO: "видеоконферентно", HYBRID: "смесено" };
-const CHANNEL: Record<string, string> = { IN_PERSON: "лично", VIDEO: "видео" };
+const CHANNEL: Record<string, string> = { IN_PERSON: "лично", VIDEO: "видео", PROXY: "чрез пълномощник" };
+const CHOICE: Record<string, string> = { FOR: "за", AGAINST: "против", ABSTAIN: "въздържал се" };
 const SCOPE: Record<string, string> = { WHOLE_AGENDA: "целия дневен ред", LISTED_ITEMS: "точки" };
 const FORM: Record<string, string> = { WRITTEN: "писмено", NOTARISED: "с нотариална заверка", LAWYER_AUTHORISATION: "адвокатско пълномощно" };
 const word = (table: Record<string, string>, code: string) => table[code] ?? code;
@@ -219,7 +230,7 @@ function Listed({ entrance, listed, year, asked }: {
 }
 
 function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: Voided }) {
-  const { assembly, quorum, attendance, proxies } = shown;
+  const { assembly, quorum, attendance, proxies, votes } = shown;
   if (!assembly.ok) return <div className="as-note" style={FAILED}>{unanswered(assembly.by, "събранието")}</div>;
   const a = assembly.data;
   const status = STATUS[a.status] ?? { text: a.status, kind: "warn" as const };
@@ -292,6 +303,9 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
           <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} />
         </div>
       )}
+      {a.status === "OPEN" && [...a.agenda].sort((x, y) => x.ordinal - y.ordinal).map((i) => (
+        <Votes key={i.id} item={i} votes={votes[i.id]} entrance={entrance} assembly={a.id} />
+      ))}
     </>
   );
 }
@@ -379,6 +393,40 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
             <div className="num">{sofiaTime(p.registeredAt)}</div>
           </div>
         ))}
+      </div>
+    </>
+  );
+}
+
+/**
+ * One item's vote record as the API serves it, row by row in its order:
+ * each row's weight is the API's, a correction shows what it reverses and why, a reversed row is marked not in
+ * effect. Who may read it is the API's; a refusal stands in place of the rows. Below it, the form to record a vote.
+ */
+// Rule: PM-VOTE-014
+// Rule: PM-ORG-005
+// Rule: PM-SEC-002
+function Votes({ item, votes, entrance, assembly }: { item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; entrance: string; assembly: string }) {
+  return (
+    <>
+      <div style={{ margin: "20px 0 0", ...HEADING }}>Гласуване — точка {item.ordinal}</div>
+      <div className="pf-card cp-card" style={{ margin: "12px 0 0" }}>
+        <div className="as-votes pf-head"><div>Собственик</div><div>Обект</div><div>Тежест</div><div>Глас</div><div>Начин · засед.</div><div>Записан</div></div>
+        {votes && !votes.ok && <div className="as-votes pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{unanswered(votes.by, "гласовете по точката")}</div></div>}
+        {votes?.ok && votes.data.length === 0 && <div className="as-votes pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма записани гласове.</div></div>}
+        {votes?.ok && votes.data.map((r) => (
+          <div key={r.id} className="as-votes pf-row" style={r.inEffect ? undefined : DIM}>
+            <div><Party id={r.ownerPartyId} /></div>
+            <div><Party id={r.unitId} /></div>
+            <div className="num">{r.weight}</div>
+            <div>{word(CHOICE, r.choice)}{!r.inEffect && " · поправен"}</div>
+            <div>{word(CHANNEL, r.channel)} · {r.sessionNo}</div>
+            <div>{sofiaTime(r.castAt)} · <Party id={r.recordedBy} />{r.reverses && <> · поправя <Party id={r.reverses} />: {r.correction}</>}</div>
+          </div>
+        ))}
+      </div>
+      <div className="co-card" style={{ marginTop: 12 }}>
+        <VoteForm entrance={entrance} assembly={assembly} item={item.id} />
       </div>
     </>
   );
