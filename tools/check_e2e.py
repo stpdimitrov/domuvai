@@ -92,6 +92,7 @@ ON_AN_ASSEMBLY = {
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/sittings"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
