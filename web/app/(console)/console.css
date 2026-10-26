@@ -913,6 +913,23 @@
   margin-left: 12px;
   color: #6b6f6c;
 }
+.as-verify {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font: 400 12.5px/1.4 "IBM Plex Sans";
+}
+.as-verify input[type="text"] {
+  flex: 1 1 240px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #deddd9;
+  border-radius: 4px;
+  font: inherit;
+  background: #fff;
+}
 
 /* two tables on one screen: each as tall as its rows, and the screen scrolls — not each table inside itself */
 .pf-card.cp-card {

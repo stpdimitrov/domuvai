@@ -170,3 +170,57 @@ export async function openSitting(_: SittingState, form: FormData): Promise<Sitt
   }
   redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
 }
+
+export type AttendanceState = { refused?: string; values?: Record<string, string> };
+
+/**
+ * Entering a person in the register of the sitting (Rule: PM-GA-012, PM-GA-016) — the api's act. Whether this
+ * person keeps the register (PM-SEC-001), whether it is the day, which sitting the line is for, whether the person is
+ * an owner or a registered proxy's representative, whether they may be present that way and whom the line brings are
+ * all the api's; a refusal is shown in its words, the form kept as filled. The person is a party id until #300.
+ */
+// Rule: PM-GA-012
+// Rule: PM-GA-016
+// Rule: PM-SEC-001
+export async function recordAttendance(_: AttendanceState, form: FormData): Promise<AttendanceState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const values = Object.fromEntries(["entrance", "assembly", "attendeePartyId", "channel"].map((n) => [n, text(n)]));
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values };
+  if (!UUID.test(values.attendeePartyId)) return { refused: "Посочете идентификатора на лицето, което вписвате.", values };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance", {
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly } },
+      body: { attendeePartyId: values.attendeePartyId, channel: values.channel },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "впишете лицето в присъствения списък") : unknownOutcome("вписването"), values };
+  }
+  redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
+}
+
+export type VerifyState = { refused?: string; how?: string };
+
+/**
+ * Recording that a remote participant was reliably identified, and how (Rule: PM-GA-016) — the api's act; from then
+ * on the api counts their presence. Who may record it, and that nobody verifies their own identity, are the api's.
+ */
+// Rule: PM-GA-016
+// Rule: PM-SEC-001
+export async function verifyIdentity(_: VerifyState, form: FormData): Promise<VerifyState> {
+  const entrance = String(form.get("entrance") ?? ""), assembly = String(form.get("assembly") ?? ""), line = String(form.get("attendance") ?? "");
+  const how = String(form.get("how") ?? "").trim();
+  if (!UUID.test(entrance) || !UUID.test(assembly) || !UUID.test(line)) return { refused: "Редът от списъка не е посочен.", how };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification", {
+      params: { path: { entranceId: entrance, assemblyId: assembly, attendanceId: line } },
+      body: { how },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "отбележите самоличността като проверена") : unknownOutcome("проверката на самоличността"), how };
+  }
+  redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
+}
