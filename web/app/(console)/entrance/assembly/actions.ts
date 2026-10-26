@@ -255,3 +255,33 @@ export async function castVote(_: VoteState, form: FormData): Promise<VoteState>
   }
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
 }
+
+export type CloseState = { refused?: string; values?: Record<string, string> };
+
+/**
+ * Closing an item of the agenda and storing its decision (Rule: PM-VOTE-011, PM-VOTE-014, PM-VOTE-016, PM-SEC-001) —
+ * the api's act, with no body: it tallies the votes in effect on ideal parts against the majority the item was bound
+ * to, on its own denominator, and stores the decision PROVISIONAL. Whether this person runs the assembly, whether the
+ * sitting is open and it is its day, and whether the item is already closed are all the api's. The one thing asked
+ * here is that the person confirms it: once closed, no vote on the item is taken. A refusal is shown in its words.
+ */
+// Rule: PM-VOTE-011
+// Rule: PM-VOTE-014
+// Rule: PM-VOTE-016
+// Rule: PM-SEC-001
+export async function closeItem(_: CloseState, form: FormData): Promise<CloseState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const values = Object.fromEntries(["entrance", "assembly", "item"].map((n) => [n, text(n)]));
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item)) return { refused: "Точката от дневния ред не е посочена.", values };
+  if (form.get("final") !== "on") return { refused: "Потвърдете, че приключвате точката — след това по нея не се гласува.", values };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision", {
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item } },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "приключите точката") : unknownOutcome("приключването на точката"), values };
+  }
+  redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
+}
