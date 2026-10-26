@@ -8,6 +8,9 @@ import { postNotice, type NoticeState } from "./actions";
  * co-signs the act, and the photograph of the posted notice. It works without a script: the server's action answers
  * either with the assembly's page, now noticed, or with the api's refusal and the fields as they were filled.
  */
+// Rule: PM-GA-004
+// Rule: PM-GA-007
+// Rule: PM-SYS-013
 export default function NoticeForm({ entrance, assembly }: { entrance: string; assembly: string }) {
   const [state, act, pending] = useActionState<NoticeState, FormData>(postNotice, {});
   const v = state.values ?? {};

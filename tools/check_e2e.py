@@ -940,6 +940,12 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
         failures.append(f"{here}: the form moved it to 19:00 in Sofia on {moved_day}, {moved_place!r}; the API stored {a or 'nothing'}")
     shown = visible_text(fetch(web, here)[1])
     failures += [f"{here}: the moved assembly does not show {w!r}" for w in (f"Кога {date(str(moved_day))} 19:00", f"Къде {moved_place}") if w not in shown]
+    # PM-GA-004: six days out leaves no room for a seven-day notice — refused in the API's words, nothing moved
+    too_soon = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date() + datetime.timedelta(days=6)
+    status, back, refused_page = submit_form(web, here, fetch(web, here)[1], 'name="wasNoticed"', {"scheduledAt": f"{too_soon}T19:00", "place": moved_place})
+    if status != 200 or back or "Системата не прие това:" not in visible_text(refused_page) or stored().get("place") != moved_place or \
+            datetime.datetime.fromisoformat(stored()["scheduledAt"].replace("Z", "+00:00")) != sofia(moved_day, datetime.time(19, 0)):
+        failures.append(f"{here}: PM-GA-004 — moving it six days out answers HTTP {status} → {back or 'the page'}; expected the API's refusal, the meeting where it was")
 
     time.sleep(1.1)              # the posting is after the move to the second: a notice posted before it stated another time (PM-GA-006)
     posted = datetime.datetime.now(ZoneInfo("Europe/Sofia")).replace(microsecond=0, tzinfo=None).isoformat()
@@ -949,15 +955,17 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
                                              {"postedAt": posted, "coSignatoryPartyId": nobody}, photo)
     said = visible_text(refused_page)
     if status != 200 or back or "Системата не прие това:" not in said or f'value="{nobody}"' not in refused_page or stored().get("status") != "DRAFT":
-        failures.append(f"{here}: a posting act co-signed by no owner answers HTTP {status} → {back or 'the page'} — expected the API's refusal (PM-GA-007), the form kept, the assembly a draft")
+        failures.append(f"{here}: PM-GA-007 — a posting act co-signed by no owner answers HTTP {status} → {back or 'the page'} — expected the API's refusal (PM-GA-007), the form kept, the assembly a draft")
     if not owner_party:
+        if os.environ.get("CI"):                    # CI seeds an owner and passes it: a missing one is a broken run, not a skip
+            return failures + ["PM-GA-007 — the notice posted through the page NOT checked in CI: no --owner-party"]
         print("—   /entrance/assembly  the notice posted and the noticed assembly moved NOT checked: no --owner-party to co-sign")
         return failures
 
     status, back, _ = submit_form(web, here, fetch(web, here)[1], 'name="coSignatoryPartyId"', {"postedAt": posted, "coSignatoryPartyId": owner_party}, photo)
     a = stored()
     if status != 303 or back.removeprefix(web) != here or a.get("status") != "NOTICED" or not a.get("noticePostedAt"):
-        return failures + [f"{here}: posting the notice answers HTTP {status} → {back or 'nowhere'}; the API keeps it {a.get('status', 'unread')} — expected NOTICED (PM-GA-007)"]
+        return failures + [f"{here}: posting the notice answers HTTP {status} → {back or 'nowhere'}; the API keeps it {a.get('status', 'unread')} — expected NOTICED (PM-GA-007, PM-SYS-013)"]
     shown = visible_text(fetch(web, here)[1])
     failures += [] if f"Покана обявена на {date(posted[:10])} {posted[11:16]}" in shown and "Обявяване на поканата" not in shown else [
         f"{here}: the noticed assembly does not show the posting at {posted}, or still offers to post it"]
@@ -965,7 +973,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
     if status != 303 or back != here + "&moved=1" or a.get("status") != "DRAFT" or a.get("noticePostedAt"):
-        failures.append(f"{here}: moving the noticed assembly answers HTTP {status} → {back or 'nowhere'}; the API keeps it {a.get('status', 'unread')} — expected a draft whose notice is void (PM-GA-006)")
+        failures.append(f"{here}: PM-GA-006 — moving the noticed assembly answers HTTP {status} → {back or 'nowhere'}; the API keeps it {a.get('status', 'unread')} — expected a draft whose notice is void (PM-GA-006)")
     elif "Събранието е преместено след обявяването на поканата" not in visible_text(fetch(web, back)[1]):
         failures.append(f"{back}: the page does not say the notice is void")
     return failures

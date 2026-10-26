@@ -8,6 +8,8 @@ import { reschedule, type ScheduleState } from "./actions";
  * without a script: the server's action answers either with the assembly's page or with the api's refusal and the
  * fields as they were filled. Whether moving it voids a posted notice is the api's answer, not this form's.
  */
+// Rule: PM-GA-004
+// Rule: PM-GA-006
 export default function ScheduleForm({ entrance, assembly, noticed, scheduledAt, place }:
   { entrance: string; assembly: string; noticed: boolean; scheduledAt: string; place: string }) {
   const [state, act, pending] = useActionState<ScheduleState, FormData>(reschedule, {});

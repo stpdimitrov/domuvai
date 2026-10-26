@@ -83,6 +83,9 @@ export type NoticeState = { refused?: string; values?: Record<string, string> };
  * whether the co-signatory is an owner that day and whether the meeting is far enough away are all the api's; a
  * refusal is shown in its words, the fields kept — the photograph is chosen again, as no browser keeps a file.
  */
+// Rule: PM-GA-004
+// Rule: PM-GA-007
+// Rule: PM-SYS-013
 export async function postNotice(_: NoticeState, form: FormData): Promise<NoticeState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
   const values = Object.fromEntries(["entrance", "assembly", "postedAt", "coSignatoryPartyId"].map((n) => [n, text(n)]));
@@ -115,6 +118,8 @@ export type ScheduleState = { refused?: string; values?: Record<string, string> 
  * the api's; so is what becomes of a posted notice: when the api answers with the assembly a draft again, the notice
  * it had stated another date, hour or place and is void, and the page says so on the assembly it returns to.
  */
+// Rule: PM-GA-004
+// Rule: PM-GA-006
 export async function reschedule(_: ScheduleState, form: FormData): Promise<ScheduleState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
   const values = Object.fromEntries(["entrance", "assembly", "wasNoticed", "scheduledAt", "place"].map((n) => [n, text(n)]));
@@ -133,6 +138,8 @@ export async function reschedule(_: ScheduleState, form: FormData): Promise<Sche
   if (!answer?.data) {
     return { refused: answer ? undoneBy(answer, "преместите събранието") : unknownOutcome("преместването"), values };
   }
-  const voided = values.wasNoticed === "1" && answer.data.status === "DRAFT";   // the api's answer, against what the form was shown on
+  // the api's answer (its view carries no noticeVoided), against the status the form was shown on: a stale form on an
+  // assembly already a draft says nothing more than the draft itself
+  const voided = values.wasNoticed === "1" && answer.data.status === "DRAFT";
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}${voided ? "&moved=1" : ""}`);
 }
