@@ -919,7 +919,7 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None):
         failures.append(f"{path}: convening as an office not held answers HTTP {status} → {location or 'the page'} — expected the API's refusal, the form kept")
     print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; this year's assembly in the API's count; "
           f"convened through the form, listed and shown as stored; an agenda item put on it and one awaiting counsel refused; the meter in the API's figures; "
-          f"an office not held refused in the API's words; moved, a notice refused and one posted, its sitting weighed, its register kept and a vote taken too soon refused, moved again and void")
+          f"an office not held refused in the API's words; moved, a notice refused and one posted, its sitting weighed, its register kept and no vote offered before the opening, one by who does not run it refused, moved again and void")
     return failures
 
 
@@ -1036,10 +1036,11 @@ def register_too_soon(api, web, here, of, owner_party):
 
 def votes_before_open(api, web, here, of, owner_party):
     """
-    WEB-31 (PM-VOTE-001, PM-VOTE-014, PM-SEC-002) on the same noticed assembly: the page offers no vote and reads no
-    record before the sitting opens; a vote posted on its agenda item is refused by the API — votes are taken at the
-    sitting that opened — and the item's record, read as the check's controller (PM-GOV-008), is empty. A vote at an
-    opened sitting cannot be reached here: the API's clock is real.
+    WEB-31 (PM-VOTE-001, PM-SEC-001, PM-GOV-008) on the same noticed assembly: the page offers no vote and reads no
+    record before the sitting opens; a vote posted on its agenda item by a member of the board who did not convene it
+    is refused by the API naming PM-SEC-001 — a vote is recorded by whoever runs the assembly — and the item's record,
+    read as the check's controller (PM-GOV-008), is empty. A vote at an opened sitting cannot be reached here: the
+    API's clock is real, and only the person signed in to the web runs this assembly.
     """
     page = fetch(web, here)[1]
     if 'name="choice"' in page or "Гласуване — точка" in visible_text(page):
@@ -1049,13 +1050,13 @@ def votes_before_open(api, web, here, of, owner_party):
     if not agenda:
         return [f"{of}: the noticed assembly has no agenda item to vote on (HTTP {st})"]
     votes = f"{of}/agenda/{agenda[0]['id']}/votes"
-    # posted as the board, which convened it and so runs it (PM-SEC-001): the refusal is the sitting's, not the asker's
+    # posted as the board's other member (E2E_MANAGER_TOKEN): of the same office, but not the person who convened it
     status, said = fetch(api, votes, body={"ownerPartyId": owner_party, "choice": "FOR"}, headers=as_board())
     st, raw = fetch(api, votes)
     record = json.loads(raw) if st == 200 else None
-    if status != 409 or "votes are taken at a sitting that opened" not in said or record != []:
-        return [f"{votes}: PM-VOTE-001 — a vote before the sitting opens answers HTTP {status} {said[:120]!r}; the record "
-                f"{record if st == 200 else f'unread (HTTP {st})'} — expected the API's 409 and an empty record"]
+    if status != 403 or "PM-SEC-001" not in said or record != []:
+        return [f"{votes}: PM-SEC-001 — a vote by a board member who does not run the assembly answers HTTP {status} {said[:120]!r}; "
+                f"the record {record if st == 200 else f'unread (HTTP {st})'} — expected the API's 403 naming PM-SEC-001 and an empty record"]
     return []
 
 
