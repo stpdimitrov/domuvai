@@ -59,13 +59,13 @@ export type AgendaState = { refused?: string; values?: Record<string, string> };
  */
 export async function addAgendaItem(_: AgendaState, form: FormData): Promise<AgendaState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
-  const values = Object.fromEntries(["entrance", "assembly", "text", "itemType"].map((n) => [n, text(n)]));
+  const values = Object.fromEntries(["entrance", "assembly", "text", "itemType", "absenteeEligible"].map((n) => [n, text(n)]));
   if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values };
 
   const answer = await reach(() =>
     api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda", {
       params: { path: { entranceId: values.entrance, assemblyId: values.assembly } },
-      body: { text: values.text, itemType: values.itemType },
+      body: { text: values.text, itemType: values.itemType, absenteeEligible: values.absenteeEligible === "on" },   // Rule: PM-GA-017 — the drafter's tag
     }),
   );
   if (!answer?.data) {
@@ -284,4 +284,67 @@ export async function closeItem(_: CloseState, form: FormData): Promise<CloseSta
     return { refused: answer ? undoneBy(answer, "приключите точката") : unknownOutcome("приключването на точката"), values };
   }
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
+}
+
+export type BallotState = { refused?: string; entered?: boolean; values?: Record<string, string> };
+
+/**
+ * Entering an absent owner's ballot on an item tagged for them, from their handwritten-signed declaration (Rule:
+ * PM-GA-017, PM-GA-018, PM-SEC-001) — the api's act: the declaration's reference, the SHA-256 of its scan and the day
+ * it was received. Whether this person runs the assembly, whether the item is tagged and closed, whether the day is in
+ * the 7-day window, whether the owner was represented at the sitting or already has a ballot, and each unit's weight
+ * are all the api's. The rows it entered are not shown: who reads ballots is open (#298) — the form says only that it
+ * was entered. A refusal is shown in its words, the form kept.
+ */
+// Rule: PM-GA-017
+// Rule: PM-GA-018
+// Rule: PM-SEC-001
+export async function enterBallot(_: BallotState, form: FormData): Promise<BallotState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const values = Object.fromEntries(["entrance", "assembly", "item", "ownerPartyId", "choice", "documentRef", "documentSha256", "receivedOn"].map((n) => [n, text(n)]));
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item)) return { refused: "Точката от дневния ред не е посочена.", values };
+  if (!UUID.test(values.ownerPartyId)) return { refused: "Посочете идентификатора на собственика, чиято бюлетина вписвате.", values };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots", {
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item } },
+      body: {
+        ownerPartyId: values.ownerPartyId, choice: values.choice, signature: "HANDWRITTEN",   // a QES waits for its provider (PM-GA-018)
+        documentRef: values.documentRef, documentSha256: values.documentSha256.toLowerCase(), receivedOn: values.receivedOn,
+      },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "впишете бюлетината") : unknownOutcome("вписването на бюлетината"), values };
+  }
+  return { entered: true };
+}
+
+export type MergeState = { refused?: string };
+
+/**
+ * Merging the absent owners' ballots into an item's tally (Rule: PM-VOTE-013, PM-GA-017, PM-SEC-001) — the api's act,
+ * with no body: it tallies the votes in effect and every ballot, and stores a decision superseding the provisional one.
+ * Whether this person runs the assembly, whether the item is tagged and closed and whether day 7 is over are all the
+ * api's. The one thing asked here is that the person confirms it: the merge is entered once. A refusal is shown in its
+ * words.
+ */
+// Rule: PM-VOTE-013
+// Rule: PM-GA-017
+// Rule: PM-SEC-001
+export async function mergeBallots(_: MergeState, form: FormData): Promise<MergeState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const [entrance, assembly, item] = ["entrance", "assembly", "item"].map(text);
+  if (!UUID.test(entrance) || !UUID.test(assembly) || !UUID.test(item)) return { refused: "Точката от дневния ред не е посочена." };
+  if (form.get("final") !== "on") return { refused: "Потвърдете сливането — то се вписва веднъж и заменя предварителното решение." };
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge", {
+      params: { path: { entranceId: entrance, assemblyId: assembly, itemId: item } },
+    }),
+  );
+  if (!answer?.data) {
+    return { refused: answer ? undoneBy(answer, "слеете неприсъствените бюлетини") : unknownOutcome("сливането на бюлетините") };
+  }
+  redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
 }
