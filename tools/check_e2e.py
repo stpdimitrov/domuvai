@@ -29,11 +29,14 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 
 11. WEB-23 (PM-BOOK-003, PM-BOOK-012): the compliance screen shows each entrance's overdue declarations and the month's
     headcount check as the API gives them, says so where no run was issued, and nothing of the design's sample.
-12. WEB-25 … WEB-27 (PM-GA-001, PM-GA-002, PM-GA-006, PM-GA-012, PM-GOV-005, PM-VOTE-004): the entrance's assembly
+12. WEB-25 … WEB-28 (PM-GA-001, PM-GA-002, PM-GA-004, PM-GA-006, PM-GA-007, PM-GA-012, PM-GOV-005, PM-VOTE-004): the entrance's assembly
     screen — whether this year's assembly was held, in the API's count; in CI, an assembly convened through the page's
     own form, listed among the entrance's assemblies and shown as the API stored it, an agenda item put on it through
     the page's own form and shown bound to the API's majority, one whose majority waits on counsel refused in the API's
-    words, its quorum meter in the API's figures, an office not held refused.
+    words, its quorum meter in the API's figures, an office not held refused; the draft moved through the page's own
+    form and shown as stored; a posting act co-signed by no owner refused in the API's words, the form kept; the notice
+    posted through the form with its photograph, the assembly NOTICED; the noticed assembly moved, a draft again whose
+    notice the page says is void.
 13. AUTH-03 (ADR-011), in CI: a person signs in as a browser does — through the issuer's own form — and holds an
     httpOnly cookie and no token; every screen above is then read signed in, from an api that is closed; the console
     names the person, with the login the api read from the web's bearer; sign-out ends the session at the web and at
@@ -54,6 +57,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -85,6 +89,8 @@ def sofia_year():
 ON_AN_ASSEMBLY = {
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
@@ -751,11 +757,11 @@ def refusal_words(raw):
     return body.get("error") if isinstance(body, dict) and isinstance(body.get("error"), str) else None
 
 
-def submit_form(web, path, page, marker, fields):
+def submit_form(web, path, page, marker, fields, files=None):
     """
     A form posted as a browser with no script posts it: every hidden input the server rendered in the form that
     holds [marker] (a server action's own references among them), the visible fields given, multipart — signed in,
-    from this site's own page. Answers status, Location, body.
+    from this site's own page; [files], name → (filename, bytes), as a file input sends them. Answers status, Location, body.
     """
     forms = [f for f in re.findall(r"<form\b.*?</form>", page, re.S) if marker in f]
     if len(forms) != 1:
@@ -767,6 +773,9 @@ def submit_form(web, path, page, marker, fields):
             hidden.append((attrs["name"], attrs.get("value", "")))
     boundary = "----e2e" + uuid.uuid4().hex
     body = b"".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in hidden + list(fields.items()))
+    for name, (filename, content) in (files or {}).items():
+        body += (f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+                 f"Content-Type: application/octet-stream\r\n\r\n").encode() + content + b"\r\n"
     body += f"--{boundary}--\r\n".encode()
     target = urllib.parse.urlsplit(web)
     connection = http.client.HTTPConnection(target.hostname, target.port, timeout=60)
@@ -778,7 +787,7 @@ def submit_form(web, path, page, marker, fields):
         connection.close()
 
 
-def assembly_screen(api, web, entrance, signed_in):
+def assembly_screen(api, web, entrance, signed_in, owner_party=None):
     """
     WEB-25 — the entrance's general assembly as the API answers it. Signed in (CI): the offices in force today as
     identity gives them (PM-GOV-005); an assembly convened through the page's own form, by the office the person holds
@@ -893,6 +902,8 @@ def assembly_screen(api, web, entrance, signed_in):
     if status != 200 or back or "Системата не прие това:" not in said or "PM-VOTE-004" not in said or f'value="{html.escape(pending, quote=True)}"' not in refused_page:
         failures.append(f"{here}: an item whose majority waits on counsel answers HTTP {status} → {back or 'the page'} — expected the API's refusal (PM-VOTE-004), the form kept")
 
+    failures += moved_and_noticed(api, web, here, of, day, place, owner_party)
+
     # an office the person does not hold: refused in the API's words, and nothing convened
     status, location, refused_page = submit_form(web, path, page, 'name="convenedAs"',
                                                  {"convenedAs": "BM", "scheduledAt": f"{day}T19:30", "place": place + " (отказано)", "mode": "IN_PERSON"})
@@ -902,7 +913,69 @@ def assembly_screen(api, web, entrance, signed_in):
         failures.append(f"{path}: convening as an office not held answers HTTP {status} → {location or 'the page'} — expected the API's refusal, the form kept")
     print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; this year's assembly in the API's count; "
           f"convened through the form, listed and shown as stored; an agenda item put on it and one awaiting counsel refused; the meter in the API's figures; "
-          f"an office not held refused in the API's words")
+          f"an office not held refused in the API's words; moved, a notice refused and one posted, moved again and void")
+    return failures
+
+
+def moved_and_noticed(api, web, here, of, day, place, owner_party):
+    """
+    WEB-28 (PM-GA-004, PM-GA-006, PM-GA-007, PM-SYS-013) on the draft assembly_screen convened: moved through the page's
+    own form and stored as asked; a posting act co-signed by a party who owns nothing refused in the API's words, the
+    form kept; then — given an owner of the entrance — the notice posted through the form with a photograph, the
+    assembly NOTICED as the API keeps it; and moved once more, the API's draft again, the page saying the notice is void.
+    """
+    failures, date = [], lambda iso: ".".join(reversed(iso.split("-")))
+    sofia = lambda d, hm: datetime.datetime.combine(d, hm, ZoneInfo("Europe/Sofia")).astimezone(datetime.timezone.utc)
+    stored = lambda: (lambda st, raw: json.loads(raw) if st == 200 else {})(*fetch(api, of))
+    def move(to_day, to_place):
+        status, back, _ = submit_form(web, here, fetch(web, here)[1], 'name="wasNoticed"', {"scheduledAt": f"{to_day}T19:00", "place": to_place})
+        return status, back.removeprefix(web)
+    moved_day, moved_place = day + datetime.timedelta(days=1), place + " (преместено)"
+    status, back = move(moved_day, moved_place)
+    a = stored()
+    if status != 303 or back != here:
+        return [f"{here}: moving the draft answers HTTP {status} → {back or 'nowhere'} — expected the assembly's page"]
+    if a.get("place") != moved_place or not a.get("scheduledAt") or \
+            datetime.datetime.fromisoformat(a["scheduledAt"].replace("Z", "+00:00")) != sofia(moved_day, datetime.time(19, 0)):
+        failures.append(f"{here}: the form moved it to 19:00 in Sofia on {moved_day}, {moved_place!r}; the API stored {a or 'nothing'}")
+    shown = visible_text(fetch(web, here)[1])
+    failures += [f"{here}: the moved assembly does not show {w!r}" for w in (f"Кога {date(str(moved_day))} 19:00", f"Къде {moved_place}") if w not in shown]
+    # PM-GA-004: six days out leaves no room for a seven-day notice — refused in the API's words, nothing moved
+    too_soon = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date() + datetime.timedelta(days=6)
+    status, back, refused_page = submit_form(web, here, fetch(web, here)[1], 'name="wasNoticed"', {"scheduledAt": f"{too_soon}T19:00", "place": moved_place})
+    if status != 200 or back or "Системата не прие това:" not in visible_text(refused_page) or stored().get("place") != moved_place or \
+            datetime.datetime.fromisoformat(stored()["scheduledAt"].replace("Z", "+00:00")) != sofia(moved_day, datetime.time(19, 0)):
+        failures.append(f"{here}: PM-GA-004 — moving it six days out answers HTTP {status} → {back or 'the page'}; expected the API's refusal, the meeting where it was")
+
+    time.sleep(1.1)              # the posting is after the move to the second: a notice posted before it stated another time (PM-GA-006)
+    posted = datetime.datetime.now(ZoneInfo("Europe/Sofia")).replace(microsecond=0, tzinfo=None).isoformat()
+    photo = {"photo": ("notice.jpg", b"\xff\xd8\xff\xe0" + uuid.uuid4().bytes)}   # any bytes: the API keeps their SHA-256
+    nobody = str(uuid.uuid4())
+    status, back, refused_page = submit_form(web, here, fetch(web, here)[1], 'name="coSignatoryPartyId"',
+                                             {"postedAt": posted, "coSignatoryPartyId": nobody}, photo)
+    said = visible_text(refused_page)
+    if status != 200 or back or "Системата не прие това:" not in said or f'value="{nobody}"' not in refused_page or stored().get("status") != "DRAFT":
+        failures.append(f"{here}: PM-GA-007 — a posting act co-signed by no owner answers HTTP {status} → {back or 'the page'} — expected the API's refusal (PM-GA-007), the form kept, the assembly a draft")
+    if not owner_party:
+        if os.environ.get("CI"):                    # CI seeds an owner and passes it: a missing one is a broken run, not a skip
+            return failures + ["PM-GA-007 — the notice posted through the page NOT checked in CI: no --owner-party"]
+        print("—   /entrance/assembly  the notice posted and the noticed assembly moved NOT checked: no --owner-party to co-sign")
+        return failures
+
+    status, back, _ = submit_form(web, here, fetch(web, here)[1], 'name="coSignatoryPartyId"', {"postedAt": posted, "coSignatoryPartyId": owner_party}, photo)
+    a = stored()
+    if status != 303 or back.removeprefix(web) != here or a.get("status") != "NOTICED" or not a.get("noticePostedAt"):
+        return failures + [f"{here}: posting the notice answers HTTP {status} → {back or 'nowhere'}; the API keeps it {a.get('status', 'unread')} — expected NOTICED (PM-GA-007, PM-SYS-013)"]
+    shown = visible_text(fetch(web, here)[1])
+    failures += [] if f"Покана обявена на {date(posted[:10])} {posted[11:16]}" in shown and "Обявяване на поканата" not in shown else [
+        f"{here}: the noticed assembly does not show the posting at {posted}, or still offers to post it"]
+
+    status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
+    a = stored()
+    if status != 303 or back != here + "&moved=1" or a.get("status") != "DRAFT" or a.get("noticePostedAt"):
+        failures.append(f"{here}: PM-GA-006 — moving the noticed assembly answers HTTP {status} → {back or 'nowhere'}; the API keeps it {a.get('status', 'unread')} — expected a draft whose notice is void (PM-GA-006)")
+    elif "Събранието е преместено след обявяването на поканата" not in visible_text(fetch(web, back)[1]):
+        failures.append(f"{back}: the page does not say the notice is void")
     return failures
 
 
@@ -925,6 +998,7 @@ def main():
     parser.add_argument("--user", help="the login to sign in with at the issuer; its password is read from E2E_PASSWORD, never from the command line")
     parser.add_argument("--subject", help="the issuer's own id for --user")
     parser.add_argument("--entrance", required=True)
+    parser.add_argument("--owner-party", help="an owner's party id in --entrance, to co-sign a posting act (WEB-28); seed_demo.py writes them to SEED_OWNERS_FILE")
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
@@ -994,7 +1068,7 @@ def main():
     failures += charges_multiple(api, web)
     failures += entrance_screen(api, web, entrance)
     failures += compliance_screen(api, web, entrance)
-    failures += assembly_screen(api, web, entrance, signed_in=bool(args.user))
+    failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
     status, raw = fetch(api, "/api/law/version")
