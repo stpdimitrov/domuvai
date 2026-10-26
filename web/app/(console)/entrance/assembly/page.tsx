@@ -5,6 +5,8 @@ import { entranceAt, reach, type EntranceAt } from "@/lib/console";
 import { refused, unanswered, type Refused } from "@/lib/refusal";
 import { sofiaLocal, sofiaTime } from "@/lib/sofia";
 import AgendaForm from "./AgendaForm";
+import BallotForm from "./BallotForm";
+import MergeForm from "./MergeForm";
 import AttendanceForm from "./AttendanceForm";
 import CloseForm from "./CloseForm";
 import ConveneForm from "./ConveneForm";
@@ -267,7 +269,7 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
           <div key={i.id} className="as-agenda pf-row">
             <div className="num">{i.ordinal}</div>
             <div className="ellipsis" title={i.text}>{i.text}</div>
-            <div className="mono">{i.itemType}</div>
+            <div><span className="mono">{i.itemType}</span>{i.absenteeEligible && " · и неприсъствено"}</div>
             <div className="mono">{i.majorityRuleId}</div>
           </div>
         ))}
@@ -419,6 +421,7 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
 // Rule: PM-ORG-005
 // Rule: PM-SEC-001
 // Rule: PM-SEC-002
+// Rule: PM-GA-017
 function Votes({ item, votes, decision, entrance, assembly }: {
   item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; decision: Part<Schemas["DecisionView"]> | undefined; entrance: string; assembly: string;
 }) {
@@ -448,6 +451,12 @@ function Votes({ item, votes, decision, entrance, assembly }: {
         </div>
       )}
       {decision && !open && <Decided decision={decision} />}
+      {item.absenteeEligible && decision?.ok && !decision.data.supersedes && (   // closed, tagged, not merged (PM-GA-017, PM-VOTE-013); the window and who may act are the API's
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <BallotForm entrance={entrance} assembly={assembly} item={item.id} />
+          <MergeForm entrance={entrance} assembly={assembly} item={item.id} />
+        </div>
+      )}
     </>
   );
 }

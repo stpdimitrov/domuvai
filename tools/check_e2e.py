@@ -101,6 +101,8 @@ ON_AN_ASSEMBLY = {
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
@@ -888,21 +890,22 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None):
         failures.append(f"{path}: the quorum is refused (HTTP {status}) and the page does not say the API's words")
 
     # WEB-27 (PM-GA-006, PM-VOTE-004): an item put on the agenda through the page's own form, bound to the majority the
-    # API has in force for its type and shown as stored; a type whose majority waits on counsel, refused in the API's words
+    # API has in force for its type and shown as stored; a type whose majority waits on counsel, refused in the API's words.
+    # WEB-33 (PM-GA-017): the item is tagged for absentee ballots through the form's own checkbox, and the API keeps it.
     here = location.removeprefix(web)
     _, assembly_page = fetch(web, here)
     item = f"Отчет на управителя — проверката {uuid.uuid4().hex[:6]}"
-    status, back, _ = submit_form(web, here, assembly_page, 'name="itemType"', {"text": item, "itemType": "GENERAL"})
+    status, back, _ = submit_form(web, here, assembly_page, 'name="itemType"', {"text": item, "itemType": "GENERAL", "absenteeEligible": "on"})
     if status != 303 or back.removeprefix(web) != here:
         failures.append(f"{here}: adding an agenda item answers HTTP {status} → {back or 'nowhere'} — expected the assembly's page")
     else:
         status, raw = fetch(api, of)
         agenda = json.loads(raw).get("agenda", []) if status == 200 else []
         put = [i for i in agenda if i["text"] == item]
-        if len(put) != 1 or put[0]["itemType"] != "GENERAL":
-            failures.append(f"{here}: the API stored the agenda {agenda or status} — not the item the form asked for")
+        if len(put) != 1 or put[0]["itemType"] != "GENERAL" or put[0].get("absenteeEligible") is not True:
+            failures.append(f"{here}: the API stored the agenda {agenda or status} — not the item the form asked for, tagged for absentee ballots (PM-GA-017)")
         else:
-            row = f"{put[0]['ordinal']} {item} GENERAL {put[0]['majorityRuleId']}"
+            row = f"{put[0]['ordinal']} {item} GENERAL · и неприсъствено {put[0]['majorityRuleId']}"
             failures += [] if row in visible_text(fetch(web, here)[1]) else [f"{here}: the agenda does not show {row!r}"]
     pending = item + " (чака юрист)"
     status, back, refused_page = submit_form(web, here, assembly_page, 'name="itemType"', {"text": pending, "itemType": "COMMON_PART_USE_RIGHT"})
@@ -981,6 +984,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     failures += register_too_soon(api, web, here, of, owner_party)
     failures += votes_before_open(api, web, here, of, owner_party)
     failures += decision_before_open(api, web, here, of)
+    failures += absentee_before_open(api, web, here, of)
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
@@ -1085,6 +1089,33 @@ def decision_before_open(api, web, here, of):
         return [f"{decision}: PM-SEC-001 — closing by a board member who does not run the assembly answers HTTP {status} {said[:120]!r}; "
                 f"the decision reads HTTP {read} — expected the API's 403 naming PM-SEC-001 and a 404 (not closed)"]
     return []
+
+
+def absentee_before_open(api, web, here, of):
+    """
+    WEB-33 (PM-GA-017, PM-VOTE-013, PM-SEC-001) on the same noticed assembly: its item is tagged for absentee ballots
+    but not closed, so the page offers no ballot and no merge; an absent owner's ballot and the merge, posted by the
+    board's other member (not the person who convened it), are each refused by the API naming PM-SEC-001. A ballot or a
+    merge on an item closed at an opened sitting cannot be reached here (the API's clock is real); they are the assembly
+    lane's rule-named tests. No ballot is read: the API serves none (#298).
+    """
+    page = fetch(web, here)[1]
+    if 'name="documentSha256"' in page or "Слей бюлетините" in visible_text(page):
+        return [f"{here}: PM-GA-017 — the noticed assembly offers an absentee ballot or a merge on an item not closed"]
+    st, raw = fetch(api, of)
+    agenda = json.loads(raw).get("agenda", []) if st == 200 else []
+    tagged = [i for i in agenda if i.get("absenteeEligible")]
+    if not tagged:
+        return [f"{of}: the noticed assembly has no item tagged for absentee ballots (HTTP {st})"]
+    item = f"{of}/agenda/{tagged[0]['id']}"
+    ballot = {"ownerPartyId": str(uuid.uuid4()), "choice": "FOR", "signature": "HANDWRITTEN", "documentRef": "e2e",
+              "documentSha256": "0" * 64, "receivedOn": datetime.datetime.now(ZoneInfo("Europe/Sofia")).date().isoformat()}
+    failures = []
+    for what, path, body in (("a ballot", f"{item}/absentee-ballots", ballot), ("the merge", f"{item}/absentee-merge", {})):
+        status, said = fetch(api, path, body=body, headers=as_board())
+        if status != 403 or "PM-SEC-001" not in said:
+            failures.append(f"{path}: PM-SEC-001 — {what} by a board member who does not run the assembly answers HTTP {status} {said[:120]!r} — expected the API's 403 naming PM-SEC-001")
+    return failures
 
 
 def visible_text(page):

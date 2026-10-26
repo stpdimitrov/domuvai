@@ -31,6 +31,9 @@ export default function AgendaForm({ entrance, assembly }: { entrance: string; a
           {TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </label>
+      <label className="check wide">   {/* Rule: PM-GA-017 — the drafter tags the item; the platform keeps no statutory list */}
+        <input type="checkbox" name="absenteeEligible" defaultChecked={v.absenteeEligible === "on"} /> Допуска неприсъствено гласуване до 7 дни след заседанието
+      </label>
       {state.refused && <div className="as-refused" role="alert">{state.refused}</div>}
       <div className="wide">
         <button type="submit" className="chip active" disabled={pending}>{pending ? "Добавя се…" : "Добави точка"}</button>
