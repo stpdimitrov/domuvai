@@ -108,6 +108,8 @@ Review the diff against the rule texts as if someone else wrote it. Re-reading y
 
 Add the slice's entry as a new file in `docs/sessionlog/` and commit it with the slice. Never edit an earlier entry.
 
+**Claim only in a session whose first act was the boot** — the claim gate (`.claude/hooks/claim-gate.sh`, T-07) refuses a second claim and a claim in a long or forked session, and prints the fresh-session prompt.
+
 **One slice per session.** After the merge and `main` synced, the session starts its successor when the chain-at-close conditions hold, and ends either way; the next slice boots fresh from the repo (`.claude/skills/zues-slice/SKILL.md` §7.5).
 
 ### Working cheaply

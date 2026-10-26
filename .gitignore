@@ -25,3 +25,6 @@ package-lock.json
 # Generated on every gate run and changed by every slice that adds a test: committed, it conflicted between any
 # two open PRs. `python3 tools/traceability.py` writes it; the gate still runs the generator for its integrity checks.
 docs/TRACEABILITY.md
+
+# Per-session hook state (T-07 claim markers) — per machine, never shared
+.claude/state/
