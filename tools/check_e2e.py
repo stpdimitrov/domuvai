@@ -42,6 +42,9 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
     httpOnly cookie and no token; every screen above is then read signed in, from an api that is closed; the console
     names the person, with the login the api read from the web's bearer; sign-out ends the session at the web and at
     the issuer.
+14. WEB-35 (ADR-012, PM-SEC-001): the intake screen — a fee sheet uploaded through its own form shows every column the
+    API profiled, each preset to the API's field, and the columns it could not place; the mapping confirmed through the
+    second form, one column corrected, shown as confirmed. The controller's profile is the API's 403 naming PM-BOOK-005.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage, in CI — a real issuer, the api closed (E2E_PASSWORD and E2E_API_TOKEN in the environment):
@@ -107,8 +110,11 @@ ON_AN_ASSEMBLY = {
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
-# The calls that keep an entrance's accounts — for the manager and the board only (G-3, PM-SEC-001).
-KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/preview")}
+# The calls that keep an entrance's accounts or enter its book — for the manager and the board only (G-3, G-1, PM-SEC-001).
+KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
+                     ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile")}
+# A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
+INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
@@ -131,6 +137,8 @@ CALLS = {
     ("GET", "/api/money/entrances/{entranceId}/arrears"): lambda e: (f"/api/money/entrances/{e}/arrears?asOf=2026-09-30", None),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies"): lambda e: (f"/api/assembly/entrances/{e}/assemblies", None),
     ("GET", "/api/assembly/entrances/{entranceId}/years/{year}"): lambda e: (f"/api/assembly/entrances/{e}/years/{sofia_year()}", None),
+    ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"): lambda e: (
+        f"/api/intake/entrances/{e}/fee-sheet/profile", {"csv": INTAKE_SHEET}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1139,6 +1147,59 @@ def protocol_before_open(api, web, here, of):
     return failures
 
 
+def intake_screen(api, web, entrance):
+    """
+    WEB-35 (ADR-012, PM-SEC-001) — `/entrance/intake`: a sheet uploaded through the page's own form, as a browser with no
+    script posts it, shows every column of the API's own proposal for the same sheet, each select preset to the API's
+    field, and names the columns the API could not place; confirming with the one it could not place given a field
+    shows that choice as confirmed. Nothing here is typed of the proposal: it is taken from the API. With a token of its
+    own, the check asks as the controller too — the API's 403 naming PM-BOOK-005 (G-1).
+    """
+    path = f"/entrance/intake?entrance={entrance}"
+    status, page = fetch(web, path)
+    if status != 200 or 'name="sheet"' not in page:
+        return [f"{path}: HTTP {status}, or no form to upload a sheet"]
+    of, failures = f"/api/intake/entrances/{entrance}/fee-sheet/profile", []
+    if api in CARRIED and as_board():
+        status, said = fetch(api, of, {"csv": INTAKE_SHEET})
+        failures += [] if status == 403 and "PM-BOOK-005" in said else [f"{of}: the controller profiled a sheet (HTTP {status} {said[:120]!r}), not the API's 403 naming PM-BOOK-005"]
+    else:
+        print(f"—   {of}  the controller's 403 NOT checked: this run holds no token of its own and no board's")
+    status, raw = fetch(api, of, {"csv": INTAKE_SHEET}, headers=as_board())
+    if status != 200:
+        return failures + [f"{of}: HTTP {status} {raw[:200]}"]
+    proposal = json.loads(raw)
+    if "м2" not in proposal["unmappedColumns"]:
+        return failures + [f"{of}: the API placed 'м2' ({proposal['mapping'].get('м2')}) — the check corrects a column it could not place; pick another"]
+    columns = list(proposal["mapping"]) + proposal["unmappedColumns"]
+
+    def presets(page):
+        selects = re.findall(r'<select[^>]*name="field-(\d+)"[^>]*>(.*?)</select>', page, re.S)
+        chosen = lambda options: next(iter(re.findall(r'<option(?=[^>]*\bselected\b)[^>]*value="([^"]*)"', options)), "")
+        return [chosen(options) for _, options in sorted(selects, key=lambda s: int(s[0]))]
+
+    status, _, answered = submit_form(web, path, page, 'name="sheet"', {}, files={"sheet": ("fees.csv", INTAKE_SHEET.encode())})
+    text = visible_text(answered)
+    want = [proposal["mapping"].get(c, "") for c in columns]
+    failures += [] if status == 200 else [f"{path}: the upload answered HTTP {status}"]
+    failures += [f"{path}: does not show the column {c!r} the API profiled" for c in columns if f"„{c}“" not in text]
+    failures += [] if presets(answered) == want else [f"{path}: the selects are preset to {presets(answered)}, the API proposed {want}"]
+    failures += [f"{path}: does not name {c!r} among the columns the API could not place" for c in proposal["unmappedColumns"]
+                 if not re.search(rf"Системата не разпозна:[^.]*„{re.escape(c)}“", text)]
+    if failures:
+        return failures
+    chosen = {f"field-{i}": f for i, f in enumerate(want)}
+    corrected = columns.index("м2")
+    chosen[f"field-{corrected}"] = "BUILT_AREA"
+    status, _, confirmed = submit_form(web, path, answered, 'name="sheetName"', chosen)
+    text = visible_text(confirmed)
+    failures += [] if status == 200 and "Потвърдено разпределение" in text else [f"{path}: the confirmation answered HTTP {status}, and no confirmed mapping"]
+    failures += [] if "„м2“ → Застроена площ (BUILT_AREA)" in text else [f"{path}: the corrected column is not shown confirmed as BUILT_AREA"]
+    failures += [] if presets(confirmed)[corrected] == "BUILT_AREA" else [f"{path}: the form does not keep the corrected choice"]
+    print(f"{'ok ' if not failures else 'BAD'} {path}  {len(columns)} columns as the API profiled them, one corrected and confirmed")
+    return failures
+
+
 def visible_text(page):
     page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
     page = re.sub(r"<(script|style)\b.*?</\1>", " ", page, flags=re.S)
@@ -1229,6 +1290,7 @@ def main():
     failures += entrance_screen(api, web, entrance)
     failures += compliance_screen(api, web, entrance)
     failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
+    failures += intake_screen(api, web, entrance)
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
     status, raw = fetch(api, "/api/law/version")
