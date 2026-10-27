@@ -45,6 +45,9 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 14. WEB-35 (ADR-012, PM-SEC-001): the intake screen — a fee sheet uploaded through its own form shows every column the
     API profiled, each preset to the API's field, and the columns it could not place; the mapping confirmed through the
     second form, one column corrected, shown as confirmed. The controller's profile is the API's 403 naming PM-BOOK-005.
+15. WEB-36 (ADR-012, PM-FEE-014, PM-FEE-012, PM-SEC-001): on the same screen, the confirmed sheet dry-run with a tariff
+    typed in euros shows the API's own verdict for the same request — every count and each differing bill, to the cent;
+    recording it shows the import's id, which the API then reads with the same verdict.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage, in CI — a real issuer, the api closed (E2E_PASSWORD and E2E_API_TOKEN in the environment):
@@ -112,9 +115,14 @@ ON_AN_ASSEMBLY = {
 }
 # The calls that keep an entrance's accounts or enter its book — for the manager and the board only (G-3, G-1, PM-SEC-001).
 KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
-                     ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile")}
+                     ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"),
+                     ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/dry-run"),
+                     ("POST", "/api/intake/entrances/{entranceId}/imports")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
+# The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
+INTAKE_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
+              "lines": [{"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 250}]}
 CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
@@ -139,6 +147,10 @@ CALLS = {
     ("GET", "/api/assembly/entrances/{entranceId}/years/{year}"): lambda e: (f"/api/assembly/entrances/{e}/years/{sofia_year()}", None),
     ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"): lambda e: (
         f"/api/intake/entrances/{e}/fee-sheet/profile", {"csv": INTAKE_SHEET}),
+    ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/dry-run"): lambda e: (
+        f"/api/intake/entrances/{e}/fee-sheet/dry-run", {"csv": INTAKE_SHEET, **INTAKE_RUN}),
+    ("POST", "/api/intake/entrances/{entranceId}/imports"): lambda e: (
+        f"/api/intake/entrances/{e}/imports", {"csv": INTAKE_SHEET, **INTAKE_RUN}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1197,6 +1209,54 @@ def intake_screen(api, web, entrance):
     failures += [] if "„м2“ → Застроена площ (BUILT_AREA)" in text else [f"{path}: the corrected column is not shown confirmed as BUILT_AREA"]
     failures += [] if presets(confirmed)[corrected] == "BUILT_AREA" else [f"{path}: the form does not keep the corrected choice"]
     print(f"{'ok ' if not failures else 'BAD'} {path}  {len(columns)} columns as the API profiled them, one corrected and confirmed")
+    return failures + intake_run(api, web, entrance, path, confirmed, {**proposal["mapping"], "м2": "BUILT_AREA"})
+
+
+def eur(minor):
+    """The web's own rendering of minor units (lib/console.ts `eur`) — what the page must show for the API's figure."""
+    whole, cents = divmod(abs(minor), 100)
+    return f"{'−' if minor < 0 else ''}€{whole:,}".replace(",", ".") + f",{cents:02d}"
+
+
+def intake_run(api, web, entrance, path, page, mapping):
+    """
+    WEB-36 (ADR-012, PM-FEE-014, PM-FEE-012, PM-SEC-001) — the confirmed sheet dry-run through the page's third form,
+    the rate typed in euros: the page shows the verdict the API gives for the same request — the counts and each
+    differing bill, theirs, ours and the difference — and recording it shows the id of an import the API reads back.
+    Nothing of the verdict is typed here: it is the API's.
+    """
+    line = INTAKE_RUN["lines"][0]
+    typed = {"period": INTAKE_RUN["period"], "legalDate": INTAKE_RUN["legalDate"], "stream-0": line["stream"], "key-0": line["key"],
+             "per-0": "rate", "amount-0": "2,50", "decision-0": line["decisionId"]}
+    of = f"/api/intake/entrances/{entrance}/fee-sheet/dry-run"
+    status, raw = fetch(api, of, {"csv": INTAKE_SHEET, "mapping": mapping, **INTAKE_RUN}, headers=as_board())
+    if status != 200:
+        return [f"{of}: HTTP {status} {raw[:200]}"]
+    report = json.loads(raw)
+    if not report["differences"]:
+        return [f"{of}: the sheet reproduced — the check wants a differing bill to show; pick another rate"]
+
+    def verdict(text):
+        said = [f"Редове: {report['rowsParsed']} · съвпадат: {report['matched']} · различават се: {report['differing']}"]
+        said += [f"{d['designation']} {eur(d['theirMinor'])} {eur(d['ourMinor'])} {eur(d['deltaMinor'])}" for d in report["differences"]]
+        said += report["violations"]
+        return [f"{path}: does not show the API's {s!r}" for s in said if s not in text]
+
+    status, _, answered = submit_form(web, path, page, 'name="period"', {**typed, "step": "dry-run"})
+    failures = ([] if status == 200 else [f"{path}: the dry-run answered HTTP {status}"]) + verdict(visible_text(answered))
+    if failures:
+        return failures
+    status, _, recorded = submit_form(web, path, answered, 'name="period"', {**typed, "step": "record"})
+    text = visible_text(recorded)
+    found = re.search(r"Внасянето е записано: ([0-9a-f-]{36})", text)
+    if status != 200 or not found:
+        return [f"{path}: the record answered HTTP {status}, and no import id"]
+    failures += verdict(text)
+    status, raw = fetch(api, f"/api/intake/imports/{found[1]}", headers=as_board())
+    read = json.loads(raw) if status == 200 else {}
+    failures += [] if read.get("differing") == report["differing"] and read.get("rowsParsed") == report["rowsParsed"] else [
+        f"/api/intake/imports/{found[1]}: HTTP {status} {raw[:160]!r}, not the import the page recorded"]
+    print(f"{'ok ' if not failures else 'BAD'} {path}  dry-run and record show the API's verdict, {report['differing']} bill(s) differing")
     return failures
 
 
