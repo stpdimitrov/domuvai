@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import type { Schemas } from "@/lib/api/client";
+import { eur } from "@/lib/money";
 import { intake, type ProfileState } from "./actions";
 
 type Field = Schemas["ProposedMapping"]["mapping"][string];
@@ -21,13 +22,22 @@ const FIELD: Record<Field, string> = {
 };
 const named = (f: Field) => `${FIELD[f] ?? f} (${f})`;
 
+/** The law's streams, keys and named costs (PM-FEE-001, PM-FEE-011), the API's codes in words. */
+const STREAM = { MANAGEMENT: "Управление", MAINTENANCE: "Поддръжка", REPAIR_FUND: "Фонд за ремонт" };
+const KEY = { PER_PERSON: "на живущ", BY_IDEAL_PARTS: "по идеални части", PER_UNIT: "на обект" };
+const ITEM = { CONCIERGE: "Портиер", WATER: "Вода", HEATING: "Отопление" };
+/** The rows of the tariff form: no script adds one, so a few stand ready and the empty ones are left out. */
+const LINES = 4;
+const options = (words: Record<string, string>) => Object.entries(words).map(([code, w]) => <option key={code} value={code}>{w} ({code})</option>);
+
 /**
- * The intake's first three steps (ADR-012): a fee sheet uploaded, the API's proposal for its columns, and the mapping
- * the person confirms. Both forms work without a script — the server's action answers with the proposal, the
- * confirmed mapping, or the API's refusal and the form as it was. The page proposes nothing of its own: every column,
- * every unplaced one and every missing required field is the API's.
+ * The intake's steps (ADR-012): a fee sheet uploaded, the API's proposal for its columns, the mapping the person
+ * confirms, and the dry-run or the import recorded with the tariff the firm billed on. Every form works without a
+ * script — the server's action answers with the proposal, the confirmed mapping, the verdict, or the API's refusal and
+ * the form as it was. The page proposes and compares nothing of its own: every column, every unplaced one, every
+ * missing required field, and which bills reproduce to the cent and which do not, is the API's.
  */
-// Rule: PM-SEC-001
+// Rule: PM-SEC-001, PM-FEE-014
 export default function IntakeForm({ entrance }: { entrance: string }) {
   const [state, act, pending] = useActionState<ProfileState, FormData>(intake, {});
   const { sheet, proposal, confirmed } = state;
@@ -75,7 +85,7 @@ export default function IntakeForm({ entrance }: { entrance: string }) {
               </select>
             </label>
           ))}
-          {state.refused && <div className="as-refused" role="alert">{state.refused}</div>}
+          {state.refused && !state.run && <div className="as-refused" role="alert">{state.refused}</div>}
           <div className="wide">
             <button type="submit" className="chip active" disabled={pending}>{pending ? "Потвърждава се…" : "Потвърди разпределението"}</button>
             <span className="as-hint">Дали разпределението стига за изчислението, казва пробното изчисление — то е следващата стъпка.</span>
@@ -83,18 +93,73 @@ export default function IntakeForm({ entrance }: { entrance: string }) {
         </form>
       )}
 
-      {confirmed && proposal && (
-        <div className="as-form" style={{ marginTop: 16 }}>
+      {confirmed && (
+        <form action={act} key={JSON.stringify([confirmed, state.run])} className="as-form" style={{ marginTop: 16 }}>
+          <input type="hidden" name="entrance" value={entrance} />
+          <input type="hidden" name="sheetName" value={sheet?.name ?? ""} />
+          <input type="hidden" name="csv" value={sheet?.carried ?? ""} />
+          {state.recorded && <input type="hidden" name="recorded" value={state.recorded} />}
           <div className="wide acct-title">Потвърдено разпределение</div>
           <ul className="wide" style={{ margin: 0, paddingLeft: 18 }}>
             {columns.map((column, i) => (
-              <li key={i}>„{column}“ → {confirmed[column] ? named(confirmed[column]) : "не се внася"}</li>
+              <li key={i}>
+                „{column}“ → {confirmed[column] ? named(confirmed[column]) : "не се внася"}
+                <input type="hidden" name="column" value={column} />
+                <input type="hidden" name={`field-${i}`} value={confirmed[column] ?? ""} />
+              </li>
             ))}
           </ul>
-          <div className="wide as-hint">
-            Пазят се само в тази страница, с таблицата. Пробното изчисление по тях — всяка сметка срещу таблицата, до стотинка —
-            още не е тук; дотогава нищо не е записано.
+          <div className="wide acct-title">Тарифа, по която фирмата е изчислила таблицата</div>
+          <label>Период (ГГГГ-ММ)<input name="period" required pattern="\d{4}-\d{2}" defaultValue={state.run?.period} /></label>
+          <label>Юридическа дата<input name="legalDate" type="date" required defaultValue={state.run?.legalDate} /></label>
+          <label>Множител за стопанска дейност (ако има)<input name="multiplier" inputMode="numeric" defaultValue={state.run?.multiplier} /></label>
+          {Array.from({ length: LINES }, (_, j) => {
+            const l = state.run?.lines[j];
+            return (
+              <div key={j} className="wide" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select name={`stream-${j}`} defaultValue={l?.stream ?? ""} aria-label={`Ред ${j + 1}: перо`}><option value="">— празен ред</option>{options(STREAM)}</select>
+                <select name={`key-${j}`} defaultValue={l?.key ?? "PER_PERSON"} aria-label={`Ред ${j + 1}: разпределение`}>{options(KEY)}</select>
+                <select name={`item-${j}`} defaultValue={l?.item ?? ""} aria-label={`Ред ${j + 1}: разход`}><option value="">— цялото перо</option>{options(ITEM)}</select>
+                <select name={`per-${j}`} defaultValue={l?.per ?? "rate"} aria-label={`Ред ${j + 1}: вид сума`}>
+                  <option value="rate">ставка, €</option>
+                  <option value="total">обща сума, €</option>
+                </select>
+                <input name={`amount-${j}`} defaultValue={l?.amount} placeholder="0,00" aria-label={`Ред ${j + 1}: сума в евро`} style={{ width: 90 }} />
+                <input name={`decision-${j}`} defaultValue={l?.decision} placeholder="решение на ОС" aria-label={`Ред ${j + 1}: решение на общото събрание`} />
+              </div>
+            );
+          })}
+          {state.refused && state.run && <div className="as-refused" role="alert">{state.refused}</div>}
+          <div className="wide">
+            <button type="submit" name="step" value="dry-run" className="chip active" disabled={pending}>{pending ? "Изчислява се…" : "Пробно изчисление"}</button>
+            {!state.recorded && <button type="submit" name="step" value="record" className="chip" disabled={pending}>Запиши внасянето</button>}
+            <span className="as-hint">Пробното изчисление не записва нищо. Записът пази присъдата на системата и съдържанието на таблицата; в регистъра не влиза нищо, докато внасянето не бъде прието.</span>
           </div>
+        </form>
+      )}
+
+      {state.report && (
+        <div className="as-form" style={{ marginTop: 16 }}>
+          {state.recorded && <div className="wide acct-title">{state.recordedNow ? "Внасянето е записано" : "Записано по-рано"}: {state.recorded}</div>}
+          <div className="wide acct-title">
+            {state.report.reproduced ? "Таблицата е възпроизведена до стотинка." : "Таблицата не е възпроизведена."}
+          </div>
+          <div className="wide">Редове: {state.report.rowsParsed} · съвпадат: {state.report.matched} · различават се: {state.report.differing}</div>
+          {state.report.differences.length > 0 && (
+            <table className="wide">
+              <thead><tr><th>Обект</th><th>По таблицата</th><th>По системата</th><th>Разлика</th></tr></thead>
+              <tbody>
+                {state.report.differences.map((d, i) => (
+                  <tr key={i}><td>{d.designation}</td><td className="num">{eur(d.theirMinor)}</td><td className="num">{eur(d.ourMinor)}</td><td className="num">{eur(d.deltaMinor)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {state.report.violations.length > 0 && (
+            <ul className="wide as-refused" role="status" style={{ margin: 0, paddingLeft: 18 }}>
+              {state.report.violations.map((v, i) => <li key={i}>{v}</li>)}
+            </ul>
+          )}
         </div>
       )}
     </>
