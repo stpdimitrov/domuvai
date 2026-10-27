@@ -83,6 +83,17 @@ Everything a session needs to take over is in the repository or on its GitHub is
 - **Nobody audits their own work**: after a batch of parallel slices, `zues-audit` runs in a fresh session over what was merged.
 - **Credentials are each developer's own.** A push refused with an account error is checked first against the identity git actually uses (`git credential fill` — the keychain can hold another account's login), and is never worked around by switching accounts in a session.
 
+## Persistence tests without Docker
+
+The `*IT` tests run on a real Postgres through Testcontainers (`@Testcontainers(disabledWithoutDocker = true)`). On a machine with no container runtime they are **skipped, not run** — the gate pack still says green, and a migration or SQL fault turns up only in CI (#266: a column added twice; every IT and the e2e job failed there). Run the ones your slice touches against a local Postgres 16 before you push:
+
+1. `createdb -h localhost -U postgres domuvai_<slice id>` — a scratch database of your own.
+2. Copy the test to `…ScratchLocalIT.kt` beside it: remove the `@Testcontainers(…)` annotation and the `companion object` with the container and its `@DynamicPropertySource`, and rename the class.
+3. `DB_URL='jdbc:postgresql://localhost:5432/domuvai_<slice id>?currentSchema=registry,identity_org,assembly,money,maintenance,compliance,evidence,app,intake,public' ./gradlew :app:test --tests '*ScratchLocalIT'` — then check its report shows the tests **run**, not skipped.
+4. Delete the copy (never commit it) and `dropdb` the scratch database.
+
+Gate 9 also refuses a migration that adds a column its table already has — the failure #266 hit — on any machine.
+
 ## Skills
 
 Committed to `.claude/skills/`, not a personal account, so every session gets the same version. They load in a session opened on this repository; a session opened elsewhere (a coordinator, say) links them — `ln -s <repo>/.claude/skills/zues-* ~/.claude/skills/` — and never keeps a copy, which would drift.
