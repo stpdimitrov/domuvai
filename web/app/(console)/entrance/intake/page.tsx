@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Внасяне на таблица �
 /**
  * A firm's existing fee sheet brought in (ADR-012): format-agnostic — the columns are mapped onto the domain's fields
  * per import, never read as one canonical layout. This screen holds the steps up to the import recorded: upload,
- * proposal, confirmation, the dry-run and the record; reading, committing and reverting an import follow. Who may do it is the API's (the manager or the board, G-1).
+ * proposal, confirmation, the dry-run, the record and the commit; the import is read and reverted on its own page (`[id]`). Who may do it is the API's (the manager or the board, G-1).
  */
 export default async function IntakePage({ searchParams }: { searchParams: Promise<{ entrance?: string }> }) {
   const view = await entranceAt((await searchParams).entrance);

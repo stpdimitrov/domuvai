@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { Schemas } from "@/lib/api/client";
 import { eur } from "@/lib/money";
 import { intake, type ProfileState } from "./actions";
+import { statusOf } from "./status";
 
 type Field = Schemas["ProposedMapping"]["mapping"][string];
 
@@ -43,6 +44,7 @@ export default function IntakeForm({ entrance }: { entrance: string }) {
   const { sheet, proposal, confirmed } = state;
   const columns = state.columns ?? (proposal ? [...Object.keys(proposal.mapping), ...proposal.unmappedColumns] : []);
   const mapping = !!sheet && columns.length > 0;
+  const page = (id: string) => `/entrance/intake/${id}?entrance=${encodeURIComponent(entrance)}`;
   return (
     <>
       <form action={act} className="as-form">
@@ -133,14 +135,37 @@ export default function IntakeForm({ entrance }: { entrance: string }) {
           <div className="wide">
             <button type="submit" name="step" value="dry-run" className="chip active" disabled={pending}>{pending ? "Изчислява се…" : "Пробно изчисление"}</button>
             {!state.recorded && <button type="submit" name="step" value="record" className="chip" disabled={pending}>Запиши внасянето</button>}
-            <span className="as-hint">Пробното изчисление не записва нищо. Записът пази присъдата на системата и съдържанието на таблицата; в регистъра не влиза нищо, докато внасянето не бъде прието.</span>
+            {state.recorded && <button type="submit" name="step" value="commit" className="chip" disabled={pending}>Приеми внасянето</button>}
+            <span className="as-hint">Пробното изчисление не записва нищо. Записът пази присъдата на системата и съдържанието на таблицата; в регистъра не влиза нищо, докато внасянето не бъде прието. Приемането изпраща същата таблица и тарифа — системата проверява, че са записаните.</span>
           </div>
         </form>
       )}
 
+      {state.committed && (
+        <div className="as-form" style={{ marginTop: 16 }} role="status">
+          <div className="wide acct-title">Приемането е поискано: {statusOf(state.committed.status)}</div>
+          <div className="wide">
+            Нови обекти: {state.committed.rowsCreated} · променени: {state.committed.rowsChanged}. Регистърът ги приема след този отговор — <a href={page(state.committed.importId)}>прочетете внасянето</a>.
+          </div>
+          {state.committed.manualEntries.length > 0 && (
+            <>
+              <div className="wide">Не се внасят — записват се от човек, по декларация:</div>
+              <table className="wide">
+                <thead><tr><th>Обект</th><th>Поле</th><th>По таблицата</th><th>Правило</th></tr></thead>
+                <tbody>
+                  {state.committed.manualEntries.map((m, i) => (
+                    <tr key={i}><td>{m.designation}</td><td>{named(m.field)}</td><td>{m.value}</td><td>{m.rule}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
+
       {state.report && (
         <div className="as-form" style={{ marginTop: 16 }}>
-          {state.recorded && <div className="wide acct-title">{state.recordedNow ? "Внасянето е записано" : "Записано по-рано"}: {state.recorded}</div>}
+          {state.recorded && <div className="wide acct-title">{state.recordedNow ? "Внасянето е записано" : "Записано по-рано"}: <a href={page(state.recorded)}>{state.recorded}</a></div>}
           <div className="wide acct-title">
             {state.report.reproduced ? "Таблицата е възпроизведена до стотинка." : "Таблицата не е възпроизведена."}
           </div>
