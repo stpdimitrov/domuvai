@@ -98,6 +98,7 @@ export default function IntakeForm({ entrance }: { entrance: string }) {
           <input type="hidden" name="entrance" value={entrance} />
           <input type="hidden" name="sheetName" value={sheet?.name ?? ""} />
           <input type="hidden" name="csv" value={sheet?.carried ?? ""} />
+          {state.recorded && <input type="hidden" name="recorded" value={state.recorded} />}
           <div className="wide acct-title">Потвърдено разпределение</div>
           <ul className="wide" style={{ margin: 0, paddingLeft: 18 }}>
             {columns.map((column, i) => (
@@ -139,7 +140,7 @@ export default function IntakeForm({ entrance }: { entrance: string }) {
 
       {state.report && (
         <div className="as-form" style={{ marginTop: 16 }}>
-          {state.recorded && <div className="wide acct-title">Внасянето е записано: {state.recorded}</div>}
+          {state.recorded && <div className="wide acct-title">{state.recordedNow ? "Внасянето е записано" : "Записано по-рано"}: {state.recorded}</div>}
           <div className="wide acct-title">
             {state.report.reproduced ? "Таблицата е възпроизведена до стотинка." : "Таблицата не е възпроизведена."}
           </div>

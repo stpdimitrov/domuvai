@@ -24,6 +24,7 @@ export type ProfileState = {
   run?: RunInput;
   report?: Schemas["DryRunReport"];
   recorded?: string;                             // the import's id, as the API recorded it
+  recordedNow?: boolean;                         // this answer is the record's, not a later dry-run's
 };
 
 
@@ -110,7 +111,9 @@ async function runSheet(_: ProfileState, form: FormData, step: "dry-run" | "reco
       per: text(`per-${j}`), amount: text(`amount-${j}`), decision: text(`decision-${j}`),
     })),
   };
-  const kept = { sheet, columns, confirmed, run };
+  // once recorded, the id stays with the form, so a later dry-run does not offer to record the same sheet again
+  const recorded = UUID.test(text("recorded")) ? text("recorded") : undefined;
+  const kept = { sheet, columns, confirmed, run, recorded };
   const lines: Line[] = [];
   for (const [j, l] of run.lines.entries()) {
     if (!l.stream) continue;                                    // an empty row
@@ -130,7 +133,7 @@ async function runSheet(_: ProfileState, form: FormData, step: "dry-run" | "reco
   const answer = await reach(() => api.POST("/api/intake/entrances/{entranceId}/imports", { params: { path: { entranceId: entrance } }, body }));
   // a record may be stored before its answer is lost: the person is told to look, not to ask again
   if (!answer?.data) return { ...kept, refused: answer ? undoneBy(answer, "запишете внасянето") : unknownOutcome("записването на внасянето") };
-  return { ...kept, report: answer.data.report, recorded: answer.data.importId };
+  return { ...kept, report: answer.data.report, recorded: answer.data.importId, recordedNow: true };
 }
 
 // Rule: PM-SEC-001
