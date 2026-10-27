@@ -48,6 +48,9 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 15. WEB-36 (ADR-012, PM-FEE-014, PM-FEE-012, PM-SEC-001): on the same screen, the confirmed sheet dry-run with a tariff
     typed in euros shows the API's own verdict for the same request — every count and each differing bill, to the cent;
     recording it shows the import's id, which the API then reads with the same verdict.
+16. WEB-37 (PM-SEC-001, PM-FEE-014): the import's page shows it as the API reads it — status, counts, content hash, what
+    blocked it; a commit of a sheet that does not reproduce is the API's refusal in its words; a sheet that reproduces is
+    recorded and committed through the page (COMMITTING), and its revert through the import's page is the API's answer.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage, in CI — a real issuer, the api closed (E2E_PASSWORD and E2E_API_TOKEN in the environment):
@@ -117,12 +120,31 @@ ON_AN_ASSEMBLY = {
 KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/dry-run"),
-                     ("POST", "/api/intake/entrances/{entranceId}/imports")}
+                     ("POST", "/api/intake/entrances/{entranceId}/imports"),
+                     ("GET", "/api/intake/imports/{id}"),
+                     ("POST", "/api/intake/imports/{id}/commit"),
+                     ("POST", "/api/intake/imports/{id}/revert")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
 INTAKE_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
               "lines": [{"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 250}]}
+# A sheet that reproduces (WEB-37): €10,00 a unit for maintenance, which is what the firm billed each.
+INTAKE_REPRO = "Ап.,Идеални части,Живущи,Такса\n1,50.000,2,1000\n2,50.000,3,1000\n"
+INTAKE_REPRO_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
+                    "lines": [{"stream": "MAINTENANCE", "key": "PER_UNIT", "decisionId": "GA-2026-03-12-5", "rateMinor": 1000}]}
+# The answer a CALLS entry is validated against when the call is refused by design: a revert needs a committed import,
+# and the seeded entrance's book already holds its units, so no import of the check's commits (WEB-37).
+REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409}
+
+
+def recorded(entrance, csv, run):
+    """An import recorded with the board's token, for a call that needs one: its id, or a nil one the call then fails on."""
+    status, raw = fetch(API[0], f"/api/intake/entrances/{entrance}/imports", {"csv": csv, **run}, headers=as_board())
+    return json.loads(raw)["importId"] if status in (200, 201) else "00000000-0000-0000-0000-000000000000"
+
+
+API = [""]   # the api's base, set in main() before CALLS is run
 CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
@@ -151,6 +173,11 @@ CALLS = {
         f"/api/intake/entrances/{e}/fee-sheet/dry-run", {"csv": INTAKE_SHEET, **INTAKE_RUN}),
     ("POST", "/api/intake/entrances/{entranceId}/imports"): lambda e: (
         f"/api/intake/entrances/{e}/imports", {"csv": INTAKE_SHEET, **INTAKE_RUN}),
+    ("GET", "/api/intake/imports/{id}"): lambda e: (f"/api/intake/imports/{recorded(e, INTAKE_SHEET, INTAKE_RUN)}", None),
+    ("POST", "/api/intake/imports/{id}/commit"): lambda e: (
+        f"/api/intake/imports/{recorded(e, INTAKE_REPRO, INTAKE_REPRO_RUN)}/commit", {"sheet": {"csv": INTAKE_REPRO, **INTAKE_REPRO_RUN}}),
+    ("POST", "/api/intake/imports/{id}/revert"): lambda e: (
+        f"/api/intake/imports/{recorded(e, INTAKE_SHEET, INTAKE_RUN)}/revert", {"reason": "e2e: an import not committed"}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1159,6 +1186,13 @@ def protocol_before_open(api, web, here, of):
     return failures
 
 
+def presets(page):
+    """The field each column's select is preset to, in the form's order."""
+    selects = re.findall(r'<select[^>]*name="field-(\d+)"[^>]*>(.*?)</select>', page, re.S)
+    chosen = lambda options: next(iter(re.findall(r'<option(?=[^>]*\bselected\b)[^>]*value="([^"]*)"', options)), "")
+    return [chosen(options) for _, options in sorted(selects, key=lambda s: int(s[0]))]
+
+
 def intake_screen(api, web, entrance):
     """
     WEB-35 (ADR-012, PM-SEC-001) — `/entrance/intake`: a sheet uploaded through the page's own form, as a browser with no
@@ -1184,11 +1218,6 @@ def intake_screen(api, web, entrance):
     if "м2" not in proposal["unmappedColumns"]:
         return failures + [f"{of}: the API placed 'м2' ({proposal['mapping'].get('м2')}) — the check corrects a column it could not place; pick another"]
     columns = list(proposal["mapping"]) + proposal["unmappedColumns"]
-
-    def presets(page):
-        selects = re.findall(r'<select[^>]*name="field-(\d+)"[^>]*>(.*?)</select>', page, re.S)
-        chosen = lambda options: next(iter(re.findall(r'<option(?=[^>]*\bselected\b)[^>]*value="([^"]*)"', options)), "")
-        return [chosen(options) for _, options in sorted(selects, key=lambda s: int(s[0]))]
 
     status, _, answered = submit_form(web, path, page, 'name="sheet"', {}, files={"sheet": ("fees.csv", INTAKE_SHEET.encode())})
     text = visible_text(answered)
@@ -1252,11 +1281,90 @@ def intake_run(api, web, entrance, path, page, mapping):
     if status != 200 or not found:
         return [f"{path}: the record answered HTTP {status}, and no import id"]
     failures += verdict(text)
-    status, raw = fetch(api, f"/api/intake/imports/{found[1]}", headers=as_board())
-    read = json.loads(raw) if status == 200 else {}
-    failures += [] if read.get("differing") == report["differing"] and read.get("rowsParsed") == report["rowsParsed"] else [
-        f"/api/intake/imports/{found[1]}: HTTP {status} {raw[:160]!r}, not the import the page recorded"]
+    failures += import_page(api, web, entrance, found[1], {"differing": report["differing"], "rowsParsed": report["rowsParsed"]})[0]
     print(f"{'ok ' if not failures else 'BAD'} {path}  dry-run and record show the API's verdict, {report['differing']} bill(s) differing")
+    return failures + intake_commit(api, web, entrance, path, recorded_page=recorded, typed=typed, refused_id=found[1])
+
+
+def api_words(raw):
+    """A refusal's words as the web shows them (lib/refusal.ts `refused`): the body's `error`."""
+    try:
+        return json.loads(raw).get("error", "")
+    except ValueError:
+        return ""
+
+
+def import_page(api, web, entrance, id, expected=None):
+    """
+    WEB-37 (PM-SEC-001) — `/entrance/intake/<id>`: the import as the API reads it — its status, counts, content hash
+    and what blocked a commit or a revert. A commit or a revert settles after its answer, so the API is read before and
+    after the page, and the page must show one of the two. [expected]: figures the record answered, which the read must agree with.
+    """
+    url = f"/entrance/intake/{id}?entrance={entrance}"
+    of = f"/api/intake/imports/{id}"
+    before = fetch(api, of, headers=as_board())
+    status, page = fetch(web, url)
+    after = fetch(api, of, headers=as_board())
+    if before[0] != 200 or after[0] != 200:
+        return [f"{of}: HTTP {after[0]} {after[1][:160]!r}"], page, {}
+    reads = [json.loads(before[1]), json.loads(after[1])]
+    text = visible_text(page)
+    failures = [] if status == 200 else [f"{url}: HTTP {status}"]
+    failures += [f"{of}: reads {k}={reads[1][k]}, the record answered {v}" for k, v in (expected or {}).items() if reads[1].get(k) != v]
+    shown = [r for r in reads if f"({r['status']})" in text and
+             f"Редове: {r['rowsParsed']} · различават се: {r['differing']} · нарушения: {r['violations']}" in text and r["sourceSha"] in text
+             and all(f"{word}: {r[k]}" in text for k, word in (("commitBlockedBy", "Приемането е спряно"), ("revertBlockedBy", "Отмяната е спряна")) if r.get(k))]
+    failures += [] if shown else [f"{url}: does not show the import as the API reads it ({reads[1]['status']}, {reads[1]['rowsParsed']} rows)"]
+    print(f"{'ok ' if not failures else 'BAD'} {url}  the import's page as the API reads it ({reads[1]['status']})")
+    return failures, page, reads[1]
+
+
+def intake_commit(api, web, entrance, path, recorded_page, typed, refused_id):
+    """
+    WEB-37 (PM-SEC-001, PM-FEE-014) — committing through the page. The import WEB-36 recorded does not reproduce: its
+    commit is refused in the API's words, as the API answers the same request. A sheet that reproduces is uploaded,
+    confirmed as the API proposed, recorded and committed through the page, which shows the commit asked; the import's
+    page shows it as the API reads it; and its revert through that page shows the API's answer — REVERTING — or its
+    refusal in its words. Nothing is typed of the answers: each is the API's.
+    """
+    failures = []
+    status, _, answered = submit_form(web, path, recorded_page, 'name="period"', {**typed, "step": "commit"})
+    of = f"/api/intake/imports/{refused_id}/commit"
+    _, raw = fetch(api, of, {"sheet": {"csv": INTAKE_SHEET, **INTAKE_RUN}}, headers=as_board())
+    words = api_words(raw)
+    failures += [] if words and f"Системата не прие това: {words}" in visible_text(answered) else [
+        f"{path}: the commit of a sheet that does not reproduce does not show the API's refusal {words!r}"]
+
+    status, page = fetch(web, path)
+    status, _, uploaded = submit_form(web, path, page, 'name="sheet"', {}, files={"sheet": ("reproduces.csv", INTAKE_REPRO.encode())})
+    status, _, confirmed = submit_form(web, path, uploaded, 'name="sheetName"', {f"field-{i}": f for i, f in enumerate(presets(uploaded))})
+    line = INTAKE_REPRO_RUN["lines"][0]
+    tariff = {"period": INTAKE_REPRO_RUN["period"], "legalDate": INTAKE_REPRO_RUN["legalDate"], "stream-0": line["stream"],
+              "key-0": line["key"], "per-0": "rate", "amount-0": "10,00", "decision-0": line["decisionId"]}
+    status, _, recorded = submit_form(web, path, confirmed, 'name="period"', {**tariff, "step": "record"})
+    found = re.search(r"Внасянето е записано: ([0-9a-f-]{36})", visible_text(recorded))
+    if not found or "Таблицата е възпроизведена до стотинка." not in visible_text(recorded):
+        return failures + [f"{path}: the sheet that reproduces was not recorded as reproduced (HTTP {status})"]
+    status, _, committed = submit_form(web, path, recorded, 'name="period"', {**tariff, "step": "commit"})
+    text = visible_text(committed)
+    page_failures, imported, read = import_page(api, web, entrance, found[1])
+    failures += page_failures
+    # the API creates one unit per row it parsed (rowsCreated = the rows, ImportService.commit); the answer is not read twice
+    failures += [] if "Приемането е поискано: Приема се (COMMITTING)" in text and f"Нови обекти: {read.get('rowsParsed')}" in text else [
+        f"{path}: the commit through the page does not show COMMITTING and {read.get('rowsParsed')} new unit(s)"]
+    url = f"/entrance/intake/{found[1]}?entrance={entrance}"
+    status, _, reverted = submit_form(web, url, imported, 'name="reason"', {"reason": "e2e: проверка на отмяната"})
+    text = visible_text(reverted)
+    # the API asked the same revert again: refused for an import it has just been asked to revert, or refused in the
+    # same words as the page was, since nothing has changed
+    _, raw = fetch(api, f"/api/intake/imports/{found[1]}/revert", {"reason": "e2e: проверка на отмяната"}, headers=as_board())
+    _, read = fetch(api, f"/api/intake/imports/{found[1]}", headers=as_board())
+    now = json.loads(read).get("status", "?") if read.startswith("{") else "?"
+    asked = "Отмяната е поискана: Отменя се (REVERTING)" in text and now in ("REVERTING", "REVERTED", "REVERT_BLOCKED")
+    refused = bool(api_words(raw)) and f"Системата не прие това: {api_words(raw)}" in text
+    failures += [] if asked or refused else [
+        f"{url}: the revert shows neither REVERTING nor the API's refusal {api_words(raw)!r} (HTTP {status}, the API reads {now})"]
+    print(f"{'ok ' if not failures else 'BAD'} {path}  commit and revert through the pages, as the API answers ({now})")
     return failures
 
 
@@ -1283,6 +1391,7 @@ def main():
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
+    API[0] = api
     # Two ways to run. In CI (--user): --web signs people in at a real issuer and the api is closed — this check signs
     # in as a person does and reads every screen signed in, and asks the api with a bearer of its own (E2E_API_TOKEN).
     # On a machine with no issuer: --web runs without sign-in, the api open, and nobody is signed in or out.
@@ -1323,7 +1432,7 @@ def main():
             refused, _ = fetch(api, url, body)
             failures += [] if refused == 403 else [f"{method} {path}: the controller kept the accounts (HTTP {refused}), not refused (PM-SEC-001)"]
         status, raw = fetch(api, url, body, headers=board)
-        if status not in (200, 201):
+        if status not in ((REFUSED_BY_DESIGN[(method, path)],) if (method, path) in REFUSED_BY_DESIGN else (200, 201)):
             failures.append(f"{method} {path}: HTTP {status} {raw[:200]}")
             continue
         validator = Draft202012Validator(response_schema(method, path, status), format_checker=Draft202012Validator.FORMAT_CHECKER)

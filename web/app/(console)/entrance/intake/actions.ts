@@ -25,6 +25,7 @@ export type ProfileState = {
   report?: Schemas["DryRunReport"];
   recorded?: string;                             // the import's id, as the API recorded it
   recordedNow?: boolean;                         // this answer is the record's, not a later dry-run's
+  committed?: Schemas["CommitResult"];           // the commit's answer: COMMITTING, the rows, what a person must record
 };
 
 
@@ -32,7 +33,7 @@ export type ProfileState = {
 /** One action for the page's two forms, so the upload's answer is the state the mapping form is drawn from. */
 export async function intake(previous: ProfileState, form: FormData): Promise<ProfileState> {
   const step = form.get("step");
-  if (step === "dry-run" || step === "record") return runSheet(previous, form, step);
+  if (step === "dry-run" || step === "record" || step === "commit") return runSheet(previous, form, step);
   return step === "confirm" ? confirmMapping(previous, form) : profileSheet(previous, form);
 }
 
@@ -99,7 +100,7 @@ function carriedBy(form: FormData) {
  * either is the API's (the manager or the board, G-1); a refusal is shown in its words, the form kept.
  */
 // Rule: PM-SEC-001, PM-FEE-014, PM-FEE-012
-async function runSheet(_: ProfileState, form: FormData, step: "dry-run" | "record"): Promise<ProfileState> {
+async function runSheet(_: ProfileState, form: FormData, step: "dry-run" | "record" | "commit"): Promise<ProfileState> {
   const got = carriedBy(form);
   if ("refused" in got) return got;
   const { entrance, csv, sheet, columns, confirmed } = got;
@@ -130,10 +131,45 @@ async function runSheet(_: ProfileState, form: FormData, step: "dry-run" | "reco
     if (!answer?.data) return { ...kept, refused: answer ? undoneBy(answer, "изчислите пробно") : "Системата не отговори — нищо не е записано. Опитайте отново." };
     return { ...kept, report: answer.data };
   }
+  if (step === "commit") return commitSheet(kept, body);   // the commit's answer stands in place of the earlier verdict: the API ran it again
   const answer = await reach(() => api.POST("/api/intake/entrances/{entranceId}/imports", { params: { path: { entranceId: entrance } }, body }));
   // a record may be stored before its answer is lost: the person is told to look, not to ask again
   if (!answer?.data) return { ...kept, refused: answer ? undoneBy(answer, "запишете внасянето") : unknownOutcome("записването на внасянето") };
   return { ...kept, report: answer.data.report, recorded: answer.data.importId, recordedNow: true };
+}
+
+/**
+ * The recorded import committed (STAGE1-ADDENDUM §1 step 6; Rule: PM-SEC-001, PM-FEE-014) — the same sheet, mapping
+ * and tariff sent again, as the API checks the sheet's hash against the record and runs the dry-run once more. Whether
+ * it still reproduces, and may commit, is the API's. It answers COMMITTING: the registry adopts the rows after the
+ * answer, so the import's page is read for COMMITTED or COMMIT_BLOCKED. What needs a declaration is listed for a
+ * person to record, never adopted. Who committed is the sign-in's party (G-1), so the body names nobody.
+ */
+// Rule: PM-SEC-001, PM-FEE-014
+async function commitSheet(kept: ProfileState, sheet: Schemas["FeeSheetDryRunRequest"]): Promise<ProfileState> {
+  if (!kept.recorded) return { ...kept, refused: "Внасянето не е записано — запишете го, преди да го приемете." };
+  const answer = await reach(() => api.POST("/api/intake/imports/{id}/commit", { params: { path: { id: kept.recorded! } }, body: { sheet } }));
+  if (!answer?.data) return { ...kept, refused: answer ? undoneBy(answer, "приемете внасянето") : unknownOutcome("приемането на внасянето") };
+  return { ...kept, committed: answer.data };
+}
+
+/** What the import's page holds: the reason as typed, and the revert's answer or the API's refusal. */
+export type RevertState = { refused?: string; reason?: string; view?: Schemas["ImportView"] };
+
+/**
+ * A committed import reverted wholesale, with its reason (STAGE1-ADDENDUM §1; Rule: PM-SEC-001) — the API's to allow:
+ * the manager or the board (G-1), only a COMMITTED import or one whose revert was blocked. It answers REVERTING; the
+ * page is read again for REVERTED or REVERT_BLOCKED. Who reverted is the sign-in's party, so the body names nobody.
+ */
+// Rule: PM-SEC-001
+export async function revertImport(_: RevertState, form: FormData): Promise<RevertState> {
+  const text = textOf(form);
+  const [id, reason] = [text("import"), text("reason")];
+  if (!UUID.test(id)) return { reason, refused: "Внасянето не е посочено." };
+  if (!reason.trim()) return { reason, refused: "Напишете защо внасянето се отменя." };
+  const answer = await reach(() => api.POST("/api/intake/imports/{id}/revert", { params: { path: { id } }, body: { reason } }));
+  if (!answer?.data) return { reason, refused: answer ? undoneBy(answer, "отмените внасянето") : unknownOutcome("отмяната на внасянето") };
+  return { reason, view: answer.data };
 }
 
 // Rule: PM-SEC-001
