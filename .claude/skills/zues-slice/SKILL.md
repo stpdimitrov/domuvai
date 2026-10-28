@@ -24,7 +24,9 @@ If a boot document is missing, say so and stop. Do not reconstruct context from 
 
 ## 3. State the slice contract — before writing code
 
-Write out the contract in the shape `CLAUDE.md` gives (Slice · Module · Branch · Rules · Interprets · Out of scope · Done when) and get confirmation. Quote each rule's text from `docs/RULES.md` verbatim.
+Write out the contract in the shape `CLAUDE.md` gives (Slice · Module · Branch · Rules · Interprets · Out of scope · Model · Done when) and get confirmation. Quote each rule's text from `docs/RULES.md` verbatim. `Model:` names the model the slice runs on — Opus for a design or rule slice, Sonnet for a mechanical one; the claim gate refuses a contract without it.
+
+When the next 2–3 slices are already planned, ask the owner to approve their contracts in one go.
 
 Quoting the rules back is not ceremony. A misread rule caught here costs a sentence; caught after the code costs the slice.
 
@@ -54,7 +56,7 @@ Write the entry as a new file, `docs/sessionlog/<yyyyMMddHHmm>-<slice id>.md` (t
 **Decisions** — ADR-nnn, or "none"
 **Open** — what the next session must pick up
 **Read first next time** — two or three documents
-**Cost** — $x · context yk   (the session's own figures: `get_session` → `usage.cost_usd`, `external_metadata.context_usage.used_tokens`)
+**Cost** — transcript yk bytes · n turns · <model>   (`python3 tools/cost.py`: the size gate's Stop hook records it in `.claude/state/<session_id>.json` every turn; a local `get_session` reports no usage)
 ```
 
 Then deliver it. **The owner never merges a PR, and is never asked to watch for one: from the push to the next slice, delivery is the session's job.**
@@ -65,9 +67,9 @@ Then deliver it. **The owner never merges a PR, and is never asked to watch for 
 4. **Never poll CI** — no watch loops, no scheduled checks. The session is not woken when a PR merges, so whenever it is next woken — the owner's message, a CI event, a subagent's report — it looks at the open PR once (`gh pr view <n>`) and carries on: merged → step 5; green and still open → merge it; failing → fix it. It never asks the owner to report that a PR merged.
 5. **After the merge:** sync `main` (`git switch main && git merge --ff-only origin/main`), confirm the claim issue closed — then, when the chain-at-close conditions below hold, **start the next slice in a new session; end this one either way**. The next slice boots from the repo (§1): the handover and the log entries carry everything; a session carried on re-reads its whole growing context on every call. Nothing is stacked on unmerged work.
 
-   **Chain at close** (owner, 2026-10-24). Call the claude-code-remote `create_session` tool — `source_url` the repo, `outcome_branch` `slice/<next>` (the next slice's id and name, from the handover) — with this prompt, filled in:
+   **Chain at close** (owner, 2026-10-24). Call the claude-code-remote `create_session` tool — `source_url` the repo, `outcome_branch` `slice/<next>` (the next slice's id and name, from the handover), and the next slice's model (its planned contract's `Model:`, else Opus for design or rules, Sonnet for mechanical) as the session's model where the tool takes one — with this prompt, filled in:
 
-   > Boot per CLAUDE.md; lane `<lane>`; next slice per the newest H- handover, docs/TESTPLAN.md and the open owner-question issues; quote any owner decision it relies on; work cheaply; record a Cost line. Owner decisions already recorded: `<quote + where, or "none — confirm the contract with the owner">`.
+   > Boot per CLAUDE.md; lane `<lane>`; model `<model>`; next slice per the newest H- handover, docs/TESTPLAN.md and the open owner-question issues; quote any owner decision it relies on; work cheaply; record a Cost line. Owner decisions already recorded: `<quote + where, or "none — confirm the contract with the owner">`.
 
    Only when all hold — otherwise start nothing and say why in the log entry's **Open**:
    - (a) no open `owner-question` issue blocks the next slice. If one does, or a decision is missing, open it as an `owner-question` issue (§7a) and stop.
