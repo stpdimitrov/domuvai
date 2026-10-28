@@ -27,6 +27,7 @@ function Arrears({ arrears }: { arrears: Schemas["UnitArrears"] }) {
   );
 }
 
+// Rule: PM-FEE-018, PM-FEE-017
 function Line({ line }: { line: StatementLine }) {
   return (
     <div style={ROW}>
@@ -88,6 +89,7 @@ export default async function StatementPage({ searchParams }: { searchParams: Pr
     : null;
   const [units, statement, arrears] = loaded ?? [null, null, null];
   const designation = new Map((units?.data ?? []).map((u) => [u.id, u.designation]));
+  const foreign = Boolean(unit && units?.data && !designation.has(unit));   // a unit of another entrance is not shown under this one
   return (
     <>
       <div className="topbar">
@@ -114,10 +116,15 @@ export default async function StatementPage({ searchParams }: { searchParams: Pr
             <label>Задължения към<input type="date" name="asOf" defaultValue={asOf} /></label>
             <div className="wide"><button type="submit">Покажи</button></div>
           </form>
-          {arrears?.data && <Arrears arrears={arrears.data} />}
-          {arrears && !arrears.data && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{unansweredBy(arrears, "задълженията на обекта")}</div>}
-          {statement?.data && <Statement statement={statement.data} />}
-          {statement && !statement.data && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{unansweredBy(statement, "извлечението на обекта")}</div>}
+          {foreign && (
+            <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>Обектът <code>{unit}</code> не е от този вход.</div>
+          )}
+          {!foreign && <>
+            {arrears?.data && <Arrears arrears={arrears.data} />}
+            {arrears && !arrears.data && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{unansweredBy(arrears, "задълженията на обекта")}</div>}
+            {statement?.data && <Statement statement={statement.data} />}
+            {statement && !statement.data && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{unansweredBy(statement, "извлечението на обекта")}</div>}
+          </>}
         </>
       ) : (
         <div style={{ padding: "16px 24px", font: "400 13px/1.6 'IBM Plex Sans'" }}>

@@ -44,5 +44,6 @@ export const day = (iso: string) => iso.split("-").reverse().join(".");
 // Rule: PM-DEBT-001
 export const oldest = (debt: { dueOn: string; overdueDays: number } | undefined) =>
   !debt ? "Няма открито задължение."
+    : debt.overdueDays === 0 ? `Най-старото открито задължение е с падеж ${day(debt.dueOn)} — падежът е денят, към който се гледа.`
     : debt.overdueDays > 0 ? `Най-старото открито задължение е с падеж ${day(debt.dueOn)} — просрочено с ${debt.overdueDays} ${debt.overdueDays === 1 ? "ден" : "дни"}.`
       : `Най-старото открито задължение е с падеж ${day(debt.dueOn)} — в срок.`;

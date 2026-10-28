@@ -1252,6 +1252,9 @@ def charges_issue(api, web, entrance):
     return failures
 
 
+BAND = {"CURRENT": "в срок", "0-30": "0–30 дни", "31-60": "31–60 дни", "61-90": "61–90 дни", "90+": "над 90 дни"}   # web/lib/statement.ts
+
+
 def statement_screen(api, web, entrance):
     """
     WEB-40 (PM-FEE-018, PM-FEE-017, PM-DEBT-001) — `/entrance/statement`: a unit's statement and arrears as of a date
@@ -1271,6 +1274,9 @@ def statement_screen(api, web, entrance):
             f"Дължимо {eur(arrears['totalMinor'])} · аванс {eur(arrears['advanceMinor'])} · нетно {eur(arrears['netMinor'])}",
             *[f"Период {p}" for p in dict.fromkeys(line["period"] for line in statement["lines"])],
             *[f"{line['derivation']} {eur(line['amountMinor'])}" for line in statement["lines"]]]
+    want += [f"{BAND.get(b['band'], b['band'])}: {eur(b['amountMinor'])}" for b in arrears["buckets"]]
+    if any(line["allocationKey"] == "METERED" for line in statement["lines"]):
+        want.append("По потребление — отделно от законовите ключове")   # PM-FEE-017: consumption lines apart
     if arrears.get("oldestDebt"):
         want.append(".".join(reversed(arrears["oldestDebt"]["dueOn"].split("-"))))
     failures = [f"{path}: HTTP {status}"] if status != 200 else []
