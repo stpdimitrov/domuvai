@@ -33,6 +33,7 @@ export function signOffOf(input: SignOffInput, party: string | undefined, passed
   if (!(input.purpose in PURPOSE)) return { refused: "Изберете за какво е разходът (PM-FUND-006)." };
   const amountMinor = minorOf(input.amount);
   if (amountMinor == null) return { refused: `„${input.amount}“ не е сума в евро — например 120 или 120,50.` };
+  if (amountMinor <= 0) return { refused: "Сумата на разхода е по-голяма от нула." };
   const measure = input.measure.trim();
   if (input.purpose === "PASSPORT_MEASURE" && !measure) return { refused: "Посочете мярката от техническия паспорт (PM-FUND-006)." };
   const signed = { amountMinor, purpose: input.purpose, authorisedBy: party };

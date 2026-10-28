@@ -12,7 +12,7 @@ test("PM-FUND-006 the body carries the purpose code, a measure only for a passpo
   assert.deepEqual(signOffOf(typed({ purpose: "PASSPORT_MEASURE", measure: " ТП 2019, мярка 4.2 " }), me, passed),
     { amountMinor: 48000, purpose: "PASSPORT_MEASURE", authorisedBy: me, decisionId: "d-1", passportMeasure: "ТП 2019, мярка 4.2" });
   assert.equal("passportMeasure" in signOffOf(typed({ purpose: "GA_PURPOSE", measure: "ТП 2019" }), me, passed), false);
-  for (const p of [{ purpose: "" }, { purpose: "FURNITURE" }, { amount: "" }, { amount: "12,345" }, { purpose: "PASSPORT_MEASURE", measure: " " },
+  for (const p of [{ purpose: "" }, { purpose: "FURNITURE" }, { amount: "" }, { amount: "12,345" }, { amount: "0" }, { amount: "0,00" }, { purpose: "PASSPORT_MEASURE", measure: " " },
     { decision: "" }, { decision: "GA-typed-by-hand" }, { basis: "" }]) {
     assert.ok("refused" in signOffOf(typed(p), me, passed), JSON.stringify(p));
   }
@@ -21,7 +21,8 @@ test("PM-FUND-006 the body carries the purpose code, a measure only for a passpo
 test("PM-FUND-007 the signatory is the session's party and nothing typed, on a decision from the passed list", () => {
   assert.equal((signOffOf(typed({}), "p-2", passed) as { authorisedBy: string }).authorisedBy, "p-2");
   assert.deepEqual(signOffOf(typed({}), undefined, passed), { refused: NO_PARTY });
-  assert.equal("authorisedBy" in typed({}), false);
+  const smuggled = { ...typed({}), authorisedBy: "p-typed" } as SignOffInput;
+  assert.equal((signOffOf(smuggled, me, passed) as { authorisedBy: string }).authorisedBy, me);
   assert.ok("refused" in signOffOf(typed({ decision: "d-3" }), me, passed));
 });
 

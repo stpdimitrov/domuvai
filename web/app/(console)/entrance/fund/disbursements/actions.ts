@@ -20,21 +20,24 @@ const typedIn = (form: FormData, names: string[]) =>
  * The signed-in person's own party, read from the API on this write (owner, 2026-10-28, "Confirm Q1"): never a field
  * anyone types or picks. `undefined` when the sign-in is tied to no party; `null` when the API did not say.
  */
+// Rule: PM-FUND-007, PM-SEC-001
 async function myParty(): Promise<string | undefined | null> {
   const me = await reach(() => api.GET("/api/identity/me"));
-  return me?.data ? me.data.partyId : null;
+  return me?.data ? me.data.partyId ?? undefined : null;
 }
 
 /**
  * The API's answer to a write: the disbursement as it now stands takes the person back to the list; a refusal recorded
- * nothing, so the form comes back under a new key; an answer lost keeps the key, so the same form sent again is the
- * same write, never a second one.
+ * nothing, so the form comes back under a new key; an answer lost, or a 5xx that may have recorded it, keeps the key,
+ * so the same form sent again is the same write, never a second one.
  */
+// Rule: PM-FUND-007, PM-SEC-001
 function settled(
   answer: { data?: { status: string }; error?: unknown; response: { status: number } } | null, entranceId: string, state: DisbursementState, act: string,
 ): DisbursementState {
   if (answer?.data) redirect(`/entrance/fund/disbursements?entrance=${entranceId}&done=${answer.data.status.toLowerCase()}`);
-  return answer ? { ...state, key: randomUUID(), refused: disbursementRefused(answer, act) } : { ...state, refused: LOST };
+  if (!answer || answer.response.status >= 500) return { ...state, refused: LOST };
+  return { ...state, key: randomUUID(), refused: disbursementRefused(answer, act) };
 }
 
 /**

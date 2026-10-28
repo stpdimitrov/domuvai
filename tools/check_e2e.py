@@ -1355,7 +1355,7 @@ def disbursements_screen(api, web, entrance, signed_in):
     failures += [f"{path}: the committed {d['id']} is not listed" for d in committed if f"{eur(d['amountMinor'])} ·" not in text
                  or (d.get("emergencyJustification") or d.get("decisionId")) not in text]
     failures += [f"{path}: the {d['status'].lower()} {d['id']} is listed" for d in listed if d["status"] != "COMMITTED"
-                 and (d.get("emergencyJustification") or d.get("passportMeasure") or d["decisionId"]) in text]
+                 and f"{eur(d['amountMinor'])} ·" in text and (d.get("emergencyJustification") or d.get("passportMeasure") or d["decisionId"]) in text]
     if signed_in:
         fields = {"purpose": "WORKS", "amount": "1,00", "measure": "", "basis": "EMERGENCY", "decision": "", "justification": "e2e: signed by the board"}
         status, _, refused_page = submit_form(web, path, page, 'name="justification"', fields)
@@ -1371,7 +1371,8 @@ def disbursements_screen(api, web, entrance, signed_in):
     if as_board() and (e_status != 409 or "PM-FUND-008" not in (refusal_words(e_raw) or "")):
         failures.append(f"POST …/fund/disbursements: an emergency above what is available answers HTTP {e_status} {e_raw[:160]!r}, not the 409 naming PM-FUND-008")
     print(f"{'ok ' if not failures else 'BAD'} PM-FUND-006…008 the disbursements: {len(committed)} committed listed, "
-          f"{len(listed) - len(committed)} closed not; {'a sign-off by a non-holder refused' if signed_in else 'forms NOT checked: no sign-in'}")
+          f"{len(listed) - len(committed)} closed not; {'a sign-off by a non-holder refused' if signed_in else 'forms NOT checked: no sign-in'}"
+          f"{'' if as_board() else '; the emergency 409 NOT checked: no board token'}")
     return failures
 
 
