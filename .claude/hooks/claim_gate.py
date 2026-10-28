@@ -3,10 +3,12 @@
 
   pre   PreToolUse(Bash): `tools/lanes.py claim` is refused (exit 2) when this session already claimed — or has a
         claim in flight — when its transcript is past CLAIM_MAX_BYTES (a long or forked session), or when the contract
-        (`--body-file`) states no `Model:` (T-08). Otherwise the claim is allowed and marked.
+        (`--body-file`) states no `Model:` (T-08) or no `Confirmed:` with a date (T-09). Otherwise the claim is allowed
+        and marked.
   post  PostToolUse(Bash): records the claim issue from lanes.py's own output ("yours, as #n"); a claim that did not
         take (lane held, lost race) leaves no issue, so its marker is removed and the session may pick another lane.
-  stop  Stop: once the claim issue is closed (the slice PR merged), one line: end this session, start the next.
+  stop  Stop: once the claim issue is closed (the slice PR merged), one line to the owner: a successor confirmed here
+        starts on their next message (zues-slice §7.5); then this session ends.
         Never blocks, never fails; asks GitHub at most once a minute, says it once.
 
 Marker: <state>/claims/<session_id>, JSON {lane, issue, state, checked, nudged}; <state> is .claude/state
@@ -28,7 +30,11 @@ CLAIM = re.compile(r'lanes\.py["\']?\s+claim\s+(?:-\S+\s+)*([a-z][a-z0-9-]*)')
 CLAIMED = re.compile(r'yours, as #(\d+)')   # what lanes.py claim prints on success
 # A command segment that only shows the words — not a claim.
 BODY_FILE = re.compile(r'--body-file[ =]["\']?([^\s"\';&|]+)')
-MODEL = re.compile(r'^\s*Model:\s*(Opus|Sonnet|Haiku|Fable)\b', re.M | re.I)   # the contract's Model: line (T-08)
+# [ \t], never \s: a bare `Model:` / `Confirmed:` line must not borrow the next line's text.
+MODEL = re.compile(r'^[ \t]*Model:[ \t]*(Opus|Sonnet|Haiku|Fable)\b', re.M | re.I)   # the contract's Model: line (T-08)
+# The owner's confirmation (T-09), on one line with a date; the template `<who, yyyy-mm-dd, where>` does not pass. A weak
+# gate by design: it proves the line was written, not who confirmed — that is the PR reviewer's to read.
+CONFIRMED = re.compile(r'^[ \t]*Confirmed:[ \t]*[^<\s].*\b20\d\d-\d\d-\d\d\b', re.M | re.I)
 QUOTING = re.compile(r'\s*(?:\w+=\S*\s+)*(?:echo|printf|grep|rg|sed|awk|cat|less|head|tail|git|gh)\b')
 
 
@@ -76,10 +82,16 @@ def pre(event: dict) -> int:
         if size > MAX_BYTES:
             why = (f'this session is too long to start a slice in — transcript {size // 1000}k bytes, '
                    f'limit {MAX_BYTES // 1000}k (a long or forked session pays for its whole context on every call)')
-    model = MODEL.search(contract(event.get('tool_input', {}).get('command', ''), event.get('cwd', '')))
+    text = contract(event.get('tool_input', {}).get('command', ''), event.get('cwd', ''))
+    model = MODEL.search(text)
     if why is None and not model:
         print('claim refused: the contract (--body-file) has no `Model:` line — state the model this slice runs on '
               '(Opus for design or rule slices, Sonnet for mechanical ones; CLAUDE.md, zues-slice §3).', file=sys.stderr)
+        return 2
+    if why is None and not CONFIRMED.search(text):
+        print('claim refused: the contract (--body-file) has no `Confirmed:` line — get the contract confirmed by the '
+              'owner first and record it: who, the date (yyyy-mm-dd), where, and any change they made '
+              '(CLAUDE.md, zues-slice §3).', file=sys.stderr)
         return 2
     if why:
         print(f'claim refused: {why}.\nClaim only in a session whose first act was the boot. '
@@ -125,8 +137,9 @@ def stop(event: dict) -> int:
         marker['checked'] = time.time()
     if marker.get('state') == 'CLOSED':
         marker['nudged'] = True
-        print(json.dumps({'systemMessage': f'Slice claim #{issue} is closed — sync main, end this session and start '
-                                           f'the successor fresh (zues-slice §7.5): {boot_prompt(marker["lane"], marker.get("model", "<model>"))}'}))
+        print(json.dumps({'systemMessage': f'Slice claim #{issue} is closed (its PR merged) — if you confirmed the '
+                                           f'next contract here, say so and this session starts the successor '
+                                           f'(zues-slice §7.5); then end it. Or start it yourself: {boot_prompt(marker["lane"], marker.get("model", "<model>"))}'}))
     path.write_text(json.dumps(marker))
     return 0
 

@@ -24,7 +24,7 @@ If a boot document is missing, say so and stop. Do not reconstruct context from 
 
 ## 3. State the slice contract — before writing code
 
-Write out the contract in the shape `CLAUDE.md` gives (Slice · Module · Branch · Rules · Interprets · Out of scope · Model · Done when) and get confirmation. Quote each rule's text from `docs/RULES.md` verbatim. `Model:` names the model the slice runs on — Opus for a design or rule slice, Sonnet for a mechanical one; the claim gate refuses a contract without it.
+Write out the contract in the shape `CLAUDE.md` gives (Slice · Module · Branch · Rules · Interprets · Out of scope · Model · Confirmed · Done when) and get confirmation. Quote each rule's text from `docs/RULES.md` verbatim. `Model:` names the model the slice runs on — Opus for a design or rule slice, Sonnet for a mechanical one. `Confirmed:` records the owner's confirmation — who, the date (yyyy-mm-dd), where, and any change they made, quoted. The claim gate refuses a contract without either line.
 
 When the next 2–3 slices are already planned, ask the owner to approve their contracts in one go.
 
@@ -56,29 +56,40 @@ Write the entry as a new file, `docs/sessionlog/<yyyyMMddHHmm>-<slice id>.md` (t
 **Decisions** — ADR-nnn, or "none"
 **Open** — what the next session must pick up
 **Read first next time** — two or three documents
+**Successor** — <slice id> · lane <lane> · <model> — contract to be put to the owner once the PR is open   |   none: <the stop condition of §7.5 and why, e.g. "(a) owner-question #57 blocks WEB-43">
 **Cost** — transcript yk bytes · n turns · <model>   (`python3 tools/cost.py`: the size gate's Stop hook records it in `.claude/state/<session_id>.json` every turn; a local `get_session` reports no usage)
 ```
+
+The entry is committed before the PR opens, so **Successor** says what was planned; the session that starts the successor names its session id in a comment on the PR.
 
 Then deliver it. **The owner never merges a PR, and is never asked to watch for one: from the push to the next slice, delivery is the session's job.**
 
 1. **Bring `main` in:** `git fetch && git merge origin/main` — never rebase a pushed branch, never force-push. A conflict in a generated doc: take `origin/main`'s copy and re-run the generator, never hand-merge. The session log cannot conflict: each entry is its own file. Run `tools/check.sh <lane>` (the gate pack, quiet, the lane's tests) — one validated push per round; when the API contract changed, also `cd web && npm run build` — the gate pack does not build the web client, and a field the spec marks required breaks every caller that omits it (S-G1-02e, #63). Then push the branch (never `main`). Fix conflicts without asking.
 2. **Open the PR** — the slice contract is its description, and it says `Closes #n` — and **switch auto-merge on (squash) at once**. The ruleset on `main` requires `gates`, so GitHub merges only when CI is green. If GitHub refuses auto-merge with "clean status", CI is already green: merge it now, `gh pr merge <n> --squash`. Turn the app's CI monitor on (auto-fix) for the PR.
 3. **Keep it moving until it merges.** A failing check or a conflict wakes the session through the CI monitor: fix it, run the gates, push. A draft waiting on the review is marked ready (`gh pr ready <n>`) with auto-merge on as soon as the findings are applied. Nothing is left for the owner to do.
-4. **Never poll CI** — no watch loops, no scheduled checks. The session is not woken when a PR merges, so whenever it is next woken — the owner's message, a CI event, a subagent's report — it looks at the open PR once (`gh pr view <n>`) and carries on: merged → step 5; green and still open → merge it; failing → fix it. It never asks the owner to report that a PR merged.
-5. **After the merge:** sync `main` (`git switch main && git merge --ff-only origin/main`), confirm the claim issue closed — then, when the chain-at-close conditions below hold, **start the next slice in a new session; end this one either way**. The next slice boots from the repo (§1): the handover and the log entries carry everything; a session carried on re-reads its whole growing context on every call. Nothing is stacked on unmerged work.
+4. **Never poll CI** — no watch loops, no scheduled checks. The session is not woken when a PR merges, so whenever it is next woken — the owner's message, a CI event, a subagent's report — it looks at the open PR once (`gh pr view <n>`) and carries on: merged → if the owner confirmed the next contract on this turn, step 5's start; otherwise one line that it starts on their next message; then end; green and still open → merge it; failing → fix it. It never asks the owner to report that a PR merged.
+5. **The next slice is set up while the PR is open, and started once it has merged** (owner, 2026-10-28). Nobody is awake at a merge — the CI monitor wakes a session only on a failure, a conflict or a review comment — and the app archives a session once its PR merges. So, once the PR is open and no stop condition below holds, **draft the next slice's contract** (§3; this session has the context) to a file and end the turn with it: to the owner, or — when a coordinating session started this one — in the report the coordinator receives. Nothing is stacked on unmerged work: the successor starts only after the merge (the merge check below).
 
-   **Chain at close** (owner, 2026-10-24). Call the claude-code-remote `create_session` tool — `source_url` the repo, `outcome_branch` `slice/<next>` (the next slice's id and name, from the handover), and the next slice's model (its planned contract's `Model:`, else Opus for design or rules, Sonnet for mechanical) as the session's model where the tool takes one — with this prompt, filled in:
+   **Who starts it:** the session in which the owner confirms that contract, on that owner turn — the app refuses a start on a turn another session or an event began. A slice the owner started: this session. A slice a coordinating session started: the coordinator.
 
-   > Boot per CLAUDE.md; lane `<lane>`; model `<model>`; next slice per the newest H- handover, docs/TESTPLAN.md and the open owner-question issues; quote any owner decision it relies on; work cheaply; record a Cost line. Owner decisions already recorded: `<quote + where, or "none — confirm the contract with the owner">`.
+   **Merge check first** (owner, 2026-10-28, "Confirm + merge check"): before starting, `gh pr view <n> --json state -q .state`. Not `MERGED` → say so in one line and start it on the owner's next turn, never a session that will only stop. The claim gate's Stop hook says so too if this session is woken after the merge.
 
-   Only when all hold — otherwise start nothing and say why in the log entry's **Open**:
-   - (a) no open `owner-question` issue blocks the next slice. If one does, or a decision is missing, open it as an `owner-question` issue (§7a) and stop.
-   - (b) at most one successor per closing session, and never past the platform's session lineage depth limit (8): `get_session` → start one only while `lineage.depth` < `lineage.limit`; unreadable → start none.
-   - (c) the successor confirms its slice contract with the owner before code, unless every decision it needs is already recorded — the prompt then quotes where (log entry, ADR, or closed owner-question issue).
-   - (d) `create_session` unavailable (e.g. a local session): print the filled prompt for the owner to paste instead.
-   - (e) the next slice's lane is free — no other open claim holds it (`python3 tools/lanes.py check <lane>`, or the open issues labelled `lane:<lane>`).
+   **Start it** with the tool the place has:
+   - **Local (Claude Desktop):** `mcp__ccd_session__start_session` — `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: true`, `title` the slice, `model` the contract's `Model:` as a model id, the prompt below, and `background` naming the merged PR. A session inside this repo needs no place; a coordinating session outside it passes `preset: "domuvai"` — started from any other folder, this repo's hooks (claim gate, size gate, cost record) never load.
+   - **Cloud:** the claude-code-remote `create_session` — `source_url` the repo, `outcome_branch` `slice/<next>`, the model where the tool takes one.
+   - **Neither:** print the filled prompt for the owner to paste.
 
-   The log entry, committed before the merge, says whether a successor is planned; after starting it, name its session id in a comment on the closed claim issue.
+   Then name its session id in a comment on the PR, and end. The prompt is `boot_prompt()` in `.claude/hooks/size_gate.py` (its one home), filled in — the confirmed contract verbatim, its `Confirmed:` line included:
+
+   > Boot per CLAUDE.md, lean; lane `<lane>`; model `<model>`. Contract: `<the confirmed contract verbatim — claim with it as written>`. Before the claim run `python3 tools/lanes.py check <lane>`; if the lane is held, say so in one line and stop. …
+
+   The successor boots lean and claims straight after: its contract arrives confirmed, so it never waits for a reply inside the claim limit (the first WEB-42 session did, and was refused at 1375k). The lane check is a backstop, not a wait: the earlier claim closes with its merge, but another developer may claim the lane in between, or the issue's closing may lag the merge by a moment. Held → the successor stops itself in one line and the owner re-prompts it.
+
+   **The chain stops** — start nothing, and the **Successor** line names which:
+   - (a) an open `owner-question` issue blocks the next slice; a decision missing → open one (§7a);
+   - (b) one successor per finishing session; in the cloud, never at or past the platform's lineage limit (`get_session` → `lineage.depth` < `lineage.limit`; unreadable → start none). The local start tool reports no lineage: there, one successor per session is the bound;
+   - (c) the owner declines the contract or has not confirmed it — nothing starts on an unconfirmed contract;
+   - (d) no next slice is planned (a tooling slice, an empty lane).
 
 Repository settings (auto-merge, rulesets) and Claude's own permissions stay the owner's to change.
 
