@@ -1,5 +1,5 @@
 /**
- * A disbursement from the fund as the person typed it, made the API's body (WEB-42): signed off. Paying and cancelling are WEB-42b.
+ * A disbursement from the fund as the person typed it, made the API's body (WEB-42): signed off, then paid or cancelled (WEB-42b).
  * Pure: no import but `minorOf` and `undone`, so it is tested on Node's own runner. The actor is the signed-in person's
  * own party, read from the API on every write (owner, 2026-10-28, "Confirm Q1") — never typed, never picked. Whether
  * that party holds the fund's account and whether the fund covers an emergency are the API's.
@@ -48,8 +48,24 @@ export function signOffOf(input: SignOffInput, party: string | undefined, passed
   return { ...signed, decisionId: input.decision, ...(input.purpose === "PASSPORT_MEASURE" && { passportMeasure: measure }) };
 }
 
+/** Rule: PM-FUND-007 — the payout the fund's bank made, recorded by the session's party on the date as typed; the platform moves no money (ADR-007). */
+// Rule: PM-FUND-007
+export function payOf(paidOn: string, party: string | undefined): { paidOn: string; paidBy: string } | { refused: string } {
+  if (!party) return { refused: NO_PARTY };
+  if (!paidOn) return { refused: "Посочете датата, на която банката е платила." };
+  return { paidOn, paidBy: party };
+}
+
+/** Rule: PM-FUND-007 — a signed-off disbursement withdrawn by the session's party, with its reason. */
+// Rule: PM-FUND-007
+export function cancelOf(reason: string, party: string | undefined): { cancelledBy: string; reason: string } | { refused: string } {
+  if (!party) return { refused: NO_PARTY };
+  if (!reason.trim()) return { refused: "Посочете защо разходът се оттегля (PM-FUND-007)." };
+  return { cancelledBy: party, reason: reason.trim() };
+}
+
 /**
- * Rule: PM-SEC-001 — who may sign off is the API's (the manager or the board, then the fund's holder):
+ * Rule: PM-SEC-001 — who may sign off, pay or cancel is the API's (the manager or the board, then the fund's holder):
  * its 403 and its 409 are shown in its words; [act] is the verb phrase after "да".
  */
 // Rule: PM-SEC-001

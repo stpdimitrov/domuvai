@@ -34,9 +34,9 @@ export async function recordPayment(_: PaymentState, form: FormData): Promise<Pa
     api.POST("/api/money/entrances/{entranceId}/payments", { params: { path: { entranceId }, header: { "Idempotency-Key": key } }, body }),
   );
   if (!answer?.data) {
-    // the payment may be stored before its answer is lost: the same form, sent again unchanged, carries the same key
+    // the payment may be stored before its answer is lost, or behind a 5xx: the same form, sent again unchanged, carries the same key
     const lost = "Системата не отговори — не е ясно дали плащането е записано. Изпратете формата отново без промяна: със същия ключ то не се записва втори път.";
-    return answer ? { input, key: randomUUID(), refused: undoneBy(answer, "запишете плащането") } : { input, key, refused: lost };
+    return answer && answer.response.status < 500 ? { input, key: randomUUID(), refused: undoneBy(answer, "запишете плащането") } : { input, key, refused: lost };
   }
   redirect(`/entrance/payments?entrance=${entranceId}&payment=${answer.data.paymentId}`);
 }

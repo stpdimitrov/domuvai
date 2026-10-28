@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { disbursementRefused, NO_PARTY, signOffOf, type SignOffInput } from "./disbursement.ts";
+import { cancelOf, disbursementRefused, NO_PARTY, payOf, signOffOf, type SignOffInput } from "./disbursement.ts";
 
 const me = "p-1";
 const passed = ["d-1", "d-2"];
@@ -18,12 +18,18 @@ test("PM-FUND-006 the body carries the purpose code, a measure only for a passpo
   }
 });
 
-test("PM-FUND-007 the signatory is the session's party and nothing typed, on a decision from the passed list", () => {
+test("PM-FUND-007 the signatory is the session's party and nothing typed; pay and cancel carry it too; a cancel needs a reason, a pay a date", () => {
   assert.equal((signOffOf(typed({}), "p-2", passed) as { authorisedBy: string }).authorisedBy, "p-2");
   assert.deepEqual(signOffOf(typed({}), undefined, passed), { refused: NO_PARTY });
   const smuggled = { ...typed({}), authorisedBy: "p-typed" } as SignOffInput;
   assert.equal((signOffOf(smuggled, me, passed) as { authorisedBy: string }).authorisedBy, me);
   assert.ok("refused" in signOffOf(typed({ decision: "d-3" }), me, passed));
+  assert.deepEqual(payOf("2026-10-27", me), { paidOn: "2026-10-27", paidBy: me });
+  assert.ok("refused" in payOf("", me));
+  assert.deepEqual(payOf("2026-10-27", undefined), { refused: NO_PARTY });
+  assert.deepEqual(cancelOf(" изпълнителят се отказа ", me), { cancelledBy: me, reason: "изпълнителят се отказа" });
+  assert.ok("refused" in cancelOf("  ", me));
+  assert.deepEqual(cancelOf("причина", undefined), { refused: NO_PARTY });
 });
 
 test("PM-FUND-008 an emergency is works only, carries its justification and no decision", () => {

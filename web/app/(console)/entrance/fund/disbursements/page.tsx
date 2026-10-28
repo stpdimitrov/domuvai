@@ -4,19 +4,21 @@ import { randomUUID } from "node:crypto";
 import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, eur, reach } from "@/lib/console";
 import { NO_PARTY, PURPOSE } from "@/lib/disbursement";
+import { sofiaToday } from "@/lib/payment";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { passedDecisions } from "../../charges/decisions";
+import { CancelForm, PayForm } from "./PayCancelForms";
 import SignOffForm from "./SignOffForm";
 
 export const metadata: Metadata = { title: "Разходване на фонда — Етаж" };
 
-const DONE: Record<string, string> = { committed: "Разходът е подписан и е поет." };
+const DONE: Record<string, string> = { committed: "Разходът е подписан и е поет.", paid: "Плащането е записано.", cancelled: "Разходът е оттеглен." };
 
 /**
- * A disbursement signed off (WEB-42). One screen, one server-side aggregation (ADR-011): the fund as the API reads it
+ * A disbursement signed off, paid or cancelled (WEB-42, WEB-42b). One screen, one server-side aggregation (ADR-011): the fund as the API reads it
  * (its figures shown, never recomputed — PM-FUND-009 is the API's), who is signed in, and this entrance's passed
- * decisions. The committed, unpaid disbursements are listed under the form (paying and cancelling them is WEB-42b);
- * paid and cancelled ones are on `/entrance/fund`. The form's key is minted here, once per form.
+ * decisions. The committed, unpaid disbursements each carry a pay and a cancel form; paid and cancelled ones are on
+ * `/entrance/fund`. Every form's key is minted here, once per form.
  */
 // Rule: PM-FUND-006, PM-FUND-007, PM-FUND-008, PM-SEC-001
 export default async function DisbursementsPage({ searchParams }: { searchParams: Promise<{ entrance?: string; done?: string }> }) {
@@ -30,6 +32,7 @@ export default async function DisbursementsPage({ searchParams }: { searchParams
     : null;
   const [fund, me] = loaded ?? [null, null];
   const party = me?.data?.partyId;
+  const today = sofiaToday();
   const decisions = view.kind === "ok" && party ? await passedDecisions(view.entrance.id) : null;
   return (
     <>
@@ -73,6 +76,8 @@ export default async function DisbursementsPage({ searchParams }: { searchParams
                       {d.passportMeasure && <> · {d.passportMeasure}</>}
                       {d.emergencyJustification && <> · аварийно, без решение: {d.emergencyJustification}</>}
                     </div>
+                    {party && <PayForm entrance={view.entrance.id} disbursement={d.id} today={today} mintedKey={randomUUID()} />}
+                    {party && <CancelForm entrance={view.entrance.id} disbursement={d.id} mintedKey={randomUUID()} />}
                   </div>
                 ))}
                 {!fund.data.disbursements.some((d) => d.status === "COMMITTED") && <div className="as-hint">Няма поет, неплатен разход.</div>}
