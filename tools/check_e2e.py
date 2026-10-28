@@ -133,7 +133,8 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/money/entrances/{entranceId}/fund-accounts"),
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"),
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"),
-                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel")}
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"),
+                     ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
@@ -151,7 +152,8 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): 409,  # both purposes are seeded; fund_accounts_screen checks the words
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): 409,                     # an emergency above the seeded €145,00 available (PM-FUND-008)
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"): 409,    # the seeded paid one: paid once
-                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"): 409}  # the seeded cancelled one: cancelled once
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"): 409,  # the seeded cancelled one: cancelled once
+                     ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"): 400}                    # the seeded manager on both sides: the demo stays as seeded (PM-FUND-010)
 # The seeded entrance's fund account — tools/seed_demo.py's iban("UNCR70001512998102").
 SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
@@ -188,6 +190,13 @@ def seeded(entrance, status):
     return listed[0]["id"] if listed else "00000000-0000-0000-0000-000000000000"
 
 
+def seeded_handover(entrance):
+    """The first handover statement the API lists (tools/seed_demo.py issues one), its id — a nil one, which the call then fails on, when none is listed."""
+    found, raw = fetch(API[0], f"/api/money/entrances/{entrance}/fund/handover-statements")
+    listed = json.loads(raw) if found == 200 else []
+    return listed[0]["id"] if listed else "00000000-0000-0000-0000-000000000000"
+
+
 API = [""]   # the api's base, set in main() before CALLS is run
 CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
@@ -210,6 +219,12 @@ CALLS = {
         f"/api/money/entrances/{e}/journal?from=2026-09-01&to=2026-09-30", None),
     ("GET", "/api/money/entrances/{entranceId}/fund/handover-statements"): lambda e: (
         f"/api/money/entrances/{e}/fund/handover-statements", None),
+    ("GET", "/api/money/entrances/{entranceId}/fund/handover-statements/{statementId}"): lambda e: (
+        f"/api/money/entrances/{e}/fund/handover-statements/{seeded_handover(e)}", None),
+    ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"): lambda e: (
+        f"/api/money/entrances/{e}/fund/handover-statements",
+        {"handoverOn": "2026-10-01", "outgoingPartyId": fund_holder(e), "incomingPartyId": fund_holder(e), "bankBalanceMinor": 0},
+        {"Idempotency-Key": str(uuid.uuid4())}),
     ("GET", "/api/money/entrances/{entranceId}/arrears"): lambda e: (f"/api/money/entrances/{e}/arrears?asOf=2026-09-30", None),
     ("GET", "/api/money/units/{unitId}/statement"): lambda e: (f"/api/money/units/{a_unit(e)}/statement", None),
     ("GET", "/api/money/units/{unitId}/arrears"): lambda e: (f"/api/money/units/{a_unit(e)}/arrears?asOf=2026-09-30", None),
@@ -1397,6 +1412,46 @@ def disbursements_screen(api, web, entrance, signed_in):
     return failures
 
 
+def handover_screen(api, web, entrance, signed_in):
+    """
+    WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
+    "not signed" line; opened (`?statement=`), the seeded one shows its hash, its basis text verbatim and the web's own
+    "съвпада" check. Signed in, the issue form posted with the seeded manager on both sides is refused in the API's
+    words naming PM-FUND-010, the form kept, nothing issued.
+    """
+    path = f"/entrance/fund/handover?entrance={entrance}"
+    a_status, raw = fetch(api, f"/api/money/entrances/{entrance}/fund/handover-statements")
+    if a_status != 200 or not json.loads(raw):
+        return [f"{path}: the API's list answers HTTP {a_status}, or lists none (the seed issues one)"]
+    listed = json.loads(raw)
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    not_signed = "Не е подписан от страните — подписването чака избора на доставчик на квалифициран електронен подпис (#57)."
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: the statement {v['id']} is not listed" for v in listed if f"statement={v['id']}" not in page.replace("&amp;", "&")]
+    failures += [f"{path}: {len(listed)} statements listed, the line 'not signed' shown {text.count(not_signed)} times"] if text.count(not_signed) != len(listed) else []
+    o_status, o_page = fetch(web, f"{path}&statement={listed[0]['id']}")
+    o_text = visible_text(o_page)
+    first = listed[0]
+    want = [first["basisHash"], " ".join(first["basis"].split()), "Хешът съвпада с показания текст на основата", f"закон {first['lawVersion']} · двигател {first['engineVersion']}"]
+    failures += [f"{path}&statement=…: HTTP {o_status}"] if o_status != 200 else []
+    failures += [f"{path}&statement=…: does not show {w[:60]!r}" for w in want if w not in o_text]
+    failures += [f"{path}&statement=…: {o_text.count(not_signed)} 'not signed' lines for {len(listed)} statements and the one opened"] if o_text.count(not_signed) != len(listed) + 1 else []
+    failures += [f"{path}: {word!r} on a statement that is not signed"] if any(w in text for w in ("Подписан от", "подписан от двете")) else []
+    if signed_in:
+        holder = fund_holder(entrance)
+        fields = {"handoverOn": "2026-10-01", "from": "", "outgoing": holder, "incoming": holder, "bankBalance": "1,23"}
+        s_status, _, refused_page = submit_form(web, path, page, 'name="bankBalance"', fields)
+        said = visible_text(refused_page)
+        if s_status != 200 or "Системата не прие това:" not in said or "PM-FUND-010" not in said or 'value="1,23"' not in refused_page:
+            failures.append(f"{path}: a handover with one party on both sides answered HTTP {s_status} without the API's words, or the form not kept")
+        after = json.loads(fetch(api, f"/api/money/entrances/{entrance}/fund/handover-statements")[1])
+        failures += [] if len(after) == len(listed) else [f"{path}: a refused handover recorded a statement"]
+    print(f"{'ok ' if not failures else 'BAD'} PM-FUND-010 the handover statements: {len(listed)} listed, each not signed; the first opened with its hash checked; "
+          f"{'a handover with one party on both sides refused' if signed_in else 'the form NOT checked: no sign-in'}")
+    return failures
+
+
 def payment_screen(api, web, entrance):
     """
     WEB-39 (PM-DEBT-008) — `/entrance/payments`: a payment designating a debt the unit does not owe, posted
@@ -1710,6 +1765,7 @@ def main():
     failures += statement_screen(api, web, entrance)
     failures += fund_accounts_screen(api, web, entrance)
     failures += disbursements_screen(api, web, entrance, signed_in=bool(args.user))
+    failures += handover_screen(api, web, entrance, signed_in=bool(args.user))
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
@@ -1720,7 +1776,7 @@ def main():
     under = ["/portfolio", "/debts", "/compliance", f"/entrance?entrance={entrance}", f"/entrance/charges?entrance={entrance}&period=2026-09",
              f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}",
              f"/entrance/statement?entrance={entrance}", f"/entrance/fund/accounts?entrance={entrance}",
-             f"/entrance/fund/disbursements?entrance={entrance}"]
+             f"/entrance/fund/disbursements?entrance={entrance}", f"/entrance/fund/handover?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
