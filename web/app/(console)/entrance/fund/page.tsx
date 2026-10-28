@@ -3,6 +3,7 @@ import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthDays, monthName, reach, shiftPeriod, thisPeriod, type EntranceAt } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
+import { PURPOSE } from "@/lib/disbursement";
 
 export const metadata: Metadata = { title: "Каса и фонд — Етаж" };
 
@@ -66,13 +67,6 @@ async function load(entranceId: string | undefined, period: string, account: str
       ?? { failed: unansweredBy(journal, "дневника") },
   };
 }
-
-/** What a disbursement may be for (PM-FUND-006), the API's purpose codes in words. */
-const PURPOSE: Record<string, string> = {
-  WORKS: "работи и оборудване (чл. 48–49)",
-  PASSPORT_MEASURE: "мярка по техническия паспорт",
-  GA_PURPOSE: "друга цел, решена от ОС",
-};
 
 const STATUS: Record<string, { label: string; many: string; tone: string }> = {
   COMMITTED: { label: "Поето", many: "Поети", tone: "warn" },
@@ -164,7 +158,7 @@ export default async function FundPage({ searchParams }: { searchParams: Promise
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button type="button" className="chip" disabled title="Още няма API за банкови извлечения." style={{ opacity: 0.5, cursor: "not-allowed" }}>Банково извлечение</button>
-          <button type="button" className="chip active" disabled title="Разход от фонда подписва титулярят на сметката — изисква вход в системата." style={{ opacity: 0.5, cursor: "not-allowed" }}>Нов документ</button>
+          {entrance && <Link href={`/entrance/fund/disbursements?entrance=${entrance.id}`} className="chip active">Нов документ</Link>}
         </div>
       </div>
 
