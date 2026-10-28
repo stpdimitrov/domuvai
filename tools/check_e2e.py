@@ -128,7 +128,8 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/intake/entrances/{entranceId}/imports"),
                      ("GET", "/api/intake/imports/{id}"),
                      ("POST", "/api/intake/imports/{id}/commit"),
-                     ("POST", "/api/intake/imports/{id}/revert")}
+                     ("POST", "/api/intake/imports/{id}/revert"),
+                     ("POST", "/api/money/entrances/{entranceId}/payments")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
@@ -141,7 +142,18 @@ INTAKE_REPRO_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
 # The answer a CALLS entry is validated against when the call is refused by design: a revert needs a committed import,
 # and the seeded entrance's book already holds its units, so no import of the check's commits (WEB-37).
 REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
-                     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409}   # September is seeded as billed: a bill is not reissued
+                     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409,   # September is seeded as billed: a bill is not reissued
+                     ("POST", "/api/money/entrances/{entranceId}/payments"): 409}      # dated before the seeded payments: the demo stays as seeded
+# A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
+# this itself (WEB-39). Listed here so that the web calls nothing this check does not cover.
+ON_A_PAYMENT = {("GET", "/api/money/entrances/{entranceId}/payments/{paymentId}")}
+
+
+def a_unit(entrance):
+    """The entrance's first unit by designation, as the registry lists it — the one the payment checks pay for."""
+    status, raw = fetch(API[0], f"/api/registry/entrances/{entrance}/units")
+    units = sorted(json.loads(raw), key=lambda u: u["designation"]) if status == 200 else []
+    return units[0]["id"] if units else "00000000-0000-0000-0000-000000000000"
 
 
 def recorded(entrance, csv, run):
@@ -186,6 +198,9 @@ CALLS = {
         f"/api/intake/imports/{recorded(e, INTAKE_REPRO, INTAKE_REPRO_RUN)}/commit", {"sheet": {"csv": INTAKE_REPRO, **INTAKE_REPRO_RUN}}),
     ("POST", "/api/intake/imports/{id}/revert"): lambda e: (
         f"/api/intake/imports/{recorded(e, INTAKE_SHEET, INTAKE_RUN)}/revert", {"reason": "e2e: an import not committed"}),
+    ("POST", "/api/money/entrances/{entranceId}/payments"): lambda e: (
+        f"/api/money/entrances/{e}/payments", {"unitId": a_unit(e), "amountMinor": 100, "receivedInto": "CASH", "valueDate": "2026-01-01"},
+        {"Idempotency-Key": str(uuid.uuid4())}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1235,6 +1250,48 @@ def charges_issue(api, web, entrance):
     return failures
 
 
+def payment_screen(api, web, entrance):
+    """
+    WEB-39 (PM-DEBT-008) — `/entrance/payments`: a payment designating a debt the unit does not owe, posted
+    through the page's form as a browser with no script posts it, is refused in the API's words, the form kept. A
+    payment in cash, today, is then recorded through the same form and lands on its allocation; the same form posted
+    again lands on the same payment (one Idempotency-Key per form). The allocation shown is the API's, read back with
+    GET …/payments/{paymentId} and validated against the contract: the rule applied and what each debt received.
+    """
+    path, unit = f"/entrance/payments?entrance={entrance}", a_unit(entrance)
+    status, page = fetch(web, path)
+    if status != 200 or 'name="designated"' not in page:
+        return [f"{path}: HTTP {status}, or no payment form"]
+    today = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date().isoformat()
+    fields = {"unit": unit, "amount": "1,00", "valueDate": today, "receivedInto": "CASH", "designated": ""}
+    failures = []
+    status, _, refused_page = submit_form(web, path, page, 'name="designated"', {**fields, "designated": "2020-01-01"})
+    if status != 200 or "owes no debt dated 2020-01-01" not in visible_text(refused_page) or 'value="1,00"' not in refused_page:
+        failures.append(f"{path}: a designation of a debt not owed answered HTTP {status} without the API's words, or the form not kept")
+    landed, page = [], fetch(web, path)[1]             # a fresh form: its own key
+    for _ in range(2):                                 # the same form, the same key, twice: one payment
+        status, location, _ = submit_form(web, path, page, 'name="designated"', fields)
+        made = re.fullmatch(rf"(?:{re.escape(web)})?/entrance/payments\?entrance={entrance}&payment=([0-9a-f-]{{36}})", location)
+        if status != 303 or not made:
+            return failures + [f"{path}: recording through the page's form answers HTTP {status} → {location or 'nowhere'}, not the payment's page"]
+        landed.append(made.group(1))
+    failures += [] if landed[0] == landed[1] else [f"{path}: the same form sent twice recorded two payments {landed}"]
+    of = "/api/money/entrances/{entranceId}/payments/{paymentId}"
+    status, raw = fetch(api, f"/api/money/entrances/{entrance}/payments/{landed[0]}", headers=as_board())
+    if status != 200:
+        return failures + [f"GET {of}: HTTP {status} {raw[:200]}"]
+    validator = Draft202012Validator(response_schema("GET", of, 200), format_checker=Draft202012Validator.FORMAT_CHECKER)
+    failures += [f"GET {of}: {e.message}" for e in validator.iter_errors(json.loads(raw))]
+    payment = json.loads(raw)
+    text = visible_text(fetch(web, location.removeprefix(web))[1])
+    want = [f"Плащане {eur(payment['amountMinor'])}", f"({payment['allocationRule']})", f"Неразпределено (аванс): {eur(payment['unallocatedMinor'])}",
+            *[f"Задължение от {p['debtDate']}: {eur(p['amountMinor'])}" for p in payment["allocation"]]]
+    failures += [f"{location}: does not show {w!r}, the API's allocation" for w in want if w not in text]
+    print(f"{'ok ' if not failures else 'BAD'} PM-DEBT-008 the payment form: {payment['allocationRule']}, {len(payment['allocation'])} debt(s); "
+          "a resend is the same payment; a debt not owed refused")
+    return failures
+
+
 def intake_screen(api, web, entrance):
     """
     WEB-35 (ADR-012, PM-SEC-001) — `/entrance/intake`: a sheet uploaded through the page's own form, as a browser with no
@@ -1461,19 +1518,20 @@ def main():
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable
-    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY)]
-    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY) - called)]
+    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT)]
+    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT) - called)]
 
     for (method, path), call in CALLS.items():
-        url, body = call(entrance)
+        url, body, *sent = call(entrance)              # a third element: headers the call needs (an Idempotency-Key)
+        sent = sent[0] if sent else {}
         if path in ("/api/identity/me", "/api/identity/entrances/{entranceId}/mandates") and api not in CARRIED:
             print(f"—   {method:4} {path}  NOT checked: it answers only a request with a token, and this run has none")
             continue
         board = as_board() if (method, path) in KEPT_BY_THE_BOARD else None
         if board:                                       # the check's own token is the controller's: refused (G-3, PM-SEC-001)
-            refused, _ = fetch(api, url, body)
+            refused, _ = fetch(api, url, body, headers=sent)
             failures += [] if refused == 403 else [f"{method} {path}: the controller kept the accounts (HTTP {refused}), not refused (PM-SEC-001)"]
-        status, raw = fetch(api, url, body, headers=board)
+        status, raw = fetch(api, url, body, headers={**sent, **(board or {})})
         if status not in ((REFUSED_BY_DESIGN[(method, path)],) if (method, path) in REFUSED_BY_DESIGN else (200, 201)):
             failures.append(f"{method} {path}: HTTP {status} {raw[:200]}")
             continue
@@ -1503,13 +1561,14 @@ def main():
     failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
     failures += intake_screen(api, web, entrance)
     failures += charges_issue(api, web, entrance)
+    failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
     status, raw = fetch(api, "/api/law/version")
     served = json.loads(raw) if status == 200 else {}
     footer = f"Каталог на правилата v{served.get('catalogueVersion')} · изчислител {served.get('engineVersion')}"
     under = ["/portfolio", "/debts", "/compliance", f"/entrance?entrance={entrance}", f"/entrance/charges?entrance={entrance}&period=2026-09",
-             f"/entrance/fund?entrance={entrance}"]
+             f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
