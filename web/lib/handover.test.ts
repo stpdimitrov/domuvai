@@ -15,7 +15,8 @@ test("PM-FUND-010 the body carries the dates as typed, the bank balance in minor
 });
 
 test("PM-FUND-010 an empty date, a missing or malformed bank balance, or a malformed party id is refused before any call", () => {
-  for (const p of [{ handoverOn: "" }, { handoverOn: "  " }, { bankBalance: "" }, { bankBalance: "  " }, { bankBalance: "570,001" }, { bankBalance: "abc" }, { bankBalance: "-5" },
+  for (const p of [{ handoverOn: "" }, { handoverOn: "  " }, { bankBalance: "" }, { bankBalance: "  " }, { bankBalance: "570,001" }, { bankBalance: "abc" }, { bankBalance: "-5" },   // a minus sign is refused: the fund's bank account is a credit balance, and minorOf takes digits only
+    
     { outgoing: "" }, { outgoing: "p-1" }, { incoming: "" }, { incoming: "22222222-2222-4222-8222" }, { incoming: `${into}x` }]) {
     assert.ok("refused" in handoverOf(typed(p)), JSON.stringify(p));
   }
@@ -36,12 +37,12 @@ test("PM-FUND-010 nothing calls a statement signed: one 'not signed' line, expor
   assert.match(NOT_SIGNED, /^Не е подписан от страните/);
   assert.match(NOT_SIGNED, /#57/);
   const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
-  const [list, page, form] = ["../app/(console)/entrance/fund/page.tsx", "../app/(console)/entrance/fund/handover/page.tsx",
-    "../app/(console)/entrance/fund/handover/HandoverForm.tsx"].map(read);
+  const [list, page, form, actions, lib] = ["../app/(console)/entrance/fund/page.tsx", "../app/(console)/entrance/fund/handover/page.tsx",
+    "../app/(console)/entrance/fund/handover/HandoverForm.tsx", "../app/(console)/entrance/fund/handover/actions.ts", "./handover.ts"].map(read);
   assert.ok(list.includes("NOT_SIGNED") && page.includes("NOT_SIGNED"), "both screens show the one constant");
   // the handover screen has no word that says a party signed, agreed, accepted or finalised (the fund page's disbursement column "Подписан" is another thing)
-  const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replaceAll("NOT_SIGNED", "");
-  assert.doesNotMatch(code(page) + code(form), /подписан|приет|съгласен|окончателен|signed|accepted|final/i);
+  const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/^export const NOT_SIGNED.*$/m, "").replaceAll("NOT_SIGNED", "");
+  assert.doesNotMatch(code(page) + code(form) + code(actions) + code(lib), /подписан|приет|съгласен|окончателен|signed|accepted|final/i);
 });
 
 test("PM-SEC-001 the API's 403, 400 and 409 are shown in its words", () => {

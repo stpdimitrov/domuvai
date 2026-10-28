@@ -363,6 +363,7 @@ function JournalSection({ journal, period, account, link }: {
  * The fund's handover statements as issued, newest first (PM-FUND-010) — the API checks each against its hash.
  * Each carries the one line saying the parties have not signed it yet (#57); `/entrance/fund/handover` issues and opens them (WEB-43).
  */
+// Rule: PM-FUND-010
 function Handovers({ handovers, entrance }: { handovers: Handover[] | { failed: string }; entrance: string }) {
   return (
     <>

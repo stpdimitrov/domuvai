@@ -94,6 +94,7 @@ export default async function HandoverPage({ searchParams }: { searchParams: Pro
  * One statement as the API issued it: the movement of the fund, the two sides, the canonical basis verbatim, its hash,
  * the versions it was made under, and the web's own check of the hash against the text shown (Rule: PM-FUND-010).
  */
+// Rule: PM-FUND-010
 function Opened({ view: { id, statement: s, basis, basisHash, lawVersion, engineVersion } }: { view: View }) {
   const ok = matches(basis, basisHash);
   return (

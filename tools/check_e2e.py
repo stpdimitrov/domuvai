@@ -1437,7 +1437,7 @@ def handover_screen(api, web, entrance, signed_in):
     failures += [f"{path}&statement=…: HTTP {o_status}"] if o_status != 200 else []
     failures += [f"{path}&statement=…: does not show {w[:60]!r}" for w in want if w not in o_text]
     failures += [f"{path}&statement=…: {o_text.count(not_signed)} 'not signed' lines for {len(listed)} statements and the one opened"] if o_text.count(not_signed) != len(listed) + 1 else []
-    failures += [f"{path}: {word!r} on a statement that is not signed"] if any(w in text for w in ("Подписан от", "подписан от двете")) else []
+    failures += [f"{path}: {word!r} on a statement that is not signed"] if re.search(r"подписан|съгласуван|приет|окончателен", text.replace(not_signed, ""), re.I) else []
     if signed_in:
         holder = fund_holder(entrance)
         fields = {"handoverOn": "2026-10-01", "from": "", "outgoing": holder, "incoming": holder, "bankBalance": "1,23"}

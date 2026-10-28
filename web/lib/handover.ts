@@ -26,7 +26,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function handoverOf(input: HandoverInput): HandoverBody | { refused: string } {
   const [handoverOn, from, outgoing, incoming, balance] = [input.handoverOn, input.from, input.outgoing, input.incoming, input.bankBalance].map((s) => s.trim());
   if (!handoverOn) return { refused: "Посочете датата на предаване." };
-  if (!balance) return { refused: "Посочете салдото по банковия извлечение за деня — то не се взема от книгата, иначе отчетът винаги би съвпадал." };
+  if (!balance) return { refused: "Посочете салдото по банковото извлечение за деня — то не се взема от книгата, иначе отчетът винаги би съвпадал." };
   const bankBalanceMinor = minorOf(balance);
   if (bankBalanceMinor == null) return { refused: `„${balance}“ не е сума в евро — например 570 или 570,00.` };
   if (!UUID.test(outgoing)) return { refused: "Посочете предаващата страна — идентификатор на лице." };
