@@ -51,6 +51,10 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
 16. WEB-37 (PM-SEC-001, PM-FEE-014): the import's page shows it as the API reads it — status, counts, content hash, what
     blocked it; a commit of a sheet that does not reproduce is the API's refusal in its words; a sheet that reproduces is
     recorded and committed through the page (COMMITTING), and its revert through the import's page is the API's answer.
+17. WEB-38 (PM-FEE-012, PM-FEE-015, PM-SEC-001): the charges screen's issue form offers, as decisions to cite, exactly the
+    entrance's PASSED decisions the assembly API stores (none: it says no run can be issued); an issue posted through it
+    citing a decision that is not one is refused by the web, and the API then holds no run for that period. The issue
+    call is validated against its 409 (the seeded period is billed) with the board's token, and refused for the controller.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
 Usage, in CI — a real issuer, the api closed (E2E_PASSWORD and E2E_API_TOKEN in the environment):
@@ -118,6 +122,7 @@ ON_AN_ASSEMBLY = {
 }
 # The calls that keep an entrance's accounts or enter its book — for the manager and the board only (G-3, G-1, PM-SEC-001).
 KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
+                     ("POST", "/api/money/entrances/{entranceId}/charge-runs"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/dry-run"),
                      ("POST", "/api/intake/entrances/{entranceId}/imports"),
@@ -135,7 +140,8 @@ INTAKE_REPRO_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
                     "lines": [{"stream": "MAINTENANCE", "key": "PER_UNIT", "decisionId": "GA-2026-03-12-5", "rateMinor": 1000}]}
 # The answer a CALLS entry is validated against when the call is refused by design: a revert needs a committed import,
 # and the seeded entrance's book already holds its units, so no import of the check's commits (WEB-37).
-REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409}
+REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
+                     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409}   # September is seeded as billed: a bill is not reissued
 
 
 def recorded(entrance, csv, run):
@@ -156,6 +162,8 @@ CALLS = {
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}),
+    ("POST", "/api/money/entrances/{entranceId}/charge-runs"): lambda e: (
+        f"/api/money/entrances/{e}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}),
     ("GET", "/api/money/entrances/{entranceId}/fund"): lambda e: (f"/api/money/entrances/{e}/fund", None),
     ("GET", "/api/money/entrances/{entranceId}/operating-account"): lambda e: (f"/api/money/entrances/{e}/operating-account", None),
     ("GET", "/api/money/entrances/{entranceId}/charge-runs/{period}/headcount"): lambda e: (
@@ -1193,6 +1201,40 @@ def presets(page):
     return [chosen(options) for _, options in sorted(selects, key=lambda s: int(s[0]))]
 
 
+def charges_issue(api, web, entrance):
+    """
+    WEB-38 (PM-FEE-012, PM-FEE-015, PM-SEC-001) — the issue form on `/entrance/charges`: the decisions it offers are the
+    entrance's PASSED ones as the assembly API stores them, read here the same way; with none it says no run is issued.
+    An issue posted through the form, as a browser with no script posts it, citing a decision that is not one (the demo
+    basis's) is refused by the web, and the API then holds no run for the period. A passed decision cannot be reached in
+    CI (the API's clock is real, WEB-32), so an issue through the page is not; the API's own refusals are its tests.
+    """
+    period = "2027-01"
+    path = f"/entrance/charges?period={period}&entrance={entrance}"
+    status, page = fetch(web, path)
+    if status != 200 or "Издаване на начисленията" not in page:
+        return [f"{path}: HTTP {status}, or no issue form"]
+    of = f"/api/assembly/entrances/{entrance}/assemblies"
+    passed = []
+    for a in json.loads(fetch(api, of)[1] or "[]"):
+        for item in json.loads(fetch(api, f"{of}/{a['id']}")[1]).get("agenda", []):
+            st, raw = fetch(api, f"{of}/{a['id']}/agenda/{item['id']}/decision")
+            passed += [json.loads(raw)["id"]] if st == 200 and json.loads(raw).get("outcome") == "PASSED" else []
+    offered = re.findall(r'<option value="([0-9a-f-]{36})"', next(iter(re.findall(r'<select[^>]*name="decision-0".*?</select>', page, re.S)), ""))
+    failures = [] if sorted(offered) == sorted(passed) else [f"{path}: offers the decisions {offered}, the API's PASSED ones are {passed}"]
+    if not passed and "Няма прието решение на общото събрание" not in visible_text(page):
+        failures.append(f"{path}: with no passed decision, does not say no run can be issued")
+    fields = {"stream-0": "MANAGEMENT", "key-0": "PER_PERSON", "per-0": "rate", "amount-0": "6,00", "decision-0": "GA-2026-03-12-4", "step": "issue"}
+    status, _, answered = submit_form(web, path, page, "Издаване на начисленията", fields)
+    text = visible_text(answered)
+    if status != 200 or "Ред 1: изберете прието решение" not in text or "Издадено:" in text:
+        failures.append(f"{path}: an issue citing no passed decision answered HTTP {status} without the web's refusal")
+    held = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/{period}/headcount", headers=as_board())[0]
+    failures += [] if held == 404 else [f"{period}: PM-FEE-012 — the API holds a run (headcount HTTP {held}) after an issue citing no passed decision"]
+    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} passed decision(s) offered; an issue on none refused, no run held")
+    return failures
+
+
 def intake_screen(api, web, entrance):
     """
     WEB-35 (ADR-012, PM-SEC-001) — `/entrance/intake`: a sheet uploaded through the page's own form, as a browser with no
@@ -1460,6 +1502,7 @@ def main():
     failures += compliance_screen(api, web, entrance)
     failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
     failures += intake_screen(api, web, entrance)
+    failures += charges_issue(api, web, entrance)
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
     status, raw = fetch(api, "/api/law/version")
