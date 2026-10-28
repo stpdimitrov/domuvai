@@ -185,6 +185,8 @@ CALLS = {
     ("GET", "/api/money/entrances/{entranceId}/fund/handover-statements"): lambda e: (
         f"/api/money/entrances/{e}/fund/handover-statements", None),
     ("GET", "/api/money/entrances/{entranceId}/arrears"): lambda e: (f"/api/money/entrances/{e}/arrears?asOf=2026-09-30", None),
+    ("GET", "/api/money/units/{unitId}/statement"): lambda e: (f"/api/money/units/{a_unit(e)}/statement", None),
+    ("GET", "/api/money/units/{unitId}/arrears"): lambda e: (f"/api/money/units/{a_unit(e)}/arrears?asOf=2026-09-30", None),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies"): lambda e: (f"/api/assembly/entrances/{e}/assemblies", None),
     ("GET", "/api/assembly/entrances/{entranceId}/years/{year}"): lambda e: (f"/api/assembly/entrances/{e}/years/{sofia_year()}", None),
     ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"): lambda e: (
@@ -1250,6 +1252,40 @@ def charges_issue(api, web, entrance):
     return failures
 
 
+BAND = {"CURRENT": "в срок", "0-30": "0–30 дни", "31-60": "31–60 дни", "61-90": "61–90 дни", "90+": "над 90 дни"}   # web/lib/statement.ts
+
+
+def statement_screen(api, web, entrance):
+    """
+    WEB-40 (PM-FEE-018, PM-FEE-017, PM-DEBT-001) — `/entrance/statement`: a unit's statement and arrears as of a date
+    show what the API serves for that unit — the balance, every period, every line's derivation and amount, and the
+    arrears' total, advance and net. Both reads are validated against the contract in CALLS; this checks the page.
+    """
+    unit, as_of = a_unit(entrance), "2026-09-30"
+    path = f"/entrance/statement?entrance={entrance}&unit={unit}&asOf={as_of}"
+    s_status, s_raw = fetch(api, f"/api/money/units/{unit}/statement")
+    a_status, a_raw = fetch(api, f"/api/money/units/{unit}/arrears?asOf={as_of}")
+    if s_status != 200 or a_status != 200:
+        return [f"{path}: the API's reads answer HTTP {s_status} (statement), {a_status} (arrears)"]
+    statement, arrears = json.loads(s_raw), json.loads(a_raw)
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    want = [f"Извлечение · салдо {eur(statement['balanceMinor'])}",
+            f"Дължимо {eur(arrears['totalMinor'])} · аванс {eur(arrears['advanceMinor'])} · нетно {eur(arrears['netMinor'])}",
+            *[f"Период {p}" for p in dict.fromkeys(line["period"] for line in statement["lines"])],
+            *[f"{line['derivation']} {eur(line['amountMinor'])}" for line in statement["lines"]]]
+    want += [f"{BAND.get(b['band'], b['band'])}: {eur(b['amountMinor'])}" for b in arrears["buckets"]]
+    if any(line["allocationKey"] == "METERED" for line in statement["lines"]):
+        want.append("По потребление — отделно от законовите ключове")   # PM-FEE-017: consumption lines apart
+    if arrears.get("oldestDebt"):
+        want.append(".".join(reversed(arrears["oldestDebt"]["dueOn"].split("-"))))
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: does not show {w!r}, the API's" for w in want if w not in text]
+    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-018 the unit's statement: {len(statement['lines'])} line(s), "
+          f"balance {eur(statement['balanceMinor'])}; arrears {eur(arrears['netMinor'])} net as of {as_of}")
+    return failures
+
+
 def payment_screen(api, web, entrance):
     """
     WEB-39 (PM-DEBT-008) — `/entrance/payments`: a payment designating a debt the unit does not owe, posted
@@ -1560,6 +1596,7 @@ def main():
     failures += compliance_screen(api, web, entrance)
     failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
     failures += intake_screen(api, web, entrance)
+    failures += statement_screen(api, web, entrance)
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
@@ -1568,7 +1605,8 @@ def main():
     served = json.loads(raw) if status == 200 else {}
     footer = f"Каталог на правилата v{served.get('catalogueVersion')} · изчислител {served.get('engineVersion')}"
     under = ["/portfolio", "/debts", "/compliance", f"/entrance?entrance={entrance}", f"/entrance/charges?entrance={entrance}&period=2026-09",
-             f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}"]
+             f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}",
+             f"/entrance/statement?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]

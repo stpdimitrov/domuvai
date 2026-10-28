@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entrances, eur, inTurn, isDay, reach } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
@@ -190,7 +191,9 @@ function Debts({ view, listed, owing, failed }: { view: Extract<Loaded, { kind: 
             )}
             {g.kind === "ok" && g.arrears.units.map((u) => (
               <div key={u.unitId} className="dt-grid pf-row">
-                <div style={{ fontWeight: 500 }}>{g.units.get(u.unitId) ?? "—"}</div>
+                <div style={{ fontWeight: 500 }}>
+                  <Link href={`/entrance/statement?entrance=${g.entrance.id}&unit=${u.unitId}&asOf=${view.asOf}`}>{g.units.get(u.unitId) ?? "—"}</Link>
+                </div>
                 <div className="ellipsis">{g.owners.get(u.unitId) ?? "—"}</div>
                 <div className="num">{eur(u.totalMinor)}</div>
                 <div className="num" style={u.advanceMinor > 0 ? undefined : DIM}>{u.advanceMinor > 0 ? eur(u.advanceMinor) : "—"}</div>
