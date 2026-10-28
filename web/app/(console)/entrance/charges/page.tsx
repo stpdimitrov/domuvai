@@ -3,6 +3,8 @@ import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthName, reach, shiftPeriod as shift, thisPeriod, type EntranceAt } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
+import { passedDecisions, type Passed } from "./decisions";
+import IssueForm from "./IssueForm";
 
 export const metadata: Metadata = { title: "Начисления — Етаж" };
 
@@ -29,7 +31,7 @@ const describe = (l: Schemas["TariffLineRequest"]) =>
 const pct = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 4, maximumFractionDigits: 6 }) + "%";
 
 type Loaded =
-  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string>; namesFailed?: string }
+  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string>; namesFailed?: string; passed: Passed[]; decisionsFailed?: string }
   | Exclude<EntranceAt, { kind: "ok" }>
   | { kind: "refused"; entrance: Schemas["EntranceView"]; message: string; aboutMultiple: boolean };
 
@@ -62,9 +64,10 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     }),
     api.GET("/api/registry/entrances/{entranceId}/units", { params: { path } }),
     api.GET("/api/registry/entrances/{entranceId}/owners", { params: { path, query: { on: legalDate } } }),
+    passedDecisions(entrance.id),   // the decisions a run may be issued on (WEB-38, PM-FEE-012)
   ]));
   if (!fetched) return { kind: "down" };
-  const [run, units, owners] = fetched;
+  const [run, units, owners, decisions] = fetched;
   if (!run.data) {
     const message = run.error?.error ?? `HTTP ${run.response.status}`;
     return { kind: "refused", entrance, message: unansweredBy(run, "изчислението"), aboutMultiple: message.includes("PM-FEE-010") };   // the API names the rule it refuses on
@@ -79,6 +82,8 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     entrance,
     run: run.data,
     ideal: new Map((units.data ?? []).map((u) => [u.id, u.idealPartsPct])),
+    passed: "passed" in decisions ? decisions.passed : [],
+    decisionsFailed: "refused" in decisions ? decisions.refused : undefined,
     owners: new Map([...names].map(([unit, list]) => [unit, list.sort((a, b) => a.localeCompare(b, "bg")).join(", ")])),   // the API lists them in no fixed order
     // The amounts are money's and stay; what the registry did not give is said to be refused, never left as a dash.
     namesFailed: [
@@ -261,7 +266,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
             <span style={{ color: "#14584A", fontWeight: 500 }}>{idealSum}</span> · посочете сума, за да видите как е изведена
           </div>
           <div style={{ font: "400 11.5px/1.4 'IBM Plex Mono', monospace", color: "#6B6F6C" }}>
-            Преглед — нищо не е записано. Издаването изисква решение на ОС, не демо базис.
+            Преглед на демо базиса — нищо не е записано. Издаването е по-долу, по прието решение на ОС.
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
@@ -269,9 +274,10 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
             <div style={{ font: "400 11px/1 'IBM Plex Sans'", letterSpacing: ".1em", textTransform: "uppercase", color: "#6B6F6C" }}>Общо за начисляване</div>
             <div style={{ font: "500 24px/1.2 'IBM Plex Sans'", fontVariantNumeric: "tabular-nums" }}>{eur(run.totalMinor)}</div>
           </div>
-          <button type="button" className="btn-confirm" disabled title="Издаването изисква решение на ОС" style={{ opacity: 0.5, cursor: "not-allowed" }}>Потвърди начисленията</button>
         </div>
       </div>
+
+      <IssueForm entrance={view.entrance.id} period={period} multiple={multiple.given} passed={view.passed} unread={view.decisionsFailed} />
     </>
   );
 }
