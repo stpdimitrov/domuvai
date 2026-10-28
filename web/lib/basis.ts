@@ -31,5 +31,14 @@ export function basisOf(input: BasisInput, passed: ReadonlySet<string>): Basis |
   return { lines, ...(multiple && { businessMultiplier: Number(multiple) }) };
 }
 
-/** The basis as text, so the one issued can be held to the one previewed (PM-FEE-015: an issued run is never altered). */
+/**
+ * The basis as text, so the one issued can be held to the one previewed. A guard against issuing what the person did
+ * not see, not the PM-FEE-015 backstop: the key travels in the form, and an issued run is kept unaltered by the API
+ * (a period billed is its 409).
+ */
+// Rule: PM-FEE-015
 export const basisKey = (period: string, basis: Basis) => JSON.stringify([period, basis.businessMultiplier ?? null, basis.lines]);
+
+/** Whether [basis] is the one previewed: [previewed] is the key the preview's answer carried in the form. */
+// Rule: PM-FEE-015
+export const asPreviewed = (previewed: string, period: string, basis: Basis) => previewed === basisKey(period, basis);

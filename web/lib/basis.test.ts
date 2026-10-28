@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { basisKey, basisOf, type BasisLine } from "./basis.ts";
+import { asPreviewed, basisKey, basisOf, type Basis, type BasisLine } from "./basis.ts";
 
 const passed = new Set(["d-1", "d-2"]);
 const line = (l: Partial<BasisLine>): BasisLine => ({ stream: "MANAGEMENT", key: "PER_PERSON", per: "rate", amount: "6,00", decision: "d-1", ...l });
@@ -32,4 +32,8 @@ test("PM-FEE-015 the basis issued is held to the one previewed: any change gives
   assert.equal(of("6"), of("6,00"));
   assert.notEqual(of("6"), of("6,01"));
   assert.notEqual(of("6"), of("6", "2026-12"));
+  const basis = (amount: string) => basisOf({ multiple: "", lines: [line({ amount })] }, passed) as Basis;
+  assert.ok(asPreviewed(of("6"), "2026-11", basis("6,00")));
+  for (const [previewed, period, amount] of [[of("6"), "2026-11", "6,01"], [of("6"), "2026-12", "6"], ["", "2026-11", "6"]] as const)
+    assert.ok(!asPreviewed(previewed, period, basis(amount)), `${period} ${amount}`);
 });
