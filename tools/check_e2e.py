@@ -129,7 +129,8 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("GET", "/api/intake/imports/{id}"),
                      ("POST", "/api/intake/imports/{id}/commit"),
                      ("POST", "/api/intake/imports/{id}/revert"),
-                     ("POST", "/api/money/entrances/{entranceId}/payments")}
+                     ("POST", "/api/money/entrances/{entranceId}/payments"),
+                     ("POST", "/api/money/entrances/{entranceId}/fund-accounts")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
@@ -143,7 +144,10 @@ INTAKE_REPRO_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
 # and the seeded entrance's book already holds its units, so no import of the check's commits (WEB-37).
 REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409,   # September is seeded as billed: a bill is not reissued
-                     ("POST", "/api/money/entrances/{entranceId}/payments"): 409}      # dated before the seeded payments: the demo stays as seeded
+                     ("POST", "/api/money/entrances/{entranceId}/payments"): 409,      # dated before the seeded payments: the demo stays as seeded
+                     ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): 409}  # both purposes are seeded; fund_accounts_screen checks the words
+# The seeded entrance's fund account — tools/seed_demo.py's iban("UNCR70001512998102").
+SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
 # this itself (WEB-39). Listed here so that the web calls nothing this check does not cover.
 ON_A_PAYMENT = {("GET", "/api/money/entrances/{entranceId}/payments/{paymentId}")}
@@ -203,6 +207,9 @@ CALLS = {
     ("POST", "/api/money/entrances/{entranceId}/payments"): lambda e: (
         f"/api/money/entrances/{e}/payments", {"unitId": a_unit(e), "amountMinor": 100, "receivedInto": "CASH", "valueDate": "2026-01-01"},
         {"Idempotency-Key": str(uuid.uuid4())}),
+    ("GET", "/api/money/entrances/{entranceId}/fund-accounts"): lambda e: (f"/api/money/entrances/{e}/fund-accounts", None),
+    ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): lambda e: (
+        f"/api/money/entrances/{e}/fund-accounts", {"purpose": "OPERATING", "iban": SEEDED_FUND_IBAN, "holderName": "e2e", "holderKind": "MANAGER"}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1286,6 +1293,35 @@ def statement_screen(api, web, entrance):
     return failures
 
 
+def fund_accounts_screen(api, web, entrance):
+    """
+    WEB-41 (PM-FUND-004, PM-FUND-001) — `/entrance/fund/accounts`: every account the API lists for the entrance is
+    shown under its purpose, with its IBAN and its holder; the seeded entrance holds both purposes, so the page flags
+    no missing fund and offers no form. A second registration is the API's 409, validated in CALLS.
+    """
+    path = f"/entrance/fund/accounts?entrance={entrance}"
+    a_status, raw = fetch(api, f"/api/money/entrances/{entrance}/fund-accounts")
+    if a_status != 200:
+        return [f"{path}: the API's list answers HTTP {a_status}"]
+    accounts = json.loads(raw)
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    words = {"REPAIR_RENEWAL": "Сметка на фонд „Ремонт и обновяване“", "OPERATING": "Оперативна сметка"}
+    want = [w for a in accounts for w in (words.get(a["purpose"], a["purpose"]), f"IBAN {a['iban']}", f"Титуляр: {a['holderName']}", f"({a['holderKind']})")]
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: does not show {w!r}, the API's" for w in want if w not in text]
+    if {a["purpose"] for a in accounts} >= set(words):
+        failures += [f"{path}: both accounts are held, yet it flags a missing fund (PM-FUND-001)"] if "Входът няма регистрирана сметка" in text else []
+        failures += [f"{path}: both accounts are held, yet it offers a registration form (PM-FUND-004)"] if 'name="iban"' in page else []
+    # PM-FUND-005: the seeded fund's IBAN, offered again, is refused for the IBAN — the API checks it before the purpose
+    p_status, p_raw = fetch(api, f"/api/money/entrances/{entrance}/fund-accounts",
+                            {"purpose": "OPERATING", "iban": SEEDED_FUND_IBAN, "holderName": "e2e", "holderKind": "MANAGER"}, headers=as_board())
+    if p_status != 409 or "PM-FUND-005" not in (refusal_words(p_raw) or ""):
+        failures.append(f"POST …/fund-accounts: the seeded fund's IBAN again answers HTTP {p_status} {p_raw[:160]!r}, not the 409 naming PM-FUND-005")
+    print(f"{'ok ' if not failures else 'BAD'} PM-FUND-004, PM-FUND-001, PM-FUND-005 the entrance's accounts: {len(accounts)} listed, each with its IBAN and holder")
+    return failures
+
+
 def payment_screen(api, web, entrance):
     """
     WEB-39 (PM-DEBT-008) — `/entrance/payments`: a payment designating a debt the unit does not owe, posted
@@ -1597,6 +1633,7 @@ def main():
     failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
     failures += intake_screen(api, web, entrance)
     failures += statement_screen(api, web, entrance)
+    failures += fund_accounts_screen(api, web, entrance)
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
@@ -1606,7 +1643,7 @@ def main():
     footer = f"Каталог на правилата v{served.get('catalogueVersion')} · изчислител {served.get('engineVersion')}"
     under = ["/portfolio", "/debts", "/compliance", f"/entrance?entrance={entrance}", f"/entrance/charges?entrance={entrance}&period=2026-09",
              f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}",
-             f"/entrance/statement?entrance={entrance}"]
+             f"/entrance/statement?entrance={entrance}", f"/entrance/fund/accounts?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
