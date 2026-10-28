@@ -130,7 +130,8 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/intake/imports/{id}/commit"),
                      ("POST", "/api/intake/imports/{id}/revert"),
                      ("POST", "/api/money/entrances/{entranceId}/payments"),
-                     ("POST", "/api/money/entrances/{entranceId}/fund-accounts")}
+                     ("POST", "/api/money/entrances/{entranceId}/fund-accounts"),
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
@@ -145,7 +146,8 @@ INTAKE_REPRO_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
 REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409,   # September is seeded as billed: a bill is not reissued
                      ("POST", "/api/money/entrances/{entranceId}/payments"): 409,      # dated before the seeded payments: the demo stays as seeded
-                     ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): 409}  # both purposes are seeded; fund_accounts_screen checks the words
+                     ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): 409,  # both purposes are seeded; fund_accounts_screen checks the words
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): 409}                     # an emergency above the seeded €145,00 available (PM-FUND-008)
 # The seeded entrance's fund account — tools/seed_demo.py's iban("UNCR70001512998102").
 SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
@@ -164,6 +166,14 @@ def recorded(entrance, csv, run):
     """An import recorded with the board's token, for a call that needs one: its id, or a nil one the call then fails on."""
     status, raw = fetch(API[0], f"/api/intake/entrances/{entrance}/imports", {"csv": csv, **run}, headers=as_board())
     return json.loads(raw)["importId"] if status in (200, 201) else "00000000-0000-0000-0000-000000000000"
+
+
+def fund_holder(entrance):
+    """The party holding the fund's account: the one who signed the seeded disbursements (tools/seed_demo.py) — no API
+    read names it otherwise; a nil one, which the call then fails on, when the fund cannot be read."""
+    found, raw = fetch(API[0], f"/api/money/entrances/{entrance}/fund")
+    listed = json.loads(raw)["disbursements"] if found == 200 else []
+    return listed[0]["authorisedBy"] if listed else "00000000-0000-0000-0000-000000000000"
 
 
 API = [""]   # the api's base, set in main() before CALLS is run
@@ -210,6 +220,9 @@ CALLS = {
     ("GET", "/api/money/entrances/{entranceId}/fund-accounts"): lambda e: (f"/api/money/entrances/{e}/fund-accounts", None),
     ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): lambda e: (
         f"/api/money/entrances/{e}/fund-accounts", {"purpose": "OPERATING", "iban": SEEDED_FUND_IBAN, "holderName": "e2e", "holderKind": "MANAGER"}),
+    ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): lambda e: (
+        f"/api/money/entrances/{e}/fund/disbursements", {"amountMinor": 1_000_000, "purpose": "WORKS", "authorisedBy": fund_holder(e),
+                                                         "emergencyJustification": "e2e: above what is available"}, {"Idempotency-Key": str(uuid.uuid4())}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1322,6 +1335,47 @@ def fund_accounts_screen(api, web, entrance):
     return failures
 
 
+def disbursements_screen(api, web, entrance, signed_in):
+    """
+    WEB-42 (PM-FUND-006…008, PM-SEC-001) — `/entrance/fund/disbursements`: every COMMITTED disbursement the API lists is
+    listed on the page; no paid or cancelled one is. A sign-off posted
+    through the page's form by the person signed in — a board member (e2e.yml), not the fund's holder — is refused in the
+    API's words naming PM-FUND-007, the form kept, nothing recorded. An emergency above what is available, signed by the
+    holder with the board's token, is the API's 409 naming PM-FUND-008.
+    """
+    path = f"/entrance/fund/disbursements?entrance={entrance}"
+    a_status, raw = fetch(api, f"/api/money/entrances/{entrance}/fund")
+    if a_status != 200:
+        return [f"{path}: the API's fund answers HTTP {a_status}"]
+    listed = json.loads(raw)["disbursements"]
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    committed = [d for d in listed if d["status"] == "COMMITTED"]
+    failures += [f"{path}: the committed {d['id']} is not listed" for d in committed if f"{eur(d['amountMinor'])} ·" not in text
+                 or (d.get("emergencyJustification") or d.get("decisionId")) not in text]
+    failures += [f"{path}: the {d['status'].lower()} {d['id']} is listed" for d in listed if d["status"] != "COMMITTED"
+                 and f"{eur(d['amountMinor'])} ·" in text and (d.get("emergencyJustification") or d.get("passportMeasure") or d["decisionId"]) in text]
+    if signed_in:
+        fields = {"purpose": "WORKS", "amount": "1,00", "measure": "", "basis": "EMERGENCY", "decision": "", "justification": "e2e: signed by the board"}
+        status, _, refused_page = submit_form(web, path, page, 'name="justification"', fields)
+        said = visible_text(refused_page)
+        if status != 200 or "Системата не прие това:" not in said or "PM-FUND-007" not in said or 'value="e2e: signed by the board"' not in refused_page:
+            failures.append(f"{path}: a sign-off by a party not holding the fund answered HTTP {status} without the API's words, or the form not kept")
+        after = fetch(api, f"/api/money/entrances/{entrance}/fund")[1]
+        failures += [] if len(json.loads(after)["disbursements"]) == len(listed) else [f"{path}: a refused sign-off recorded a disbursement"]
+    holder = fund_holder(entrance)
+    e_status, e_raw = fetch(api, f"/api/money/entrances/{entrance}/fund/disbursements",
+                            {"amountMinor": 1_000_000, "purpose": "WORKS", "authorisedBy": holder, "emergencyJustification": "e2e: above what is available"},
+                            headers={**(as_board() or {}), "Idempotency-Key": str(uuid.uuid4())})
+    if as_board() and (e_status != 409 or "PM-FUND-008" not in (refusal_words(e_raw) or "")):
+        failures.append(f"POST …/fund/disbursements: an emergency above what is available answers HTTP {e_status} {e_raw[:160]!r}, not the 409 naming PM-FUND-008")
+    print(f"{'ok ' if not failures else 'BAD'} PM-FUND-006…008 the disbursements: {len(committed)} committed listed, "
+          f"{len(listed) - len(committed)} closed not; {'a sign-off by a non-holder refused' if signed_in else 'forms NOT checked: no sign-in'}"
+          f"{'' if as_board() else '; the emergency 409 NOT checked: no board token'}")
+    return failures
+
+
 def payment_screen(api, web, entrance):
     """
     WEB-39 (PM-DEBT-008) — `/entrance/payments`: a payment designating a debt the unit does not owe, posted
@@ -1634,6 +1688,7 @@ def main():
     failures += intake_screen(api, web, entrance)
     failures += statement_screen(api, web, entrance)
     failures += fund_accounts_screen(api, web, entrance)
+    failures += disbursements_screen(api, web, entrance, signed_in=bool(args.user))
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
@@ -1643,7 +1698,8 @@ def main():
     footer = f"Каталог на правилата v{served.get('catalogueVersion')} · изчислител {served.get('engineVersion')}"
     under = ["/portfolio", "/debts", "/compliance", f"/entrance?entrance={entrance}", f"/entrance/charges?entrance={entrance}&period=2026-09",
              f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}",
-             f"/entrance/statement?entrance={entrance}", f"/entrance/fund/accounts?entrance={entrance}"]
+             f"/entrance/statement?entrance={entrance}", f"/entrance/fund/accounts?entrance={entrance}",
+             f"/entrance/fund/disbursements?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
