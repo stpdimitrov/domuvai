@@ -131,7 +131,9 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/intake/imports/{id}/revert"),
                      ("POST", "/api/money/entrances/{entranceId}/payments"),
                      ("POST", "/api/money/entrances/{entranceId}/fund-accounts"),
-                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements")}
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"),
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"),
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
@@ -147,7 +149,9 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409,   # September is seeded as billed: a bill is not reissued
                      ("POST", "/api/money/entrances/{entranceId}/payments"): 409,      # dated before the seeded payments: the demo stays as seeded
                      ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): 409,  # both purposes are seeded; fund_accounts_screen checks the words
-                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): 409}                     # an emergency above the seeded €145,00 available (PM-FUND-008)
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): 409,                     # an emergency above the seeded €145,00 available (PM-FUND-008)
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"): 409,    # the seeded paid one: paid once
+                     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"): 409}  # the seeded cancelled one: cancelled once
 # The seeded entrance's fund account — tools/seed_demo.py's iban("UNCR70001512998102").
 SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
@@ -174,6 +178,14 @@ def fund_holder(entrance):
     found, raw = fetch(API[0], f"/api/money/entrances/{entrance}/fund")
     listed = json.loads(raw)["disbursements"] if found == 200 else []
     return listed[0]["authorisedBy"] if listed else "00000000-0000-0000-0000-000000000000"
+
+
+def seeded(entrance, status):
+    """The seeded disbursement in [status] (tools/seed_demo.py: one paid, one cancelled), as the fund lists it — a nil id,
+    which the call then fails on, when the fund cannot be read or lists none."""
+    found, raw = fetch(API[0], f"/api/money/entrances/{entrance}/fund")
+    listed = [d for d in json.loads(raw)["disbursements"] if d["status"] == status] if found == 200 else []
+    return listed[0]["id"] if listed else "00000000-0000-0000-0000-000000000000"
 
 
 API = [""]   # the api's base, set in main() before CALLS is run
@@ -223,6 +235,12 @@ CALLS = {
     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): lambda e: (
         f"/api/money/entrances/{e}/fund/disbursements", {"amountMinor": 1_000_000, "purpose": "WORKS", "authorisedBy": fund_holder(e),
                                                          "emergencyJustification": "e2e: above what is available"}, {"Idempotency-Key": str(uuid.uuid4())}),
+    ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"): lambda e: (
+        f"/api/money/entrances/{e}/fund/disbursements/{seeded(e, 'PAID')}/pay",
+        {"paidOn": "2026-10-01", "paidBy": fund_holder(e)}, {"Idempotency-Key": str(uuid.uuid4())}),
+    ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"): lambda e: (
+        f"/api/money/entrances/{e}/fund/disbursements/{seeded(e, 'CANCELLED')}/cancel",
+        {"cancelledBy": fund_holder(e), "reason": "e2e: cancelled once"}, {"Idempotency-Key": str(uuid.uuid4())}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1337,8 +1355,9 @@ def fund_accounts_screen(api, web, entrance):
 
 def disbursements_screen(api, web, entrance, signed_in):
     """
-    WEB-42 (PM-FUND-006…008, PM-SEC-001) — `/entrance/fund/disbursements`: every COMMITTED disbursement the API lists is
-    listed on the page; no paid or cancelled one is. A sign-off posted
+    WEB-42 (PM-FUND-006…008, PM-SEC-001), WEB-42b (PM-FUND-007) — `/entrance/fund/disbursements`: every COMMITTED
+    disbursement the API lists is on the page, signed in with a pay and a cancel form each; no paid or cancelled one
+    is listed or offered either. A sign-off posted
     through the page's form by the person signed in — a board member (e2e.yml), not the fund's holder — is refused in the
     API's words naming PM-FUND-007, the form kept, nothing recorded. An emergency above what is available, signed by the
     holder with the board's token, is the API's 409 naming PM-FUND-008.
@@ -1356,7 +1375,9 @@ def disbursements_screen(api, web, entrance, signed_in):
                  or (d.get("emergencyJustification") or d.get("decisionId")) not in text]
     failures += [f"{path}: the {d['status'].lower()} {d['id']} is listed" for d in listed if d["status"] != "COMMITTED"
                  and f"{eur(d['amountMinor'])} ·" in text and (d.get("emergencyJustification") or d.get("passportMeasure") or d["decisionId"]) in text]
+    failures += [f"{path}: the {d['status'].lower()} {d['id']} is offered a pay or cancel form" for d in listed if d["status"] != "COMMITTED" and d["id"] in page]
     if signed_in:
+        failures += [f"{path}: the committed {d['id']} has no pay and cancel form" for d in committed if page.count(f'value="{d["id"]}"') != 2]
         fields = {"purpose": "WORKS", "amount": "1,00", "measure": "", "basis": "EMERGENCY", "decision": "", "justification": "e2e: signed by the board"}
         status, _, refused_page = submit_form(web, path, page, 'name="justification"', fields)
         said = visible_text(refused_page)

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { reach } from "@/lib/console";
-import { disbursementRefused, signOffOf, type SignOffInput } from "@/lib/disbursement";
+import { cancelOf, disbursementRefused, payOf, signOffOf, type SignOffInput } from "@/lib/disbursement";
 import { passedDecisions } from "../../charges/decisions";
 
 /** What a disbursement form holds after a refusal: the form as typed, and the key it was sent with. */
@@ -57,4 +57,38 @@ export async function signOff(_: DisbursementState, form: FormData): Promise<Dis
     api.POST("/api/money/entrances/{entranceId}/fund/disbursements", { params: { path: { entranceId }, header: { "Idempotency-Key": key } }, body }),
   );
   return settled(answer, entranceId, { input, key }, "подпишете разход от фонда");
+}
+
+/** The payout the fund's bank made, recorded (WEB-42b). Rule: PM-FUND-007 — by the session's party; nothing here moves money (ADR-007). */
+// Rule: PM-FUND-007, PM-SEC-001
+export async function pay(_: DisbursementState, form: FormData): Promise<DisbursementState> {
+  const { entrance: entranceId, key, disbursement: disbursementId, ...input } = typedIn(form, ["entrance", "key", "disbursement", "paidOn"]);
+  if (![entranceId, key, disbursementId].every((id) => UUID.test(id))) return { input, key: randomUUID(), refused: "Разходът не е посочен." };
+  const party = await myParty();
+  if (party === null) return { input, key, refused: "Системата не каза кой сте — не е изпратено нищо. Опитайте отново." };
+  const body = payOf(input.paidOn, party);
+  if ("refused" in body) return { input, key: randomUUID(), refused: body.refused };
+  const answer = await reach(() =>
+    api.POST("/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay", {
+      params: { path: { entranceId, disbursementId }, header: { "Idempotency-Key": key } }, body,
+    }),
+  );
+  return settled(answer, entranceId, { input, key }, "отбележите разхода като платен");
+}
+
+/** A signed-off disbursement withdrawn, with its reason (WEB-42b). Rule: PM-FUND-007 — by the session's party. */
+// Rule: PM-FUND-007, PM-SEC-001
+export async function cancel(_: DisbursementState, form: FormData): Promise<DisbursementState> {
+  const { entrance: entranceId, key, disbursement: disbursementId, ...input } = typedIn(form, ["entrance", "key", "disbursement", "reason"]);
+  if (![entranceId, key, disbursementId].every((id) => UUID.test(id))) return { input, key: randomUUID(), refused: "Разходът не е посочен." };
+  const party = await myParty();
+  if (party === null) return { input, key, refused: "Системата не каза кой сте — не е изпратено нищо. Опитайте отново." };
+  const body = cancelOf(input.reason, party);
+  if ("refused" in body) return { input, key: randomUUID(), refused: body.refused };
+  const answer = await reach(() =>
+    api.POST("/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel", {
+      params: { path: { entranceId, disbursementId }, header: { "Idempotency-Key": key } }, body,
+    }),
+  );
+  return settled(answer, entranceId, { input, key }, "оттеглите разхода");
 }
