@@ -2,8 +2,8 @@
 """T-07 — one slice per fresh session, enforced. Called by claim-gate.sh with the hook's stdin JSON.
 
   pre   PreToolUse(Bash): `tools/lanes.py claim` is refused (exit 2) when this session already claimed — or has a
-        claim in flight — or when its transcript is past MAX_BYTES (a long or forked session). Otherwise the claim is
-        allowed and marked.
+        claim in flight — when its transcript is past CLAIM_MAX_BYTES (a long or forked session), or when the contract
+        (`--body-file`) states no `Model:` (T-08). Otherwise the claim is allowed and marked.
   post  PostToolUse(Bash): records the claim issue from lanes.py's own output ("yours, as #n"); a claim that did not
         take (lane held, lost race) leaves no issue, so its marker is removed and the session may pick another lane.
   stop  Stop: once the claim issue is closed (the slice PR merged), one line: end this session, start the next.
@@ -20,14 +20,15 @@ import sys
 import time
 from pathlib import Path
 
-# The transcript's size when a session reaches its claim. Real fresh boots claimed at 626k–917k bytes (most of it
-# is the fixed tool and skill listing); the WEB-28 fork claimed at 1593k, a long session at 4966k. 1.2 MB is the
-# largest fresh boot plus ~30% headroom (the T-07 log entry). Override with ZUES_CLAIM_MAX_BYTES.
-MAX_BYTES = int(os.environ.get('ZUES_CLAIM_MAX_BYTES', 1_200_000))
+# The measure, the claim limit (T-07: 1.2 MB, ZUES_CLAIM_MAX_BYTES) and the boot prompt are shared with the size gate.
+from size_gate import CLAIM_MAX_BYTES as MAX_BYTES, boot_prompt, transcript_bytes
+
 IN_FLIGHT = 120   # seconds: a marker with no issue older than this is a claim whose PostToolUse never came
 CLAIM = re.compile(r'lanes\.py["\']?\s+claim\s+(?:-\S+\s+)*([a-z][a-z0-9-]*)')
 CLAIMED = re.compile(r'yours, as #(\d+)')   # what lanes.py claim prints on success
 # A command segment that only shows the words — not a claim.
+BODY_FILE = re.compile(r'--body-file[ =]["\']?([^\s"\';&|]+)')
+MODEL = re.compile(r'^\s*Model:\s*(Opus|Sonnet|Haiku|Fable)\b', re.M | re.I)   # the contract's Model: line (T-08)
 QUOTING = re.compile(r'\s*(?:\w+=\S*\s+)*(?:echo|printf|grep|rg|sed|awk|cat|less|head|tail|git|gh)\b')
 
 
@@ -46,11 +47,13 @@ def marker_of(sid: str) -> Path | None:
     return state_dir() / sid if re.fullmatch(r'[\w-]+', sid) else None
 
 
-def boot_prompt(lane: str) -> str:
-    # The chain-at-close prompt, zues-slice §7.5.
-    return (f'Boot per CLAUDE.md; lane {lane}; next slice per the newest H- handover, docs/TESTPLAN.md and the open '
-            'owner-question issues; quote any owner decision it relies on; work cheaply; record a Cost line. '
-            'Owner decisions already recorded: <quote + where, or "none — confirm the contract with the owner">.')
+def contract(command: str, cwd: str) -> str:
+    """The text of the claim's --body-file, '' when absent or unreadable."""
+    hit = BODY_FILE.search(command)
+    try:
+        return (Path(cwd or '.') / hit.group(1)).read_text() if hit else ''
+    except OSError:
+        return ''
 
 
 def pre(event: dict) -> int:
@@ -68,18 +71,24 @@ def pre(event: dict) -> int:
             marker = {'lane': '?', 'issue': '?'}
         if marker.get('issue') or time.time() - path.stat().st_mtime < IN_FLIGHT:
             why = f'this session already claimed a slice (lane {marker.get("lane")}) — one slice per session'
-    if why is None and transcript and os.path.exists(transcript):
-        size = os.path.getsize(transcript)
+    if why is None:
+        size = transcript_bytes(transcript)
         if size > MAX_BYTES:
             why = (f'this session is too long to start a slice in — transcript {size // 1000}k bytes, '
                    f'limit {MAX_BYTES // 1000}k (a long or forked session pays for its whole context on every call)')
+    model = MODEL.search(contract(event.get('tool_input', {}).get('command', ''), event.get('cwd', '')))
+    if why is None and not model:
+        print('claim refused: the contract (--body-file) has no `Model:` line — state the model this slice runs on '
+              '(Opus for design or rule slices, Sonnet for mechanical ones; CLAUDE.md, zues-slice §3).', file=sys.stderr)
+        return 2
     if why:
         print(f'claim refused: {why}.\nClaim only in a session whose first act was the boot. '
-              f'Start a fresh session with:\n\n  {boot_prompt(lanes[0])}', file=sys.stderr)
+              f'Start a fresh session with:\n\n  {boot_prompt(lanes[0], model.group(1) if model else "<model>")}',
+              file=sys.stderr)
         return 2
     if path:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({'lane': lanes[0], 'issue': None}))
+        path.write_text(json.dumps({'lane': lanes[0], 'model': model.group(1), 'issue': None}))
     return 0
 
 
@@ -117,7 +126,7 @@ def stop(event: dict) -> int:
     if marker.get('state') == 'CLOSED':
         marker['nudged'] = True
         print(json.dumps({'systemMessage': f'Slice claim #{issue} is closed — sync main, end this session and start '
-                                           f'the successor fresh (zues-slice §7.5): {boot_prompt(marker["lane"])}'}))
+                                           f'the successor fresh (zues-slice §7.5): {boot_prompt(marker["lane"], marker.get("model", "<model>"))}'}))
     path.write_text(json.dumps(marker))
     return 0
 
