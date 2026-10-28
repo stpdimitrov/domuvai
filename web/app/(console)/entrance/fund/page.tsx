@@ -4,6 +4,7 @@ import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthDays, monthName, reach, shiftPeriod, thisPeriod, type EntranceAt } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { PURPOSE } from "@/lib/disbursement";
+import { NOT_SIGNED } from "@/lib/handover";
 
 export const metadata: Metadata = { title: "Каса и фонд — Етаж" };
 
@@ -282,7 +283,7 @@ function Fund({ view, status, period, account: shownAccount }: { view: Extract<L
         </div>
       </div>
 
-      <Handovers handovers={handovers} />
+      <Handovers handovers={handovers} entrance={entrance.id} />
 
       <JournalSection journal={journal} period={period} account={shownAccount} link={link} />
     </div>
@@ -360,14 +361,15 @@ function JournalSection({ journal, period, account, link }: {
 
 /**
  * The fund's handover statements as issued, newest first (PM-FUND-010) — the API checks each against its hash.
- * The parties' signatures are not recorded yet, so nothing here calls a statement signed or agreed.
+ * Each carries the one line saying the parties have not signed it yet (#57); `/entrance/fund/handover` issues and opens them (WEB-43).
  */
-function Handovers({ handovers }: { handovers: Handover[] | { failed: string } }) {
+// Rule: PM-FUND-010
+function Handovers({ handovers, entrance }: { handovers: Handover[] | { failed: string }; entrance: string }) {
   return (
     <>
       <div style={{ margin: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         <span className="acct-title">Отчети при предаване на фонда</span>
-        <span style={NOTE}>при смяна на управителя · подписите на страните още не се записват</span>
+        <span style={NOTE}>при смяна на управителя · <Link href={`/entrance/fund/handover?entrance=${entrance}`}>Издай отчет</Link></span>
       </div>
       <div className="pf-card" style={{ margin: "8px 24px 0", flex: "none" }}>
         <div className="ho-grid pf-head">
@@ -394,6 +396,9 @@ function Handovers({ handovers }: { handovers: Handover[] | { failed: string } }
                 </div>
                 <div className="ho-grid ho-note">
                   <div>разполагаемо след поетите {eur(s.availableMinor)} · издаден {date(s.issuedOn)} · закон {lawVersion} · двигател {engineVersion} · хеш на основата <span className="mono">{basisHash}</span></div>
+                </div>
+                <div className="ho-grid ho-note">
+                  <div>{NOT_SIGNED} · <Link href={`/entrance/fund/handover?entrance=${entrance}&statement=${id}`}>отвори</Link></div>
                 </div>
                 {s.inherited.map((d) => (
                   <div key={d.disbursementId} className="ho-grid ho-note">
