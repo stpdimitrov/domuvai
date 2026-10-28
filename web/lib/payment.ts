@@ -11,7 +11,7 @@ export type PaymentBody = { unitId: string; amountMinor: number; valueDate: stri
 /**
  * Rule: PM-DEBT-008 — oldest debt first unless the payer designates one: the web carries the designation as given
  * and never chooses one. Left empty, it is not sent, and the API applies OLDEST_FIRST. Rule: PM-FEE-016 — euros as
- * typed are integer minor units; no float.
+ * typed are integer minor units; no float. A zero is sent as typed: a non-positive amount is the API's 400.
  */
 // Rule: PM-DEBT-008, PM-FEE-016
 export function paymentOf(input: PaymentInput): PaymentBody | { refused: string } {

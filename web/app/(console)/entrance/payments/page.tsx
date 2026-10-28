@@ -17,9 +17,9 @@ const INTO: Record<string, string> = { OPERATING: "оперативната см
 
 /**
  * A payment's allocation as the API reads it back (Rule: PM-DEBT-008 — the rule applied, visible, and what each debt
- * received). Who may read it is the API's (Rule: PM-SEC-002); a refusal is shown in its words. Every figure is the API's.
+ * received). Who may read it is the API's (PM-SEC-002, enforced there); a refusal is shown in its words. Every figure is the API's.
  */
-// Rule: PM-DEBT-008, PM-SEC-002
+// Rule: PM-DEBT-008
 function Allocation({ payment, unit }: { payment: Schemas["PaymentView"]; unit: string }) {
   return (
     <div style={{ margin: "16px 24px", background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }} role="status">
@@ -46,6 +46,7 @@ function Allocation({ payment, unit }: { payment: Schemas["PaymentView"]; unit: 
  * the units to choose from (the registry's), and, after a record, the payment as the API reads it back (`?payment=`).
  * The key the form is sent with is minted here, once per form.
  */
+// Rule: PM-DEBT-008
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<{ entrance?: string; payment?: string }> }) {
   const asked = await searchParams;
   const view = await entranceAt(asked.entrance);

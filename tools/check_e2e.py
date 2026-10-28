@@ -1252,7 +1252,7 @@ def charges_issue(api, web, entrance):
 
 def payment_screen(api, web, entrance):
     """
-    WEB-39 (PM-DEBT-008, PM-SEC-002) — `/entrance/payments`: a payment designating a debt the unit does not owe, posted
+    WEB-39 (PM-DEBT-008) — `/entrance/payments`: a payment designating a debt the unit does not owe, posted
     through the page's form as a browser with no script posts it, is refused in the API's words, the form kept. A
     payment in cash, today, is then recorded through the same form and lands on its allocation; the same form posted
     again lands on the same payment (one Idempotency-Key per form). The allocation shown is the API's, read back with
@@ -1268,7 +1268,7 @@ def payment_screen(api, web, entrance):
     status, _, refused_page = submit_form(web, path, page, 'name="designated"', {**fields, "designated": "2020-01-01"})
     if status != 200 or "owes no debt dated 2020-01-01" not in visible_text(refused_page) or 'value="1,00"' not in refused_page:
         failures.append(f"{path}: a designation of a debt not owed answered HTTP {status} without the API's words, or the form not kept")
-    landed = []
+    landed, page = [], fetch(web, path)[1]             # a fresh form: its own key
     for _ in range(2):                                 # the same form, the same key, twice: one payment
         status, location, _ = submit_form(web, path, page, 'name="designated"', fields)
         made = re.fullmatch(rf"(?:{re.escape(web)})?/entrance/payments\?entrance={entrance}&payment=([0-9a-f-]{{36}})", location)
