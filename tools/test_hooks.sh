@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T-07, T-08 — the session hooks, against fake hook stdin. Each case breaks the rule on purpose and asserts the refusal.
+# T-07, T-08, T-09 — the session hooks, against fake hook stdin. Each case breaks the rule on purpose and asserts the refusal.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
@@ -18,7 +18,7 @@ post() {  # session_id command stdout
 refused() { [ "$1" -eq 2 ] && grep -q "$2" <<<"$3"; }
 lp=tools/lanes.py   # spelled apart, so this file's own text is not a claim to the live gate
 claim="python3 $lp claim money --title \\\"S-99 x\\\" --body-file c.md"
-printf 'Slice:        S-99 x\nModel:        Sonnet\n' > "$tmp/c.md"
+printf 'Slice:        S-99 x\nModel:        Sonnet\nConfirmed:    the owner, 2026-10-28, in this session\n' > "$tmp/c.md"
 head -c 2000 /dev/zero | tr '\0' x > "$tmp/fresh.jsonl"
 head -c 20000 /dev/zero | tr '\0' x > "$tmp/long.jsonl"
 
@@ -43,7 +43,7 @@ post s1 "$claim" 'https://github.com/o/r/issues/42\nmoney: yours, as #42 — bra
 grep -q '"issue": 42' "$m/s1" && ok "PostToolUse records the claim issue from lanes.py's output" || bad "post: $(cat "$m/s1")"
 
 out=$(event s1 "$tmp/fresh.jsonl" "${claim/money/web}" | $gate pre 2>&1); rc=$?
-refused $rc 'already claimed' "$out" && grep -q 'Boot per CLAUDE.md; lane web; model Sonnet; next slice per the newest H- handover' <<<"$out" \
+refused $rc 'already claimed' "$out" && grep -q 'Boot per CLAUDE.md, lean; lane web; model Sonnet.*lanes.py check web; if the lane is held' <<<"$out" \
   && ok "second claim in the same session refused, with the boot prompt" || bad "second claim: rc=$rc $out"
 
 for shape in "bash -c \\\"$claim\\\"" "FOO=1 $claim" "time python3 -u $lp claim money --title x" \
@@ -73,6 +73,13 @@ refused $rc 'no `Model:` line' "$out" && ok "a claim whose contract is unreadabl
 out=$(event s5 "$tmp/fresh.jsonl" "${claim/ --body-file c.md/}" | $gate pre 2>&1); rc=$?
 refused $rc 'no `Model:` line' "$out" && ok "a claim with no --body-file refused" || bad "no body-file: rc=$rc $out"
 
+# T-09: the contract records the owner's confirmation — who, a date, where.
+for line in '' 'Confirmed:    <who, yyyy-mm-dd, where>' 'Confirmed:    <who>, 2026-10-28, <where>' 'Confirmed:    the owner, today' 'Confirmed:' 'Confirmed:\nDone when:    2026-10-28'; do
+  printf 'Slice:        S-99 x\nModel:        Sonnet\n%b\n' "$line" > "$tmp/unconfirmed.md"
+  out=$(event s6 "$tmp/fresh.jsonl" "${claim/c.md/unconfirmed.md}" | $gate pre 2>&1); rc=$?
+  refused $rc 'no `Confirmed:` line' "$out" && [ ! -e "$m/s6" ] && ok "unconfirmed contract refused: '${line:-no line}'" || bad "unconfirmed '$line': rc=$rc $out"
+done
+
 stop() { printf '{"session_id":"%s","transcript_path":"%s","hook_event_name":"Stop"}' "$1" "$2" | PATH="$tmp/bin:$PATH" $gate stop 2>&1; }
 mkdir -p "$tmp/bin"
 printf '#!/bin/sh\necho "$GH_STATE"\n' > "$tmp/bin/gh"; chmod +x "$tmp/bin/gh"
@@ -82,7 +89,7 @@ out=$(GH_STATE=CLOSED stop s1 "$tmp/fresh.jsonl"); rc=$?
 [ $rc -eq 0 ] && [ -z "$out" ] && ok "Stop: asks GitHub at most once a minute" || bad "stop throttle: rc=$rc $out"
 python3 -c "import json,sys; p=sys.argv[1]; d=json.load(open(p)); d['checked']=0; json.dump(d,open(p,'w'))" "$m/s1"
 out=$(GH_STATE=CLOSED stop s1 "$tmp/fresh.jsonl"); rc=$?
-[ $rc -eq 0 ] && grep -q '"systemMessage": "Slice claim #42 is closed.*model Sonnet' <<<"$out" && ok "Stop: claim closed — one-line nudge, never blocks" || bad "stop closed: rc=$rc $out"
+[ $rc -eq 0 ] && grep -q '"systemMessage": "Slice claim #42 is closed (its PR merged).*if you confirmed the next contract here.*starts the successor.*model Sonnet' <<<"$out" && ok "Stop: claim closed — one-line nudge, never blocks" || bad "stop closed: rc=$rc $out"
 out=$(GH_STATE=CLOSED stop s1 "$tmp/fresh.jsonl")
 [ -z "$out" ] && ok "Stop: says it once" || bad "stop repeats: $out"
 out=$(GH_STATE=CLOSED stop nobody "$tmp/fresh.jsonl"); rc=$?
@@ -117,7 +124,7 @@ out=$(say m1 "$tmp/mid.jsonl" 'carry on'); rc=$?
 
 out=$(say l1 "$tmp/long.jsonl" 'carry on'); rc=$?
 refused $rc 'prompt refused: this session is too long to carry on — transcript 20k bytes, limit 10k' "$out" \
-  && grep -q 'Boot per CLAUDE.md; lane <lane>; model <model>' <<<"$out" && grep -q 'status only' <<<"$out" \
+  && grep -q 'Boot per CLAUDE.md, lean; lane <lane>; model <model>' <<<"$out" && grep -q 'status only' <<<"$out" \
   && ok "size gate: hard limit — the prompt refused, with both boot prompts" || bad "hard: rc=$rc $out"
 for c in 'git push origin HEAD' 'cd x && git -C . push' 'gh pr create --fill' 'gh pr merge 3 --squash'; do
   out=$(tool l1 "$tmp/long.jsonl" Bash "$c"); rc=$?

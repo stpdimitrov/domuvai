@@ -40,10 +40,12 @@ def transcript_bytes(path: str) -> int:
 
 
 def boot_prompt(lane: str = '<lane>', model: str = '<model>') -> str:
-    # The chain-at-close prompt, zues-slice §7.5.
-    return (f'Boot per CLAUDE.md; lane {lane}; model {model}; next slice per the newest H- handover, docs/TESTPLAN.md '
-            'and the open owner-question issues; quote any owner decision it relies on; work cheaply; record a Cost '
-            'line. Owner decisions already recorded: <quote + where, or "none — confirm the contract with the owner">.')
+    # The successor's prompt, zues-slice §7.5 (T-09): the contract arrives confirmed, so the claim follows the boot.
+    return (f'Boot per CLAUDE.md, lean; lane {lane}; model {model}. Contract: <the confirmed contract verbatim, its '
+            'Confirmed: line quoting who, the date and where — claim with it as written; or "none": draft one from the '
+            'newest H- handover, docs/TESTPLAN.md and the open owner-question issues and get it confirmed before the '
+            f'claim>. Before the claim run python3 tools/lanes.py check {lane}; if the lane is held, say so in one '
+            'line and stop. Work cheaply; record a Cost line.')
 
 
 def status_prompt() -> str:

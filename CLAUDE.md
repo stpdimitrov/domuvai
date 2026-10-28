@@ -80,10 +80,11 @@ Rules:        PM-XXX-000 … (quote each rule's text back, do not paraphrase)
 Interprets:   how I read each rule, one line each
 Out of scope: what this slice deliberately does not touch
 Model:        <Opus|Sonnet> — Opus for a design or rule slice, Sonnet for a mechanical one
+Confirmed:    <who, yyyy-mm-dd, where — quote any change they made>
 Done when:    the exit checks pass
 ```
 
-The claim gate refuses a contract with no `Model:` line (T-08).
+The claim gate refuses a contract with no `Model:` line (T-08) or no dated `Confirmed:` line (T-09).
 
 The contract becomes the pull request description.
 
@@ -113,7 +114,7 @@ Add the slice's entry as a new file in `docs/sessionlog/` and commit it with the
 
 **Claim only in a session whose first act was the boot** — the claim gate (`.claude/hooks/claim-gate.sh`, T-07) refuses a second claim and a claim in a long or forked session, and prints the fresh-session prompt.
 
-**One slice per session.** After the merge and `main` synced, the session starts its successor when the chain-at-close conditions hold, and ends either way; the next slice boots fresh from the repo (`.claude/skills/zues-slice/SKILL.md` §7.5).
+**One slice per session.** Once its PR is open the session drafts the next slice's contract; the session in which the owner confirms it starts the successor once the PR has merged, and the next slice boots fresh from the repo and claims at once (`.claude/skills/zues-slice/SKILL.md` §7.5).
 
 ### Working cheaply
 
