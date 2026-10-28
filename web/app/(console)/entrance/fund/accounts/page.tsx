@@ -6,7 +6,7 @@ import { byPurpose, fundMissing, HOLDER, PURPOSE, unheld, type Account } from "@
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import AccountForm from "./AccountForm";
 
-export const metadata: Metadata = { title: "Сметки на входа — Етаж" };
+export const metadata: Metadata = { title: "Банкови сметки — Етаж" };
 
 /**
  * The entrance's bank accounts as the API lists them (WEB-41). Rule: PM-FUND-004 — each account's IBAN, its holder and
@@ -31,7 +31,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           <span className="entrance-pill">
             <span className="name">{view.kind === "ok" ? view.entrance.label : "—"}</span>
           </span>
-          <span className="meta">Сметки на входа</span>
+          <span className="meta">Банкови сметки</span>
         </div>
       </div>
       {view.kind === "ok" ? (
