@@ -177,7 +177,7 @@ export default async function FundPage({ searchParams }: { searchParams: Promise
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
-            {view.kind === "nofund" && <>Входът няма регистрирана сметка на фонд „Ремонт и обновяване“ — фондът се създава от общото събрание, а парите му се държат в отделна банкова сметка (чл. 50 ЗУЕС). Регистрирайте сметката в <code>money</code>, после опреснете.</>}
+            {view.kind === "nofund" && <>Входът няма регистрирана сметка на фонд „Ремонт и обновяване“ — фондът се създава от общото събрание, а парите му се държат в отделна банкова сметка (чл. 50 ЗУЕС). <Link href={`/entrance/fund/accounts?entrance=${view.entrance.id}`}>Регистрирайте сметката</Link>.</>}
             {view.kind === "refused" && view.message}
           </div>
         </div>
