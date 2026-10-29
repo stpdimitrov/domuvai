@@ -1936,11 +1936,11 @@ def registry_screen(api, web, signed_in, administrator=None, owner=None, nobody=
     registered = []
     if administrator:
         s, made = as_(administrator, "Регистрирай входа", entrance_form)
-        first = re.search(r"Номер на входа: ([0-9a-f-]{36}), номер на сградата: ([0-9a-f-]{36})", visible_text(made))
+        first = re.search(r"Номер на входа: ([0-9a-f-]{36}) ?, номер на сградата: ([0-9a-f-]{36})", visible_text(made))
         failures += [] if s == 200 and first else [f"{path}: the administrator registering an entrance answered HTTP {s} without its numbers: {visible_text(made)[:200]!r}"]
         if first:                                           # the rest needs the first entrance's building; the no-role words below are read either way
             s, joined = as_(administrator, "Регистрирай входа", {**entrance_form, "label": f"{label} б", "address": "", "condominiumId": first.group(2)})
-            second = re.search(r"Номер на входа: ([0-9a-f-]{36}), номер на сградата: ([0-9a-f-]{36})", visible_text(joined))
+            second = re.search(r"Номер на входа: ([0-9a-f-]{36}) ?, номер на сградата: ([0-9a-f-]{36})", visible_text(joined))
             failures += [] if s == 200 and second and second.group(2) == first.group(2) else [f"{path}: the second entrance did not join the first one's building: {visible_text(joined)[:200]!r}"]
             s, neither = as_(administrator, "Регистрирай входа", {**entrance_form, "address": ""})
             failures += [] if s == 200 and "Системата не прие това:" in visible_text(neither) else [f"{path}: an entrance with no address and no building answered HTTP {s} without the API's words"]
