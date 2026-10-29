@@ -180,6 +180,9 @@ ON_A_PAYMENT = {("GET", "/api/money/entrances/{entranceId}/payments/{paymentId}"
 ON_A_PETITION = {("POST", "/api/assembly/entrances/{entranceId}/petitions"), ("GET", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}"),
                  ("POST", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures"),
                  ("POST", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly")}
+# Mandates are recorded and ended by the deployment's administrator through the page (WEB-49): mandates_screen checks them
+# itself, against the API's own list. Listed here so that the web calls nothing this check does not cover.
+ON_A_MANDATE = {("POST", "/api/identity/entrances/{entranceId}/mandates"), ("POST", "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end")}
 
 
 def a_unit(entrance):
@@ -588,7 +591,7 @@ def login_form(page):
     return html.unescape(action.group(1)) if action else None
 
 
-def sign_in(web, issuer, user, password, subject):
+def sign_in(web, issuer, user, password, subject, tied=True):
     """
     ADR-011, AUTH-03 — a person signs in as a browser does: asks for a console page, is sent to the issuer, gives a
     name and a password there, and comes back signed in to the page they asked for. What they then hold is an httpOnly
@@ -630,7 +633,11 @@ def sign_in(web, issuer, user, password, subject):
         failures += [] if user in shown and "Изход" in shown else [f"who am I: the strip says {shown!r} — expected {user!r} and the way out"]
         # AUTH-04: the run's administrator tied this login to a party before the screens were read (e2e.yml), so the strip
         # no longer says the person is nobody in the book — the web is told so by the api's own record, not by the token.
-        failures += [] if "без лице в книгата" not in shown else [f"who am I: the strip says {shown!r} — this login is tied to a party, and it says it is nobody in the book"]
+        # … except the deployment's administrator (WEB-49), tied to nobody — and the strip says so
+        if tied:
+            failures += [] if "без лице в книгата" not in shown else [f"who am I: the strip says {shown!r} — this login is tied to a party, and it says it is nobody in the book"]
+        else:
+            failures += [] if "без лице в книгата" in shown else [f"who am I: the strip says {shown!r} — this login is the administrator's, tied to nobody, and it does not say so"]
         failures += [] if f'data-login="{subject}"' in strip.group(0) else [
             "who am I: the login the api read from the web's bearer is not the issuer's id for this person "
             f"({subject}) — GET /api/identity/me through the web answered something else, or nothing"]
@@ -1791,6 +1798,67 @@ def petitions_screen(api, web, entrance, signed_in, owner=None):
     return failures
 
 
+def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_party=None):
+    """
+    WEB-49 (PM-GOV-004, PM-GOV-005, PM-SEC-001) — `/entrance/mandates`. Every mandate the API lists is on the page, with its
+    number, and the four offices the API accepts are offered. Signed in as a board member, who is not the administrator,
+    recording a mandate is the API's 403 in its words, the form kept, and the API's list unchanged.
+    Signed in as the administrator (`--admin-user`, a login tied to nobody and named in DOMUVAI_AUTH_ADMINS), a controller's
+    mandate for `--spare-party` (a party holding no other office) is recorded through the page and read back in
+    the API's list, then ended on its own first day — which leaves it no day in force, so the board stays as seeded; ending
+    it a second time is the API's "once" in its words.
+    """
+    path = f"/entrance/mandates?entrance={entrance}"
+    listed = lambda: json.loads(fetch(api, f"/api/identity/entrances/{entrance}/mandates")[1]) if CARRIED.get(api) else []
+    status, page = fetch(web, path)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    for what, marker in (("recording", "Впиши мандата"), ("ending", "Запиши края")):
+        failures += [] if marker in page else [f"{path}: the {what} form is missing"]
+    offered = [dict(re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag)).get("value") for tag in re.findall(r"<option\b[^>]*>", page)]
+    failures += [] if offered == ["BM", "MB", "CTL", "CSH"] else [f"{path}: offers the offices {offered}, not the API's BM, MB, CTL, CSH"]
+    before = listed()
+    failures += [f"{path}: does not show the mandate {m['mandateId']}" for m in before if m["mandateId"] not in page]
+    if not signed_in:
+        print("—   /entrance/mandates  NOT checked: no sign-in")
+        return failures
+    word = lambda said: "Системата не прие това:" in said           # a 400/409 of the API, in its words — not a 403: the rule, not the role, is the cause
+    protocol = f"e2e: протокол {uuid.uuid4().hex[:6]}"
+    today = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date()
+    first, last = str(today - datetime.timedelta(days=2)), str(today + datetime.timedelta(days=30))
+    # PM-SEC-001 — a board member is not the administrator: the API's 403 in its words, the form kept, nothing recorded
+    s, _, refused = submit_form(web, path, page, "Впиши мандата", {"body": "CTL", "party": NO_ONE, "validFrom": first, "validTo": last, "protocolRef": protocol})
+    failures += [] if s == 200 and "Нямате право да впишете мандат:" in visible_text(refused) and f'value="{protocol}"' in refused else [f"{path}: a board member recording a mandate answered HTTP {s} without the API's 403 in its words, or the form not kept"]
+    failures += [] if listed() == before else [f"{path}: a refused attempt changed the API's mandates"]
+    if not (administrator and spare_party):
+        print("—   /entrance/mandates  the administrator's path NOT checked: no --admin-user or --spare-party")
+        return failures
+    board = CARRIED.get(web)
+    CARRIED[web] = administrator                            # the page, signed in as the administrator
+    try:
+        s, _, recorded = submit_form(web, path, page, "Впиши мандата", {"body": "CTL", "party": spare_party, "validFrom": first, "validTo": last, "protocolRef": protocol})
+        made = re.search(r"Мандатът е вписан\. Номер: ([0-9a-f-]{36})", visible_text(recorded))
+        if s != 200 or not made:
+            return failures + [f"{path}: the administrator recording a mandate answered HTTP {s} without the mandate's number: {visible_text(recorded)[:200]!r}"]
+        mandate = made.group(1)
+        # PM-GOV-004 — the API's list now holds it: a controller's mandate for that party, in term, up to the day typed
+        held = [m for m in listed() if m["mandateId"] == mandate]
+        failures += [] if len(held) == 1 and held[0]["role"] == "CTL" and held[0].get("partyId") == spare_party and held[0]["validTo"] == last and held[0]["standing"]["kind"] == "IN_TERM" else [f"{path}: the API's list does not hold the mandate recorded as typed: {held}"]
+        shown = visible_text(fetch(web, path)[1])
+        failures += [] if mandate in shown else [f"{path}: the page does not show the mandate recorded"]
+        # ended on its own first day, it has no day in force: the board stands as seeded
+        s, _, ended = submit_form(web, path, page, "Запиши края", {"mandate": mandate, "on": first, "protocolRef": protocol})
+        failures += [] if s == 200 and f"е приключен на {first}" in visible_text(ended) else [f"{path}: ending the mandate answered HTTP {s} without the API's day: {visible_text(ended)[:200]!r}"]
+        failures += [] if [m["mandateId"] for m in listed()] == [m["mandateId"] for m in before] else [f"{path}: after the end the API's mandates are not as seeded"]
+        failures += [] if [m["standing"] for m in listed()] == [m["standing"] for m in before] else [f"{path}: after the end a seeded mandate's standing is not as seeded"]
+        s, _, again = submit_form(web, path, page, "Запиши края", {"mandate": mandate, "on": first, "protocolRef": protocol})
+        failures += [] if s == 200 and word(visible_text(again)) and f'value="{mandate}"' in again else [f"{path}: ending a second time answered HTTP {s} without the API's words, or the form not kept"]
+    finally:
+        CARRIED[web] = board
+    print(f"{'ok ' if not failures else 'BAD'} PM-GOV-004 the mandates: {len(before)} on the page as the API lists them; recorded by the administrator through the page, read back, "
+          "ended with the board as seeded; the board member refused in the API's words")
+    return failures
+
+
 def handover_screen(api, web, entrance, signed_in):
     """
     WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
@@ -2070,6 +2138,9 @@ def main():
     parser.add_argument("--owner-party", help="an owner's party id in --entrance, to co-sign a posting act (WEB-28); seed_demo.py writes them to SEED_OWNERS_FILE")
     parser.add_argument("--owner-user", help="the login of the seeded owner (--owner-party), tied to it by the administrator; signs in with E2E_PASSWORD (WEB-48)")
     parser.add_argument("--owner-subject", help="the issuer's own id for --owner-user")
+    parser.add_argument("--admin-user", help="a login named in DOMUVAI_AUTH_ADMINS and tied to nobody; signs in with E2E_PASSWORD (WEB-49)")
+    parser.add_argument("--admin-subject", help="the issuer's own id for --admin-user")
+    parser.add_argument("--spare-party", help="a party holding no login and no office, for the administrator to give a mandate and tie a throwaway login to (WEB-49)")
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
@@ -2087,7 +2158,7 @@ def main():
         CARRIED[api] = {"Authorization": f"Bearer {os.environ['E2E_API_TOKEN']}"}
     failures = console_closed(open_web, args.closed_web.rstrip("/"), args.next_dir)
     failures += signed_in_only(signin_web, args.closed_web.rstrip("/"), args.next_dir)
-    browser = owner = None
+    browser = owner = administrator = None
     if args.user:
         problems, browser = sign_in(web, args.issuer.rstrip("/"), args.user, os.environ["E2E_PASSWORD"], args.subject)
         failures += problems
@@ -2097,6 +2168,10 @@ def main():
             problems, owner_browser = sign_in(web, args.issuer.rstrip("/"), args.owner_user, os.environ["E2E_PASSWORD"], args.owner_subject)
             failures += problems
             owner = {"Cookie": owner_browser.cookie_header(web)} if owner_browser else None
+        if args.admin_user and args.admin_subject:       # the deployment's administrator, signed in as a third person (WEB-49)
+            problems, admin_browser = sign_in(web, args.issuer.rstrip("/"), args.admin_user, os.environ["E2E_PASSWORD"], args.admin_subject, tied=False)
+            failures += problems
+            administrator = {"Cookie": admin_browser.cookie_header(web)} if admin_browser else None
     else:
         print("—   sign-in, who-am-I and sign-out NOT checked: no --user (a machine with no issuer). CI checks them.")
     without_address = {"no address to write to": args.closed_web.rstrip("/"),
@@ -2105,8 +2180,8 @@ def main():
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable
-    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT - ON_A_PETITION)]
-    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT | ON_A_PETITION) - called)]
+    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT - ON_A_PETITION - ON_A_MANDATE)]
+    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT | ON_A_PETITION | ON_A_MANDATE) - called)]
 
     for (method, path), call in CALLS.items():
         url, body, *sent = call(entrance)              # a third element: headers the call needs (an Idempotency-Key)
@@ -2165,6 +2240,7 @@ def main():
     failures += animals_screen(api, web, entrance, signed_in=bool(args.user))
     failures += declarations_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
     failures += petitions_screen(api, web, entrance, signed_in=bool(args.user), owner=owner)
+    failures += mandates_screen(api, web, entrance, signed_in=bool(args.user), administrator=administrator, spare_party=args.spare_party)
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 

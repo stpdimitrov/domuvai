@@ -90,6 +90,10 @@ jobs:
           kc create users -r domuvai -s username=stefan -s enabled=true -s emailVerified=true -s email=stefan@example.test -s firstName=Stefan -s lastName=Dimov
           kc set-password -r domuvai --username stefan --new-password "$password"
           owner_subject=$(kc get users -r domuvai -q username=stefan -q exact=true --fields id --format csv --noquotes)
+          # … and so does the deployment's administrator (WEB-49): a user named in DOMUVAI_AUTH_ADMINS and tied to no party, who records and ends mandates through the page (and, in WEB-49b, ties logins)
+          kc create users -r domuvai -s username=admin -s enabled=true -s emailVerified=true -s email=admin@example.test -s firstName=Admin -s lastName=Domuvai
+          kc set-password -r domuvai --username admin --new-password "$password"
+          admin_subject=$(kc get users -r domuvai -q username=admin -q exact=true --fields id --format csv --noquotes)
           # The check asks the API itself, so it needs a token of its own; and somebody has to be the deployment's
           # administrator (AUTH-04c) — a login that is nobody in the book. Two clients that exist only in this run's
           # Keycloak — never in the realm file, which gives no client a service account.
@@ -106,13 +110,13 @@ jobs:
           check_subject=$(service_client e2e-check "$check" | tail -n 1)
           administrator_subject=$(service_client e2e-administrator "$administrator" | tail -n 1)
           manager_subject=$(service_client e2e-manager "$manager" | tail -n 1)        # enters the book as the board (AUTH-05c)
-          test -n "$subject" && test -n "$owner_subject" && test -n "$check_subject" && test -n "$administrator_subject" && test -n "$manager_subject"
-          { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject"; echo "OWNER_SUBJECT=$owner_subject";
+          test -n "$subject" && test -n "$owner_subject" && test -n "$admin_subject" && test -n "$check_subject" && test -n "$administrator_subject" && test -n "$manager_subject"
+          { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject"; echo "OWNER_SUBJECT=$owner_subject"; echo "ADMIN_SUBJECT=$admin_subject";
             echo "CHECK_SUBJECT=$check_subject"; echo "ADMINISTRATOR_SECRET=$administrator"; echo "ADMINISTRATOR_SUBJECT=$administrator_subject";
             echo "MANAGER_SECRET=$manager"; echo "MANAGER_SUBJECT=$manager_subject"; } >> "$GITHUB_ENV"
 
       - name: Start the API closed — it accepts only a token this Keycloak signed for it (ADR-011)
-        env: { DOMUVAI_AUTH_ISSUER: '${{ env.ISSUER }}', DOMUVAI_AUTH_AUDIENCE: domuvai-api, DOMUVAI_AUTH_ADMINS: '${{ env.ADMINISTRATOR_SUBJECT }}' }
+        env: { DOMUVAI_AUTH_ISSUER: '${{ env.ISSUER }}', DOMUVAI_AUTH_AUDIENCE: domuvai-api, DOMUVAI_AUTH_ADMINS: '${{ env.ADMINISTRATOR_SUBJECT }},${{ env.ADMIN_SUBJECT }}' }
         run: |
           nohup java -jar app/build/libs/app.jar > api.log 2>&1 &
           curl -sf --max-time 10 --retry 60 --retry-connrefused --retry-delay 2 http://localhost:8080/actuator/health
@@ -152,6 +156,10 @@ jobs:
                        {"body": office, "partyId": party, "validFrom": first, "validTo": last, "protocolRef": "the end-to-end run"})
           # … and the seeded owner Стефан Димов is who the login stefan is: an owner by his title, holding no office (WEB-48)
           call("POST", "/api/identity/logins", {"subject": os.environ["OWNER_SUBJECT"], "partyId": os.environ["OWNER_PARTY"]})
+          # … and one party holds no login and no office (WEB-49b ties a throwaway login to it): the administrator, signed in as admin, gives it a mandate and ends it in the same run (WEB-49)
+          spare = call("POST", "/api/registry/parties", {"fullName": "Проверката (резервно лице)"})["partyId"]
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write(f"SPARE_PARTY={spare}\n")
           PY
           # … and now the controller is given the names — and still anonymises nothing: reads all, writes none. The
           # administrator, who said who everybody is, is given none of it.
@@ -192,7 +200,7 @@ jobs:
           E2E_API_TOKEN="$token" E2E_MANAGER_TOKEN="$manager" python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
             --open-web http://localhost:3003 --closed-web http://localhost:3001 --bad-contact-web http://localhost:3002 \
             --contact demo@example.test --issuer "$ISSUER" --user ivan --subject "$SUBJECT" --entrance "$ENTRANCE" --owner-party "$OWNER_PARTY" \
-            --owner-user stefan --owner-subject "$OWNER_SUBJECT"
+            --owner-user stefan --owner-subject "$OWNER_SUBJECT" --admin-user admin --admin-subject "$ADMIN_SUBJECT" --spare-party "$SPARE_PARTY"
 
       - name: Logs
         if: failure()
