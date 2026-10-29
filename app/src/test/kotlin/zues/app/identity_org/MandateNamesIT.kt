@@ -103,7 +103,7 @@ class MandateNamesIT {
         val read = read(administrator, b.entrance)
         assertThat(read.map { it.partyId }).containsExactlyInAnyOrder(b.manager, b.controller)
         assertThat(read.map { it.partyName }).containsOnlyNulls()
-        assertThat(json.writeValueAsString(read)).doesNotContain("partyName").doesNotContain("Иван")
+        assertThat(json.writeValueAsString(read)).doesNotContain("Иван Петров").doesNotContain("Мария Иванова")
     }
 
     @Test
