@@ -204,6 +204,8 @@ CALLS = {
     ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
     ("GET", "/api/registry/entrances/{entranceId}/units"): lambda e: (f"/api/registry/entrances/{e}/units", None),
+    ("GET", "/api/registry/entrances/{entranceId}/book"): lambda e: (f"/api/registry/entrances/{e}/book?purpose=e2e%3A%20contract", None),
+    ("GET", "/api/registry/entrances/{entranceId}/book/access-log"): lambda e: (f"/api/registry/entrances/{e}/book/access-log?purpose=e2e%3A%20contract", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/declarations/overdue"): lambda e: (
         f"/api/registry/entrances/{e}/book/declarations/overdue", None),
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
@@ -1412,6 +1414,60 @@ def disbursements_screen(api, web, entrance, signed_in):
     return failures
 
 
+# The book and its log are served only to a reader the sign-in names (PM-BOOK-006): with no token, both are the 403.
+BOOK_READS = ("/api/registry/entrances/{entranceId}/book", "/api/registry/entrances/{entranceId}/book/access-log")
+# A title's role in the page's words (web/lib/book.ts).
+ROLE = {"OWN": "собственик", "USR": "ползвател"}
+
+
+def book_screen(api, web, entrance, signed_in):
+    """
+    WEB-44 (PM-BOOK-001, PM-BOOK-002, PM-BOOK-006, PM-BOOK-007, PM-BOOK-011, PM-SEC-001) — `/entrance/book`: the page
+    reads nothing of the book until a purpose is typed; a read with none is refused by the page, and the API's log gains
+    no read. Signed in (a reader: the board), the seeded book is shown as the API serves it for the same purpose — every
+    unit, its parties by name, role and share, complete or not — and the log, read through the same form, lists that
+    read with the purpose typed, oldest first. With no sign-in (the api open), the read is the API's 403, in its words.
+    """
+    path = f"/entrance/book?entrance={entrance}"
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [] if "Четене на книгата" in text and "Книгата към" not in text else [f"{path}: the page is not the purpose form alone — it read the book unasked"]
+    reads = lambda: [v for v in json.loads(fetch(api, f"/api/registry/entrances/{entrance}/book/access-log?purpose=e2e%3A%20count")[1]) if v["kind"] == "BOOK_READ"]
+    before = reads() if signed_in else None
+    s_status, _, no_purpose = submit_form(web, path, page, 'name="purpose"', {"on": "", "purpose": "  ", "what": "book"})
+    if s_status != 200 or "Посочете с каква цел четете книгата" not in visible_text(no_purpose) or "Книгата към" in visible_text(no_purpose):
+        failures.append(f"{path}: a read with no purpose answered HTTP {s_status} without the page's refusal, or showed a book")
+    if signed_in and len(reads()) != len(before):
+        failures.append(f"{path}: a read with no purpose reached the API — its log gained a read")
+    purpose = f"e2e: проверка {uuid.uuid4().hex[:8]}"
+    b_status, _, read_page = submit_form(web, path, page, 'name="purpose"', {"on": "", "purpose": purpose, "what": "book"})
+    shown = visible_text(read_page)
+    a_status, raw = fetch(api, f"/api/registry/entrances/{entrance}/book?purpose=" + urllib.parse.quote(purpose))
+    if signed_in:
+        book = json.loads(raw) if a_status == 200 else None
+        if not book or not book["units"]:
+            return failures + [f"{path}: the API serves the board no book (HTTP {a_status}), or one with no unit — the seed enters six"]
+        want = [f"Книгата към {'.'.join(reversed(book['asOf'].split('-')))} · {'пълно' if book['complete'] is True else 'непълно'}"]
+        for u in book["units"]:
+            want += [u["designation"]] + [f"{p['name']} · {ROLE.get(p['role'], p['role'])} · дял {p['share']}" for p in u["parties"]]
+        failures += [f"{path}: HTTP {b_status} reading the book"] if b_status != 200 else []
+        failures += [f"{path}: the book read does not show {w!r}" for w in want if w not in shown]
+        failures += [] if shown.count("пълно") >= len(book["units"]) else [f"{path}: not every unit says whether it is complete"]
+        l_status, _, log_page = submit_form(web, path, page, 'name="purpose"', {"on": "", "purpose": purpose, "what": "log"})
+        logged = visible_text(log_page)
+        mine = [v for v in reads() if v["purpose"] == purpose]
+        failures += [] if l_status == 200 and "Дневник на книгата" in logged and f"цел: {purpose}" in logged else [f"{path}: the log read through the form does not list the read made for {purpose!r}"]
+        failures += [] if len(mine) == 2 and all(v["outcome"] == "SERVED" for v in mine) else [f"{path}: the API logged {len(mine)} reads for the purpose typed, not the page's one and the check's one, served"]
+    else:
+        words = refusal_words(raw)
+        if a_status != 403 or "Нямате право да четете книгата на етажната собственост:" not in shown or not words or words not in shown or "Книгата към" in shown:
+            failures.append(f"{path}: with no sign-in the API answers HTTP {a_status}; the page does not show its 403 in its words ({words!r})")
+    print(f"{'ok ' if not failures else 'BAD'} PM-BOOK-007 the book: read only with a purpose, none refused by the page; "
+          f"{'the seeded book shown as served, and the read in its log' if signed_in else 'the API refusal shown in its words (no sign-in: a non-reader)'}")
+    return failures
+
+
 def handover_screen(api, web, entrance, signed_in):
     """
     WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
@@ -1726,7 +1782,7 @@ def main():
     for (method, path), call in CALLS.items():
         url, body, *sent = call(entrance)              # a third element: headers the call needs (an Idempotency-Key)
         sent = sent[0] if sent else {}
-        if path in ("/api/identity/me", "/api/identity/entrances/{entranceId}/mandates") and api not in CARRIED:
+        if path in ("/api/identity/me", "/api/identity/entrances/{entranceId}/mandates", *BOOK_READS) and api not in CARRIED:
             print(f"—   {method:4} {path}  NOT checked: it answers only a request with a token, and this run has none")
             continue
         board = as_board() if (method, path) in KEPT_BY_THE_BOARD else None
@@ -1766,6 +1822,7 @@ def main():
     failures += fund_accounts_screen(api, web, entrance)
     failures += disbursements_screen(api, web, entrance, signed_in=bool(args.user))
     failures += handover_screen(api, web, entrance, signed_in=bool(args.user))
+    failures += book_screen(api, web, entrance, signed_in=bool(args.user))
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
