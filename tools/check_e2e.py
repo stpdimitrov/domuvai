@@ -1624,7 +1624,7 @@ def declarations_screen(api, web, entrance, signed_in, owner_party=None):
     failures = [f"{path}: HTTP {status}"] if status != 200 else []
     failures += [f"{path}: the unit {u['designation']} ({u['id']}) is not offered" for u in units if f'value="{u["id"]}"' not in page]
     failures += [f"{path}: the kind {k} is not offered" for k in ("ACQUISITION", "CHANGE") if f'value="{k}"' not in page]
-    failures += [] if 'name="declarant"' in page and re.search(r'type="checkbox" name="confirm"[^>]*required', page) else [f"{path}: the declarant field or the retention run's confirmation is missing"]
+    failures += [] if 'name="declarant"' in page and re.search(r'<input(?=[^>]*name="confirm")(?=[^>]*type="checkbox")(?=[^>]*\brequired\b)[^>]*>', page) else [f"{path}: the declarant field or the retention run's confirmation is missing"]
     # PM-BOOK-010 — the run is never made here, not even without its confirmation: the page's guard is the source test's, and
     # a broken one must not anonymise the demo. The log is read only to see that no run was SERVED (the controller's refused one is logged too).
     if signed_in:
