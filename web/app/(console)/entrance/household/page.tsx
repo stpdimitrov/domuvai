@@ -5,6 +5,7 @@ import { entranceAt, reach } from "@/lib/console";
 import { sofiaToday } from "@/lib/payment";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { HouseholdForm, LeavingForm } from "./HouseholdForm";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Живущи в обектите — Етаж" };
 
@@ -49,7 +50,7 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
         <div style={BODY}>
           {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
           {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-          {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход в <code>registry</code>, после опреснете.</>}
+          {view.kind === "none" && <NoEntrance />}
           {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
         </div>
       )}

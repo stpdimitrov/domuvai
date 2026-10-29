@@ -5,6 +5,7 @@ import { entranceAt, eur, isPeriod, monthName, reach, shiftPeriod as shift, this
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { passedDecisions, type Passed } from "./decisions";
 import IssueForm from "./IssueForm";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Начисления — Етаж" };
 
@@ -158,7 +159,7 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-            {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
+            {view.kind === "none" && <NoEntrance />}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
             {view.kind === "refused" && (
               <>

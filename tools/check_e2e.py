@@ -184,6 +184,8 @@ ON_A_PETITION = {("POST", "/api/assembly/entrances/{entranceId}/petitions"), ("G
 # itself, against the API's own list. Listed here so that the web calls nothing this check does not cover.
 ON_A_MANDATE = {("POST", "/api/identity/entrances/{entranceId}/mandates"), ("POST", "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end"),
                 ("POST", "/api/identity/logins"), ("POST", "/api/identity/logins/untie")}
+# An entrance and a party are registered through the page (WEB-50): registry_screen checks them itself, against the API's own list.
+ON_A_REGISTRATION = {("POST", "/api/registry/entrances"), ("POST", "/api/registry/parties")}
 
 
 def a_unit(entrance):
@@ -1879,6 +1881,90 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     return failures
 
 
+def registry_screen(api, web, signed_in, administrator=None, owner=None, nobody=None):
+    """
+    WEB-50 (PM-SEC-001, PM-ORG-001, PM-BOOK-011, #363) — `/registry`. Both forms are offered, with the API's closed lists. Signed in as a
+    board member (`--user`, not the administrator), a party is registered through the page and shown by its number, never its
+    identity number, and an entrance is the API's 403 in its words; the seeded owner is refused both. The administrator registers
+    an entrance through the page (a new building at an address, then a second entrance joining it) and reads both back on the
+    entrance screen, which the board member's list does not hold. Nothing seeded changes: a party holds no title, an entrance no
+    unit and nobody's role — and this runs last, so no screen above reads the new entrance. A login holding no role reads
+    `200 []` and is told so in the words that tell nobody to register one (#363).
+    """
+    path = "/registry"
+    status, page = fetch(web, path)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    for what, marker in (("entrance", "Регистрирай входа"), ("party", "Регистрирай лицето")):
+        failures += [] if marker in page else [f"{path}: the {what} form is missing"]
+    offered = [dict(re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag)).get("value") for tag in re.findall(r"<option\b[^>]*>", page)]
+    failures += [] if offered == ["GA", "ASSOCIATION", "CLOSED_COMPLEX", "", "EGN", "LNCH", "BULSTAT", "PASSPORT"] else [f"{path}: offers {offered}, not the API's closed lists"]
+    if not signed_in:
+        print("—   /registry  NOT checked: no sign-in")
+        return failures
+    tag = uuid.uuid4().hex[:6]
+    label = f"ЯЯЯ e2e {tag}"
+    entrance_form = {"label": label, "managementForm": "GA", "address": f"ул. e2e {tag} 1", "condominiumId": ""}
+    party_form = {"fullName": f"e2e {tag}", "idType": "EGN", "idValue": f"E2E{tag}"}
+    board = CARRIED.get(web)
+
+    def as_(who, marker, form):          # the page signed in as [who], and one form posted
+        CARRIED[web] = who
+        try:
+            s, _, answer = submit_form(web, path, page, marker, form)
+            return s, answer
+        finally:
+            CARRIED[web] = board
+
+    def sees(who, entrance):             # whether the entrance screen, signed in as [who], names the entrance
+        CARRIED[web] = who
+        try:
+            return label in visible_text(fetch(web, f"/entrance/mandates?entrance={entrance}")[1])
+        finally:
+            CARRIED[web] = board
+
+    # PM-SEC-001 — a board member registers a party (R2a) and is refused an entrance (R3a), in the API's words, the form kept
+    s, made = as_(board, "Регистрирай лицето", party_form)
+    failures += [] if s == 200 and re.search(rf"Лицето e2e {tag} е регистрирано\. Номер: [0-9a-f-]{{36}}", visible_text(made)) else [f"{path}: a board member registering a party answered HTTP {s} without the party's number: {visible_text(made)[:200]!r}"]
+    failures += [] if f"E2E{tag}" not in made else [f"{path}: the party's identity number is shown back (PM-BOOK-011)"]
+    s, refused = as_(board, "Регистрирай лицето", {**party_form, "idType": "SSN"})     # a refusal of the API's or the page's own: the number is not shown back either
+    failures += [] if s == 200 and "не е вид на идентификатора" in visible_text(refused) and f"E2E{tag}" not in refused else [f"{path}: a party refused for its id type answered HTTP {s} without the refusal, or shows the identity number back (PM-BOOK-011)"]
+    s, refused = as_(board, "Регистрирай входа", entrance_form)
+    failures += [] if s == 200 and "Нямате право да регистрирате вход:" in visible_text(refused) and f'value="{label}"' in refused else [f"{path}: a board member registering an entrance answered HTTP {s} without the API's 403 in its words, or the form not kept"]
+    for marker, form, words in (("Регистрирай лицето", party_form, "регистрирате лице"), ("Регистрирай входа", entrance_form, "регистрирате вход")):
+        s, refused = as_(owner, marker, form) if owner else (0, "")
+        failures += [] if not owner or (s == 200 and f"Нямате право да {words}:" in visible_text(refused)) else [f"{path}: the owner's attempt ({words}) answered HTTP {s} without the API's 403 in its words"]
+    registered = []
+    if administrator:
+        s, made = as_(administrator, "Регистрирай входа", entrance_form)
+        first = re.search(r"Номер на входа: ([0-9a-f-]{36}), номер на сградата: ([0-9a-f-]{36})", visible_text(made))
+        failures += [] if s == 200 and first else [f"{path}: the administrator registering an entrance answered HTTP {s} without its numbers: {visible_text(made)[:200]!r}"]
+        if first:                                           # the rest needs the first entrance's building; the no-role words below are read either way
+            s, joined = as_(administrator, "Регистрирай входа", {**entrance_form, "label": f"{label} б", "address": "", "condominiumId": first.group(2)})
+            second = re.search(r"Номер на входа: ([0-9a-f-]{36}), номер на сградата: ([0-9a-f-]{36})", visible_text(joined))
+            failures += [] if s == 200 and second and second.group(2) == first.group(2) else [f"{path}: the second entrance did not join the first one's building: {visible_text(joined)[:200]!r}"]
+            s, neither = as_(administrator, "Регистрирай входа", {**entrance_form, "address": ""})
+            failures += [] if s == 200 and "Системата не прие това:" in visible_text(neither) else [f"{path}: an entrance with no address and no building answered HTTP {s} without the API's words"]
+            registered = [first.group(1)] + ([second.group(1)] if second else [])
+        for entrance in registered:
+            failures += [] if sees(administrator, entrance) else [f"/entrance/mandates?entrance={entrance}: the administrator's screen does not show the entrance registered"]
+            failures += [] if not sees(board, entrance) else [f"/entrance/mandates?entrance={entrance}: the board member sees an entrance they hold no role in"]
+    else:
+        print("—   /registry  the administrator's path NOT checked: no --admin-user")
+    if nobody:
+        CARRIED[web] = nobody
+        try:
+            for url in ("/portfolio", "/entrance"):
+                said = visible_text(fetch(web, url)[1])
+                failures += [] if "не заемате роля в нито един" in said and "Регистрирайте вход" not in said else [f"{url}: a login holding no role is not told so, or is told to register an entrance"]
+        finally:
+            CARRIED[web] = board
+    else:
+        print("—   /registry  the no-role words NOT checked: no --none-user")
+    print(f"{'ok ' if not failures else 'BAD'} PM-ORG-001 the registry: a party registered by the board member without its identity number shown, "
+          f"an entrance refused to the board member and the owner in the API's words, {len(registered)} registered by the administrator and seen by nobody else; the no-role words for a login with no role")
+    return failures
+
+
 def handover_screen(api, web, entrance, signed_in):
     """
     WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
@@ -2160,6 +2246,8 @@ def main():
     parser.add_argument("--owner-subject", help="the issuer's own id for --owner-user")
     parser.add_argument("--admin-user", help="a login named in DOMUVAI_AUTH_ADMINS and tied to nobody; signs in with E2E_PASSWORD (WEB-49)")
     parser.add_argument("--admin-subject", help="the issuer's own id for --admin-user")
+    parser.add_argument("--none-user", help="a login tied to nobody and holding no role anywhere; signs in with E2E_PASSWORD (WEB-50)")
+    parser.add_argument("--none-subject", help="the issuer's own id for --none-user")
     parser.add_argument("--spare-party", help="a party holding no login and no office, for the administrator to give a mandate and tie a throwaway login to (WEB-49)")
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
@@ -2178,7 +2266,7 @@ def main():
         CARRIED[api] = {"Authorization": f"Bearer {os.environ['E2E_API_TOKEN']}"}
     failures = console_closed(open_web, args.closed_web.rstrip("/"), args.next_dir)
     failures += signed_in_only(signin_web, args.closed_web.rstrip("/"), args.next_dir)
-    browser = owner = administrator = None
+    browser = owner = administrator = nobody = None
     if args.user:
         problems, browser = sign_in(web, args.issuer.rstrip("/"), args.user, os.environ["E2E_PASSWORD"], args.subject)
         failures += problems
@@ -2192,6 +2280,10 @@ def main():
             problems, admin_browser = sign_in(web, args.issuer.rstrip("/"), args.admin_user, os.environ["E2E_PASSWORD"], args.admin_subject, tied=False)
             failures += problems
             administrator = {"Cookie": admin_browser.cookie_header(web)} if admin_browser else None
+        if args.none_user and args.none_subject:         # a login holding no role at all, signed in as a fourth person (WEB-50)
+            problems, none_browser = sign_in(web, args.issuer.rstrip("/"), args.none_user, os.environ["E2E_PASSWORD"], args.none_subject, tied=False)
+            failures += problems
+            nobody = {"Cookie": none_browser.cookie_header(web)} if none_browser else None
     else:
         print("—   sign-in, who-am-I and sign-out NOT checked: no --user (a machine with no issuer). CI checks them.")
     without_address = {"no address to write to": args.closed_web.rstrip("/"),
@@ -2200,8 +2292,8 @@ def main():
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable
-    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT - ON_A_PETITION - ON_A_MANDATE)]
-    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT | ON_A_PETITION | ON_A_MANDATE) - called)]
+    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT - ON_A_PETITION - ON_A_MANDATE - ON_A_REGISTRATION)]
+    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT | ON_A_PETITION | ON_A_MANDATE | ON_A_REGISTRATION) - called)]
 
     for (method, path), call in CALLS.items():
         url, body, *sent = call(entrance)              # a third element: headers the call needs (an Idempotency-Key)
@@ -2329,6 +2421,8 @@ def main():
     shown = payouts and payout in visible_text(fetch(web, f"/entrance/fund?entrance={entrance}&period={payouts[0]['valueDate'][:7]}")[1])
     failures += [] if shown else [f"/entrance/fund: the month of the fund's payout does not show {payout!r}"]
     print(f"{'ok ' if shown else 'BAD'} /entrance/fund  the fund's payout in the journal of its month")
+
+    failures += registry_screen(web=web, api=api, signed_in=bool(args.user), administrator=administrator, owner=owner, nobody=nobody)   # last: it registers an entrance
 
     if browser:
         failures += sign_out(web, args.issuer.rstrip("/"), browser)
