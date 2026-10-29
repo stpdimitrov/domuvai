@@ -71,6 +71,7 @@ class MandateWebTest {
     @MockitoBean lateinit var store: MandateStore
     @MockitoBean lateinit var acts: MandateActLog
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames         // the registry's; unanswered here, so the ids alone
 
     private val entrance = UUID.randomUUID()
     private val maria = UUID.randomUUID()
@@ -145,6 +146,7 @@ class MandateOpenTest {
     @MockitoBean lateinit var store: MandateStore
     @MockitoBean lateinit var acts: MandateActLog
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames         // the registry's; unanswered here, so the ids alone
 
     @Test
     fun `PM-SEC-001 with sign-in switched off nobody is the administrator — a 403, nothing is recorded and nothing written`() {

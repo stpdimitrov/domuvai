@@ -30,8 +30,8 @@ class MandateController(private val administration: MandateAdministration, priva
     /**
      * Every mandate in force in the entrance on [on] — today in Sofia if none is given — and how each stands: in term,
      * an election due and by when, or acting past term and since when (PM-GOV-004, PM-GOV-005). The office-holder is a
-     * party's id; the name is the registry's. Read by the entrance's manager, board and controller and by the
-     * administrator; anybody else is a 403. No task is stored or sent from it.
+     * party's id, with the registry's name beside it for a reader of the book only (PM-BOOK-006). Read by the
+     * entrance's manager, board and controller and by the administrator; anybody else is a 403. No task is stored or sent from it.
      */
     @GetMapping
     fun read(@PathVariable entranceId: UUID, @RequestParam(required = false) on: String?, signedIn: JwtAuthenticationToken?): List<StandingMandate> =

@@ -56,6 +56,8 @@ enum class BookAccessKind {
     OVERDUE_LIST,
     /** what is past its retention window was anonymised */
     RETENTION,
+    /** the names beside parties' ids in another module's read — the mandates, the register — were given */
+    PARTY_NAMES,
 }
 
 /** Reads only: an entry is written once, through the aggregate template, and never saved over or deleted. */
@@ -151,6 +153,38 @@ class BookAccessService(
             )
         }
         return BookAnswer.Served(serve())
+    }
+
+    /**
+     * The names beside parties' ids that another module's read serves (#249 N1): decided as a read of the book is, as
+     * at today in Sofia, and entered when given — under the caller's standing [purpose], of today. Withheld is null and
+     * enters nothing, since nothing of the book was given: the policy does not allow it, or allows a login tied to no
+     * party, or the entrance is not registered. With sign-in switched off nobody is asking: the names are given, as the
+     * names lists are, and entered as given to nobody. The name only, never an identity number (Rule: PM-BOOK-011).
+     */
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
+    // Rule: PM-BOOK-011
+    @Transactional
+    internal fun names(entranceId: UUID, who: Asking, ids: Collection<UUID>, purpose: String): Map<UUID, String>? {
+        require(purpose.isNotBlank() && purpose.length <= PURPOSE_MAX) { "names are given under a standing purpose of at most $PURPOSE_MAX characters (PM-BOOK-007)" }
+        val now = clock.instant()
+        val today = LocalDate.parse(toSofiaDate(now))
+        val outcome = if (open && who.login == null && who.party == null) {
+            BookAccessOutcome.OPEN
+        } else {
+            val decision = policy.decide(who, Action.READ_BOOK, Resource.OfEntrance(entranceId), today)
+            if (!decision.allowed || who.party == null) return null
+            BookAccessOutcome.SERVED
+        }
+        if (!entrances.existsById(entranceId)) return null
+        aggregates.insert(
+            BookAccessRow(
+                UUID.randomUUID(), entranceId, who.party, purpose, BookAccessKind.PARTY_NAMES.name, today, now.truncatedTo(ChronoUnit.MICROS),
+                outcome.name, Action.READ_BOOK.governedBy, who.login?.issuer, who.login?.subject,
+            ),
+        )
+        return parties.findAllById(ids.toSet()).associate { it.id to it.fullName }
     }
 
     /**

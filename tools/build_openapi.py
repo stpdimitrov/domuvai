@@ -137,7 +137,7 @@ RUNNING = {
  ('post', '/api/identity/logins/untie'):
    ("Untie a login — only the deployment's administrator; an issuer may be named to clear what a changed issuer URL left. On the record, refusals too", ['PM-SEC-001', 'PM-SEC-004']),
  ('get', '/api/identity/entrances/{entranceId}/mandates'):
-   ("Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when; party ids, not names. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). No task is stored or sent", ['PM-GOV-004', 'PM-GOV-005', 'PM-GOV-008', 'PM-SEC-001']),
+   ("Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent", ['PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011', 'PM-GOV-004', 'PM-GOV-005', 'PM-GOV-008', 'PM-SEC-001']),
  ('post', '/api/identity/entrances/{entranceId}/mandates'):
    ("Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too", ['PM-GOV-004', 'PM-SEC-001', 'PM-SEC-004', 'PM-SEC-011']),
  ('post', '/api/identity/entrances/{entranceId}/mandates/{mandateId}/end'):
