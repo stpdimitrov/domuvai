@@ -139,6 +139,7 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"),
+                     ("POST", "/api/registry/entrances/{entranceId}/book/declarations"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/absences")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
@@ -163,7 +164,11 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): 404,   # no resident of this id either (WEB-45)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"): 404,                    # no unit of this id: the seeded book is not written (WEB-46; animals_screen writes through the page)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"): 404,     # no animal of this id either (WEB-46)
+                     ("POST", "/api/registry/entrances/{entranceId}/book/declarations"): 404,                          # no unit of this id: the seeded book is not written (WEB-47; declarations_screen files through the page)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/absences"): 404}                   # no unit of this id (WEB-46)
+# Never run against the seeded demo: the retention run anonymises for good (PM-BOOK-010; the owner, 2026-10-29, WEB-47). The
+# check asks it only with its own token — the controller's, which the API refuses (403) — and only where it has one.
+NEVER_RUN = {("POST", "/api/registry/entrances/{entranceId}/book/retention")}
 # The seeded entrance's fund account — tools/seed_demo.py's iban("UNCR70001512998102").
 SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
@@ -227,6 +232,9 @@ CALLS = {
         f"/api/registry/entrances/{e}/units/{NO_ONE}/absences", {"absences": [{"absentFrom": "2026-11-02", "absentTo": "2026-11-09"}]}),
     ("GET", "/api/registry/entrances/{entranceId}/book"): lambda e: (f"/api/registry/entrances/{e}/book?purpose=e2e%3A%20contract", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/access-log"): lambda e: (f"/api/registry/entrances/{e}/book/access-log?purpose=e2e%3A%20contract", None),
+    ("POST", "/api/registry/entrances/{entranceId}/book/declarations"): lambda e: (
+        f"/api/registry/entrances/{e}/book/declarations", {"unitId": NO_ONE, "partyId": NO_ONE, "kind": "ACQUISITION"}),
+    ("POST", "/api/registry/entrances/{entranceId}/book/retention"): lambda e: (f"/api/registry/entrances/{e}/book/retention", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/declarations/overdue"): lambda e: (
         f"/api/registry/entrances/{e}/book/declarations/overdue", None),
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
@@ -1596,6 +1604,61 @@ def animals_screen(api, web, entrance, signed_in):
     return failures
 
 
+def declarations_screen(api, web, entrance, signed_in, owner_party=None):
+    """
+    WEB-47 (PM-BOOK-003, PM-BOOK-004, PM-BOOK-005, PM-BOOK-010, PM-SEC-001) — `/entrance/declarations`: every unit the API
+    lists is offered, with the two kinds of declaration and the retention form's confirmation. Signed in (a board member),
+    a declaration recorded through the page for the seeded owner Стефан Димов (`--owner-party`) shows the date and the
+    template the API answered, with its id, and the owner leaves the API's overdue list; a declarant who holds no such
+    unit is the API's refusal in its words, the form kept. The check's own token is the controller's: its filing in
+    another's name is the API's 403. The retention run is NEVER made here (it anonymises for good; the seeded demo stays as
+    seeded, the owner 2026-10-29): the page's form is checked for its confirmation only (the guard in the action is the
+    source test's), and the controller's 403 is checked in the contract loop above.
+    """
+    path = f"/entrance/declarations?entrance={entrance}"
+    a_status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units")
+    if a_status != 200 or not json.loads(raw):
+        return [f"{path}: the API's units answer HTTP {a_status}, or list none (the seed enters six)"]
+    units = json.loads(raw)
+    status, page = fetch(web, path)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: the unit {u['designation']} ({u['id']}) is not offered" for u in units if f'value="{u["id"]}"' not in page]
+    failures += [f"{path}: the kind {k} is not offered" for k in ("ACQUISITION", "CHANGE") if f'value="{k}"' not in page]
+    failures += [] if 'name="declarant"' in page and re.search(r'<input(?=[^>]*name="confirm")(?=[^>]*type="checkbox")(?=[^>]*\brequired\b)[^>]*>', page) else [f"{path}: the declarant field or the retention run's confirmation is missing"]
+    # PM-BOOK-010 — the run is never made here, not even without its confirmation: the page's guard is the source test's, and
+    # a broken one must not anonymise the demo. The log is read only to see that no run was SERVED (the controller's refused one is logged too).
+    if signed_in:
+        l_status, l_raw = fetch(api, f"/api/registry/entrances/{entrance}/book/access-log?purpose=e2e%3A%20declarations")
+        served = [v for v in json.loads(l_raw) if v["kind"] == "RETENTION" and v["outcome"] == "SERVED"] if l_status == 200 else None
+        failures += [f"{path}: the book's log is not served to the check (HTTP {l_status})"] if served is None else \
+                    [f"{path}: the book's log holds a retention run served — it must never be made against the seeded demo"] if served else []
+    if signed_in and owner_party:
+        overdue = lambda: {(v["partyName"], v["unitId"]) for v in json.loads(fetch(api, f"/api/registry/entrances/{entrance}/book/declarations/overdue")[1])}
+        mine = [unit for name, unit in overdue() if name == "Стефан Димов"]
+        if len(mine) != 1:
+            return failures + [f"{path}: the API's overdue list does not name Стефан Димов once (the seed enters one title and files no declaration)"]
+        unit = mine[0]
+        # PM-SEC-001 — the controller (this check's own token) records nothing in another's name: the API's 403, in its words
+        c_status, c_raw = fetch(api, f"/api/registry/entrances/{entrance}/book/declarations", {"unitId": unit, "partyId": owner_party, "kind": "ACQUISITION"})
+        failures += [] if c_status == 403 and refusal_words(c_raw) else [f"POST …/declarations: the controller's recording answers HTTP {c_status} {c_raw[:120]!r}, not the API's 403 in its words"]
+        failures += [] if ("Стефан Димов", unit) in overdue() else [f"{path}: the controller's refused recording changed the overdue list"]
+        # PM-BOOK-005 — a declarant who holds no such unit is the API's 404, in its words; the form is kept, nothing filed
+        other = next(u["id"] for u in units if u["id"] != unit)
+        d_status, _, refused = submit_form(web, path, page, 'name="declarant"', {"unit": other, "kind": "ACQUISITION", "declarant": owner_party})
+        said = visible_text(refused)
+        failures += [] if d_status == 200 and "Системата не прие това:" in said and f'value="{owner_party}"' in refused and "Декларацията е подадена" not in said else [f"{path}: a declarant who holds no such unit answered HTTP {d_status} without the API's words, or the form not kept"]
+        # PM-BOOK-003, PM-BOOK-004 — recorded in the owner's name (the 15-day window and the day-16 overdue task are the API's): the date and the template are the API's, shown with the id
+        f_status, _, filed = submit_form(web, path, page, 'name="declarant"', {"unit": unit, "kind": "ACQUISITION", "declarant": owner_party})
+        shown = visible_text(filed)
+        made = re.search(r"Декларацията е подадена на (\d{4}-\d{2}-\d{2}), по образец (\S+)\. Номер: ([0-9a-f-]{36})", shown)
+        if f_status != 200 or not made:
+            return failures + [f"{path}: the declaration form answered HTTP {f_status} without the API's date, template and id: {shown[:200]!r}"]
+        failures += [] if ("Стефан Димов", unit) not in overdue() else [f"{path}: the owner is still on the overdue list after the declaration was recorded"]
+    print(f"{'ok ' if not failures else 'BAD'} PM-BOOK-003 the declarations: {len(units)} units offered; "
+          f"{'a declaration recorded and dated by the API, the overdue list cleared of the owner; the controller refused; the retention run never made' if signed_in and owner_party else 'recording NOT checked: no sign-in or no --owner-party'}")
+    return failures
+
+
 def handover_screen(api, web, entrance, signed_in):
     """
     WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
@@ -1913,6 +1976,15 @@ def main():
         if path in ("/api/identity/me", "/api/identity/entrances/{entranceId}/mandates", *BOOK_READS) and api not in CARRIED:
             print(f"—   {method:4} {path}  NOT checked: it answers only a request with a token, and this run has none")
             continue
+        if (method, path) in NEVER_RUN:                 # irreversible: asked with the controller's token only, never run (PM-BOOK-010, PM-SEC-001)
+            if api not in CARRIED:
+                print(f"—   {method:4} {path}  NOT checked: the refusal is the controller's, and this run has no token; the run itself is never made")
+                continue
+            refused, raw = fetch(api, url, body, method=method, headers=sent)
+            bad = [] if refused == 403 and refusal_words(raw) else [f"{method} {path}: the controller's run answers HTTP {refused} {raw[:120]!r}, not the API's 403 in its words (PM-SEC-001)"]
+            failures += bad
+            print(f"{'ok ' if not bad else 'BAD'} {method:4} {path}  refused for the controller, never run")
+            continue
         board = as_board() if (method, path) in KEPT_BY_THE_BOARD else None
         if board:                                       # the check's own token is the controller's: refused (G-3, PM-SEC-001)
             refused, _ = fetch(api, url, body, headers=sent)
@@ -1953,6 +2025,7 @@ def main():
     failures += book_screen(api, web, entrance, signed_in=bool(args.user))
     failures += household_screen(api, web, entrance, signed_in=bool(args.user))
     failures += animals_screen(api, web, entrance, signed_in=bool(args.user))
+    failures += declarations_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
@@ -1964,7 +2037,8 @@ def main():
              f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}",
              f"/entrance/statement?entrance={entrance}", f"/entrance/fund/accounts?entrance={entrance}",
              f"/entrance/fund/disbursements?entrance={entrance}", f"/entrance/fund/handover?entrance={entrance}",
-             f"/entrance/household?entrance={entrance}", f"/entrance/animals?entrance={entrance}"]
+             f"/entrance/household?entrance={entrance}", f"/entrance/animals?entrance={entrance}",
+             f"/entrance/declarations?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
