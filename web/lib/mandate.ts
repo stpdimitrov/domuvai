@@ -1,5 +1,5 @@
 /**
- * Mandates recorded and ended (WEB-49; logins tied and untied are WEB-49b). Pure: no import but `refusal`, so it is
+ * Mandates recorded and ended (WEB-49), and logins tied to a party and untied (WEB-49b). Pure: no import but `refusal`, so it is
  * tested on Node's own runner. How long a mandate may run (PM-GOV-004), when an election is due (PM-GOV-005) and who may
  * administer any of it (PM-SEC-001) are the API's: the web types no term, does no date arithmetic and gates nothing —
  * it sends the form as typed and shows the API's answer in its words.
@@ -43,10 +43,37 @@ export function endingOf(t: { mandate: string; on: string; protocolRef: string }
   return { mandateId, on, protocolRef };
 }
 
+/** The request's `TieLogin`, as typed. */
+export type NewTie = { partyId: string; subject: string };
+
+/**
+ * Rule: PM-SEC-001 — a login tied to a party, as typed: the party's id and the login's subject. Whether the login or the party
+ * is already tied, and whether the login is the administrator's own, are the API's (its 409 and 400 in its words).
+ */
+// Rule: PM-SEC-001
+export function tieOf(t: { party: string; subject: string }): NewTie | { refused: string } {
+  const [partyId, subject] = [t.party.trim(), t.subject.trim()];
+  if (!UUID.test(partyId)) return { refused: "Посочете номера на лицето, във вида, в който го дава системата." };
+  if (!subject) return { refused: "Посочете входа (субекта), който се свързва." };
+  return { partyId, subject };
+}
+
+/** Rule: PM-SEC-001 — a login untied: its subject, and its issuer only when one was typed (a changed issuer URL leaves logins under the old one). */
+// Rule: PM-SEC-001
+export function untieOf(t: { issuer: string; subject: string }): { subject: string; issuer?: string } | { refused: string } {
+  const [issuer, subject] = [t.issuer.trim(), t.subject.trim()];
+  if (!subject) return { refused: "Посочете входа (субекта), който се развързва." };
+  return issuer ? { subject, issuer } : { subject };
+}
+
 type Answer = { error?: unknown; response: { status: number } };
 
-/** Rule: PM-SEC-001 — only the deployment's administrator records or ends a mandate: anybody else is the API's 403, in its words, nothing said to be done. */
+/** Rule: PM-SEC-001 — only the deployment's administrator records or ends a mandate, ties or unties a login: anybody else is the API's 403, in its words, nothing said to be done. */
 // Rule: PM-SEC-001
 export const recordRefused = (answer: Answer): string => undoneBy(answer, "впишете мандат");
 // Rule: PM-SEC-001
 export const endRefused = (answer: Answer): string => undoneBy(answer, "приключите мандат");
+// Rule: PM-SEC-001
+export const tieRefused = (answer: Answer): string => undoneBy(answer, "свържете вход с лице");
+// Rule: PM-SEC-001
+export const untieRefused = (answer: Answer): string => undoneBy(answer, "развържете вход");

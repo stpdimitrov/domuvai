@@ -4,16 +4,16 @@ import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, reach } from "@/lib/console";
 import { OFFICE } from "@/lib/mandate";
 import { unanswered, unansweredBy } from "@/lib/refusal";
-import { EndForm, RecordForm } from "./MandateForms";
+import { EndForm, RecordForm, TieForm, UntieForm } from "./MandateForms";
 
-export const metadata: Metadata = { title: "Мандати — Етаж" };
+export const metadata: Metadata = { title: "Мандати и входове — Етаж" };
 
 const BODY = { margin: "16px 24px", font: "400 13px/1.6 'IBM Plex Sans'" } as const;
 const date = (iso: string) => iso.split("-").reverse().join(".");
 const STANDING: Record<string, string> = { IN_TERM: "в мандат", ELECTION_DUE: "изборът се дължи", EXPIRED_ACTING: "изпълнява след срока" };
 
 /**
- * The mandates in force at the entrance today, and the forms that record one and end one (WEB-49).
+ * The mandates in force at the entrance today, and the forms that record one and end one (WEB-49), and tie a login to a party and untie it (WEB-49b).
  * "Today", the term and when an election is due are the API's (Rule: PM-GOV-004, PM-GOV-005) — shown as answered, no date
  * arithmetic here. Only the deployment's administrator may record or end one (Rule: PM-SEC-001): every form is
  * offered, and a refusal is shown in the API's words.
@@ -51,6 +51,8 @@ export default async function MandatesPage({ searchParams }: { searchParams: Pro
           </div>
           <RecordForm entrance={view.entrance.id} />
           <EndForm entrance={view.entrance.id} />
+          <TieForm />
+          <UntieForm />
         </>
       ) : (
         <div style={BODY}>
