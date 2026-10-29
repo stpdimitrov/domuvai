@@ -67,6 +67,7 @@ class BookListsClosedTest {
     @MockitoBean lateinit var declarations: DeclarationService
     @MockitoBean lateinit var declarationFiling: zues.app.registry.DeclarationFiling
     @MockitoBean lateinit var bookEntries: BookEntries
+    @MockitoBean lateinit var registrations: Registrations
     @MockitoBean lateinit var retention: BookRetentionService
     @MockitoBean lateinit var book: BookService
     @MockitoBean lateinit var entrances: EntranceRepository

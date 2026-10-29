@@ -47,16 +47,17 @@ data class OwnerResponse(
 @RestController
 @RequestMapping("/api/registry")
 class OwnershipController(
-    private val ownership: OwnershipService,
+    private val registrations: Registrations,
     private val lists: BookLists,
     private val book: BookEntries,
     private val who: WhoAsks,
 ) {
 
+    /** A party, registered by the administrator or by the manager or the board of any entrance; anybody else is a 403 (PM-SEC-001, PM-BOOK-005). */
     @PostMapping("/parties")
     @ResponseStatus(HttpStatus.CREATED)
-    fun registerParty(@RequestBody request: RegisterPartyRequest): PartyRegisteredResponse {
-        val id = ownership.registerParty(RegisterParty(request.fullName, request.idType, request.idValue))
+    fun registerParty(@RequestBody request: RegisterPartyRequest, signedIn: JwtAuthenticationToken?): PartyRegisteredResponse {
+        val id = registrations.party(RegisterParty(request.fullName, request.idType, request.idValue), who.of(signedIn))
         return PartyRegisteredResponse(id)
     }
 

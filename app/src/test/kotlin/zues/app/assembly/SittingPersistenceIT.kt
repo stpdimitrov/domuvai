@@ -62,11 +62,18 @@ class SittingPersistenceIT {
             .andExpect(status().isCreated).andReturn().response.contentAsString,
     )
 
+    /** An entrance or a party, registered as nobody — sign-in switched off — whoever the test has signed in: registering them is the administrator's (AUTH-05e). */
+    private fun registered(path: String, body: String): JsonNode {
+        val before = signedInAs
+        signedInAs = null
+        try { return created(path, body) } finally { signedInAs = before }
+    }
+
     private fun entrance() = UUID.fromString(
-        created("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText(),
+        registered("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText(),
     )
 
-    private fun party() = UUID.fromString(created("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private fun party() = UUID.fromString(registered("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
 
     @Autowired lateinit var logins: Logins
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"

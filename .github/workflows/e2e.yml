@@ -175,6 +175,10 @@ jobs:
           arrears() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $1" "http://localhost:8080/api/money/entrances/$entrance/arrears?asOf=2026-09-01"; }
           test "$(arrears "$check")" = 200
           test "$(arrears "$administrator")" = 403
+          # … and registering is the administrator's (AUTH-05e, PM-SEC-001): the controller registers no entrance and no party.
+          register() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $1" -H 'Content-Type: application/json' -d "$3" "http://localhost:8080/api/registry/$2"; }
+          test "$(register "$check" entrances '{"address":"ул. Проверка 1","label":"Х","managementForm":"GA"}')" = 403
+          test "$(register "$check" parties '{"fullName":"Проверката (отказано лице)"}')" = 403
 
       - name: Start the web against the API — signing people in, with nothing set, with a bad address, told to run without sign-in (PM-DEBT-011, #79)
         working-directory: web

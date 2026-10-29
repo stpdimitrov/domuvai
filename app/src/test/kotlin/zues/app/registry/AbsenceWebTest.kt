@@ -21,7 +21,7 @@ import java.util.UUID
 
 /** Sign-in switched off, as the test task runs: nobody is asking, and the entry is made as before (PM-BOOK-005). Who may enter is BookEntriesIT's. */
 @WebMvcTest(RegistryController::class)
-@Import(BookEntries::class, WhoAsks::class)
+@Import(BookEntries::class, WhoAsks::class, Registrations::class)
 class AbsenceWebTest {
 
     @Autowired lateinit var mvc: MockMvc

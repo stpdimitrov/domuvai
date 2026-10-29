@@ -9152,12 +9152,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the registered entrances",
+        "summary": "List the registered entrances — each person sees those where they hold a role today, the administrator every one, as the sign-in says who is asking; holding none, the list is empty",
         "tags": [
           "registry"
         ],
         "x-rules": [
-          "PM-ORG-001"
+          "PM-ORG-001",
+          "PM-SEC-001"
         ]
       },
       "post": {
@@ -9236,12 +9237,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register an entrance — founding its building at an address, or joining an existing building",
+        "summary": "Register an entrance — founding its building at an address, or joining an existing building — by the deployment's administrator only, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
-          "PM-ORG-001"
+          "PM-ORG-001",
+          "PM-SEC-001"
         ]
       }
     },
@@ -10707,12 +10709,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register a party — a person or company that can hold a title",
+        "summary": "Register a party — a person or company that can hold a title — by the deployment's administrator, or by the manager or the board of any entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
-          "PM-BOOK-002"
+          "PM-BOOK-002",
+          "PM-BOOK-005",
+          "PM-SEC-001"
         ]
       }
     }

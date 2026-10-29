@@ -97,13 +97,20 @@ class VotePersistenceIT {
     private fun created(path: String, body: String): JsonNode =
         json.readTree(mvc.perform(post(path, body)).andExpect(status().isCreated).andReturn().response.contentAsString)
 
+    /** An entrance or a party, registered as nobody — sign-in switched off — whoever the test has signed in: registering them is the administrator's (AUTH-05e). */
+    private fun registered(path: String, body: String): JsonNode {
+        val before = signedInAs
+        signedInAs = null
+        try { return created(path, body) } finally { signedInAs = before }
+    }
+
     private fun <T> signedIn(party: UUID, act: () -> T): T {
         val before = signedInAs
         signedInAs = "login-$party"
         try { return act() } finally { signedInAs = before }
     }
 
-    private fun person(): UUID = UUID.fromString(created("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private fun person(): UUID = UUID.fromString(registered("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
         .also { logins.tie(realm, "login-$it", it) }
 
     /** An entrance of one unit of 100% — owned a half by the first owner, a quarter by each of the next two. */
@@ -111,7 +118,7 @@ class VotePersistenceIT {
 
     /** Convened by the manager, noticed a month ahead, then made to meet today; the second owner's proxy names the first, who is present; the sitting opened. */
     private fun opened(absenteeEligible: Boolean = false): Meeting {
-        val entranceId = UUID.fromString(created("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText())
+        val entranceId = UUID.fromString(registered("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText())
         val unit = UUID.fromString(
             created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
                 .get("unitIds")[0].asText(),

@@ -90,6 +90,15 @@ enum class Action(val governedBy: String) {
 
     /** who holds more than the law's share of an entrance's ideal parts, behind a higher quorum — another person's holding */
     READ_CONCENTRATION("PM-SEC-002"),
+
+    /** an entrance in the list of entrances: its id, its building, its label, its management form */
+    LIST_ENTRANCE("PM-SEC-001"),
+
+    /** registering a party — the person a title, a mandate or a login will name */
+    REGISTER_PARTY("PM-SEC-001"),
+
+    /** registering an entrance — a new building's, or another of a building already registered (PM-ORG-001) */
+    REGISTER_ENTRANCE("PM-SEC-001"),
 }
 
 /**
@@ -161,6 +170,17 @@ class Policy(private val sources: List<RoleSource>) {
         return Decision(true, permit.ruleId, permit.role, MATRIX_VERSION)
     }
 
+    /**
+     * What is asked of no one entrance, allowed when the person may do it in any of these (the owner's decision R2a on
+     * #322): the administrator's line on the deployment, otherwise the first of [entranceIds] whose roles carry it. The
+     * caller names the entrances — the policy reads no table.
+     */
+    // Rule: PM-SEC-001
+    fun decideInAny(who: Asking, action: Action, entranceIds: Collection<UUID>, asAt: LocalDate): Decision =
+        decide(who, action, Resource.Deployment, asAt).takeIf { it.allowed }
+            ?: entranceIds.asSequence().map { decide(who, action, Resource.OfEntrance(it), asAt) }.firstOrNull { it.allowed }
+            ?: Decision(false, action.governedBy, null, MATRIX_VERSION)
+
     private fun nobody(who: Asking) = who.login == null && who.party == null
 
     private fun carries(held: Held, line: Permit, resource: Resource): Boolean =
@@ -168,7 +188,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 20
+        const val MATRIX_VERSION = 21
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -198,7 +218,11 @@ class Policy(private val sources: List<RoleSource>) {
          * law's share behind a higher quorum is another person's holding, for the manager, the board and the controller
          * only (the owner's decisions R1 on #247, 2026-10-22, and P1, 2026-10-23). A vote at a sitting is recorded by
          * whoever runs the assembly, as its register is kept — an office, or the owner who convened on a petition (the
-         * owner's decision of 2026-10-24).
+         * owner's decision of 2026-10-24). The list of entrances shows each person the entrances where they hold a role
+         * on the day — whichever role, as an entrance's units are read — and the administrator every one; a party is
+         * registered by the administrator and by the manager or the board of any entrance, who enter the titles that name
+         * it (PM-BOOK-005); an entrance by the administrator only, no entrance's office (the owner's decisions R1a, R2a,
+         * R3a on #322, 2026-10-29).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -208,6 +232,9 @@ class Policy(private val sources: List<RoleSource>) {
             Action.TIE_LOGIN to Resource.Deployment::class.java,
             Action.RECORD_MANDATE to Resource.OfEntrance::class.java,
             Action.READ_MANDATES to Resource.OfEntrance::class.java,
+            Action.LIST_ENTRANCE to Resource.OfEntrance::class.java,
+            Action.REGISTER_PARTY to Resource.Deployment::class.java,
+            Action.REGISTER_ENTRANCE to Resource.Deployment::class.java,
         )
 
         val MATRIX: List<Permit> = listOf(
@@ -287,6 +314,17 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.READ_VOTES, Role.BM, "PM-SEC-001"),
             Permit(Action.READ_VOTES, Role.MB, "PM-SEC-001"),
             Permit(Action.READ_VOTES, Role.CTL, "PM-GOV-008"),
+            Permit(Action.LIST_ENTRANCE, Role.OWN, "PM-SEC-001"),
+            Permit(Action.LIST_ENTRANCE, Role.USR, "PM-SEC-001"),
+            Permit(Action.LIST_ENTRANCE, Role.BM, "PM-SEC-001"),
+            Permit(Action.LIST_ENTRANCE, Role.MB, "PM-SEC-001"),
+            Permit(Action.LIST_ENTRANCE, Role.CTL, "PM-SEC-001"),
+            Permit(Action.LIST_ENTRANCE, Role.CSH, "PM-SEC-001"),
+            Permit(Action.LIST_ENTRANCE, Role.SYS_ADMIN, "PM-SEC-001"),
+            Permit(Action.REGISTER_PARTY, Role.BM, "PM-BOOK-005"),
+            Permit(Action.REGISTER_PARTY, Role.MB, "PM-BOOK-005"),
+            Permit(Action.REGISTER_PARTY, Role.SYS_ADMIN, "PM-SEC-001"),
+            Permit(Action.REGISTER_ENTRANCE, Role.SYS_ADMIN, "PM-SEC-001"),
         )
     }
 }
