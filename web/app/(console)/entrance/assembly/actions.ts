@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { reach } from "@/lib/console";
+import { proxyOf, proxyRefused } from "@/lib/proxy";
 import { undoneBy, unknownOutcome } from "@/lib/refusal";
 import { sofiaInstant } from "@/lib/sofia";
 
@@ -376,5 +377,39 @@ export async function postProtocol(_: ProtocolState, form: FormData): Promise<Pr
   if (!answer?.data) {
     return { refused: answer ? undoneBy(answer, "впишете обявяването на протокола") : unknownOutcome("вписването на обявяването"), values };
   }
+  redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
+}
+
+export type ProxyState = { refused?: string; values?: Record<string, string> };
+
+/**
+ * A proxy appointed for the assembly, or recorded from a written authorisation (Rule: PM-GA-009, PM-GA-010, PM-GA-011,
+ * PM-SEC-001) — the api's act, asked with the signed-in person's bearer. With no principal named the signed-in person appoints
+ * their own; naming one records the document handed over, and the SHA-256 of the file attached goes with it (the file itself
+ * is not kept by this call). Who may, whether the agent is who the kind says, whether the form suffices and how many one person
+ * may represent are the api's; a refusal is shown in its words, the fields kept — the file is chosen again.
+ */
+// Rule: PM-GA-009
+// Rule: PM-GA-010
+// Rule: PM-GA-011
+// Rule: PM-SEC-001
+export async function appointProxy(_: ProxyState, form: FormData): Promise<ProxyState> {
+  const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
+  const values = Object.fromEntries(["entrance", "assembly", "agentKind", "agentPartyId", "form", "scope", "items", "principalPartyId"].map((n) => [n, text(n)]));
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values };
+  const body = proxyOf({ agentKind: values.agentKind, agent: values.agentPartyId, form: values.form, scope: values.scope, items: values.items, principal: values.principalPartyId });
+  if ("refused" in body) return { refused: body.refused, values };
+  const document = form.get("authorisation");
+  const authorisationHash = document instanceof File && document.size > 0 ? createHash("sha256").update(Buffer.from(await document.arrayBuffer())).digest("hex") : undefined;
+
+  const answer = await reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies", {
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly } },
+      body: { ...body, ...(authorisationHash && { authorisationHash }) },
+    }),
+  );
+  // no answer: the proxy may be registered — and a principal has one per assembly
+  if (!answer) return { refused: unknownOutcome("вписването на пълномощното"), values };
+  if (!answer.data) return { refused: proxyRefused(answer), values };
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
 }

@@ -118,6 +118,7 @@ ON_AN_ASSEMBLY = {
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge"),
     ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting"),
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance"),
+    ("POST", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),   # appointed through the page by the seeded owner (WEB-48b; proxies_on)
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
 # The calls that keep an entrance's accounts or enter its book — for the manager and the board only (G-3, G-1, PM-SEC-001).
@@ -959,7 +960,7 @@ def submit_form(web, path, page, marker, fields, files=None):
         connection.close()
 
 
-def assembly_screen(api, web, entrance, signed_in, owner_party=None):
+def assembly_screen(api, web, entrance, signed_in, owner_party=None, owner=None):
     """
     WEB-25 — the entrance's general assembly as the API answers it. Signed in (CI): the offices in force today as
     identity gives them (PM-GOV-005); an assembly convened through the page's own form, by the office the person holds
@@ -1075,6 +1076,7 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None):
     if status != 200 or back or "Системата не прие това:" not in said or "PM-VOTE-004" not in said or f'value="{html.escape(pending, quote=True)}"' not in refused_page:
         failures.append(f"{here}: an item whose majority waits on counsel answers HTTP {status} → {back or 'the page'} — expected the API's refusal (PM-VOTE-004), the form kept")
 
+    failures += proxies_on(api, web, entrance, here, of, owner, owner_party)
     failures += moved_and_noticed(api, web, here, of, day, place, owner_party)
 
     # an office the person does not hold: refused in the API's words, and nothing convened
@@ -1087,6 +1089,62 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None):
     print(f"{'ok ' if not failures else 'BAD'} /entrance/assembly  {len(mandates)} offices as identity gives them; this year's assembly in the API's count; "
           f"convened through the form, listed and shown as stored; an agenda item put on it and one awaiting counsel refused; the meter in the API's figures; "
           f"an office not held refused in the API's words; moved, a notice refused and one posted, its sitting weighed, its register kept and no vote offered before the opening, one by who does not run it refused, moved again and void")
+    return failures
+
+
+def proxies_on(api, web, entrance, here, of, owner=None, owner_party=None):
+    """
+    WEB-48b (PM-GA-009, PM-GA-010, PM-GA-011, PM-SEC-001) on the draft assembly_screen convened, with an item on its agenda.
+    Signed in as a board member, who holds no title, appointing a proxy is the API's 403 in its words, the form kept, nothing
+    registered. Signed in as the seeded owner (`--owner-user`): items the assembly does not have are the API's 400 in its
+    words; a proxy for the whole agenda, appointed through the page for oneself, is registered as the API keeps it — read
+    back with the check's own token and validated against the contract, and shown in the register; a second one for the same
+    principal is the API's 409. The agent is the fund's holder, a registered party — a third party, which anybody may be.
+    No limit is the check's: the 4th proxy for one agent (PM-GA-010) would need three more principals' written
+    authorisations, which the seed does not hold, so the limit is the API's and pinned in the unit tests.
+    """
+    agent, fields = fund_holder(entrance), {"agentKind": "THIRD_PARTY", "form": "WRITTEN", "scope": "WHOLE_AGENDA"}
+    proxies = of + "/proxies"
+    if owner_party and agent == owner_party:
+        return [f"{here}: the fund's holder is the seeded owner — a proxy for oneself is the API's 400 (nobody is their own proxy); pick another agent"]
+    registered = lambda: (lambda st, raw: json.loads(raw) if st == 200 else None)(*fetch(api, proxies))
+    status, page = fetch(web, here)
+    failures = [f"{here}: HTTP {status}"] if status != 200 else []
+    failures += [f"{here}: the proxy form is missing"] if 'name="agentPartyId"' not in page else []
+    s, back, refused = submit_form(web, here, page, 'name="agentPartyId"', {**fields, "agentPartyId": agent})
+    failures += [] if s == 200 and not back and "Нямате право да впишете пълномощно:" in visible_text(refused) and f'value="{agent}"' in refused else [
+        f"{here}: PM-SEC-001 — a board member appointing a proxy answered HTTP {s} → {back or 'the page'}, without the API's 403 in its words, or the form not kept"]
+    failures += [] if registered() == [] else [f"{here}: a proxy was registered for a board member"]
+    if not owner:
+        print("—   /entrance/assembly  the owner's proxy NOT checked: no --owner-user")
+        return failures
+    board = CARRIED.get(web)
+    CARRIED[web] = owner                                    # the page, signed in as the owner
+    try:
+        page = fetch(web, here)[1]
+        s, back, refused = submit_form(web, here, page, 'name="agentPartyId"', {**fields, "agentPartyId": agent, "scope": "LISTED_ITEMS", "items": "999"})
+        failures += [] if s == 200 and not back and "Системата не прие това:" in visible_text(refused) and "999" in visible_text(refused) and registered() == [] else [
+            f"{here}: PM-GA-009 — a proxy for an agenda item the assembly does not have answered HTTP {s} → {back or 'the page'}, without the API's words, or one was registered"]
+        s, back, _ = submit_form(web, here, page, 'name="agentPartyId"', {**fields, "agentPartyId": agent})
+        if s != 303 or back.removeprefix(web) != here:
+            return failures + [f"{here}: appointing a proxy through the page answers HTTP {s} → {back or 'nowhere'} — expected the assembly's page"]
+        status, raw = fetch(api, proxies)
+        kept = json.loads(raw) if status == 200 else []
+        errors = list(Draft202012Validator(response_schema("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies", 200),
+                                           format_checker=Draft202012Validator.FORMAT_CHECKER).iter_errors(kept))
+        failures += [f"GET …/proxies: {'/'.join(map(str, e.absolute_path)) or '(root)'} — {e.message}" for e in errors]
+        want = {"agentKind": "THIRD_PARTY", "agentPartyId": agent, "form": "WRITTEN", "scope": "WHOLE_AGENDA", "items": []}
+        if len(kept) != 1 or any(kept[0].get(k) != v for k, v in want.items()) or (owner_party and kept[0].get("principalPartyId") != owner_party) or kept[0].get("authorisationHash"):
+            failures.append(f"{here}: the API holds {kept or status}, not the one proxy the form asked for, in person (no document)")
+        row = f"{kept[0]['principalPartyId'][:8]} {agent[:8]} писмено целия дневен ред" if kept else ""
+        failures += [] if row in visible_text(fetch(web, here)[1]) else [f"{here}: the register does not show the proxy as {row!r}"]
+        s, back, again = submit_form(web, here, fetch(web, here)[1], 'name="agentPartyId"', {**fields, "agentPartyId": agent})
+        failures += [] if s == 200 and not back and "Системата не прие това:" in visible_text(again) and len(registered() or []) == 1 else [
+            f"{here}: PM-GA-009 — a second proxy for the same principal answered HTTP {s} → {back or 'the page'}, without the API's words, or a second was kept"]
+    finally:
+        CARRIED[web] = board
+    print(f"{'ok ' if not failures else 'BAD'} PM-GA-009 the proxies: a board member's refused in the API's 403, an unknown agenda item in its 400; "
+          "the owner's proxy appointed through the page, read back and shown in the register; a second for the same principal refused")
     return failures
 
 
@@ -2096,7 +2154,7 @@ def main():
     failures += charges_multiple(api, web)
     failures += entrance_screen(api, web, entrance)
     failures += compliance_screen(api, web, entrance)
-    failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
+    failures += assembly_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party, owner=owner)
     failures += intake_screen(api, web, entrance)
     failures += statement_screen(api, web, entrance)
     failures += fund_accounts_screen(api, web, entrance)

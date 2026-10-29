@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, reach, type EntranceAt } from "@/lib/console";
+import { FORM, SCOPE } from "@/lib/proxy";
 import { refused, unanswered, type Refused } from "@/lib/refusal";
 import { sofiaLocal, sofiaTime } from "@/lib/sofia";
 import AgendaForm from "./AgendaForm";
@@ -12,6 +13,7 @@ import AttendanceForm from "./AttendanceForm";
 import CloseForm from "./CloseForm";
 import ConveneForm from "./ConveneForm";
 import NoticeForm from "./NoticeForm";
+import ProxyForm from "./ProxyForm";
 import ScheduleForm from "./ScheduleForm";
 import SittingForm from "./SittingForm";
 import VerifyForm from "./VerifyForm";
@@ -105,8 +107,6 @@ const STANDING: Record<string, string> = { PROVISIONAL: "предварител�
 const DENOMINATOR: Record<string, string> = { REPRESENTED: "от представените идеални части", TOTAL: "от всички идеални части" };
 const COMPARISON: Record<string, string> = { MORE_THAN: "повече от", AT_LEAST: "поне" };
 const CHOICE: Record<string, string> = { FOR: "за", AGAINST: "против", ABSTAIN: "въздържал се" };
-const SCOPE: Record<string, string> = { WHOLE_AGENDA: "целия дневен ред", LISTED_ITEMS: "точки" };
-const FORM: Record<string, string> = { WRITTEN: "писмено", NOTARISED: "с нотариална заверка", LAWYER_AUTHORISATION: "адвокатско пълномощно" };
 const word = (table: Record<string, string>, code: string) => table[code] ?? code;
 
 const date = (iso: string) => iso.split("-").reverse().join(".");
@@ -313,6 +313,14 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
         </div>
       )}
       <Register attendance={attendance} proxies={proxies} entrance={entrance} assembly={a.id} />
+      {(a.status === "DRAFT" || a.status === "NOTICED") && (   // the proxies the api takes; who may, how many and in what form are the api's (PM-GA-009, PM-GA-010, PM-GA-011)
+        <>
+          <div style={{ margin: "20px 0 0", ...HEADING }}>Вписване на пълномощно</div>
+          <div className="co-card" style={{ marginTop: 12 }}>
+            <ProxyForm entrance={entrance} assembly={a.id} />
+          </div>
+        </>
+      )}
       {(a.status === "NOTICED" || a.status === "OPEN") && (   // the register is kept for these; on which day, for which sitting and by whom are the api's (PM-GA-012, PM-SEC-001)
         <div className="co-card" style={{ marginTop: 12 }}>
           <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} />
