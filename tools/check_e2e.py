@@ -182,7 +182,8 @@ ON_A_PETITION = {("POST", "/api/assembly/entrances/{entranceId}/petitions"), ("G
                  ("POST", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly")}
 # Mandates are recorded and ended by the deployment's administrator through the page (WEB-49): mandates_screen checks them
 # itself, against the API's own list. Listed here so that the web calls nothing this check does not cover.
-ON_A_MANDATE = {("POST", "/api/identity/entrances/{entranceId}/mandates"), ("POST", "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end")}
+ON_A_MANDATE = {("POST", "/api/identity/entrances/{entranceId}/mandates"), ("POST", "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end"),
+                ("POST", "/api/identity/logins"), ("POST", "/api/identity/logins/untie")}
 
 
 def a_unit(entrance):
@@ -1807,12 +1808,16 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     mandate for `--spare-party` (a party holding no other office) is recorded through the page and read back in
     the API's list, then ended on its own first day — which leaves it no day in force, so the board stays as seeded; ending
     it a second time is the API's "once" in its words.
+    WEB-49b (PM-SEC-001) — logins tied and untied: a board member tying a login (for no party, as the record above) is the API's 403 in its words, the form kept.
+    The administrator ties a throwaway subject `e2e-spare-<hex>` to `--spare-party` (the page says so), ties it again (the API's
+    409 in its words, form kept), unties it (the page says untied) and unties it again (the page says it was tied to none).
+    Only that subject is ever tied — never a seeded login or a service client — and it is untied before the check ends.
     """
     path = f"/entrance/mandates?entrance={entrance}"
     listed = lambda: json.loads(fetch(api, f"/api/identity/entrances/{entrance}/mandates")[1]) if CARRIED.get(api) else []
     status, page = fetch(web, path)
     failures = [f"{path}: HTTP {status}"] if status != 200 else []
-    for what, marker in (("recording", "Впиши мандата"), ("ending", "Запиши края")):
+    for what, marker in (("recording", "Впиши мандата"), ("ending", "Запиши края"), ("tying", "Свържи входа"), ("untying", "Развържи входа")):
         failures += [] if marker in page else [f"{path}: the {what} form is missing"]
     offered = [dict(re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag)).get("value") for tag in re.findall(r"<option\b[^>]*>", page)]
     failures += [] if offered == ["BM", "MB", "CTL", "CSH"] else [f"{path}: offers the offices {offered}, not the API's BM, MB, CTL, CSH"]
@@ -1829,6 +1834,10 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     s, _, refused = submit_form(web, path, page, "Впиши мандата", {"body": "CTL", "party": NO_ONE, "validFrom": first, "validTo": last, "protocolRef": protocol})
     failures += [] if s == 200 and "Нямате право да впишете мандат:" in visible_text(refused) and f'value="{protocol}"' in refused else [f"{path}: a board member recording a mandate answered HTTP {s} without the API's 403 in its words, or the form not kept"]
     failures += [] if listed() == before else [f"{path}: a refused attempt changed the API's mandates"]
+    # PM-SEC-001 — nor does a board member tie a login: the API's 403 in its words, the form kept
+    spare = f"e2e-spare-{uuid.uuid4().hex[:8]}"
+    s, _, refused = submit_form(web, path, page, "Свържи входа", {"party": NO_ONE, "subject": spare})
+    failures += [] if s == 200 and "Нямате право да свържете вход с лице:" in visible_text(refused) and f'value="{spare}"' in refused else [f"{path}: a board member tying a login answered HTTP {s} without the API's 403 in its words, or the form not kept"]
     if not (administrator and spare_party):
         print("—   /entrance/mandates  the administrator's path NOT checked: no --admin-user or --spare-party")
         return failures
@@ -1852,10 +1861,21 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
         failures += [] if [m["standing"] for m in listed()] == [m["standing"] for m in before] else [f"{path}: after the end a seeded mandate's standing is not as seeded"]
         s, _, again = submit_form(web, path, page, "Запиши края", {"mandate": mandate, "on": first, "protocolRef": protocol})
         failures += [] if s == 200 and word(visible_text(again)) and f'value="{mandate}"' in again else [f"{path}: ending a second time answered HTTP {s} without the API's words, or the form not kept"]
+        # PM-SEC-001 — the throwaway subject is tied to the spare party, refused a second time, untied, and said to be tied to none
+        try:
+            s, _, tied = submit_form(web, path, page, "Свържи входа", {"party": spare_party, "subject": spare})
+            failures += [] if s == 200 and f"Входът {spare} е свързан с лице {spare_party}" in visible_text(tied) else [f"{path}: the administrator tying {spare} answered HTTP {s} without the page saying so: {visible_text(tied)[:200]!r}"]
+            s, _, twice = submit_form(web, path, page, "Свържи входа", {"party": spare_party, "subject": spare})
+            failures += [] if s == 200 and word(visible_text(twice)) and f'value="{spare}"' in twice else [f"{path}: tying {spare} a second time answered HTTP {s} without the API's words, or the form not kept"]
+        finally:
+            s, _, untied = submit_form(web, path, page, "Развържи входа", {"subject": spare, "issuer": ""})
+            failures += [] if s == 200 and f"Входът {spare} е развързан" in visible_text(untied) else [f"{path}: untying {spare} answered HTTP {s} without the page saying so — it may still be tied: {visible_text(untied)[:200]!r}"]
+        s, _, nothing = submit_form(web, path, page, "Развържи входа", {"subject": spare, "issuer": ""})
+        failures += [] if s == 200 and f"Входът {spare} не е бил свързан с лице" in visible_text(nothing) else [f"{path}: untying {spare} a second time answered HTTP {s} without saying it was tied to none: {visible_text(nothing)[:200]!r}"]
     finally:
         CARRIED[web] = board
     print(f"{'ok ' if not failures else 'BAD'} PM-GOV-004 the mandates: {len(before)} on the page as the API lists them; recorded by the administrator through the page, read back, "
-          "ended with the board as seeded; the board member refused in the API's words")
+          "ended with the board as seeded; a throwaway login tied, refused twice and untied; the board member refused in the API's words")
     return failures
 
 

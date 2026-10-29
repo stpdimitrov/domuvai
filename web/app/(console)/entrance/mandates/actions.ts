@@ -2,7 +2,7 @@
 
 import { api } from "@/lib/api/client";
 import { reach } from "@/lib/console";
-import { endingOf, endRefused, mandateOf, recordRefused } from "@/lib/mandate";
+import { endingOf, endRefused, mandateOf, recordRefused, tieOf, tieRefused, untieOf, untieRefused } from "@/lib/mandate";
 import { unknownOutcome } from "@/lib/refusal";
 
 /** What a form here holds after a submission: the API's refusal in its words, the form as typed, and what the API did. */
@@ -42,4 +42,32 @@ export async function end(_: MandateState<{ mandateId: string; on: string }>, fo
   if (!answer) return { values, refused: unknownOutcome("приключването на мандата") };
   if (!answer.data) return { values, refused: endRefused(answer) };
   return { done: { mandateId: answer.data.mandateId, on: answer.data.on } };
+}
+
+/**
+ * A login tied to a party (WEB-49b). Rule: PM-SEC-001 — only the deployment's administrator may; a login or a party already
+ * tied, and the administrator's own login, are the API's refusals (409, 400) in its words, the form kept.
+ */
+// Rule: PM-SEC-001
+export async function tie(_: MandateState<{ partyId: string; subject: string }>, form: FormData): Promise<MandateState<{ partyId: string; subject: string }>> {
+  const values = fields(form, ["party", "subject"]);
+  const body = tieOf({ party: values.party, subject: values.subject });
+  if ("refused" in body) return { values, refused: body.refused };
+  const answer = await reach(() => api.POST("/api/identity/logins", { body }));
+  // no answer: the login may be tied — sent again it would be refused as already tied
+  if (!answer) return { values, refused: unknownOutcome("свързването на входа") };
+  if (!answer.data) return { values, refused: tieRefused(answer) };
+  return { done: { partyId: answer.data.partyId, subject: answer.data.subject } };
+}
+
+/** A login untied (WEB-49b): one tied to none answers "nothing done" (200, `untied: false`) — said so, not said to be undone. Rule: PM-SEC-001. */
+// Rule: PM-SEC-001
+export async function untie(_: MandateState<{ untied: boolean; subject: string }>, form: FormData): Promise<MandateState<{ untied: boolean; subject: string }>> {
+  const values = fields(form, ["issuer", "subject"]);
+  const body = untieOf({ issuer: values.issuer, subject: values.subject });
+  if ("refused" in body) return { values, refused: body.refused };
+  const answer = await reach(() => api.POST("/api/identity/logins/untie", { body }));
+  if (!answer) return { values, refused: unknownOutcome("развързването на входа") };
+  if (!answer.data) return { values, refused: untieRefused(answer) };
+  return { done: { untied: answer.data.untied, subject: body.subject } };
 }
