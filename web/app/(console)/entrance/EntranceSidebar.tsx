@@ -16,6 +16,7 @@ const ENTRANCE: { label: string; href: string; due?: string }[] = [
   { label: "Обекти и идеални части", href: "#" },
   { label: "Книга на етажната собственост", href: "/entrance/book" },
   { label: "Живущи в обектите", href: "/entrance/household" },
+  { label: "Животни и отсъствия", href: "/entrance/animals" },
   { label: "Начисления", href: "/entrance/charges" },
   { label: "Каса и фонд", href: "/entrance/fund" },
   { label: "Банкови сметки", href: "/entrance/fund/accounts" },

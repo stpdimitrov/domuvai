@@ -136,7 +136,10 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"),
                      ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household"),
-                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end")}
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"),
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"),
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"),
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/absences")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
@@ -157,7 +160,10 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"): 409,  # the seeded cancelled one: cancelled once
                      ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"): 400,                    # the seeded manager on both sides: the demo stays as seeded (PM-FUND-010)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household"): 404,                  # no unit of this id: the seeded book is not written (WEB-45; household_screen writes through the page)
-                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): 404}   # no resident of this id either (WEB-45)
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): 404,   # no resident of this id either (WEB-45)
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"): 404,                    # no unit of this id: the seeded book is not written (WEB-46; animals_screen writes through the page)
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"): 404,     # no animal of this id either (WEB-46)
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/absences"): 404}                   # no unit of this id (WEB-46)
 # The seeded entrance's fund account — tools/seed_demo.py's iban("UNCR70001512998102").
 SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
@@ -213,6 +219,12 @@ CALLS = {
         f"/api/registry/entrances/{e}/units/{NO_ONE}/household", {"members": [{"isChildUnder6": False}]}),
     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): lambda e: (
         f"/api/registry/entrances/{e}/units/{NO_ONE}/household/{NO_ONE}/end", {"on": "2026-10-15"}),
+    ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"): lambda e: (
+        f"/api/registry/entrances/{e}/units/{NO_ONE}/animals", {"animals": [{"species": "куче"}]}),
+    ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"): lambda e: (
+        f"/api/registry/entrances/{e}/units/{NO_ONE}/animals/{NO_ONE}/end", {"on": "2026-10-15"}),
+    ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/absences"): lambda e: (
+        f"/api/registry/entrances/{e}/units/{NO_ONE}/absences", {"absences": [{"absentFrom": "2026-11-02", "absentTo": "2026-11-09"}]}),
     ("GET", "/api/registry/entrances/{entranceId}/book"): lambda e: (f"/api/registry/entrances/{e}/book?purpose=e2e%3A%20contract", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/access-log"): lambda e: (f"/api/registry/entrances/{e}/book/access-log?purpose=e2e%3A%20contract", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/declarations/overdue"): lambda e: (
@@ -1528,6 +1540,62 @@ def household_screen(api, web, entrance, signed_in):
     return failures
 
 
+def animals_screen(api, web, entrance, signed_in):
+    """
+    WEB-46 (PM-BOOK-005, PM-BOOK-008, PM-FEE-006, PM-FEE-007, PM-SEC-001) — `/entrance/animals`: every unit the API lists
+    is offered. Signed in (a board member, e2e.yml: the book is entered by the manager or the board), an animal entered
+    through the page's form with a veterinary passport number answers its id; a leaving on the day of the move-in is
+    refused in the API's words, the form kept, and a later day closes the stay as the API says. An absence entered
+    through the third form is read back in the book's own `nonUse`. The check's own token is the controller's: its
+    entries are the API's 403, which writes nothing.
+    """
+    path = f"/entrance/animals?entrance={entrance}"
+    a_status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units")
+    if a_status != 200 or not json.loads(raw):
+        return [f"{path}: the API's units answer HTTP {a_status}, or list none (the seed enters six)"]
+    units = json.loads(raw)
+    status, page = fetch(web, path)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: the unit {u['designation']} ({u['id']}) is not offered" for u in units if f'value="{u["id"]}"' not in page]
+    failures += [] if 'name="species0"' in page and 'name="animal"' in page and 'name="absentFrom0"' in page else [f"{path}: the animals, leaving or absences form is missing"]
+    failures += [] if "#215" in visible_text(page) and "Животните още не се четат в книгата" in visible_text(page) else [f"{path}: the page does not state that an absence entered late is stamped with the day it is entered (#215) and that the book does not serve animals yet"]
+    if signed_in:
+        unit = sorted(units, key=lambda u: u["designation"])[0]["id"]
+        spans = lambda: [(n["from"], n["to"]) for u in json.loads(fetch(api, f"/api/registry/entrances/{entrance}/book?purpose=e2e%3A%20animals")[1]).get("units", []) if u["unitId"] == unit for n in u["nonUse"]]
+        before = spans()
+        # PM-SEC-001 — the controller (this check's own token) may not enter the book: the API's 403, in its words, nothing written
+        for what, url, body in (("animals", "animals", {"animals": [{"species": "куче", "vetPassportNo": "BG-E2E-1"}]}),
+                                ("absences", "absences", {"absences": [{"absentFrom": "2026-11-02", "absentTo": "2026-11-09"}]})):
+            c_status, c_raw = fetch(api, f"/api/registry/entrances/{entrance}/units/{unit}/{url}", body)
+            failures += [] if c_status == 403 and refusal_words(c_raw) else [f"POST …/{what}: the controller's entry answers HTTP {c_status} {c_raw[:120]!r}, not the API's 403 in its words"]
+        failures += [] if spans() == before else [f"{path}: the controller's refused entry changed the book's non-use spans"]
+        # PM-BOOK-005, PM-BOOK-008 — an animal entered through the form, with its passport number and a day, as typed
+        fields = {"unit": unit, "species0": "куче", "passport0": "BG-E2E-1", "from0": "2026-10-01",
+                  **{f"{k}{i}": "" for i in (1, 2, 3) for k in ("species", "passport", "from")}}
+        e_status, _, entered = submit_form(web, path, page, 'name="species0"', fields)
+        shown = visible_text(entered)
+        animal = re.search(r"Номера им, за записване на напускане: ([0-9a-f-]{36})", shown)
+        if e_status != 200 or "Вписани са 1 животни." not in shown or not animal:
+            return failures + [f"{path}: the animals form answered HTTP {e_status} without the API's animal id: {shown[:200]!r}"]
+        # PM-BOOK-008 — a day not after the move-in is the API's refusal, in its words; the form is kept, nothing closed
+        l_fields = {"unit": unit, "animal": animal.group(1), "on": "2026-10-01"}
+        r_status, _, refused = submit_form(web, path, entered, 'name="animal"', l_fields)
+        said = visible_text(refused)
+        failures += [] if r_status == 200 and "Системата не прие това:" in said and 'value="2026-10-01"' in refused else [f"{path}: a leaving on the day of the move-in answered HTTP {r_status} without the API's words, or the form not kept"]
+        # a day after it closes the stay: [2026-10-01, 2026-10-15)
+        c_status, _, left = submit_form(web, path, entered, 'name="animal"', {**l_fields, "on": "2026-10-15"})
+        failures += [] if c_status == 200 and "Престоят е затворен: от 2026-10-01 до 2026-10-15." in visible_text(left) else [f"{path}: the leaving form does not show the stay closed as the API says"]
+        # PM-BOOK-008, PM-FEE-006, PM-FEE-007 — an absence entered through the form, read back in the book's `nonUse`
+        a_fields = {"unit": unit, "absentFrom0": "2026-11-02", "absentTo0": "2026-11-09", **{f"{k}{i}": "" for i in (1, 2) for k in ("absentFrom", "absentTo")}}
+        s_status, _, absent = submit_form(web, path, entered, 'name="absentFrom0"', a_fields)
+        failures += [] if s_status == 200 and "Вписани са 1 отсъствия." in visible_text(absent) else [f"{path}: the absences form answered HTTP {s_status} without the API's absence id"]
+        after = spans()
+        failures += [] if after.count(("2026-11-02", "2026-11-09")) == before.count(("2026-11-02", "2026-11-09")) + 1 else [f"{path}: the book's non-use spans do not hold the absence entered, once more than before"]
+    print(f"{'ok ' if not failures else 'BAD'} PM-BOOK-005 the animals: {len(units)} units offered; "
+          f"{'an animal entered and its stay closed, an absence read back in the book; the controller refused' if signed_in else 'forms NOT checked: no sign-in'}")
+    return failures
+
+
 def handover_screen(api, web, entrance, signed_in):
     """
     WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
@@ -1884,6 +1952,7 @@ def main():
     failures += handover_screen(api, web, entrance, signed_in=bool(args.user))
     failures += book_screen(api, web, entrance, signed_in=bool(args.user))
     failures += household_screen(api, web, entrance, signed_in=bool(args.user))
+    failures += animals_screen(api, web, entrance, signed_in=bool(args.user))
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
@@ -1895,7 +1964,7 @@ def main():
              f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}",
              f"/entrance/statement?entrance={entrance}", f"/entrance/fund/accounts?entrance={entrance}",
              f"/entrance/fund/disbursements?entrance={entrance}", f"/entrance/fund/handover?entrance={entrance}",
-             f"/entrance/household?entrance={entrance}"]
+             f"/entrance/household?entrance={entrance}", f"/entrance/animals?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
