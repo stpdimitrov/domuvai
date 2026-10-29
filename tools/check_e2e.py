@@ -185,7 +185,8 @@ ON_A_PETITION = {("POST", "/api/assembly/entrances/{entranceId}/petitions"), ("G
 ON_A_MANDATE = {("POST", "/api/identity/entrances/{entranceId}/mandates"), ("POST", "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end"),
                 ("POST", "/api/identity/logins"), ("POST", "/api/identity/logins/untie")}
 # An entrance and a party are registered through the page (WEB-50): registry_screen checks them itself, against the API's own list.
-ON_A_REGISTRATION = {("POST", "/api/registry/entrances"), ("POST", "/api/registry/parties")}
+# Units are registered through the page (WEB-50b): units_screen and registry_screen check them against the API's own list.
+ON_A_REGISTRATION = {("POST", "/api/registry/entrances"), ("POST", "/api/registry/parties"), ("POST", "/api/registry/entrances/{entranceId}/units")}
 
 
 def a_unit(entrance):
@@ -1881,7 +1882,102 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     return failures
 
 
-def registry_screen(api, web, signed_in, administrator=None, owner=None, nobody=None):
+def units_screen(api, web, entrance, signed_in, owner=None):
+    """
+    WEB-50b (PM-ORG-002, PM-ORG-003, PM-SEC-001) — `/entrance/units`. The seeded entrance's units are on the page as the API lists
+    them, with the form and the kinds already used. Nothing is written to the seeded entrance: the board member's set of units
+    with ideal parts declared for some and not others is the API's refusal in its words (the set is refused whole, before any
+    unit is inserted), the form kept, and the API's list unchanged; the seeded owner is refused in the API's 403 words.
+    """
+    path = f"/entrance/units?entrance={entrance}"
+    status, page = fetch(web, path)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [] if "Впиши обектите" in page else [f"{path}: the units form is missing"]
+    listed = lambda: json.loads(fetch(api, f"/api/registry/entrances/{entrance}/units")[1]) if CARRIED.get(api) else []
+    before = listed()
+    shown = visible_text(page)
+    if not before:
+        print("—   /entrance/units  the units on the page NOT compared: the API's list was not read")
+    failures += [f"{path}: does not show the unit {u['designation']} ({u['unitType']})" for u in before if f"{u['designation']} · {u['unitType']} · " not in shown]
+    if not signed_in:
+        print("—   /entrance/units  the refusals NOT checked: no sign-in")
+        return failures
+    tag = uuid.uuid4().hex[:6]
+    mixed = {"units": f"e2e-{tag};APARTMENT;60;50\ne2e-{tag}b;APARTMENT;40"}       # declared for one, not the other: refused whole, nothing inserted
+    s, _, refused = submit_form(web, path, page, "Впиши обектите", mixed)
+    failures += [] if s == 200 and "Системата не прие това:" in visible_text(refused) and f"e2e-{tag};APARTMENT;60;50" in refused else [f"{path}: a mixed set answered HTTP {s} without the API's words, or the list not kept: {visible_text(refused)[:200]!r}"]
+    s, _, unreadable = submit_form(web, path, page, "Впиши обектите", {"units": f"e2e-{tag};APARTMENT;abc"})
+    failures += [] if s == 200 and "Ред 1:" in visible_text(unreadable) else [f"{path}: an unreadable line answered HTTP {s} without its number"]
+    failures += [] if listed() == before else [f"{path}: a refused set changed the API's units"]
+    if owner:
+        board = CARRIED.get(web)
+        CARRIED[web] = owner
+        try:
+            s, _, refused = submit_form(web, path, page, "Впиши обектите", mixed)
+            failures += [] if s == 200 and "Нямате право да впишете обекти:" in visible_text(refused) else [f"{path}: the owner's set answered HTTP {s} without the API's 403 in its words"]
+        finally:
+            CARRIED[web] = board
+        failures += [] if listed() == before else [f"{path}: the owner's refused set changed the API's units"]
+    else:
+        print("—   /entrance/units  the owner's refusal NOT checked: no --owner-user")
+    print(f"{'ok ' if not failures else 'BAD'} PM-ORG-002 the units: {len(before)} on the page as the API lists them; a mixed set refused in the API's words by the board member and a 403 for the owner, nothing written")
+    return failures
+
+
+def units_in(web, entrance, administrator, owner, owner_party):
+    """
+    WEB-50b — units registered through the page in an entrance `registry_screen` has just registered (it holds none). The
+    administrator reads no book: the API's 403. The administrator gives `--owner-party` a member-of-the-board mandate in
+    that entrance only (through the mandates page, as WEB-49), so the seeded owner's login may enter its book; the owner
+    is refused a set summing to 99.98% (PM-ORG-002), then registers two units with the ideal parts left out (derived by area,
+    PM-ORG-003), reads them back on the page, and is refused a second set. The mandate is ended on its own first day, so
+    the seeded demo is as it was: it is in this entrance only, which holds no other unit.
+    """
+    path, mandates = f"/entrance/units?entrance={entrance}", f"/entrance/mandates?entrance={entrance}"
+    as_ = lambda who: CARRIED.__setitem__(web, who)
+    board = CARRIED.get(web)
+    tag = uuid.uuid4().hex[:6]
+    today = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date()
+    first, last = str(today - datetime.timedelta(days=2)), str(today + datetime.timedelta(days=30))
+    protocol = f"e2e: протокол {tag}"
+    failures, mandate = [], None
+    derived = {"units": f"e2e-{tag}a;APARTMENT;60\ne2e-{tag}b;SHOP;40;;да;не"}
+    try:
+        as_(administrator)
+        page = fetch(web, path)[1]
+        s, _, refused = submit_form(web, path, page, "Впиши обектите", derived)
+        failures += [] if s == 200 and "Нямате право да впишете обекти:" in visible_text(refused) else [f"{path}: the administrator's set answered HTTP {s} without the API's 403 in its words (PM-SEC-001)"]
+        mpage = fetch(web, mandates)[1]
+        s, _, recorded = submit_form(web, mandates, mpage, "Впиши мандата", {"body": "MB", "party": owner_party, "validFrom": first, "validTo": last, "protocolRef": protocol})
+        made = re.search(r"Мандатът е вписан\. Номер: ([0-9a-f-]{36})", visible_text(recorded))
+        if s != 200 or not made:
+            return failures + [f"{mandates}: the administrator's mandate for the owner's party in the new entrance answered HTTP {s} without its number: {visible_text(recorded)[:200]!r}"]
+        mandate = made.group(1)
+        as_(owner)
+        page = fetch(web, path)[1]
+        failures += [] if "Впиши обектите" in page and "Във входа няма вписан обект." in visible_text(page) else [f"{path}: the new entrance's page is missing the form or the empty-list words for the manager"]
+        s, _, short = submit_form(web, path, page, "Впиши обектите", {"units": f"e2e-{tag}a;APARTMENT;;50\ne2e-{tag}b;APARTMENT;;49.98"})
+        failures += [] if s == 200 and re.search(r"Системата не прие това:.*99\.98", visible_text(short)) and f"e2e-{tag}a;APARTMENT;;50" in short else [f"{path}: a set summing to 99.98% answered HTTP {s} without the API's words naming the sum, or the list not kept: {visible_text(short)[:200]!r}"]
+        s, _, made_units = submit_form(web, path, page, "Впиши обектите", derived)
+        ids = re.search(r"Вписани са 2 обекта\. Номера: ([0-9a-f-]{36}) ([0-9a-f-]{36})", visible_text(made_units))
+        failures += [] if s == 200 and ids else [f"{path}: two units with no ideal parts answered HTTP {s} without their numbers: {visible_text(made_units)[:200]!r}"]
+        read = visible_text(fetch(web, path)[1])
+        for name, kind in ((f"e2e-{tag}a", "APARTMENT"), (f"e2e-{tag}b", "SHOP")):
+            failures += [] if re.search(rf"{name} · {kind} · [^·]*кв\. м · идеални части [0-9.]+% \(изчислени по площ\)", read) else [f"{path}: {name} is not read back as derived by area"]
+        failures += [] if re.search(rf"e2e-{tag}b · SHOP · [^·]*кв\. м · идеални части [0-9.]+% \(изчислени по площ\) · стопанска дейност", read) else [f"{path}: the unit typed with a business use does not read back as one"]
+        s, _, again = submit_form(web, path, page, "Впиши обектите", {"units": f"e2e-{tag}c;APARTMENT;50\ne2e-{tag}d;APARTMENT;50"})
+        failures += [] if s == 200 and "Системата не прие това:" in visible_text(again) else [f"{path}: a second derived set answered HTTP {s} without the API's words (the entrance has units)"]
+    finally:
+        if mandate:
+            as_(administrator)
+            s, _, ended = submit_form(web, mandates, fetch(web, mandates)[1], "Запиши края", {"mandate": mandate, "on": first, "protocolRef": protocol})
+            failures += [] if s == 200 and f"е приключен на {first}" in visible_text(ended) else [f"{mandates}: ending the owner's mandate answered HTTP {s} without the API's day — it may still stand: {visible_text(ended)[:200]!r}"]
+        CARRIED[web] = board
+    print(f"{'ok ' if not failures else 'BAD'} PM-ORG-003 units in a registered entrance: refused to the administrator; 99.98% refused in the API's words; two registered with ideal parts derived by area and read back; a second set refused")
+    return failures
+
+
+def registry_screen(api, web, signed_in, administrator=None, owner=None, nobody=None, owner_party=None):
     """
     WEB-50 (PM-SEC-001, PM-ORG-001, PM-BOOK-011, #363) — `/registry`. Both forms are offered, with the API's closed lists. Signed in as a
     board member (`--user`, not the administrator), a party is registered through the page and shown by its number, never its
@@ -1948,6 +2044,10 @@ def registry_screen(api, web, signed_in, administrator=None, owner=None, nobody=
         for entrance in registered:
             failures += [] if sees(administrator, entrance) else [f"/entrance/mandates?entrance={entrance}: the administrator's screen does not show the entrance registered"]
             failures += [] if not sees(board, entrance) else [f"/entrance/mandates?entrance={entrance}: the board member sees an entrance they hold no role in"]
+        if registered and owner and owner_party:
+            failures += units_in(web, registered[0], administrator, owner, owner_party)
+        elif registered:
+            print("—   /entrance/units  the units of a registered entrance NOT checked: no --owner-user or --owner-party")
     else:
         print("—   /registry  the administrator's path NOT checked: no --admin-user")
     if nobody:
@@ -2422,7 +2522,8 @@ def main():
     failures += [] if shown else [f"/entrance/fund: the month of the fund's payout does not show {payout!r}"]
     print(f"{'ok ' if shown else 'BAD'} /entrance/fund  the fund's payout in the journal of its month")
 
-    failures += registry_screen(web=web, api=api, signed_in=bool(args.user), administrator=administrator, owner=owner, nobody=nobody)   # last: it registers an entrance
+    failures += units_screen(api, web, entrance, signed_in=bool(args.user), owner=owner)
+    failures += registry_screen(web=web, api=api, signed_in=bool(args.user), administrator=administrator, owner=owner, nobody=nobody, owner_party=args.owner_party)   # last: it registers an entrance
 
     if browser:
         failures += sign_out(web, args.issuer.rstrip("/"), browser)
