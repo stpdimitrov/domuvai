@@ -134,7 +134,9 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"),
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"),
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"),
-                     ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements")}
+                     ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"),
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household"),
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end")}
 # A firm's own layout (WEB-35, ADR-012): Bulgarian headers the API places, one it cannot ("м2"), one nobody maps.
 INTAKE_SHEET = "Ап.,Идеални части,Живущи,Такса,м2,Бележка\n1,50.000,2,1250,61.40,\n2,50.000,3,1480,58.10,ремонт\n"
 # The tariff it is dry-run with (WEB-36): €2,50 a person for management — the sheet's own fees are not that, so bills differ.
@@ -153,7 +155,9 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): 409,                     # an emergency above the seeded €145,00 available (PM-FUND-008)
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"): 409,    # the seeded paid one: paid once
                      ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"): 409,  # the seeded cancelled one: cancelled once
-                     ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"): 400}                    # the seeded manager on both sides: the demo stays as seeded (PM-FUND-010)
+                     ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"): 400,                    # the seeded manager on both sides: the demo stays as seeded (PM-FUND-010)
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household"): 404,                  # no unit of this id: the seeded book is not written (WEB-45; household_screen writes through the page)
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): 404}   # no resident of this id either (WEB-45)
 # The seeded entrance's fund account — tools/seed_demo.py's iban("UNCR70001512998102").
 SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
@@ -197,6 +201,7 @@ def seeded_handover(entrance):
     return listed[0]["id"] if listed else "00000000-0000-0000-0000-000000000000"
 
 
+NO_ONE = "00000000-0000-0000-0000-000000000000"   # an id nothing has: a call on it is the API's 404
 API = [""]   # the api's base, set in main() before CALLS is run
 CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
@@ -204,6 +209,10 @@ CALLS = {
     ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
     ("GET", "/api/registry/entrances/{entranceId}/units"): lambda e: (f"/api/registry/entrances/{e}/units", None),
+    ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household"): lambda e: (
+        f"/api/registry/entrances/{e}/units/{NO_ONE}/household", {"members": [{"isChildUnder6": False}]}),
+    ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): lambda e: (
+        f"/api/registry/entrances/{e}/units/{NO_ONE}/household/{NO_ONE}/end", {"on": "2026-10-15"}),
     ("GET", "/api/registry/entrances/{entranceId}/book"): lambda e: (f"/api/registry/entrances/{e}/book?purpose=e2e%3A%20contract", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/access-log"): lambda e: (f"/api/registry/entrances/{e}/book/access-log?purpose=e2e%3A%20contract", None),
     ("GET", "/api/registry/entrances/{entranceId}/book/declarations/overdue"): lambda e: (
@@ -1468,6 +1477,57 @@ def book_screen(api, web, entrance, signed_in):
     return failures
 
 
+def household_screen(api, web, entrance, signed_in):
+    """
+    WEB-45 (PM-BOOK-008, PM-FEE-005, PM-FEE-008, PM-BOOK-005, PM-SEC-001) — `/entrance/household`: every unit the API
+    lists is offered. Signed in (a board member, e2e.yml: the book is entered by the manager or the board), a resident
+    entered through the page's form is read back in the book's own household count for the days it holds; the leaving
+    day recorded through the page's second form closes the stay as the API says (the half-open range: the day itself
+    is no longer counted), and a day not after the move-in is refused in the API's words, the form kept. The check's
+    own token is the controller's: its entry is the API's 403, which writes nothing.
+    """
+    path = f"/entrance/household?entrance={entrance}"
+    a_status, raw = fetch(api, f"/api/registry/entrances/{entrance}/units")
+    if a_status != 200 or not json.loads(raw):
+        return [f"{path}: the API's units answer HTTP {a_status}, or list none (the seed enters six)"]
+    units = json.loads(raw)
+    status, page = fetch(web, path)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: the unit {u['designation']} ({u['id']}) is not offered" for u in units if f'value="{u["id"]}"' not in page]
+    failures += [] if 'name="kind0"' in page and 'name="member"' in page else [f"{path}: the household form or the leaving form is missing"]
+    if signed_in:
+        unit = sorted(units, key=lambda u: u["designation"])[0]["id"]
+        count = lambda on: next((u["householdCount"] for u in json.loads(fetch(api, f"/api/registry/entrances/{entrance}/book?purpose=e2e%3A%20household&on={on}")[1]).get("units", []) if u["unitId"] == unit), None)
+        inside, after = count("2026-10-10"), count("2026-10-20")
+        if inside is None or after is None:
+            return failures + [f"{path}: the book the API serves holds no unit {unit}, or no book is served to the check's token"]
+        # PM-SEC-001 — the controller (this check's own token) may not enter the book: the API's 403, in its words, nothing written
+        c_status, c_raw = fetch(api, f"/api/registry/entrances/{entrance}/units/{unit}/household", {"members": [{"isChildUnder6": False, "validFrom": "2026-10-01"}]})
+        failures += [] if c_status == 403 and refusal_words(c_raw) else [f"POST …/household: the controller's entry answers HTTP {c_status} {c_raw[:120]!r}, not the API's 403 in its words"]
+        failures += [] if count("2026-10-10") == inside else [f"{path}: the controller's refused entry changed the household count"]
+        # PM-FEE-005, PM-FEE-008, PM-BOOK-008 — a resident entered through the form, from a day, as typed
+        fields = {"unit": unit, "kind0": "adult", "from0": "2026-10-01", "kind1": "", "from1": "", "kind2": "", "from2": "", "kind3": "", "from3": ""}
+        e_status, _, entered = submit_form(web, path, page, 'name="kind0"', fields)
+        shown = visible_text(entered)
+        member = re.search(r"Номера им, за записване на напускане: ([0-9a-f-]{36})", shown)
+        if e_status != 200 or "Вписани са 1 живущи." not in shown or not member:
+            return failures + [f"{path}: the household form answered HTTP {e_status} without the API's member id: {shown[:200]!r}"]
+        failures += [] if count("2026-10-10") == inside + 1 else [f"{path}: the book's household count on 2026-10-10 is not {inside} + the resident entered"]
+        # PM-BOOK-008 — a day not after the move-in is the API's refusal, in its words; the form is kept, nothing closed
+        l_fields = {"unit": unit, "member": member.group(1), "on": "2026-10-01"}
+        r_status, _, refused = submit_form(web, path, entered, 'name="member"', l_fields)
+        said = visible_text(refused)
+        failures += [] if r_status == 200 and "Системата не прие това:" in said and 'value="2026-10-01"' in refused else [f"{path}: a leaving on the day of the move-in answered HTTP {r_status} without the API's words, or the form not kept"]
+        failures += [] if count("2026-10-20") == after + 1 else [f"{path}: a refused leaving closed the stay"]
+        # a day after it closes the stay: [2026-10-01, 2026-10-15)
+        c_status, _, left = submit_form(web, path, entered, 'name="member"', {**l_fields, "on": "2026-10-15"})
+        failures += [] if c_status == 200 and "Престоят е затворен: от 2026-10-01 до 2026-10-15." in visible_text(left) else [f"{path}: the leaving form does not show the stay closed as the API says"]
+        failures += [] if count("2026-10-10") == inside + 1 and count("2026-10-20") == after else [f"{path}: after the leaving day the book's household count is not as the range says"]
+    print(f"{'ok ' if not failures else 'BAD'} PM-BOOK-008 the household: {len(units)} units offered; "
+          f"{'a resident entered, its stay closed, read back in the book; the controller refused' if signed_in else 'forms NOT checked: no sign-in'}")
+    return failures
+
+
 def handover_screen(api, web, entrance, signed_in):
     """
     WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
@@ -1823,6 +1883,7 @@ def main():
     failures += disbursements_screen(api, web, entrance, signed_in=bool(args.user))
     failures += handover_screen(api, web, entrance, signed_in=bool(args.user))
     failures += book_screen(api, web, entrance, signed_in=bool(args.user))
+    failures += household_screen(api, web, entrance, signed_in=bool(args.user))
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
@@ -1833,7 +1894,8 @@ def main():
     under = ["/portfolio", "/debts", "/compliance", f"/entrance?entrance={entrance}", f"/entrance/charges?entrance={entrance}&period=2026-09",
              f"/entrance/fund?entrance={entrance}", f"/entrance/payments?entrance={entrance}",
              f"/entrance/statement?entrance={entrance}", f"/entrance/fund/accounts?entrance={entrance}",
-             f"/entrance/fund/disbursements?entrance={entrance}", f"/entrance/fund/handover?entrance={entrance}"]
+             f"/entrance/fund/disbursements?entrance={entrance}", f"/entrance/fund/handover?entrance={entrance}",
+             f"/entrance/household?entrance={entrance}"]
     # once, inside the page's <footer> — the sidebar may be streamed after it, so its place in the text says nothing
     in_footer = re.compile(r"<footer[^>]*>(.*?)</footer>", re.S)
     bare = [url for url in under if [visible_text(f).strip() for f in in_footer.findall(fetch(web, url)[1])] != [footer]]
