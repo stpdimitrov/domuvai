@@ -5,6 +5,7 @@ import { entranceAt, eur, reach } from "@/lib/console";
 import { sofiaToday } from "@/lib/payment";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { ageing, byPeriod, COMPONENT, KEY, oldest, type StatementLine } from "@/lib/statement";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Сметка на обект — Етаж" };
 
@@ -130,7 +131,7 @@ export default async function StatementPage({ searchParams }: { searchParams: Pr
         <div style={{ padding: "16px 24px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
           {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
           {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-          {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход в <code>registry</code>, после опреснете.</>}
+          {view.kind === "none" && <NoEntrance />}
           {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
         </div>
       )}

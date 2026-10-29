@@ -5,6 +5,7 @@ import { entranceAt, reach } from "@/lib/console";
 import { byPurpose, fundMissing, HOLDER, PURPOSE, unheld, type Account } from "@/lib/fundAccount";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import AccountForm from "./AccountForm";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Банкови сметки — Етаж" };
 
@@ -56,7 +57,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         <div style={{ padding: "16px 24px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
           {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
           {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-          {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход в <code>registry</code>, после опреснете.</>}
+          {view.kind === "none" && <NoEntrance />}
           {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
         </div>
       )}

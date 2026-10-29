@@ -18,6 +18,7 @@ import ScheduleForm from "./ScheduleForm";
 import SittingForm from "./SittingForm";
 import VerifyForm from "./VerifyForm";
 import VoteForm from "./VoteForm";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -146,7 +147,7 @@ export default async function AssemblyPage({ searchParams }: { searchParams: Pro
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-            {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
+            {view.kind === "none" && <NoEntrance />}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
           </div>
         </div>

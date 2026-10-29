@@ -94,6 +94,10 @@ jobs:
           kc create users -r domuvai -s username=admin -s enabled=true -s emailVerified=true -s email=admin@example.test -s firstName=Admin -s lastName=Domuvai
           kc set-password -r domuvai --username admin --new-password "$password"
           admin_subject=$(kc get users -r domuvai -q username=admin -q exact=true --fields id --format csv --noquotes)
+          # … and a login that is nobody and holds no role (WEB-50): the API lists it no entrance, and the page says so
+          kc create users -r domuvai -s username=nobody -s enabled=true -s emailVerified=true -s email=nobody@example.test -s firstName=No -s lastName=Role
+          kc set-password -r domuvai --username nobody --new-password "$password"
+          none_subject=$(kc get users -r domuvai -q username=nobody -q exact=true --fields id --format csv --noquotes)
           # The check asks the API itself, so it needs a token of its own; and somebody has to be the deployment's
           # administrator (AUTH-04c) — a login that is nobody in the book. Two clients that exist only in this run's
           # Keycloak — never in the realm file, which gives no client a service account.
@@ -110,8 +114,8 @@ jobs:
           check_subject=$(service_client e2e-check "$check" | tail -n 1)
           administrator_subject=$(service_client e2e-administrator "$administrator" | tail -n 1)
           manager_subject=$(service_client e2e-manager "$manager" | tail -n 1)        # enters the book as the board (AUTH-05c)
-          test -n "$subject" && test -n "$owner_subject" && test -n "$admin_subject" && test -n "$check_subject" && test -n "$administrator_subject" && test -n "$manager_subject"
-          { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject"; echo "OWNER_SUBJECT=$owner_subject"; echo "ADMIN_SUBJECT=$admin_subject";
+          test -n "$subject" && test -n "$owner_subject" && test -n "$admin_subject" && test -n "$none_subject" && test -n "$check_subject" && test -n "$administrator_subject" && test -n "$manager_subject"
+          { echo "WEB_SECRET=$secret"; echo "E2E_PASSWORD=$password"; echo "CHECK_SECRET=$check"; echo "SUBJECT=$subject"; echo "OWNER_SUBJECT=$owner_subject"; echo "ADMIN_SUBJECT=$admin_subject"; echo "NONE_SUBJECT=$none_subject";
             echo "CHECK_SUBJECT=$check_subject"; echo "ADMINISTRATOR_SECRET=$administrator"; echo "ADMINISTRATOR_SUBJECT=$administrator_subject";
             echo "MANAGER_SECRET=$manager"; echo "MANAGER_SUBJECT=$manager_subject"; } >> "$GITHUB_ENV"
 
@@ -204,7 +208,7 @@ jobs:
           E2E_API_TOKEN="$token" E2E_MANAGER_TOKEN="$manager" python3 tools/check_e2e.py --api http://localhost:8080 --web http://localhost:3000 \
             --open-web http://localhost:3003 --closed-web http://localhost:3001 --bad-contact-web http://localhost:3002 \
             --contact demo@example.test --issuer "$ISSUER" --user ivan --subject "$SUBJECT" --entrance "$ENTRANCE" --owner-party "$OWNER_PARTY" \
-            --owner-user stefan --owner-subject "$OWNER_SUBJECT" --admin-user admin --admin-subject "$ADMIN_SUBJECT" --spare-party "$SPARE_PARTY"
+            --owner-user stefan --owner-subject "$OWNER_SUBJECT" --admin-user admin --admin-subject "$ADMIN_SUBJECT" --none-user nobody --none-subject "$NONE_SUBJECT" --spare-party "$SPARE_PARTY"
 
       - name: Logs
         if: failure()
