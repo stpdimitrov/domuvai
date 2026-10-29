@@ -356,7 +356,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when; party ids, not names. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). No task is stored or sent */
+        /** Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent */
         get: operations["get_identity_entrances_entranceId_mandates"];
         put?: never;
         /** Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too */
@@ -2073,6 +2073,7 @@ export interface components {
             mandateId: string;
             /** Format: uuid */
             partyId?: string;
+            partyName?: string;
             /** @enum {string} */
             role: "OWN" | "USR" | "OCC" | "BM" | "MB" | "CTL" | "CSH" | "PMC_STAFF" | "MUN" | "SYS_ADMIN";
             standing: components["schemas"]["Standing"];

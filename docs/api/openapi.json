@@ -3117,6 +3117,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "partyName": {
+            "type": "string"
+          },
           "role": {
             "enum": [
               "OWN",
@@ -6339,11 +6342,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when; party ids, not names. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). No task is stored or sent",
+        "summary": "Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent",
         "tags": [
           "identity"
         ],
         "x-rules": [
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011",
           "PM-GOV-004",
           "PM-GOV-005",
           "PM-GOV-008",

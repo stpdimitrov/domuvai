@@ -17,7 +17,7 @@ import java.util.UUID
  * or scheduled from it: it is the countdown's source, not a task.
  */
 @Service
-class MandateReading(private val standing: MandateStanding, private val policy: Policy, private val clock: Clock) {
+class MandateReading(private val standing: MandateStanding, private val names: PartyNames, private val policy: Policy, private val clock: Clock) {
 
     // Rule: PM-GOV-004
     // Rule: PM-GOV-005
@@ -25,6 +25,23 @@ class MandateReading(private val standing: MandateStanding, private val policy: 
         val today = LocalDate.parse(toSofiaDate(clock.instant()))
         val decision = policy.decide(by, Action.READ_MANDATES, Resource.OfEntrance(entranceId), today)
         if (!decision.allowed) return MandateAnswer.Refused(decision.ruleId)
-        return MandateAnswer.Done(standing.of(entranceId, on ?: today))
+        return MandateAnswer.Done(named(entranceId, by, standing.of(entranceId, on ?: today)))
+    }
+
+    /**
+     * The office-holders' names beside their ids, to a reader of the book only — the administrator, who reads the
+     * mandates and no book, keeps the ids (ADR-002). One ask for the whole read, and none where no office names anybody.
+     */
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
+    private fun named(entranceId: UUID, by: Asking, mandates: List<StandingMandate>): List<StandingMandate> {
+        val ids = mandates.mapNotNullTo(mutableSetOf()) { it.partyId }
+        if (ids.isEmpty()) return mandates
+        val served = names.named(entranceId, by, ids, PURPOSE) ?: return mandates
+        return mandates.map { m -> m.copy(partyName = m.partyId?.let(served::get)) }
+    }
+
+    companion object {
+        const val PURPOSE = "the entrance's mandates, named"
     }
 }

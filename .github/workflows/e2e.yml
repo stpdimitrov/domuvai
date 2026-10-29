@@ -174,6 +174,13 @@ jobs:
           test "$(code "$administrator" book/declarations/overdue)" = 403
           test "$(code "$administrator" "owners?on=2026-09-01")" = 403
           test "$(code "$administrator" book/retention POST)" = 403
+          # … and so the office-holders' names beside the mandates (NAMES-01, PM-BOOK-006): every office the controller
+          # reads is named; the administrator reads the same offices by id alone.
+          named() { curl -sf -H "Authorization: Bearer $1" "http://localhost:8080/api/identity/entrances/$entrance/mandates" | python3 -c 'import json, sys
+          ms = [m for m in json.load(sys.stdin) if m.get("partyId")]
+          print("none read" if not ms else "all" if all(m.get("partyName") for m in ms) else "none" if not any("partyName" in m for m in ms) else "some")'; }
+          test "$(named "$check")" = all
+          test "$(named "$administrator")" = none
           # … and money's personal reads ask the policy too (PM-SEC-002): the controller reads the entrance's arrears,
           # the administrator — an office of no entrance — does not.
           arrears() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $1" "http://localhost:8080/api/money/entrances/$entrance/arrears?asOf=2026-09-01"; }

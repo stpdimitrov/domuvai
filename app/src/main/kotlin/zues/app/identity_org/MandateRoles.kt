@@ -123,7 +123,11 @@ enum class StandingKind { IN_TERM, ELECTION_DUE, EXPIRED_ACTING }
  */
 data class Standing(val kind: StandingKind, val electBy: LocalDate? = null, val actingSince: LocalDate? = null, val until: LocalDate? = null)
 
-/** A mandate in force in an entrance on a date, with how it stands. The office-holder is a party's id — the name is the registry's — or nobody, where the mandate names none. */
+/**
+ * A mandate in force in an entrance on a date, with how it stands. The office-holder is a party's id — or nobody, where
+ * the mandate names none — and [partyName] the registry's name for it, only where the reader may read the book
+ * ([PartyNames]); absent otherwise.
+ */
 data class StandingMandate(
     val mandateId: UUID,
     val partyId: UUID?,
@@ -131,6 +135,7 @@ data class StandingMandate(
     val validFrom: LocalDate,
     val validTo: LocalDate,
     val standing: Standing,
+    val partyName: String? = null,
 )
 
 /** A party holding a role in an entrance on a date, and the mandate that says so. */
