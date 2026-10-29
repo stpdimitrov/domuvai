@@ -174,6 +174,11 @@ SEEDED_FUND_IBAN = "BG87UNCR70001512998102"
 # A payment read back needs a payment the check knows: payment_screen records one through the page, last, and validates
 # this itself (WEB-39). Listed here so that the web calls nothing this check does not cover.
 ON_A_PAYMENT = {("GET", "/api/money/entrances/{entranceId}/payments/{paymentId}")}
+# A petition is opened, read, signed and convened on by the seeded owner, through the page (WEB-48): petitions_screen checks them
+# itself (the weighing it reads back is validated against the contract; the 201 bodies are shown on the page and compared there).
+ON_A_PETITION = {("POST", "/api/assembly/entrances/{entranceId}/petitions"), ("GET", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}"),
+                 ("POST", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures"),
+                 ("POST", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly")}
 
 
 def a_unit(entrance):
@@ -1659,6 +1664,75 @@ def declarations_screen(api, web, entrance, signed_in, owner_party=None):
     return failures
 
 
+def petitions_screen(api, web, entrance, signed_in, owner=None):
+    """
+    WEB-48 (PM-GA-003, PM-SEC-001) — `/entrance/petitions`. Signed in as a board member, who is no owner, opening, signing and
+    convening are the API's 403 in its words, nothing opened. Signed in as the seeded owner Стефан Димов (`--owner-user`, a
+    login the administrator tied to `--owner-party`), a petition opened through the page is shown as the API weighs it —
+    held share, threshold, signatories, unlocked or not — read back with the check's own token; signing it again is the
+    API's "once" in its words; convening on it is refused in its words while the API holds it locked (the owner holds less than
+    the threshold: no assembly is made in the demo). No number is the check's: it compares the page with the API's answer.
+    """
+    path = f"/entrance/petitions?entrance={entrance}"
+    status, page = fetch(web, path)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: the {what} form is missing" for what, marker in (("opening", 'name="subject"'), ("reading", 'name="petition"')) if marker not in page]
+    if not signed_in:
+        print("—   /entrance/petitions  NOT checked: no sign-in")
+        return failures
+    word = lambda said: "Системата не прие това:" in said      # a 400/409 of the API, in its words — not a 403: the lock and the "once" are the cause, not a role
+    day = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date() + datetime.timedelta(days=30)
+    s, _, refused = submit_form(web, path, page, 'name="subject"', {"subject": "e2e: ремонт на покрива"})
+    said = visible_text(refused)
+    failures += [] if s == 200 and "Нямате право да откриете петиция:" in said and "ремонт на покрива" in refused else [f"{path}: a board member opening a petition answered HTTP {s} without the API's 403 in its words, or the form not kept"]
+    if not owner:
+        print("—   /entrance/petitions  the owner's path NOT checked: no --owner-user")
+        return failures
+    board = CARRIED.get(web)
+    CARRIED[web] = owner                                    # the page, signed in as the owner
+    try:
+        subject = f"e2e: ремонт на покрива {uuid.uuid4().hex[:6]}"
+        s, location, _ = submit_form(web, path, page, 'name="subject"', {"subject": subject})
+        made = re.fullmatch(rf"(?:{re.escape(web)})?(/entrance/petitions\?entrance={entrance}&petition=([0-9a-f-]{{36}}))", location)
+        if s != 303 or not made:
+            return failures + [f"{path}: the owner opening a petition answers HTTP {s} → {location or 'nowhere'} — expected the petition's page"]
+        here, petition = made.group(1), made.group(2)
+        a_status, a_raw = fetch(api, f"/api/assembly/entrances/{entrance}/petitions/{petition}")
+        if a_status != 200:
+            return failures + [f"GET …/petitions/{{petitionId}}: HTTP {a_status} {a_raw[:120]}"]
+        weighed = json.loads(a_raw)
+        errors = list(Draft202012Validator(response_schema("GET", "/api/assembly/entrances/{entranceId}/petitions/{petitionId}", 200), format_checker=Draft202012Validator.FORMAT_CHECKER).iter_errors(weighed))
+        failures += [f"GET …/petitions/{{petitionId}}: the answer breaks its contract: {errors[0].message}"] if errors else []
+        shown = visible_text(fetch(web, here)[1])
+        want = [subject, f"Подписали: {len(weighed['signatories'])}", f"Събрани {weighed['heldPct']}%", f"праг {weighed['thresholdPct']}%", petition,
+                "Отключена: подписалите" if weighed["unlocked"] else "Не е отключена"]
+        failures += [f"{here}: does not show {w!r}" for w in want if w not in shown]
+        # PM-GA-003 — a signature is once: the owner opened it, so signing it again is the API's refusal in its words, and still one signature
+        s, _, again = submit_form(web, here, fetch(web, here)[1], "Подпиши петицията", {})
+        failures += [] if s == 200 and word(visible_text(again)) else [f"{here}: signing a second time answered HTTP {s} without the API's words"]
+        failures += [] if len(json.loads(fetch(api, f"/api/assembly/entrances/{entrance}/petitions/{petition}")[1])["signatories"]) == 1 else [f"{here}: a second signature was taken"]
+        # PM-GA-003 — locked while the owner holds less than the threshold (the API's call): convening is refused in its words, the form kept
+        if weighed["unlocked"]:
+            print("—   /entrance/petitions  convening NOT checked: the seeded owner's petition is unlocked, and convening would add an assembly to the demo")
+        else:
+            place = f"Входът — {uuid.uuid4().hex[:6]}"
+            s, _, locked = submit_form(web, here, fetch(web, here)[1], "Свикай събранието",
+                                       {"demandUnmet": "не отговориха", "scheduledAt": f"{day}T18:30", "place": place, "mode": "IN_PERSON"})
+            failures += [] if s == 200 and word(visible_text(locked)) and place in locked and "Събранието е свикано" not in visible_text(locked) else [f"{here}: convening on a locked petition answered HTTP {s} without the API's refusal in its words, or the form not kept"]
+    finally:
+        CARRIED[web] = board
+    # PM-SEC-001 — the board member reads the same weighing, and signs or convenes nothing: the API's 403, in its words
+    page = fetch(web, here)[1]
+    failures += [] if f"Събрани {weighed['heldPct']}%" in visible_text(page) else [f"{here}: the board member's page does not show the weighing the API gave"]
+    s, _, signing = submit_form(web, here, page, "Подпиши петицията", {})
+    failures += [] if s == 200 and "Нямате право да подпишете петицията:" in visible_text(signing) else [f"{here}: a board member signing answered HTTP {s} without the API's 403 in its words"]
+    s, _, convening = submit_form(web, here, page, "Свикай събранието", {"demandUnmet": "x", "scheduledAt": f"{day}T18:30", "place": "x", "mode": "IN_PERSON"})
+    failures += [] if s == 200 and "Нямате право да свикате събрание по петицията:" in visible_text(convening) else [f"{here}: a board member convening answered HTTP {s} without the API's 403 in its words"]
+    print(f"{'ok ' if not failures else 'BAD'} PM-GA-003 the petitions: opened by the owner through the page and shown as the API weighs it "
+          f"({weighed['heldPct']}% of {weighed['thresholdPct']}%, {'unlocked' if weighed['unlocked'] else 'locked'}); signed once; the board member refused in the API's words")
+    return failures
+
+
 def handover_screen(api, web, entrance, signed_in):
     """
     WEB-43 (PM-FUND-010, PM-SEC-001) — `/entrance/fund/handover`: every statement the API lists is on the page with its
@@ -1936,6 +2010,8 @@ def main():
     parser.add_argument("--subject", help="the issuer's own id for --user")
     parser.add_argument("--entrance", required=True)
     parser.add_argument("--owner-party", help="an owner's party id in --entrance, to co-sign a posting act (WEB-28); seed_demo.py writes them to SEED_OWNERS_FILE")
+    parser.add_argument("--owner-user", help="the login of the seeded owner (--owner-party), tied to it by the administrator; signs in with E2E_PASSWORD (WEB-48)")
+    parser.add_argument("--owner-subject", help="the issuer's own id for --owner-user")
     parser.add_argument("--next-dir", type=Path, default=ROOT / "web/.next", help="the build both servers run")
     args = parser.parse_args()
     api, web, entrance = args.api.rstrip("/"), args.web.rstrip("/"), args.entrance
@@ -1953,12 +2029,16 @@ def main():
         CARRIED[api] = {"Authorization": f"Bearer {os.environ['E2E_API_TOKEN']}"}
     failures = console_closed(open_web, args.closed_web.rstrip("/"), args.next_dir)
     failures += signed_in_only(signin_web, args.closed_web.rstrip("/"), args.next_dir)
-    browser = None
+    browser = owner = None
     if args.user:
         problems, browser = sign_in(web, args.issuer.rstrip("/"), args.user, os.environ["E2E_PASSWORD"], args.subject)
         failures += problems
         if browser:
             CARRIED[web] = {"Cookie": browser.cookie_header(web)}      # every screen below is read signed in
+        if args.owner_user and args.owner_subject:       # the seeded owner, signed in as a second person (WEB-48)
+            problems, owner_browser = sign_in(web, args.issuer.rstrip("/"), args.owner_user, os.environ["E2E_PASSWORD"], args.owner_subject)
+            failures += problems
+            owner = {"Cookie": owner_browser.cookie_header(web)} if owner_browser else None
     else:
         print("—   sign-in, who-am-I and sign-out NOT checked: no --user (a machine with no issuer). CI checks them.")
     without_address = {"no address to write to": args.closed_web.rstrip("/"),
@@ -1967,8 +2047,8 @@ def main():
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable
-    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT)]
-    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT) - called)]
+    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT - ON_A_PETITION)]
+    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT | ON_A_PETITION) - called)]
 
     for (method, path), call in CALLS.items():
         url, body, *sent = call(entrance)              # a third element: headers the call needs (an Idempotency-Key)
@@ -2026,6 +2106,7 @@ def main():
     failures += household_screen(api, web, entrance, signed_in=bool(args.user))
     failures += animals_screen(api, web, entrance, signed_in=bool(args.user))
     failures += declarations_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
+    failures += petitions_screen(api, web, entrance, signed_in=bool(args.user), owner=owner)
     failures += charges_issue(api, web, entrance)
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 

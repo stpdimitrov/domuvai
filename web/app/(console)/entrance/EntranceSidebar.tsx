@@ -26,6 +26,7 @@ const ENTRANCE: { label: string; href: string; due?: string }[] = [
   { label: "Плащания", href: "/entrance/payments" },
   { label: "Сметка на обект", href: "/entrance/statement" },
   { label: "Общи събрания", href: "/entrance/assembly" },
+  { label: "Петиции за събрание", href: "/entrance/petitions" },
   { label: "Внасяне на таблица", href: "/entrance/intake" },
   { label: "Задължения", href: "/debts" },
   { label: "Доставчици и договори", href: "#" },
