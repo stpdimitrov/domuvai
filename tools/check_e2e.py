@@ -138,6 +138,7 @@ KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/pre
                      ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"),
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/titles"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"),
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"),
                      ("POST", "/api/registry/entrances/{entranceId}/book/declarations"),
@@ -163,6 +164,7 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/money/entrances/{entranceId}/fund/handover-statements"): 400,                    # the seeded manager on both sides: the demo stays as seeded (PM-FUND-010)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household"): 404,                  # no unit of this id: the seeded book is not written (WEB-45; household_screen writes through the page)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): 404,   # no resident of this id either (WEB-45)
+                     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/titles"): 404,                     # no unit of this id: the seeded titles are not written (WEB-51; units_in records one through the page)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"): 404,                    # no unit of this id: the seeded book is not written (WEB-46; animals_screen writes through the page)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"): 404,     # no animal of this id either (WEB-46)
                      ("POST", "/api/registry/entrances/{entranceId}/book/declarations"): 404,                          # no unit of this id: the seeded book is not written (WEB-47; declarations_screen files through the page)
@@ -237,6 +239,8 @@ CALLS = {
         f"/api/registry/entrances/{e}/units/{NO_ONE}/household", {"members": [{"isChildUnder6": False}]}),
     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end"): lambda e: (
         f"/api/registry/entrances/{e}/units/{NO_ONE}/household/{NO_ONE}/end", {"on": "2026-10-15"}),
+    ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/titles"): lambda e: (
+        f"/api/registry/entrances/{e}/units/{NO_ONE}/titles", {"partyId": NO_ONE, "titleRole": "OWN", "share": "1"}),
     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals"): lambda e: (
         f"/api/registry/entrances/{e}/units/{NO_ONE}/animals", {"animals": [{"species": "куче"}]}),
     ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"): lambda e: (
