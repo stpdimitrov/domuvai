@@ -869,10 +869,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the registered entrances */
+        /** List the registered entrances — each person sees those where they hold a role today, the administrator every one, as the sign-in says who is asking; holding none, the list is empty */
         get: operations["get_registry_entrances"];
         put?: never;
-        /** Register an entrance — founding its building at an address, or joining an existing building */
+        /** Register an entrance — founding its building at an address, or joining an existing building — by the deployment's administrator only, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances"];
         delete?: never;
         options?: never;
@@ -1111,7 +1111,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a party — a person or company that can hold a title */
+        /** Register a party — a person or company that can hold a title — by the deployment's administrator, or by the manager or the board of any entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_parties"];
         delete?: never;
         options?: never;
