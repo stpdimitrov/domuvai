@@ -4,6 +4,7 @@ import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, reach } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { typesIn } from "@/lib/units";
+import { TitleForm } from "./TitleForm";
 import { UnitsForm } from "./UnitsForm";
 import NoEntrance from "@/app/(console)/NoEntrance";
 
@@ -13,7 +14,8 @@ const BODY = { margin: "16px 24px", font: "400 13px/1.6 'IBM Plex Sans'" } as co
 const SOURCE: Record<string, string> = { DECLARED: "по нотариален акт", DERIVED: "изчислени по площ" };
 
 /**
- * The entrance's units with their ideal parts as the API serves them, and the form that registers them (WEB-50b). The sum
+ * The entrance's units with their ideal parts as the API serves them, and the form that registers them (WEB-50b); under it, the form
+ * that records a title for one of them (WEB-51: Rule: PM-ORG-005, PM-ORG-011, PM-BOOK-005). The sum
  * (Rule: PM-ORG-002), the derivation (Rule: PM-ORG-003) and who may enter the book (Rule: PM-SEC-001) are the API's: the page
  * adds, derives and gates nothing, and offers the form whatever the list said.
  */
@@ -49,6 +51,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Promis
             </ul>
           </div>
           <UnitsForm entrance={view.entrance.id} types={typesIn(units)} />
+          <TitleForm entrance={view.entrance.id} units={units.map((u) => ({ id: u.id, label: `${u.designation} · ${u.unitType}` }))} />
         </>
       ) : (
         <div style={BODY}>

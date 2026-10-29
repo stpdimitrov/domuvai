@@ -11,11 +11,11 @@ export type NewUnit = { designation: string; unitType: string; businessUse: bool
 
 const DECIMAL = /^\d+(?:[.,]\d+)?$/;
 const YES = new Set(["да", "yes", "true"]);
-const NO = new Set(["", "не", "no", "false"]);
+const NO = new Set(["не", "no", "false"]);
 
 /**
- * Rule: PM-ORG-002, PM-ORG-003 — the units as typed, one to a line: `обозначение;вид;площ;идеални части`, and optionally
- * `;стопанска дейност;самостоятелен вход` as `да`/`не` (both `не` when left out). The ideal parts, if every unit gives them,
+ * Rule: PM-ORG-002, PM-ORG-003 — the units as typed, one to a line: `обозначение;вид;площ;идеални части;стопанска дейност;самостоятелен вход`:
+ * six fields, the last two `да`/`не` and required (WEB-51), the area and the ideal parts may be empty. The ideal parts, if every unit gives them,
  * are the title deeds' (PM-ORG-002); if none does, the API derives them by area and marks them `DERIVED` (PM-ORG-003).
  * Whether the set is all of one or the other, sums to 100%, or has the areas it needs is the API's. A blank line is skipped;
  * a line the web cannot read is refused by its number.
@@ -27,14 +27,14 @@ export function unitsOf(typed: string): { units: NewUnit[] } | { refused: string
     if (!raw.trim()) continue;
     const at = `Ред ${i + 1}:`;
     const cells = raw.split(";").map((c) => c.trim());
-    if (cells.length > 6) return { refused: `${at} повече от шест полета — обозначение; вид; площ; идеални части; стопанска дейност; самостоятелен вход.` };
-    const [designation, unitType, area = "", parts = "", business = "", separate = ""] = cells;
+    if (cells.length !== 6) return { refused: `${at} ${cells.length < 6 ? "липсват полета" : "повече от шест полета"} — обозначение; вид; площ; идеални части; стопанска дейност; самостоятелен вход (площта и идеалните части може да са празни, двете последни са да или не).` };
+    const [designation, unitType, area, parts, business, separate] = cells;
     if (!designation) return { refused: `${at} липсва обозначение.` };
     if (!unitType) return { refused: `${at} липсва вид на обекта (втората колона).` };
     if (area && !DECIMAL.test(area)) return { refused: `${at} площта „${area}“ не е число.` };
     if (parts && !DECIMAL.test(parts)) return { refused: `${at} идеалните части „${parts}“ не са число.` };
     const [businessUse, separateEntrance] = [business, separate].map((c) => c.toLowerCase());
-    for (const flag of [businessUse, separateEntrance]) if (!YES.has(flag) && !NO.has(flag)) return { refused: `${at} „${flag}“ — отговорът е да или не.` };
+    for (const flag of [businessUse, separateEntrance]) if (!YES.has(flag) && !NO.has(flag)) return { refused: `${at} ${flag ? `„${flag}“ —` : "липсва отговор —"} стопанска дейност и самостоятелен вход се отговарят с да или не.` };
     units.push({
       designation, unitType, businessUse: YES.has(businessUse), separateEntrance: YES.has(separateEntrance),
       ...(area && { areaM2: Number(area.replace(",", ".")) }), ...(parts && { idealParts: parts.replace(",", ".") }),
