@@ -13,7 +13,7 @@ const FIRM: { label: string; href: string; due?: string }[] = [
 
 const ENTRANCE: { label: string; href: string; due?: string }[] = [
   { label: "Статутен календар", href: "/entrance" },
-  { label: "Обекти и идеални части", href: "#" },
+  { label: "Обекти и идеални части", href: "/entrance/units" },
   { label: "Книга на етажната собственост", href: "/entrance/book" },
   { label: "Живущи в обектите", href: "/entrance/household" },
   { label: "Животни и отсъствия", href: "/entrance/animals" },
