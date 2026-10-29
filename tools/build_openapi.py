@@ -26,9 +26,9 @@ KNOWN = {r['id'] for r in RULES['rules']}
 RUNNING = {
  # ---- registry
  ('post', '/api/registry/entrances'):
-   ('Register an entrance — founding its building at an address, or joining an existing building', ['PM-ORG-001']),
+   ("Register an entrance — founding its building at an address, or joining an existing building — by the deployment's administrator only, as the sign-in says who is asking; anybody else is a 403", ['PM-ORG-001', 'PM-SEC-001']),
  ('get', '/api/registry/entrances'):
-   ('List the registered entrances', ['PM-ORG-001']),
+   ('List the registered entrances — each person sees those where they hold a role today, the administrator every one, as the sign-in says who is asking; holding none, the list is empty', ['PM-ORG-001', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units'):
    ('Add units with their ideal parts — declared, or derived from area and marked DERIVED — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403',
     ['PM-ORG-002', 'PM-ORG-003', 'PM-ORG-009', 'PM-BOOK-005']),
@@ -57,7 +57,7 @@ RUNNING = {
  ('get', '/api/registry/entrances/{entranceId}/book/declarations/overdue'):
    ("Owners and users past their declaration deadline on a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-BOOK-003', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/parties'):
-   ('Register a party — a person or company that can hold a title', ['PM-BOOK-002']),
+   ("Register a party — a person or company that can hold a title — by the deployment's administrator, or by the manager or the board of any entrance, as the sign-in says who is asking; anybody else is a 403", ['PM-BOOK-002', 'PM-BOOK-005', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/titles'):
    ('Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included', ['PM-ORG-005', 'PM-ORG-011', 'PM-BOOK-005']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):

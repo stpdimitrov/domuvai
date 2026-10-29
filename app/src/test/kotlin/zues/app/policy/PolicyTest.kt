@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            20 to listOf(
+            21 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -115,9 +115,24 @@ class PolicyTest {
                 "READ_VOTES BM PM-SEC-001",
                 "READ_VOTES MB PM-SEC-001",
                 "READ_VOTES CTL PM-GOV-008",
+                "LIST_ENTRANCE OWN PM-SEC-001",
+                "LIST_ENTRANCE USR PM-SEC-001",
+                "LIST_ENTRANCE BM PM-SEC-001",
+                "LIST_ENTRANCE MB PM-SEC-001",
+                "LIST_ENTRANCE CTL PM-SEC-001",
+                "LIST_ENTRANCE CSH PM-SEC-001",
+                "LIST_ENTRANCE SYS_ADMIN PM-SEC-001",
+                "REGISTER_PARTY BM PM-BOOK-005",
+                "REGISTER_PARTY MB PM-BOOK-005",
+                "REGISTER_PARTY SYS_ADMIN PM-SEC-001",
+                "REGISTER_ENTRANCE SYS_ADMIN PM-SEC-001",
             ),
         )
-        assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance", Action.READ_MANDATES to "OfEntrance"))
+        assertThat(Policy.ADMINISTERED.mapValues { it.value.simpleName }).isEqualTo(mapOf(
+                Action.TIE_LOGIN to "Deployment", Action.RECORD_MANDATE to "OfEntrance", Action.READ_MANDATES to "OfEntrance",
+                Action.LIST_ENTRANCE to "OfEntrance", Action.REGISTER_PARTY to "Deployment", Action.REGISTER_ENTRANCE to "Deployment",
+            ),
+        )
         assertThat(Policy.MATRIX.filter { it.role == Role.SYS_ADMIN }.map { it.action }).containsExactlyInAnyOrderElementsOf(Policy.ADMINISTERED.keys)
         assertThat(Role.entries.map { it.name }).containsExactly("OWN", "USR", "OCC", "BM", "MB", "CTL", "CSH", "PMC_STAFF", "MUN", "SYS_ADMIN")
     }
@@ -432,5 +447,56 @@ class PolicyTest {
         assertThat(deployment.decide(admin, Action.READ_MANDATES, Resource.Deployment, day).allowed).isFalse()      // an entrance's, and only asked of one
         assertThat(deployment.decide(admin, Action.READ_BOOK, Resource.OfEntrance(entrance), day).allowed).isFalse()  // and still no book
         assertThat(policy.decide(Asking(null, null), Action.READ_MANDATES, Resource.OfEntrance(entrance), day)).isEqualTo(Decision(false, "PM-SEC-001", null, Policy.MATRIX_VERSION))
+    }
+
+    private val admin = Asking(Login("https://id.example.test/realms/domuvai", "operator"), null)
+
+    @Test
+    fun `PM-SEC-001 an entrance is listed to anyone holding a role in it today and to the administrator — to nobody else`() {
+        val listed = setOf(Role.OWN, Role.USR, Role.BM, Role.MB, Role.CTL, Role.CSH)
+        for (role in Role.entries) {
+            val holder = holder(role, setOf(flat1))
+            assertThat(policy.decide(holder, Action.LIST_ENTRANCE, Resource.OfEntrance(entrance), day))
+                .describedAs("$role").isEqualTo(Decision(role in listed, "PM-SEC-001", role.takeIf { it in listed }, Policy.MATRIX_VERSION))
+            assertThat(policy.decide(holder, Action.LIST_ENTRANCE, Resource.OfEntrance(another), day).allowed).describedAs("$role elsewhere").isFalse()
+        }
+        val former = person().also { holds(it, Role.BM, until = day) }
+        val future = person().also { holds(it, Role.OWN, setOf(flat1), from = day.plusDays(1)) }
+        for (who in listOf(former, future, person(), Asking(null, null)))
+            assertThat(policy.decide(who, Action.LIST_ENTRANCE, Resource.OfEntrance(entrance), day).allowed).isFalse()
+        val deployment = withAdministrators(admin)
+        for (any in listOf(entrance, another))
+            assertThat(deployment.decide(admin, Action.LIST_ENTRANCE, Resource.OfEntrance(any), day)).isEqualTo(Decision(true, "PM-SEC-001", Role.SYS_ADMIN, Policy.MATRIX_VERSION))
+        assertThat(deployment.decide(admin, Action.LIST_ENTRANCE, Resource.Deployment, day).allowed).isFalse()
+    }
+
+    @Test
+    fun `PM-SEC-001 a party is registered by the administrator and by the manager or the board of any entrance — not by an owner, a holder of use, the controller or the cashier`() {
+        val deployment = withAdministrators(admin)
+        val entrances = listOf(another, entrance)            // the office is in the second: any of them, not the first only
+        for (role in Role.entries) {
+            val decision = deployment.decideInAny(holder(role, setOf(flat1)), Action.REGISTER_PARTY, entrances, day)
+            val expected = role == Role.BM || role == Role.MB
+            assertThat(decision).describedAs("$role").isEqualTo(Decision(expected, if (expected) "PM-BOOK-005" else "PM-SEC-001", role.takeIf { expected }, Policy.MATRIX_VERSION))
+        }
+        assertThat(deployment.decideInAny(holder(Role.BM), Action.REGISTER_PARTY, listOf(another), day).allowed).isFalse()   // an office of an entrance not named
+        assertThat(deployment.decideInAny(admin, Action.REGISTER_PARTY, emptyList(), day)).isEqualTo(Decision(true, "PM-SEC-001", Role.SYS_ADMIN, Policy.MATRIX_VERSION))
+        val former = person().also { holds(it, Role.MB, until = day) }
+        for (who in listOf(former, person(), Asking(null, null)))
+            assertThat(deployment.decideInAny(who, Action.REGISTER_PARTY, entrances, day)).isEqualTo(Decision(false, "PM-SEC-001", null, Policy.MATRIX_VERSION))
+        // the manager's line is an entrance's: asked of the deployment it carries nothing
+        assertThat(deployment.decide(holder(Role.BM), Action.REGISTER_PARTY, Resource.Deployment, day).allowed).isFalse()
+    }
+
+    @Test
+    fun `PM-SEC-001 an entrance is registered by the administrator only — no entrance's office carries it`() {
+        val deployment = withAdministrators(admin)
+        assertThat(deployment.decide(admin, Action.REGISTER_ENTRANCE, Resource.Deployment, day)).isEqualTo(Decision(true, "PM-SEC-001", Role.SYS_ADMIN, Policy.MATRIX_VERSION))
+        assertThat(deployment.decide(admin, Action.REGISTER_ENTRANCE, Resource.OfEntrance(entrance), day).allowed).isFalse()
+        for (role in Role.entries) {
+            val holder = holder(role, setOf(flat1))
+            assertThat(deployment.decideInAny(holder, Action.REGISTER_ENTRANCE, listOf(entrance), day)).describedAs("$role").isEqualTo(Decision(false, "PM-SEC-001", null, Policy.MATRIX_VERSION))
+        }
+        assertThat(deployment.decide(admin, Action.REGISTER_ENTRANCE, Resource.Deployment, day.minusYears(2)).allowed).isFalse()
     }
 }

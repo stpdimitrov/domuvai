@@ -95,25 +95,27 @@ data class EndStayRequest(val on: String)
 data class StayEnded(val id: UUID, val validFrom: LocalDate, val validTo: LocalDate)
 
 /**
- * The registry module's HTTP edge — entrances and their units. A unit, and who lives in it, is entered in the book by
- * the manager or the board, as the sign-in says who is asking; anybody else is a 403 (PM-BOOK-005).
+ * The registry module's HTTP edge — entrances and their units. An entrance is registered by the administrator, and
+ * listed to whoever holds a role in it; a unit, and who lives in it, is entered in the book by the manager or the
+ * board, as the sign-in says who is asking; anybody else is a 403 (PM-SEC-001, PM-BOOK-005).
  */
 @RestController
 @RequestMapping("/api/registry/entrances")
-class RegistryController(private val registry: RegistryService, private val book: BookEntries, private val who: WhoAsks) {
+class RegistryController(private val registrations: Registrations, private val book: BookEntries, private val who: WhoAsks) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun register(@RequestBody request: RegisterEntranceRequest): EntranceCreatedResponse {
-        val created = registry.registerEntrance(
+    fun register(@RequestBody request: RegisterEntranceRequest, signedIn: JwtAuthenticationToken?): EntranceCreatedResponse {
+        val created = registrations.entrance(
             RegisterEntrance(request.address, request.label, request.managementForm, request.condominiumId),
+            who.of(signedIn),
         )
         return EntranceCreatedResponse(created.entranceId, created.condominiumId)
     }
 
     @GetMapping
-    fun list(): List<EntranceView> =
-        registry.listEntrances().map { EntranceView(it.id, it.condominiumId, it.label, it.managementForm) }
+    fun list(signedIn: JwtAuthenticationToken?): List<EntranceView> =
+        registrations.entrances(who.of(signedIn)).map { EntranceView(it.id, it.condominiumId, it.label, it.managementForm) }
 
     @PostMapping("/{entranceId}/units")
     @ResponseStatus(HttpStatus.CREATED)
