@@ -1852,6 +1852,8 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     failures += [f"{path}: does not show the mandate {m['mandateId']}" for m in before if m["mandateId"] not in page]
     # WEB-52 (PM-BOOK-006) — the board member is a reader of the book: each office-holder's name beside the id, as the controller's token reads it
     named = [m for m in before if m.get("partyName")]
+    if not CARRIED.get(api):
+        print("—   /entrance/mandates  the names beside the ids NOT checked: no API token")
     failures += [] if named or not CARRIED.get(api) else [f"{path}: the controller's token reads no office-holder's name — nothing to read beside the ids"]
     failures += [f"{path}: does not show {m['partyName']!r} beside {m['partyId'][:8]}" for m in named if not beside(visible_text(page), m["partyName"], m["partyId"])]
     if not signed_in:
@@ -2390,7 +2392,7 @@ def visible_text(page):
 
 def beside(text, name, party):
     """WEB-52 — whether the visible text of a page has `name` right beside the 8-character id of `party`: whitespace is not compared."""
-    return re.search(rf"{re.escape(name)}\s+{re.escape(party[:8])}(?![0-9a-f])", text) is not None
+    return re.search(rf"(?<!\S){re.escape(name)}\s+{re.escape(party[:8])}(?![0-9a-f])", text) is not None
 
 
 def main():

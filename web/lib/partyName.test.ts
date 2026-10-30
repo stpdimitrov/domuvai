@@ -38,8 +38,10 @@ test("PM-BOOK-006 the name goes beside the 8-character id with the whole id on h
 test("PM-BOOK-006 the pages name only the ids the API names: attendee, represents, principal, agent, owner, mandates' party — the rest stay Party", () => {
   const assembly = code(source("entrance/assembly/page.tsx"));
   const mandates = code(source("entrance/mandates/page.tsx"));
-  for (const id of ["l.attendeePartyId", "p", "p.principalPartyId", "p.agentPartyId", "r.ownerPartyId"]) {
-    assert.match(assembly, new RegExp(`<PartyName id=\\{${id.replace(".", "\\.")}\\} name=\\{nameFor\\(${id.replace(".", "\\.")}, (l|p|r)\\.names\\)\\} />`), id);
+  // each id is named from its own row's `names`: the attendee and `represents[]` from the register line, the proxy's two from the proxy, the owner from the vote
+  for (const [id, row] of [["l.attendeePartyId", "l"], ["p", "l"], ["p.principalPartyId", "p"], ["p.agentPartyId", "p"], ["r.ownerPartyId", "r"]]) {
+    const at = id.replace(".", "\\.");
+    assert.match(assembly, new RegExp(`<PartyName id=\\{${at}\\} name=\\{nameFor\\(${at}, ${row}\\.names\\)\\} />`), id);
   }
   assert.match(assembly, /<PartyName id=\{m\.partyId\} name=\{m\.partyName\} \/>/);
   assert.match(mandates, /<PartyName id=\{m\.partyId\} name=\{m\.partyName\} \/>/);

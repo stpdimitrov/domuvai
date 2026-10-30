@@ -392,7 +392,7 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
     <>
       <div style={{ margin: "20px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={HEADING}>Присъствен списък и пълномощни</span>
-        <span style={{ font: "400 11.5px/1 'IBM Plex Mono', monospace", ...DIM }}>лицата са с идентификатор — имената още не се подават тук</span>
+        <span style={{ font: "400 11.5px/1 'IBM Plex Mono', monospace", ...DIM }}>лицата са с идентификатор; името стои до него, когато системата го дава</span>
       </div>
       <div className="pf-card cp-card" style={{ margin: "12px 0 0" }}>
         <div className="as-register pf-head"><div>Лице</div><div>Заседание</div><div>Начин</div><div>Брои се</div><div>Представлява</div></div>
