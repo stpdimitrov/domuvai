@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.WhoAsks
 import java.time.Instant
 import java.util.UUID
@@ -25,6 +26,8 @@ data class ProxyView(
     val registeredAt: Instant,
     val recordedBy: UUID?,
     val authorisationHash: String?,
+    /** The name of the principal and of the agent, to the manager, the board and the controller only — absent otherwise. */
+    val names: Map<UUID, String>? = null,
 )
 
 /** A refusal; [limit] is the number one person may represent, when that is why (PM-GA-010). */
@@ -52,7 +55,7 @@ data class AppointProxyRequest(
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies")
-class ProxyController(private val acts: AssemblyActs, private val proxies: ProxyService, private val reads: AssemblyReads, private val who: WhoAsks) {
+class ProxyController(private val acts: AssemblyActs, private val proxies: ProxyService, private val reads: AssemblyReads, private val who: WhoAsks, private val names: PartyNames) {
 
     // Rule: PM-GA-009
     // Rule: PM-SEC-001
@@ -63,15 +66,23 @@ class ProxyController(private val acts: AssemblyActs, private val proxies: Proxy
     ): ProxyView = view(acts.registerProxy(who.of(signedIn), entranceId, assemblyId, request))
 
     // Rule: PM-SEC-001
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
+    // Rule: PM-BOOK-011
+    // Rule: PM-SEC-002
     @GetMapping
     fun list(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, signedIn: JwtAuthenticationToken?): List<ProxyView> {
-        reads.require(entranceId, who.of(signedIn))
-        return proxies.forAssembly(entranceId, assemblyId).map(::view)
+        val asking = who.of(signedIn)
+        reads.require(entranceId, asking)
+        val appointed = proxies.forAssembly(entranceId, assemblyId)
+        val served = names.beside(entranceId, asking, appointed.flatMap { listOf(it.principalPartyId, it.agentPartyId) }, NamedRead.PROXIES)
+        return appointed.map { view(it, served) }
     }
 
-    private fun view(p: Proxy) = ProxyView(
+    private fun view(p: Proxy, served: Map<UUID, String>? = null) = ProxyView(
         p.id, p.principalPartyId, p.agentPartyId, p.agentKind, p.scope,
         p.scopeItems?.split(",")?.map { it.toInt() } ?: emptyList(), p.form, p.registeredAt, p.recordedBy, p.authorisationHash,
+        served.of(p.principalPartyId, p.agentPartyId),
     )
 
     /** The policy refuses, or nobody a record could name is asking. */

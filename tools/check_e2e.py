@@ -1151,6 +1151,13 @@ def proxies_on(api, web, entrance, here, of, owner=None, owner_party=None):
         want = {"agentKind": "THIRD_PARTY", "agentPartyId": agent, "form": "WRITTEN", "scope": "WHOLE_AGENDA", "items": []}
         if len(kept) != 1 or any(kept[0].get(k) != v for k, v in want.items()) or (owner_party and kept[0].get("principalPartyId") != owner_party) or kept[0].get("authorisationHash"):
             failures.append(f"{here}: the API holds {kept or status}, not the one proxy the form asked for, in person (no document)")
+        # names beside the ids (PM-BOOK-006, PM-BOOK-011): to the controller's own token the principal's and the agent's, a name only.
+        # (The register is empty here: its names are the IT's. The owner holds a web session, not an API token: that an owner is given
+        # ids alone is the IT's and the WebMvc tests'; the page shows no name until WEB-52.)
+        if kept:
+            given = kept[0].get("names") or {}
+            failures += [] if set(given) == {kept[0]["principalPartyId"], agent} and all(isinstance(n, str) and n and n not in given for n in given.values()) else [
+                f"{here}: PM-BOOK-006 — the controller reads the proxy with names {given}, not the principal's and the agent's"]
         row = f"{kept[0]['principalPartyId'][:8]} {agent[:8]} писмено целия дневен ред" if kept else ""
         failures += [] if row in visible_text(fetch(web, here)[1]) else [f"{here}: the register does not show the proxy as {row!r}"]
         s, back, again = submit_form(web, here, fetch(web, here)[1], 'name="agentPartyId"', {**fields, "agentPartyId": agent})

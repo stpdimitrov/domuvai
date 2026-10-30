@@ -30,8 +30,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.IssuerKeys
 import zues.app.identity_org.Logins
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
+import zues.app.policy.Asking
+import zues.app.policy.Login
 import zues.app.policy.Held
 import zues.app.policy.Policy
 import zues.app.policy.Role
@@ -79,6 +82,7 @@ class AttendanceWebTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames
     @MockitoBean lateinit var succession: Succession
 
     private val assemblyId = UUID.randomUUID()
@@ -175,6 +179,27 @@ class AttendanceWebTest {
         person("login-owner-5", Role.OWN)
         whenever(attendance.register(entranceId, assemblyId)).thenReturn(emptyList())
         mvc.perform(get(base).by("login-owner-5")).andExpect(status().isOk)
+        verifyNoInteractions(names)                                      // a register of nobody asks the book for nobody
+    }
+
+    @Test
+    fun `PM-BOOK-006 PM-BOOK-007 PM-BOOK-011 the register asks the book once for the names of the attendees and of whom they bring - and serves what is given, each line its own, or the ids alone`() {
+        val keeper = person("login-reader-8", Role.CTL)
+        val (ana, boris, vera) = listOf(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())
+        whenever(attendance.register(entranceId, assemblyId)).thenReturn(listOf(line(ana, keeper, "IN_PERSON", false, setOf(ana, boris)), line(vera, keeper, "IN_PERSON", false, setOf(vera))))
+        whenever(names.named(eq(entranceId), any(), any(), eq(NamedRead.REGISTER))).thenReturn(mapOf(ana to "Ана Колева", boris to "Борис Недев", vera to "Вера Стоянова"))
+        mvc.perform(get(base).by("login-reader-8")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].names.length()").value(2)).andExpect(jsonPath("$[0].names.['$ana']").value("Ана Колева")).andExpect(jsonPath("$[0].names.['$boris']").value("Борис Недев"))
+            .andExpect(jsonPath("$[1].names.length()").value(1)).andExpect(jsonPath("$[1].names.['$vera']").value("Вера Стоянова"))
+        verify(names, times(1)).named(entranceId, Asking(Login(ISSUER, "login-reader-8"), keeper), setOf(ana, boris, vera), NamedRead.REGISTER)   // once a read, not once a line
+        // names withheld: the ids alone, and the field is not there
+        whenever(names.named(any(), any(), any(), any())).thenReturn(null)
+        mvc.perform(get(base).by("login-reader-8")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].attendeePartyId").value(ana.toString())).andExpect(jsonPath("$[0].names").doesNotExist())
+        // a refused read asks for no name
+        person("login-stranger-8")
+        mvc.perform(get(base).by("login-stranger-8")).andExpect(status().isForbidden)
+        verify(names, times(2)).named(any(), any(), any(), any())
     }
 
     @Test

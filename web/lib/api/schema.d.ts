@@ -115,7 +115,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002 */
+        /** How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002. Each row carries the owner's name beside the id, given by the book and entered in its access log once a read */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
         put?: never;
         /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
@@ -133,7 +133,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
+        /** Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The attendee's name and the names of those the line brings go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
         put?: never;
         /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly */
@@ -202,7 +202,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
+        /** List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         put?: never;
         /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown */
@@ -1239,6 +1239,9 @@ export interface components {
             identityVerified: boolean;
             /** Format: date-time */
             identityVerifiedAt?: string;
+            names?: {
+                [key: string]: string;
+            };
             /** Format: date-time */
             recordedAt: string;
             /** Format: uuid */
@@ -1922,6 +1925,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             items: number[];
+            names?: {
+                [key: string]: string;
+            };
             /** Format: uuid */
             principalPartyId: string;
             /** Format: uuid */
@@ -2224,6 +2230,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             inEffect: boolean;
+            names?: {
+                [key: string]: string;
+            };
             /** Format: uuid */
             ownerPartyId: string;
             /** Format: uuid */

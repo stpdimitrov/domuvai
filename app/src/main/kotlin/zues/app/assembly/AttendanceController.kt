@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.WhoAsks
 import java.time.Instant
 import java.util.UUID
@@ -18,7 +19,10 @@ data class RecordAttendanceRequest(val attendeePartyId: UUID, val channel: Strin
 
 data class VerifyIdentityRequest(val how: String)
 
-/** A line of the register. [counted] is false for a remote participant not yet identified; [represents] is whom the line makes present. */
+/**
+ * A line of the register. [counted] is false for a remote participant not yet identified; [represents] is whom the line makes present.
+ * [names] gives the name of each party the line carries, to the manager, the board and the controller only — absent otherwise.
+ */
 data class AttendanceView(
     val id: UUID,
     val sessionNo: Int,
@@ -30,6 +34,7 @@ data class AttendanceView(
     val represents: List<UUID>,
     val recordedBy: UUID,
     val recordedAt: Instant,
+    val names: Map<UUID, String>? = null,
 )
 
 /**
@@ -39,7 +44,7 @@ data class AttendanceView(
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance")
-class AttendanceController(private val acts: AssemblyActs, private val attendance: AttendanceService, private val reads: AssemblyReads, private val who: WhoAsks) {
+class AttendanceController(private val acts: AssemblyActs, private val attendance: AttendanceService, private val reads: AssemblyReads, private val who: WhoAsks, private val names: PartyNames) {
 
     // Rule: PM-GA-012
     // Rule: PM-SEC-001
@@ -59,14 +64,24 @@ class AttendanceController(private val acts: AssemblyActs, private val attendanc
     ): AttendanceView = view(acts.verifyIdentity(who.of(signedIn), entranceId, assemblyId, attendanceId, request.how))
 
     // Rule: PM-SEC-001
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
+    // Rule: PM-BOOK-011
+    // Rule: PM-SEC-002
     @GetMapping
     fun register(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, signedIn: JwtAuthenticationToken?): List<AttendanceView> {
-        reads.require(entranceId, who.of(signedIn))
-        return attendance.register(entranceId, assemblyId).map(::view)
+        val asking = who.of(signedIn)
+        reads.require(entranceId, asking)
+        val lines = attendance.register(entranceId, assemblyId)
+        val served = names.beside(entranceId, asking, lines.flatMap { it.represented + it.attendance.attendeePartyId }, NamedRead.REGISTER)
+        return lines.map { view(it, served) }
     }
 
-    private fun view(p: Present) = p.attendance.let {
-        AttendanceView(it.id, it.sessionNo, it.attendeePartyId, it.channel, p.identityVerified, p.identityVerifiedAt, p.counted, p.represented.sortedBy { id -> id.toString() }, it.recordedBy, it.recordedAt)
+    private fun view(p: Present, served: Map<UUID, String>? = null) = p.attendance.let {
+        AttendanceView(
+            it.id, it.sessionNo, it.attendeePartyId, it.channel, p.identityVerified, p.identityVerifiedAt, p.counted, p.represented.sortedBy { id -> id.toString() },
+            it.recordedBy, it.recordedAt, served.of(it.attendeePartyId, *p.represented.toTypedArray()),
+        )
     }
 
     @ExceptionHandler(ActRefused::class)

@@ -381,6 +381,12 @@
             "format": "date-time",
             "type": "string"
           },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
           "recordedAt": {
             "format": "date-time",
             "type": "string"
@@ -2626,6 +2632,12 @@
             },
             "type": "array"
           },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
           "principalPartyId": {
             "format": "uuid",
             "type": "string"
@@ -3608,6 +3620,12 @@
           },
           "inEffect": {
             "type": "boolean"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
           },
           "ownerPartyId": {
             "format": "uuid",
@@ -4625,7 +4643,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002",
+        "summary": "How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002. Each row carries the owner's name beside the id, given by the book and entered in its access log once a read",
         "tags": [
           "assembly"
         ],
@@ -4633,7 +4651,10 @@
           "PM-VOTE-014",
           "PM-SEC-001",
           "PM-SEC-002",
-          "PM-GOV-008"
+          "PM-GOV-008",
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011"
         ]
       },
       "post": {
@@ -4846,14 +4867,17 @@
             "description": "Conflict"
           }
         },
-        "summary": "Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
+        "summary": "Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The attendee's name and the names of those the line brings go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-012",
           "PM-GA-016",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011"
         ]
       },
       "post": {
@@ -5376,13 +5400,16 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
+        "summary": "List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-009",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011"
         ]
       },
       "post": {

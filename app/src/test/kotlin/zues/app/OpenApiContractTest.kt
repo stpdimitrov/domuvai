@@ -26,6 +26,7 @@ import zues.app.assembly.ProxyService
 import zues.app.assembly.SittingService
 import zues.app.identity_org.LoginAdministration
 import zues.app.identity_org.Logins
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.MandateAdministration
 import zues.app.identity_org.MandateReading
 import zues.app.identity_org.WhoAsks
@@ -92,6 +93,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var imports: ImportService
     @MockitoBean lateinit var importGuard: zues.app.intake.ImportGuard
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames
     @MockitoBean lateinit var loginAdministration: LoginAdministration
     @MockitoBean lateinit var mandateAdministration: MandateAdministration
     @MockitoBean lateinit var mandateReading: MandateReading
