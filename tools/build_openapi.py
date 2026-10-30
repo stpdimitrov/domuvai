@@ -85,8 +85,8 @@ RUNNING = {
    ("An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — an item tagged for absentee ballots only once they are merged, then shown as the merged decision naming the one it supersedes — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
     ['PM-VOTE-011', 'PM-VOTE-013', 'PM-VOTE-016', 'PM-GA-023', 'PM-SEC-001', 'PM-SEC-002']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes'):
-   ("How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002",
-    ['PM-VOTE-014', 'PM-SEC-001', 'PM-SEC-002', 'PM-GOV-008']),
+   ("How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002. Each row carries the owner's name beside the id, given by the book and entered in its access log once a read",
+    ['PM-VOTE-014', 'PM-SEC-001', 'PM-SEC-002', 'PM-GOV-008', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule'):
    ('Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again',
     ['PM-GA-004', 'PM-GA-006', 'PM-SEC-001']),
@@ -100,7 +100,7 @@ RUNNING = {
    ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown',
     ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
-   ('List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-009', 'PM-SEC-001']),
+   ("List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered", ['PM-GA-009', 'PM-SEC-001', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions'):
    ('Open a petition to convene an assembly — by the signed-in owner, who signs it; anybody else is a 403', ['PM-GA-003', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures'):
@@ -116,7 +116,7 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification'):
    ('Record that a remote participant was reliably identified, and how — from then on their presence counts', ['PM-GA-016', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
-   ('Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001']),
+   ("Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The attendee's name and the names of those the line brings go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered", ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum'):
    ('The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting\'s threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. Who owns the share behind a higher quorum is named to the manager, the board and the controller only',
     ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015', 'PM-ORG-005', 'PM-ORG-011', 'PM-SEC-001', 'PM-SEC-002']),

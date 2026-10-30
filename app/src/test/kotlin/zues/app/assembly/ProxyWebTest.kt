@@ -30,8 +30,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.IssuerKeys
 import zues.app.identity_org.Logins
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
+import zues.app.policy.Asking
+import zues.app.policy.Login
 import zues.app.policy.Held
 import zues.app.policy.Policy
 import zues.app.policy.Role
@@ -80,6 +83,7 @@ class ProxyWebTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames
     @MockitoBean lateinit var succession: Succession
 
     private val assemblyId = UUID.randomUUID()
@@ -246,6 +250,21 @@ class ProxyWebTest {
         person("login-holder-6", Role.USR)
         whenever(proxies.forAssembly(entranceId, assemblyId)).thenReturn(emptyList())
         mvc.perform(get(base).by("login-holder-6")).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `PM-BOOK-006 PM-BOOK-007 PM-BOOK-011 the proxies ask the book once for the names of principals and agents - and serve what is given, each proxy its own, or the ids alone`() {
+        val reader = person("login-reader-8", Role.BM)
+        val (boris, vera) = listOf(UUID.randomUUID(), UUID.randomUUID())
+        whenever(proxies.forAssembly(entranceId, assemblyId)).thenReturn(listOf(stored(boris, "login-boris"), stored(vera, "login-vera")))
+        whenever(names.named(eq(entranceId), any(), any(), eq(NamedRead.PROXIES))).thenReturn(mapOf(boris to "Борис Недев", vera to "Вера Стоянова", agent to "Ана Колева"))
+        mvc.perform(get(base).by("login-reader-8")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].names.length()").value(2)).andExpect(jsonPath("$[0].names.['$boris']").value("Борис Недев")).andExpect(jsonPath("$[0].names.['$agent']").value("Ана Колева"))
+            .andExpect(jsonPath("$[1].names.length()").value(2)).andExpect(jsonPath("$[1].names.['$vera']").value("Вера Стоянова"))
+        verify(names, times(1)).named(entranceId, Asking(Login(ISSUER, "login-reader-8"), reader), setOf(boris, vera, agent), NamedRead.PROXIES)    // once a read, not once a proxy
+        whenever(names.named(any(), any(), any(), any())).thenReturn(null)
+        mvc.perform(get(base).by("login-reader-8")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].principalPartyId").value(boris.toString())).andExpect(jsonPath("$[0].names").doesNotExist())
     }
 
     @Test

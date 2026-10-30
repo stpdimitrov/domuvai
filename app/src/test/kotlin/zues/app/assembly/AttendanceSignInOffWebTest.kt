@@ -15,10 +15,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.identity_org.Logins
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
+import zues.app.policy.Asking
 import zues.app.policy.Held
 import zues.app.policy.Policy
 import zues.app.policy.Role
@@ -47,6 +50,7 @@ class AttendanceSignInOffWebTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames
     @MockitoBean lateinit var succession: Succession
 
     @Test
@@ -60,5 +64,17 @@ class AttendanceSignInOffWebTest {
         mvc.perform(get(base)).andExpect(status().isOk)
         verify(attendance).register(any(), any(), anyOrNull())
         verifyNoMoreInteractions(attendance)
+    }
+
+    @Test
+    fun `PM-SEC-001 with sign-in switched off the register is served named - the book is asked for nobody, who it gives names and enters as open`() {
+        val entrance = UUID.randomUUID()
+        val attendee = UUID.randomUUID()
+        val line = Present(Attendance(UUID.randomUUID(), entrance, UUID.randomUUID(), 1, attendee, "IN_PERSON", UUID.randomUUID(), "https://id.example.test", "login-keeper", java.time.Instant.now()), null, setOf(attendee))
+        whenever(attendance.register(any(), any(), anyOrNull())).thenReturn(listOf(line))
+        whenever(names.named(any(), any(), any(), any())).thenReturn(mapOf(attendee to "Ана Колева"))
+        mvc.perform(get("/api/assembly/entrances/$entrance/assemblies/${UUID.randomUUID()}/attendance")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].names.['$attendee']").value("Ана Колева"))
+        verify(names).named(entrance, Asking(null, null), setOf(attendee), NamedRead.REGISTER)
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.WhoAsks
 import zues.app.policy.Action
 import zues.app.policy.Asking
@@ -39,6 +40,8 @@ data class VoteView(
     val correction: String?,
     val recordedBy: UUID,
     val inEffect: Boolean,
+    /** The owner's name, to the manager, the board and the controller — absent where names are withheld. */
+    val names: Map<UUID, String>? = null,
 )
 
 /** A vote is recorded by whoever runs the assembly (the owner's decision of 2026-10-24): the policy's line, then theirs to run. */
@@ -99,7 +102,7 @@ class VoteActs(
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes")
-class VoteController(private val acts: VoteActs, private val who: WhoAsks) {
+class VoteController(private val acts: VoteActs, private val who: WhoAsks, private val names: PartyNames) {
 
     // Rule: PM-VOTE-001
     // Rule: PM-VOTE-014
@@ -116,12 +119,22 @@ class VoteController(private val acts: VoteActs, private val who: WhoAsks) {
     // Rule: PM-SEC-001
     // Rule: PM-SEC-002
     // Rule: PM-GOV-008
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
+    // Rule: PM-BOOK-011
     @GetMapping
-    fun read(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): List<VoteView> =
-        acts.read(who.of(signedIn), entranceId, assemblyId, itemId).let { rows -> views(rows, rows.mapNotNull { it.reverses }.toSet()) }
+    fun read(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): List<VoteView> {
+        val asking = who.of(signedIn)
+        val rows = acts.read(asking, entranceId, assemblyId, itemId)
+        val served = names.beside(entranceId, asking, rows.map { it.partyId }, NamedRead.VOTES)
+        return views(rows, rows.mapNotNull { it.reverses }.toSet(), served)
+    }
 
-    private fun views(rows: List<Vote>, reversed: Set<UUID>) = rows.map {
-        VoteView(it.id, it.sessionNo, it.partyId, it.unitId, it.weight.plain(), it.choice, it.channel, it.castAt, it.reverses, it.correction, it.recordedBy, it.id !in reversed)
+    private fun views(rows: List<Vote>, reversed: Set<UUID>, served: Map<UUID, String>? = null) = rows.map {
+        VoteView(
+            it.id, it.sessionNo, it.partyId, it.unitId, it.weight.plain(), it.choice, it.channel, it.castAt, it.reverses, it.correction, it.recordedBy, it.id !in reversed,
+            served.of(it.partyId),
+        )
     }
 
     private fun BigDecimal.plain() = stripTrailingZeros().toPlainString()

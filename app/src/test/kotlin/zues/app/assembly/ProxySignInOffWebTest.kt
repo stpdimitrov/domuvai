@@ -14,10 +14,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.identity_org.Logins
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
+import zues.app.policy.Asking
 import zues.app.policy.Held
 import zues.app.policy.Policy
 import zues.app.policy.Role
@@ -46,6 +49,7 @@ class ProxySignInOffWebTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames
     @MockitoBean lateinit var succession: Succession
 
     @Test
@@ -59,5 +63,18 @@ class ProxySignInOffWebTest {
         mvc.perform(get(base)).andExpect(status().isOk)
         verify(proxies).forAssembly(any(), any())
         verifyNoMoreInteractions(proxies)
+    }
+
+    @Test
+    fun `PM-SEC-001 with sign-in switched off the proxies are served named - the book is asked for nobody, who it gives names and enters as open`() {
+        val entrance = UUID.randomUUID()
+        val (principal, agent) = listOf(UUID.randomUUID(), UUID.randomUUID())
+        whenever(proxies.forAssembly(any(), any())).thenReturn(
+            listOf(Proxy(UUID.randomUUID(), entrance, UUID.randomUUID(), principal, agent, "OWNER", "WHOLE_AGENDA", null, "WRITTEN", java.time.Instant.now(), "https://id.example.test", "login-p", principal, null)),
+        )
+        whenever(names.named(any(), any(), any(), any())).thenReturn(mapOf(principal to "Борис Недев", agent to "Ана Колева"))
+        mvc.perform(get("/api/assembly/entrances/$entrance/assemblies/${UUID.randomUUID()}/proxies")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].names.['$agent']").value("Ана Колева"))
+        verify(names).named(entrance, Asking(null, null), setOf(principal, agent), NamedRead.PROXIES)
     }
 }
