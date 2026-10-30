@@ -959,6 +959,7 @@ def submit_form(web, path, page, marker, fields, files=None):
         attrs = dict((k, html.unescape(v)) for k, v in re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag))
         if attrs.get("type") == "hidden" and "name" in attrs:
             hidden.append((attrs["name"], attrs.get("value", "")))
+    hidden = [(k, v) for k, v in hidden if v or k not in fields]    # an empty hidden field a script would fill (a picker's day) is the one given
     boundary = "----e2e" + uuid.uuid4().hex
     body = b"".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in hidden + list(fields.items()))
     for name, (filename, content) in (files or {}).items():
@@ -1095,7 +1096,8 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None, owner=None)
         failures.append(f"{here}: an item whose majority waits on counsel answers HTTP {status} → {back or 'the page'} — expected the API's refusal (PM-VOTE-004), the form kept")
 
     failures += proxies_on(api, web, entrance, here, of, owner, owner_party)
-    failures += moved_and_noticed(api, web, here, of, day, place, owner_party)
+    failures += notice_picker(api, web, entrance, here)
+    failures += moved_and_noticed(api, web, entrance, here, of, day, place, owner_party, owner)
 
     # an office the person does not hold: refused in the API's words, and nothing convened
     status, location, refused_page = submit_form(web, path, page, 'name="convenedAs"',
@@ -1183,7 +1185,93 @@ def proxies_on(api, web, entrance, here, of, owner=None, owner_party=None):
     return failures
 
 
-def moved_and_noticed(api, web, here, of, day, place, owner_party):
+def picks(page, list_id):
+    """WEB-52b — what a picker's list offers, whole id → label, whatever the order of the attributes; {} when the page has no such list."""
+    for found in re.findall(r"<datalist\b[^>]*>.*?</datalist>", page, re.S):
+        if re.search(rf'<datalist\b[^>]*\bid="{re.escape(list_id)}"', found):
+            options = [dict((k, html.unescape(v)) for k, v in re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag)) for tag in re.findall(r"<option\b[^>]*>", found)]
+            return {o.get("value"): o.get("label") for o in options}
+    return {}
+
+
+def sofia_today():
+    return datetime.datetime.now(ZoneInfo("Europe/Sofia")).date().isoformat()
+
+
+def notice_picker(api, web, entrance, here):
+    """
+    WEB-52b (PM-GA-007) on the draft assembly: the notice's picker reads as of the day it is given, the owners only — a day before any
+    title offers nobody, in the page's words. The page posts the day a script takes from the form's field; with none, this check gives it.
+    """
+    if not CARRIED.get(api):
+        print("—   /entrance/assembly  the notice's picker NOT checked: no API token")
+        return []
+    page, marker, today = fetch(web, here)[1], 'data-picks="parties-notice"', sofia_today()
+    long_ago = submit_form(web, here, page, marker, {"on": "1990-01-01"})[2]
+    failures = [] if picks(long_ago, "parties-notice") == {} and "Няма лица за избор към този ден" in visible_text(long_ago) else [
+        f"{here}: PM-GA-007 — the notice's picker offers somebody as of 1990, or does not say it offers nobody"]
+    rows = json.loads(fetch(api, f"/api/registry/entrances/{entrance}/owners?on={today}")[1])
+    owners = {r["partyId"]: f'{r["partyName"]} {r["partyId"][:8]}' for r in rows if r["titleRole"] == "OWN"}
+    offered = picks(submit_form(web, here, page, marker, {"on": today})[2], "parties-notice")
+    failures += [] if owners and offered == owners else [f"{here}: PM-GA-007 — the notice's picker offers {offered}, not the API's owners on {today}: {owners}"]
+    return failures
+
+
+def pickers_on(api, web, entrance, here, owner=None, owner_party=None):
+    """
+    WEB-52b (PM-BOOK-006, PM-BOOK-007, PM-SEC-002) on the noticed assembly. A page view enters nothing in the book's access log; the
+    board member's click on the attendance form's picker enters one row and offers every party the API lists, by name and 8-character
+    id, the value the whole id, and the chosen id goes on through the form to the API. The seeded owner is offered themself with no
+    read, and their click is the API's 403 in its words, entered in the log, the form there and no name on the page. This check posts
+    as a browser with no script does, so the page comes back whole: that a click leaves a typed field alone, with a script, is the
+    source test's (the picker is a form of its own). Form 5's "myself" is its empty principal.
+    """
+    if not CARRIED.get(api):
+        print("—   /entrance/assembly  the pickers NOT checked: no API token")
+        return []
+    marker, attendance = 'data-picks="parties-attendance"', "parties-attendance"
+    owners_read = lambda: sum(v["kind"] == "OWNERS_LIST" for v in json.loads(fetch(api, f"/api/registry/entrances/{entrance}/book/access-log?purpose=e2e%3A%20pickers")[1]))
+    before = owners_read()
+    page = fetch(web, here)[1]
+    failures = [] if owners_read() == before else [f"{here}: PM-BOOK-007 — a page view with no click entered a read of the owners in the book's log"]
+    failures += [] if re.search(rf'<input(?=[^>]*\bname="attendeePartyId")(?=[^>]*\blist="{attendance}")[^>]*>', page) else [f"{here}: the attendance field does not name its picker's list"]
+    s, back, picked = submit_form(web, here, page, marker, {})
+    failures += [] if s == 200 and not back and owners_read() == before + 1 else [
+        f"{here}: PM-BOOK-007 — the board member's click answers HTTP {s} → {back or 'the page'}, or did not enter one read in the book's log"]
+    rows = json.loads(fetch(api, f"/api/registry/entrances/{entrance}/owners?on={sofia_today()}")[1])
+    want = {r["partyId"]: f'{r["partyName"]} {r["partyId"][:8]}' for r in rows}
+    offered = picks(picked, attendance)
+    named = {i: label for i, label in offered.items() if not label.startswith("Аз ")}
+    failures += [] if want and want.keys() <= offered.keys() and all(want.get(i) == label for i, label in named.items()) else [
+        f"{here}: PM-BOOK-006 — the board member's picker offers {offered}, not the API's parties by name: {want}"]
+    chosen = owner_party if owner_party in offered else next(iter(want), None)
+    s, back, refused = submit_form(web, here, picked, 'name="attendeePartyId"', {"attendeePartyId": chosen, "channel": "IN_PERSON"})
+    failures += [] if s == 200 and not back and "is kept on" in visible_text(refused) and re.search(rf'<input(?=[^>]*\bname="attendeePartyId")(?=[^>]*\bvalue="{chosen}")[^>]*>', refused) else [
+        f"{here}: the party chosen from the picker did not reach the API whole: HTTP {s} → {back or 'the page'}, without its word on the register's day, or the id not kept in the form"]
+    if not owner or not owner_party:
+        print("—   /entrance/assembly  the owner's picker NOT checked: no --owner-user")
+        return failures
+    board = CARRIED.get(web)
+    CARRIED[web] = owner                                    # the page, signed in as the owner
+    try:
+        myself = {owner_party: f"Аз {owner_party[:8]}"}
+        page = fetch(web, here)[1]
+        failures += [] if picks(page, attendance) == myself else [f"{here}: PM-SEC-002 — the owner's attendance list offers {picks(page, attendance)}, not themself alone"]
+        failures += [] if "оставете празно, за да упълномощите себе си" in page else [f"{here}: the owner's proxy form no longer offers themself as the empty principal"]
+        before = owners_read()
+        s, back, refused = submit_form(web, here, page, marker, {})
+        said = visible_text(refused)
+        failures += [] if s == 200 and not back and "Нямате право да четете собствениците на входа:" in said and 'name="attendeePartyId"' in refused and owners_read() == before + 1 else [
+            f"{here}: PM-BOOK-006 — the owner's click answers HTTP {s} → {back or 'the page'}, without the API's 403 in its words, the form gone, or no entry in the book's log"]
+        failures += [] if picks(refused, attendance) == myself and not any(beside(said, r["partyName"], r["partyId"]) for r in rows) else [f"{here}: PM-SEC-002 — the owner's refused click shows a party by name"]
+    finally:
+        CARRIED[web] = board
+    print(f"{'ok ' if not failures else 'BAD'} WEB-52b the pickers: no read on a page view; the board member's click, one logged read, every party by name, the chosen id reaches the API; "
+          "the owner offered themself, their click the API's 403 in its words, no name")
+    return failures
+
+
+def moved_and_noticed(api, web, entrance, here, of, day, place, owner_party, owner=None):
     """
     WEB-28 (PM-GA-004, PM-GA-006, PM-GA-007, PM-SYS-013) on the draft assembly_screen convened: moved through the page's
     own form and stored as asked; a posting act co-signed by a party who owns nothing refused in the API's words, the
@@ -1241,6 +1329,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     failures += decision_before_open(api, web, here, of)
     failures += absentee_before_open(api, web, here, of)
     failures += protocol_before_open(api, web, here, of)
+    failures += pickers_on(api, web, entrance, here, owner, owner_party)     # while it is noticed: the move below makes it a draft, with no register
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
@@ -1878,7 +1967,9 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     CARRIED[web] = administrator                            # the page, signed in as the administrator
     try:
         # PM-SEC-002 — the administrator reads no book: the API sends no name, so the page shows each office-holder's id alone
-        seen = visible_text(fetch(web, path)[1])
+        own_page = fetch(web, path)[1]
+        seen = visible_text(own_page)
+        failures += [] if "<datalist" not in own_page and "data-picks" not in own_page else [f"{path}: PM-SEC-002 — the administrator reads no book, and the mandate form is offered a picker"]
         failures += [f"{path}: the administrator's page does not show {m['partyId'][:8]} for the mandate {m['mandateId']}" for m in before if m["partyId"][:8] not in seen]
         failures += [f"{path}: PM-SEC-002 — the administrator's page shows {m['partyName']!r} beside an id" for m in named if beside(seen, m["partyName"], m["partyId"])]
         s, _, recorded = submit_form(web, path, page, "Впиши мандата", {"body": "CTL", "party": spare_party, "validFrom": first, "validTo": last, "protocolRef": protocol})
@@ -2162,6 +2253,12 @@ def handover_screen(api, web, entrance, signed_in):
             failures.append(f"{path}: a handover with one party on both sides answered HTTP {s_status} without the API's words, or the form not kept")
         after = json.loads(fetch(api, f"/api/money/entrances/{entrance}/fund/handover-statements")[1])
         failures += [] if len(after) == len(listed) else [f"{path}: a refused handover recorded a statement"]
+        # WEB-52b — the handover's picker reads the mandates in force on the day given, never the book
+        day = sofia_today()
+        s_status, back, picked = submit_form(web, path, page, 'data-picks="parties-handover"', {"on": day})
+        mandated = {m["partyId"] for m in json.loads(fetch(api, f"/api/identity/entrances/{entrance}/mandates?on={day}")[1])}
+        failures += [] if s_status == 200 and not back and mandated and set(picks(picked, "parties-handover")) == mandated else [
+            f"{path}: the handover's picker answers HTTP {s_status} → {back or 'the page'} and offers {picks(picked, 'parties-handover')}, not the mandates in force on {day}: {mandated}"]
     print(f"{'ok ' if not failures else 'BAD'} PM-FUND-010 the handover statements: {len(listed)} listed, each not signed; the first opened with its hash checked; "
           f"{'a handover with one party on both sides refused' if signed_in else 'the form NOT checked: no sign-in'}")
     return failures

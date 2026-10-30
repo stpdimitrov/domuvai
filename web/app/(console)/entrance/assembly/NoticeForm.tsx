@@ -11,7 +11,7 @@ import { postNotice, type NoticeState } from "./actions";
 // Rule: PM-GA-004
 // Rule: PM-GA-007
 // Rule: PM-SYS-013
-export default function NoticeForm({ entrance, assembly }: { entrance: string; assembly: string }) {
+export default function NoticeForm({ entrance, assembly, parties }: { entrance: string; assembly: string; parties: string }) {
   const [state, act, pending] = useActionState<NoticeState, FormData>(postNotice, {});
   const v = state.values ?? {};
   return (
@@ -24,7 +24,7 @@ export default function NoticeForm({ entrance, assembly }: { entrance: string; a
       </label>
       <label>
         Подписва и собственик
-        <input type="text" name="coSignatoryPartyId" defaultValue={v.coSignatoryPartyId} required placeholder="идентификатор на лицето" maxLength={36} />
+        <input type="text" name="coSignatoryPartyId" list={parties} defaultValue={v.coSignatoryPartyId} required placeholder="идентификатор на лицето" maxLength={36} />
       </label>
       <label className="wide">
         Снимка на обявената покана

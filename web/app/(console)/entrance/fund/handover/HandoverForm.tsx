@@ -4,12 +4,12 @@ import { useActionState } from "react";
 import { issue, type HandoverState } from "./actions";
 
 /**
- * A handover statement issued (WEB-43) — works without a script. The two sides are party ids until #300 serves names.
+ * A handover statement issued (WEB-43) — works without a script. The two sides are party ids, typed or picked from the list beside the form.
  * The bank balance is the figure on the bank's own statement for that day, never filled in from the book: a figure
  * copied from the book would always match. The key is minted by the page, once per form.
  */
 // Rule: PM-FUND-010, PM-SEC-001
-export default function HandoverForm({ entrance, today, mintedKey }: { entrance: string; today: string; mintedKey: string }) {
+export default function HandoverForm({ entrance, today, mintedKey, parties }: { entrance: string; today: string; mintedKey: string; parties: string }) {
   const [state, act, pending] = useActionState<HandoverState, FormData>(issue, {});
   const input = state.input;
   return (
@@ -23,8 +23,8 @@ export default function HandoverForm({ entrance, today, mintedKey }: { entrance:
       </div>
       <label>Дата на предаване<input type="date" name="handoverOn" defaultValue={input?.handoverOn ?? today} /></label>
       <label>От (по желание — началото на периода)<input type="date" name="from" defaultValue={input?.from} /></label>
-      <label>Предаваща страна (идентификатор на лице)<input type="text" name="outgoing" defaultValue={input?.outgoing} autoComplete="off" /></label>
-      <label>Приемаща страна (идентификатор на лице)<input type="text" name="incoming" defaultValue={input?.incoming} autoComplete="off" /></label>
+      <label>Предаваща страна (идентификатор на лице)<input type="text" name="outgoing" list={parties} defaultValue={input?.outgoing} /></label>
+      <label>Приемаща страна (идентификатор на лице)<input type="text" name="incoming" list={parties} defaultValue={input?.incoming} /></label>
       <label>Салдо по банковото извлечение, евро<input type="text" name="bankBalance" defaultValue={input?.bankBalance} inputMode="decimal" autoComplete="off" /></label>
       {state.refused && <div className="wide as-refused" role="alert">{state.refused}</div>}
       <div className="wide">

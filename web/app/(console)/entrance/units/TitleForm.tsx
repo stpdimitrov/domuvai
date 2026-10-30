@@ -10,7 +10,7 @@ import { recordTitle, type TitleState } from "./actions";
  * shown in its words and the fields kept. The share's range and the days (Rule: PM-ORG-005, PM-ORG-011) are the API's too.
  */
 // Rule: PM-ORG-005, PM-ORG-011, PM-BOOK-005, PM-SEC-001
-export function TitleForm({ entrance, units }: { entrance: string; units: { id: string; label: string }[] }) {
+export function TitleForm({ entrance, units, parties }: { entrance: string; units: { id: string; label: string }[]; parties: string }) {
   const [state, act, pending] = useActionState<TitleState, FormData>(recordTitle, {});
   const v = state.typed ?? {};
   return (
@@ -29,7 +29,7 @@ export function TitleForm({ entrance, units }: { entrance: string; units: { id: 
           {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
         </select>
       </label>
-      <label>Номер на лицето<input type="text" name="party" defaultValue={v.party} maxLength={36} required autoComplete="off" /></label>
+      <label>Номер на лицето<input type="text" name="party" list={parties} defaultValue={v.party} maxLength={36} required /></label>
       <label>Право
         <select name="role" defaultValue={v.role || "OWN"}>
           {Object.entries(ROLE).map(([value, label]) => <option key={value} value={value}>{label}</option>)}

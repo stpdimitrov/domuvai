@@ -4,6 +4,7 @@ import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, reach } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { DeclarationForm, RetentionForm } from "./DeclarationForm";
+import PartyPicker from "../PartyPicker";
 import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Декларации за книгата — Етаж" };
@@ -39,7 +40,8 @@ export default async function DeclarationsPage({ searchParams }: { searchParams:
         <>
           {!listed && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>Бекендът не отговаря на <code>{API_URL}</code>.</div>}
           {listed && !listed.data && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{unansweredBy(listed, "обектите на входа")}</div>}
-          <DeclarationForm entrance={view.entrance.id} units={units} />
+          <PartyPicker id="parties-declarant" entrance={view.entrance.id} margin="16px 24px 0" />
+          <DeclarationForm entrance={view.entrance.id} units={units} parties="parties-declarant" />
           <RetentionForm entrance={view.entrance.id} />
           <div style={BODY} className="as-hint">
             Кой е просрочил декларацията си е на <Link href={`/entrance?entrance=${view.entrance.id}`}>страницата на входа</Link>; подаденото се чете в{" "}

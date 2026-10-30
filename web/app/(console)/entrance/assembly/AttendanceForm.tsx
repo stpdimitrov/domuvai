@@ -4,14 +4,14 @@ import { useActionState } from "react";
 import { recordAttendance, type AttendanceState } from "./actions";
 
 /**
- * Entering a person in the register of the sitting (PM-GA-012, PM-GA-016): the person, by party id until #300, and
+ * Entering a person in the register of the sitting (PM-GA-012, PM-GA-016): the person, by party id or picked from the list beside the form, and
  * whether they are there in person or by video — the assembly's own way preselected, both offered: a way the assembly
  * does not meet is the api's to refuse. It works without a script: the server's action answers either with the
  * assembly's page, the line on its register, or with the api's refusal and the fields as they were filled.
  */
 // Rule: PM-GA-012
 // Rule: PM-GA-016
-export default function AttendanceForm({ entrance, assembly, mode }: { entrance: string; assembly: string; mode: string }) {
+export default function AttendanceForm({ entrance, assembly, mode, parties }: { entrance: string; assembly: string; mode: string; parties: string }) {
   const [state, act, pending] = useActionState<AttendanceState, FormData>(recordAttendance, {});
   const v = state.values ?? {};
   return (
@@ -20,7 +20,7 @@ export default function AttendanceForm({ entrance, assembly, mode }: { entrance:
       <input type="hidden" name="assembly" value={assembly} />
       <label>
         Лице
-        <input type="text" name="attendeePartyId" defaultValue={v.attendeePartyId} required placeholder="идентификатор на лицето" maxLength={36} />
+        <input type="text" name="attendeePartyId" list={parties} defaultValue={v.attendeePartyId} required placeholder="идентификатор на лицето" maxLength={36} />
       </label>
       <label>
         Присъства

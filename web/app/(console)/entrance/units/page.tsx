@@ -5,6 +5,7 @@ import { entranceAt, reach } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { typesIn } from "@/lib/units";
 import { TitleForm } from "./TitleForm";
+import PartyPicker from "../PartyPicker";
 import { UnitsForm } from "./UnitsForm";
 import NoEntrance from "@/app/(console)/NoEntrance";
 
@@ -51,7 +52,8 @@ export default async function UnitsPage({ searchParams }: { searchParams: Promis
             </ul>
           </div>
           <UnitsForm entrance={view.entrance.id} types={typesIn(units)} />
-          <TitleForm entrance={view.entrance.id} units={units.map((u) => ({ id: u.id, label: `${u.designation} · ${u.unitType}` }))} />
+          <PartyPicker id="parties-title" entrance={view.entrance.id} margin="16px 24px 0" />
+          <TitleForm entrance={view.entrance.id} units={units.map((u) => ({ id: u.id, label: `${u.designation} · ${u.unitType}` }))} parties="parties-title" />
         </>
       ) : (
         <div style={BODY}>

@@ -5,13 +5,13 @@ import { enterBallot, type BallotState } from "./actions";
 
 /**
  * Entering an absent owner's ballot on an item tagged for absentee ballots (PM-GA-017, PM-GA-018): the owner, by party
- * id until #300, how they voted, and their handwritten-signed declaration — its reference, the SHA-256 of its scan and
+ * id or picked from the list beside the form, how they voted, and their handwritten-signed declaration — its reference, the SHA-256 of its scan and
  * the day it was received. It works without a script: the server's action answers either with the form emptied and the
  * word that the ballot was entered, or with the api's refusal and the fields as they were filled.
  */
 // Rule: PM-GA-017
 // Rule: PM-GA-018
-export default function BallotForm({ entrance, assembly, item }: { entrance: string; assembly: string; item: string }) {
+export default function BallotForm({ entrance, assembly, item, parties }: { entrance: string; assembly: string; item: string; parties: string }) {
   const [state, act, pending] = useActionState<BallotState, FormData>(enterBallot, {});
   const v = state.values ?? {};
   return (
@@ -21,7 +21,7 @@ export default function BallotForm({ entrance, assembly, item }: { entrance: str
       <input type="hidden" name="item" value={item} />
       <label>
         Отсъстващ собственик
-        <input type="text" name="ownerPartyId" defaultValue={v.ownerPartyId} required placeholder="идентификатор на собственика" maxLength={36} />
+        <input type="text" name="ownerPartyId" list={parties} defaultValue={v.ownerPartyId} required placeholder="идентификатор на собственика" maxLength={36} />
       </label>
       <label>
         Глас
