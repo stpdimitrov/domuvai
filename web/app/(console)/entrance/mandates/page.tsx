@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, reach } from "@/lib/console";
+import PartyName from "@/app/(console)/PartyName";
 import { OFFICE } from "@/lib/mandate";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { EndForm, RecordForm, TieForm, UntieForm } from "./MandateForms";
@@ -43,12 +44,12 @@ export default async function MandatesPage({ searchParams }: { searchParams: Pro
             <ul>
               {read?.data?.map((m) => (
                 <li key={m.mandateId}>
-                  {OFFICE[m.role] ?? m.role} · лице <code>{m.partyId ?? "—"}</code> · от {date(m.validFrom)} до {date(m.validTo)} · {STANDING[m.standing.kind] ?? m.standing.kind}
+                  {OFFICE[m.role] ?? m.role} · лице <PartyName id={m.partyId} name={m.partyName} /> · от {date(m.validFrom)} до {date(m.validTo)} · {STANDING[m.standing.kind] ?? m.standing.kind}
                   {m.standing.actingSince && <> от {date(m.standing.actingSince)}</>}{m.standing.electBy && <> (изборът — до {date(m.standing.electBy)})</>}{m.standing.until && <> (в сила до {date(m.standing.until)})</>} · номер на мандата <code>{m.mandateId}</code>
                 </li>
               ))}
             </ul>
-            <div className="as-hint">Лицата се показват с номерата си, докато имената не се четат от системата.</div>
+            <div className="as-hint">Името стои до номера на лицето, когато системата го дава; иначе се показва само номерът.</div>
           </div>
           <RecordForm entrance={view.entrance.id} />
           <EndForm entrance={view.entrance.id} />

@@ -1014,8 +1014,11 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None, owner=None)
         if s["kind"] == "EXPIRED_ACTING":
             return "мандатът е изтекъл — изпълнява" + (f" от {date(s['actingSince'])}" if s.get("actingSince") else "")
         return s["kind"]
+    named = [m for m in mandates if m.get("partyName")]
+    failures += [] if named else [f"{path}: the controller's token reads no office-holder's name — nothing to read beside the ids (PM-BOOK-006)"]
     for m in mandates:
-        row = f"{offices.get(m['role'], m['role'])} {m['partyId'][:8]} {date(m['validFrom'])} {date(m['validTo'])} {standing(m['standing'])}"
+        who = f"{m['partyName']} {m['partyId'][:8]}" if m.get("partyName") else m["partyId"][:8]       # WEB-52: the name the API serves, beside the id
+        row = f"{offices.get(m['role'], m['role'])} {who} {date(m['validFrom'])} {date(m['validTo'])} {standing(m['standing'])}"
         failures += [] if row in text else [f"{path}: does not show the office {row!r}"]
 
     day = datetime.datetime.now(ZoneInfo("Europe/Sofia")).date() + datetime.timedelta(days=30)
@@ -1135,6 +1138,7 @@ def proxies_on(api, web, entrance, here, of, owner=None, owner_party=None):
         return failures
     board = CARRIED.get(web)
     CARRIED[web] = owner                                    # the page, signed in as the owner
+    served = {}                                             # the names the controller's token reads for the proxy's two ids (WEB-52)
     try:
         page = fetch(web, here)[1]
         s, back, refused = submit_form(web, here, page, 'name="agentPartyId"', {**fields, "agentPartyId": agent, "scope": "LISTED_ITEMS", "items": "999"})
@@ -1153,18 +1157,27 @@ def proxies_on(api, web, entrance, here, of, owner=None, owner_party=None):
             failures.append(f"{here}: the API holds {kept or status}, not the one proxy the form asked for, in person (no document)")
         # names beside the ids (PM-BOOK-006, PM-BOOK-011): to the controller's own token the principal's and the agent's, a name only.
         # (The register is empty here: its names are the IT's. The owner holds a web session, not an API token: that an owner is given
-        # ids alone is the IT's and the WebMvc tests'; the page shows no name until WEB-52.)
+        # ids alone is the IT's and the WebMvc tests'; the owner's page below is the end-to-end cover, WEB-52.)
         if kept:
             given = kept[0].get("names") or {}
+            served = given
             failures += [] if set(given) == {kept[0]["principalPartyId"], agent} and all(isinstance(n, str) and n and n not in given for n in given.values()) else [
                 f"{here}: PM-BOOK-006 — the controller reads the proxy with names {given}, not the principal's and the agent's"]
         row = f"{kept[0]['principalPartyId'][:8]} {agent[:8]} писмено целия дневен ред" if kept else ""
-        failures += [] if row in visible_text(fetch(web, here)[1]) else [f"{here}: the register does not show the proxy as {row!r}"]
+        owned = visible_text(fetch(web, here)[1])
+        failures += [] if row in owned else [f"{here}: the register does not show the proxy as {row!r}"]
+        # PM-SEC-002 — the owner's page reads with the owner's own login: it shows the proxy (the API let this login in) and no name
+        # beside either id, because the API sends the owner none and the page adds none. The board's page below is the control: the same URL, other login, names.
+        failures += [] if not any(beside(owned, n, i) for i, n in served.items()) else [f"{here}: PM-SEC-002 — the owner's page shows a name beside an id"]
         s, back, again = submit_form(web, here, fetch(web, here)[1], 'name="agentPartyId"', {**fields, "agentPartyId": agent})
         failures += [] if s == 200 and not back and "Системата не прие това:" in visible_text(again) and len(registered() or []) == 1 else [
             f"{here}: PM-GA-009 — a second proxy for the same principal answered HTTP {s} → {back or 'the page'}, without the API's words, or a second was kept"]
     finally:
         CARRIED[web] = board
+    # PM-BOOK-006 — the board member's page shows the principal's and the agent's name beside the ids the API gave the controller's token
+    if served:
+        shown = visible_text(fetch(web, here)[1])
+        failures += [] if all(beside(shown, n, i) for i, n in served.items()) else [f"{here}: PM-BOOK-006 — the board member's page does not show {served} beside the proxy's ids"]
     print(f"{'ok ' if not failures else 'BAD'} PM-GA-009 the proxies: a board member's refused in the API's 403, an unknown agenda item in its 400; "
           "the owner's proxy appointed through the page, read back and shown in the register; a second for the same principal refused")
     return failures
@@ -1837,6 +1850,12 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     failures += [] if offered == ["BM", "MB", "CTL", "CSH"] else [f"{path}: offers the offices {offered}, not the API's BM, MB, CTL, CSH"]
     before = listed()
     failures += [f"{path}: does not show the mandate {m['mandateId']}" for m in before if m["mandateId"] not in page]
+    # WEB-52 (PM-BOOK-006) — the board member is a reader of the book: each office-holder's name beside the id, as the controller's token reads it
+    named = [m for m in before if m.get("partyName")]
+    if not CARRIED.get(api):
+        print("—   /entrance/mandates  the names beside the ids NOT checked: no API token")
+    failures += [] if named or not CARRIED.get(api) else [f"{path}: the controller's token reads no office-holder's name — nothing to read beside the ids"]
+    failures += [f"{path}: does not show {m['partyName']!r} beside {m['partyId'][:8]}" for m in named if not beside(visible_text(page), m["partyName"], m["partyId"])]
     if not signed_in:
         print("—   /entrance/mandates  NOT checked: no sign-in")
         return failures
@@ -1858,6 +1877,10 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     board = CARRIED.get(web)
     CARRIED[web] = administrator                            # the page, signed in as the administrator
     try:
+        # PM-SEC-002 — the administrator reads no book: the API sends no name, so the page shows each office-holder's id alone
+        seen = visible_text(fetch(web, path)[1])
+        failures += [f"{path}: the administrator's page does not show {m['partyId'][:8]} for the mandate {m['mandateId']}" for m in before if m["partyId"][:8] not in seen]
+        failures += [f"{path}: PM-SEC-002 — the administrator's page shows {m['partyName']!r} beside an id" for m in named if beside(seen, m["partyName"], m["partyId"])]
         s, _, recorded = submit_form(web, path, page, "Впиши мандата", {"body": "CTL", "party": spare_party, "validFrom": first, "validTo": last, "protocolRef": protocol})
         made = re.search(r"Мандатът е вписан\. Номер: ([0-9a-f-]{36})", visible_text(recorded))
         if s != 200 or not made:
@@ -2365,6 +2388,11 @@ def visible_text(page):
     page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
     page = re.sub(r"<(script|style)\b.*?</\1>", " ", page, flags=re.S)
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page)))
+
+
+def beside(text, name, party):
+    """WEB-52 — whether the visible text of a page has `name` right beside the 8-character id of `party`: whitespace is not compared."""
+    return re.search(rf"(?<!\S){re.escape(name)}\s+{re.escape(party[:8])}(?![0-9a-f])", text) is not None
 
 
 def main():
