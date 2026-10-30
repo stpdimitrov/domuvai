@@ -101,7 +101,7 @@ class BookListsWebTest {
     @Test
     fun `PM-BOOK-006 the manager is given the owners and the overdue declarations and runs the retention pass — as the party the sign-in names`() {
         whenever(logins.partyOf(LISTS_REALM, "login-manager")).thenReturn(manager)
-        whenever(lists.owners(entrance, LocalDate.parse("2026-05-01"), theManager)).thenReturn(BookAnswer.Served(listOf(OwnerView(UUID.randomUUID(), "Иван Петров", "OWN", BigDecimal.ONE))))
+        whenever(lists.owners(entrance, LocalDate.parse("2026-05-01"), theManager)).thenReturn(BookAnswer.Served(listOf(OwnerView(UUID.randomUUID(), UUID.randomUUID(), "Иван Петров", "OWN", BigDecimal.ONE))))
         whenever(lists.overdue(entrance, sofiaToday, theManager)).thenReturn(
             BookAnswer.Served(listOf(OverdueDeclaration(UUID.randomUUID(), "ап. 1", "Мария Георгиева", "OWN", LocalDate.parse("2026-05-01"), LocalDate.parse("2026-05-18")))),
         )

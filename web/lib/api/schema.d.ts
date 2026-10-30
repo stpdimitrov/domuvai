@@ -887,7 +887,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403) */
+        /** Read the Book of the Condominium as of a date — the id of each party beside the name, never an identity number; only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403) */
         get: operations["get_registry_entrances_entranceId_book"];
         put?: never;
         post?: never;
@@ -972,7 +972,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403) */
+        /** The owners and users of an entrance's units as of a date — each party's id beside the name, never an identity number; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403) */
         get: operations["get_registry_entrances_entranceId_owners"];
         put?: never;
         post?: never;
@@ -1281,6 +1281,8 @@ export interface components {
         };
         BookParty: {
             name: string;
+            /** Format: uuid */
+            partyId: string;
             role: string;
             share: string;
         };
@@ -1829,6 +1831,8 @@ export interface components {
             unitId: string;
         };
         OwnerResponse: {
+            /** Format: uuid */
+            partyId: string;
             partyName: string;
             share: number;
             titleRole: string;

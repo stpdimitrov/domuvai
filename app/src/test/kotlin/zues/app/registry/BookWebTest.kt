@@ -5,6 +5,7 @@ import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
@@ -82,6 +83,7 @@ class BookWebTest {
     private val entranceId = UUID.randomUUID()
     private val url = "/api/registry/entrances/$entranceId/book"
     private val manager = UUID.randomUUID()
+    private val ivan = UUID.randomUUID()
     private val theManager = Asking(Login(ISSUER, "login-manager"), manager)
 
     private fun MockHttpServletRequestBuilder.by(subject: String, more: JWTClaimsSet.Builder.() -> Unit = {}) =
@@ -91,7 +93,7 @@ class BookWebTest {
 
     private fun aBook(on: LocalDate = LocalDate.parse("2026-06-01")) = CondominiumBook(
         entranceId, on,
-        listOf(BookUnitEntry(UUID.randomUUID(), "ап. 1", "72.50", "60.0000", listOf(BookParty("Иван Петров", "OWN", "1")), 2, emptyList(), complete = true)),
+        listOf(BookUnitEntry(UUID.randomUUID(), "ап. 1", "72.50", "60.0000", listOf(BookParty(ivan, "Иван Петров", "OWN", "1")), 2, emptyList(), complete = true)),
         complete = true,
     )
 
@@ -104,6 +106,17 @@ class BookWebTest {
             .andExpect(jsonPath("$.complete").value(true))
             .andExpect(jsonPath("$.units[0].designation").value("ап. 1"))
             .andExpect(jsonPath("$.units[0].complete").value(true))
+    }
+
+    @Test
+    fun `PM-BOOK-011 the book is served with each party's id beside the name — and no identity number`() {
+        whenever(logins.partyOf(ISSUER, "login-manager")).thenReturn(manager)
+        whenever(access.read(eq(entranceId), any(), eq(theManager), eq("годишен отчет"))).thenReturn(BookAnswer.Served(aBook()))
+        val body = mvc.perform(readBook()).andExpect(status().isOk)
+            .andExpect(jsonPath("$.units[0].parties[0].partyId").value(ivan.toString()))
+            .andExpect(jsonPath("$.units[0].parties[0].name").value("Иван Петров"))
+            .andReturn().response.contentAsString
+        assertThat(body).doesNotContain("idValue").doesNotContain("idType")
     }
 
     @Test

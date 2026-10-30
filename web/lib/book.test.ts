@@ -25,7 +25,7 @@ test("PM-BOOK-011 a party is shown by name, role and share only — a field the 
   const line = partyLine(leaky);
   assert.equal(line, "Иван Петров · собственик · дял 1");
   assert.ok(!line.includes("7501010010") && !line.includes("Шипка"));
-  assert.equal(partyLine({ name: "Мария Иванова", role: "USR", share: "0.5" }), "Мария Иванова · ползвател · дял 0.5");
+  assert.equal(partyLine({ partyId: "11111111-1111-4111-8111-111111111111", name: "Мария Иванова", role: "USR", share: "0.5" }), "Мария Иванова · ползвател · дял 0.5");
 });
 
 test("PM-BOOK-011 the page code reads no party field outside the schema's name, role and share, and names no ЕГН or address", () => {

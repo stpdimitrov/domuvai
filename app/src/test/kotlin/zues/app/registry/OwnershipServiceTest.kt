@@ -136,4 +136,19 @@ class OwnershipServiceTest {
         assertThat(service.ownersAsOf(entranceId, LocalDate.of(2026, 5, 1)).single().partyName).isEqualTo("Old Owner")
         assertThat(service.ownersAsOf(entranceId, LocalDate.of(2026, 7, 1)).single().partyName).isEqualTo("New Owner")
     }
+
+    @Test
+    fun `PM-BOOK-011 the owners read carries each owner's party id beside the name — no identity number`() {
+        val egn = "7501020018"
+        val titleId = UUID.randomUUID()
+        whenever(titles.findByEntranceId(entranceId)).thenReturn(
+            listOf(Title(titleId, entranceId, unitId, partyId, "OWN", BigDecimal("1.000000"), LocalDate.of(2026, 1, 1), null)),
+        )
+        whenever(parties.findAllById(any())).thenReturn(listOf(Party(partyId, "Иван Петров", "EGN", egn)))
+        val owner = service.ownersAsOf(entranceId, LocalDate.of(2026, 5, 1)).single()
+        assertThat(owner.partyId).isEqualTo(partyId).isNotEqualTo(titleId).isNotEqualTo(unitId)
+        assertThat(owner.partyName).isEqualTo("Иван Петров")
+        val json = com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(owner)
+        assertThat(json).contains(partyId.toString()).doesNotContain(egn).doesNotContain("idValue").doesNotContain("idType")
+    }
 }

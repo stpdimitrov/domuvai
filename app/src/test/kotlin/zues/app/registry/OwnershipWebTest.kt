@@ -71,13 +71,16 @@ class OwnershipWebTest {
     }
 
     @Test
-    fun `PM-BOOK-011 the owners response carries the name but no id number`() {
+    fun `PM-BOOK-011 the owners response carries the party's id beside the name but no id number`() {
         whenever(lists.owners(any(), any(), any()))
-            .thenReturn(BookAnswer.Served(listOf(OwnerView(unitId, "Иван Петров", "OWN", BigDecimal("1.000000")))))
-        mvc.perform(get("/api/registry/entrances/$entranceId/owners").param("on", "2026-05-01"))
+            .thenReturn(BookAnswer.Served(listOf(OwnerView(unitId, partyId, "Иван Петров", "OWN", BigDecimal("1.000000")))))
+        val body = mvc.perform(get("/api/registry/entrances/$entranceId/owners").param("on", "2026-05-01"))
             .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].partyId").value(partyId.toString()))
             .andExpect(jsonPath("$[0].partyName").value("Иван Петров"))
             .andExpect(jsonPath("$[0].idValue").doesNotExist())
+            .andReturn().response.contentAsString
+        org.assertj.core.api.Assertions.assertThat(body).doesNotContain("idValue").doesNotContain("idType")
     }
 
     @Test

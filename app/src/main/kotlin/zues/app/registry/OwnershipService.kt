@@ -28,11 +28,11 @@ data class AssignTitle(
 
 /**
  * The owner or user of a unit as of a date — the resident-visible view. It carries the party's
- * **name only**: identity numbers never appear in a list other residents can read (Rule:
- * PM-BOOK-011).
+ * name and own id; identity numbers never appear in a list other residents can read (Rule: PM-BOOK-011).
  */
 data class OwnerView(
     val unitId: UUID,
+    val partyId: UUID,
     val partyName: String,
     val titleRole: String,
     val share: BigDecimal,
@@ -101,7 +101,7 @@ class OwnershipService(
     fun ownersAsOf(entranceId: UUID, on: LocalDate): List<OwnerView> {
         val current = titles.findByEntranceId(entranceId).filter { inForce(it.validFrom, it.validTo, on) }
         val nameById = parties.findAllById(current.map { it.partyId }.distinct()).associate { it.id to it.fullName }
-        return current.map { OwnerView(it.unitId, nameById[it.partyId] ?: "?", it.titleRole, it.share) }
+        return current.map { OwnerView(it.unitId, it.partyId, nameById[it.partyId] ?: "?", it.titleRole, it.share) }
     }
 
     /**
