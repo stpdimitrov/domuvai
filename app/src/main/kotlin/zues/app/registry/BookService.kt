@@ -19,13 +19,14 @@ class BookService(
     private val absences: AbsenceDeclarationRepository,
     private val entrances: EntranceRepository,
 ) {
+    // Rule: PM-BOOK-002, PM-BOOK-011
     @Transactional(readOnly = true)
     fun forEntrance(entranceId: UUID, on: LocalDate): CondominiumBook {
         if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
         val ownersByUnit = ownership.ownersAsOf(entranceId, on).groupBy { it.unitId }
         val entries = units.findByEntranceId(entranceId).map { unit ->
             val parties = (ownersByUnit[unit.id] ?: emptyList())
-                .map { BookParty(it.partyName, it.titleRole, it.share.toPlainString()) }
+                .map { BookParty(it.partyId, it.partyName, it.titleRole, it.share.toPlainString()) }
             val ownerNames = parties.filter { it.role == TitleRole.OWN.name }.map { it.name }
             val residents = household.findByUnitId(unit.id).count { current(it.validFrom, it.validTo, on) }
             val nonUse = absences.findByUnitId(unit.id).map { BookNonUse(it.absentFrom, it.absentTo) }

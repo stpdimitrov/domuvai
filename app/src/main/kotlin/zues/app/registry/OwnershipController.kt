@@ -35,9 +35,10 @@ data class AssignTitleRequest(
 
 data class TitleAssignedResponse(val titleId: UUID)
 
-/** The resident-visible owner line — name only, never an identity number (PM-BOOK-011). */
+/** The owner line — the party's id beside the name, never an identity number (PM-BOOK-011). */
 data class OwnerResponse(
     val unitId: UUID,
+    val partyId: UUID,
     val partyName: String,
     val titleRole: String,
     val share: BigDecimal,
@@ -92,7 +93,7 @@ class OwnershipController(
         val date = runCatching { LocalDate.parse(on) }
             .getOrElse { throw IllegalArgumentException("on must be an ISO date (YYYY-MM-DD): $on") }
         return lists.owners(entranceId, date, who.of(signedIn)).orForbidden()
-            .map { OwnerResponse(it.unitId, it.partyName, it.titleRole, it.share) }
+            .map { OwnerResponse(it.unitId, it.partyId, it.partyName, it.titleRole, it.share) }
     }
 
     /** A blank name, an unknown id type or role, or a share outside (0, 1] → 400. */

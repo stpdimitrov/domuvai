@@ -11,8 +11,11 @@ import java.util.UUID
  * today (PM-ORG-011).
  */
 
-/** A party recorded against a unit — name, role (OWN | USR) and share; never an identity number. */
-data class BookParty(val name: String, val role: String, val share: String)
+/**
+ * A party recorded against a unit — the party's own id (the platform's key, not an identity number) beside the
+ * name, the role (OWN | USR) and the share; never an identity number (PM-BOOK-011).
+ */
+data class BookParty(val partyId: UUID, val name: String, val role: String, val share: String)
 
 /** A closed span of declared non-use (PM-BOOK-002 "periods of non-use"). */
 data class BookNonUse(val from: LocalDate, val to: LocalDate)

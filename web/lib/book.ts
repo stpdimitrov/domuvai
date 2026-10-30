@@ -5,8 +5,8 @@
  */
 import { refused, unanswered } from "./refusal.ts";
 
-/** A party as the book lists it — the schema's `BookParty`: no identity number, no address. */
-export type Party = { name: string; role: string; share: string };
+/** A party as the book lists it — the schema's `BookParty`: its id beside the name, no identity number, no address. */
+export type Party = { partyId: string; name: string; role: string; share: string };
 
 /** The roles a title records (`TitleRole`), in the page's words; another is shown as the API wrote it. */
 export const ROLE: Record<string, string> = { OWN: "собственик", USR: "ползвател" };

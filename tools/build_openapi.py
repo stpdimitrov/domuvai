@@ -45,7 +45,7 @@ RUNNING = {
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end'):
    ('Record or correct the day an animal left the unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-005', 'PM-BOOK-008']),
  ('get', '/api/registry/entrances/{entranceId}/book'):
-   ('Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)', ['PM-BOOK-001', 'PM-BOOK-002', 'PM-BOOK-006', 'PM-BOOK-007']),
+   ('Read the Book of the Condominium as of a date — the id of each party beside the name, never an identity number; only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)', ['PM-BOOK-001', 'PM-BOOK-002', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('get', '/api/registry/entrances/{entranceId}/book/access-log'):
    ("Export who read the entrance's book or was refused it, why and when — oldest first; read by whoever may read the book, and logged too", ['PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/entrances/{entranceId}/book/retention'):
@@ -61,7 +61,7 @@ RUNNING = {
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/titles'):
    ('Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included', ['PM-ORG-005', 'PM-ORG-011', 'PM-BOOK-005']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
-   ("The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
+   ("The owners and users of an entrance's units as of a date — each party's id beside the name, never an identity number; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  # ---- assembly
  ('post', '/api/assembly/entrances/{entranceId}/assemblies'):
    ('Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked',
