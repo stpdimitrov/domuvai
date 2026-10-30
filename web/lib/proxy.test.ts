@@ -62,7 +62,7 @@ test("PM-SEC-001 who may appoint or record is the API's: its refusal in its word
   assert.match(proxyRefused(said(404, "no assembly")), /^Системата не прие това: no assembly/);
   // the web gates nothing on a role: the form is offered, whatever office the signed-in person holds
   for (const s of [actions, form].map(code)) assert.doesNotMatch(s, /\b(OWN|USR|BM|MB|CTL|CSH|isOwner)\b/);
-  assert.match(page, /<ProxyForm entrance=\{entrance\} assembly=\{a\.id\} \/>/);
+  assert.match(page, /<ProxyForm entrance=\{entrance\} assembly=\{a\.id\} parties="parties-proxy" \/>/);
   // a write that got no answer is not said to be done or undone
   assert.match(actions, /unknownOutcome\("вписването на пълномощното"\)/);
   assert.deepEqual(actions.match(/api\.POST\(\s*"[^"]*\/proxies"/g)?.length, 1);

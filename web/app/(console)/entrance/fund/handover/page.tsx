@@ -8,6 +8,7 @@ import { matches, NOT_SIGNED } from "@/lib/handover";
 import { sofiaToday } from "@/lib/payment";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import HandoverForm from "./HandoverForm";
+import PartyPicker from "../../PartyPicker";
 import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Предаване на фонда — Етаж" };
@@ -58,7 +59,8 @@ export default async function HandoverPage({ searchParams }: { searchParams: Pro
           {asked.statement && !statementId && <div className="as-refused" role="alert" style={BODY}>„{asked.statement}“ не е идентификатор на отчет.</div>}
           {opened && !opened.data && <div className="as-refused" role="alert" style={BODY}>{unansweredBy(opened, "отчета")}</div>}
           {opened?.data && <Opened view={opened.data} />}
-          <HandoverForm entrance={view.entrance.id} today={sofiaToday()} mintedKey={randomUUID()} />
+          <PartyPicker id="parties-handover" entrance={view.entrance.id} source="mandates" dayField="handoverOn" margin="16px 24px 0" />
+          <HandoverForm entrance={view.entrance.id} today={sofiaToday()} mintedKey={randomUUID()} parties="parties-handover" />
           <div style={BODY}>
             <div className="acct-title">Издадени отчети · най-новият първо</div>
             {list && !list.data && <div className="as-refused" role="alert">{unansweredBy(list, "отчетите")}</div>}

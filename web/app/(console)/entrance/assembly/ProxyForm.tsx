@@ -13,7 +13,7 @@ import { appointProxy, type ProxyState } from "./actions";
 // Rule: PM-GA-009
 // Rule: PM-GA-010
 // Rule: PM-GA-011
-export default function ProxyForm({ entrance, assembly }: { entrance: string; assembly: string }) {
+export default function ProxyForm({ entrance, assembly, parties }: { entrance: string; assembly: string; parties: string }) {
   const [state, act, pending] = useActionState<ProxyState, FormData>(appointProxy, {});
   const v = state.values ?? {};
   return (
@@ -28,7 +28,7 @@ export default function ProxyForm({ entrance, assembly }: { entrance: string; as
       </label>
       <label>
         Идентификатор на пълномощника
-        <input type="text" name="agentPartyId" defaultValue={v.agentPartyId} required placeholder="идентификатор на лицето" maxLength={36} />
+        <input type="text" name="agentPartyId" list={parties} defaultValue={v.agentPartyId} required placeholder="идентификатор на лицето" maxLength={36} />
       </label>
       <label>
         Форма
@@ -48,7 +48,7 @@ export default function ProxyForm({ entrance, assembly }: { entrance: string; as
       </label>
       <label className="wide">
         Упълномощител (само когато записвате чуждо пълномощно)
-        <input type="text" name="principalPartyId" defaultValue={v.principalPartyId} placeholder="оставете празно, за да упълномощите себе си" maxLength={36} />
+        <input type="text" name="principalPartyId" list={parties} defaultValue={v.principalPartyId} placeholder="оставете празно, за да упълномощите себе си" maxLength={36} />
       </label>
       <label className="wide">
         Писмено пълномощно (само когато записвате чуждо)

@@ -21,6 +21,7 @@ import VerifyForm from "./VerifyForm";
 import VoteForm from "./VoteForm";
 import NoEntrance from "@/app/(console)/NoEntrance";
 import PartyName from "@/app/(console)/PartyName";
+import PartyPicker from "../PartyPicker";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -44,7 +45,7 @@ type Shown = {
 type Loaded =
   | {
       kind: "ok"; entrance: Entrance; mandates: Part<Schemas["StandingMandate"][]>; shown: Shown | null; asked: string | null;
-      listed: Part<Schemas["AssemblySummaryView"][]>; year: Part<Schemas["HeldInYearView"]>;
+      listed: Part<Schemas["AssemblySummaryView"][]>; year: Part<Schemas["HeldInYearView"]>; myself?: string;
     }
   | Exclude<EntranceAt, { kind: "ok" }>;
 
@@ -85,13 +86,14 @@ async function load(entranceId: string | undefined, assemblyId: string | undefin
     };
   };
   const year = Number(sofiaTime(new Date().toISOString()).slice(6, 10));   // the calendar year in Sofia (PM-SYS-004), not this server's
-  const [mandates, shown, listed, held] = await Promise.all([
+  const [mandates, shown, listed, held, me] = await Promise.all([
     reach(() => api.GET("/api/identity/entrances/{entranceId}/mandates", { params: { path } })),   // "today" is the api's own: Sofia's, not this server's clock
     asked && UUID.test(asked) ? shownFor(asked) : Promise.resolve(null),
     reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies", { params: { path } })),
     reach(() => api.GET("/api/assembly/entrances/{entranceId}/years/{year}", { params: { path: { ...path, year } } })),
+    reach(() => api.GET("/api/identity/me")),                       // for "myself" in a picker: no read of the book (WEB-52b)
   ]);
-  return { kind: "ok", entrance, mandates: part(mandates), shown, asked, listed: part(listed), year: part(held) };
+  return { kind: "ok", entrance, mandates: part(mandates), shown, asked, listed: part(listed), year: part(held), myself: me?.data?.partyId };
 }
 
 // The words for the API's codes. Any code not here is shown as it came, never guessed.
@@ -164,7 +166,7 @@ export default async function AssemblyPage({ searchParams }: { searchParams: Pro
 type Voided = "agenda" | "moved" | null;
 
 function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided: Voided }) {
-  const { entrance, mandates, shown, asked, listed, year } = view;
+  const { entrance, mandates, shown, asked, listed, year, myself } = view;
   return (
     <div style={{ padding: "0 24px 24px" }}>
       <div style={{ margin: "20px 0 0", ...HEADING }}>Управа на входа днес</div>
@@ -191,7 +193,7 @@ function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided:
       {asked && !shown && (
         <div className="as-note" style={FAILED}>„{asked}“ не е събрание — връзката към събранието съдържа неговия идентификатор.</div>
       )}
-      {shown && <Assembly shown={shown} entrance={entrance.id} voided={voided} />}
+      {shown && <Assembly shown={shown} entrance={entrance.id} voided={voided} myself={myself} />}
 
       <div style={{ margin: "24px 0 0", ...HEADING }}>Свикване на общо събрание</div>
       <div className="co-card" style={{ marginTop: 12 }}>
@@ -247,7 +249,7 @@ function Listed({ entrance, listed, year, asked }: {
 
 // Rule: PM-GA-023
 // Rule: PM-SEC-001
-function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: Voided }) {
+function Assembly({ shown, entrance, voided, myself }: { shown: Shown; entrance: string; voided: Voided; myself?: string }) {
   const { assembly, quorum, attendance, proxies, votes, decisions } = shown;
   if (!assembly.ok) return <div className="as-note" style={FAILED}>{unanswered(assembly.by, "събранието")}</div>;
   const a = assembly.data;
@@ -298,7 +300,8 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
             <>
               <div style={{ margin: "20px 0 0", ...HEADING }}>Обявяване на поканата</div>
               <div className="co-card" style={{ marginTop: 12 }}>
-                <NoticeForm entrance={entrance} assembly={a.id} />
+                <PartyPicker id="parties-notice" entrance={entrance} role="OWN" dayField="postedAt" />
+                <NoticeForm entrance={entrance} assembly={a.id} parties="parties-notice" />
               </div>
             </>
           )}
@@ -320,17 +323,19 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
         <>
           <div style={{ margin: "20px 0 0", ...HEADING }}>Вписване на пълномощно</div>
           <div className="co-card" style={{ marginTop: 12 }}>
-            <ProxyForm entrance={entrance} assembly={a.id} />
+            <PartyPicker id="parties-proxy" entrance={entrance} />
+            <ProxyForm entrance={entrance} assembly={a.id} parties="parties-proxy" />
           </div>
         </>
       )}
       {(a.status === "NOTICED" || a.status === "OPEN") && (   // the register is kept for these; on which day, for which sitting and by whom are the api's (PM-GA-012, PM-SEC-001)
         <div className="co-card" style={{ marginTop: 12 }}>
-          <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} />
+          <PartyPicker id="parties-attendance" entrance={entrance} myself={myself} />
+          <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} parties="parties-attendance" />
         </div>
       )}
       {a.status === "OPEN" && [...a.agenda].sort((x, y) => x.ordinal - y.ordinal).map((i) => (
-        <Votes key={i.id} item={i} votes={votes[i.id]} decision={decisions[i.id]} entrance={entrance} assembly={a.id} />
+        <Votes key={i.id} item={i} votes={votes[i.id]} decision={decisions[i.id]} entrance={entrance} assembly={a.id} myself={myself} />
       ))}
       {a.status === "OPEN" && !Object.values(decisions).some((d) => d.ok && d.data.protocolPostedOn) && (   // the posting is entered once; on which day and by whom are the api's (PM-GA-023, PM-SEC-001)
         <div className="co-card" style={{ marginTop: 12 }}>
@@ -441,8 +446,8 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
 // Rule: PM-SEC-001
 // Rule: PM-SEC-002
 // Rule: PM-GA-017
-function Votes({ item, votes, decision, entrance, assembly }: {
-  item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; decision: Part<Schemas["DecisionView"]> | undefined; entrance: string; assembly: string;
+function Votes({ item, votes, decision, entrance, assembly, myself }: {
+  item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; decision: Part<Schemas["DecisionView"]> | undefined; entrance: string; assembly: string; myself?: string;
 }) {
   const open = decision !== undefined && !decision.ok && decision.by?.status === 404;   // the API's word for an item not closed yet
   return (
@@ -465,14 +470,16 @@ function Votes({ item, votes, decision, entrance, assembly }: {
       </div>
       {open && (   // once closed, no vote is taken and no second close (PM-VOTE-014); who may do either is the API's (PM-SEC-001)
         <div className="co-card" style={{ marginTop: 12 }}>
-          <VoteForm entrance={entrance} assembly={assembly} item={item.id} />
+          <PartyPicker id={`parties-vote-${item.id}`} entrance={entrance} role="OWN" myself={myself} />
+          <VoteForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-vote-${item.id}`} />
           <CloseForm entrance={entrance} assembly={assembly} item={item.id} />
         </div>
       )}
       {decision && !open && <Decided decision={decision} />}
       {item.absenteeEligible && decision?.ok && !decision.data.supersedes && (   // closed, tagged, not merged (PM-GA-017, PM-VOTE-013); the window and who may act are the API's
         <div className="co-card" style={{ marginTop: 12 }}>
-          <BallotForm entrance={entrance} assembly={assembly} item={item.id} />
+          <PartyPicker id={`parties-ballot-${item.id}`} entrance={entrance} role="OWN" />
+          <BallotForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-ballot-${item.id}`} />
           <MergeForm entrance={entrance} assembly={assembly} item={item.id} />
         </div>
       )}

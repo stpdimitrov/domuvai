@@ -14,7 +14,7 @@ const FORM = { margin: "16px 24px" } as const;
  * A declarant is typed only by the manager or the board, recording one handed in (Rule: PM-BOOK-005).
  */
 // Rule: PM-BOOK-003, PM-BOOK-004, PM-BOOK-005
-export function DeclarationForm({ entrance, units }: { entrance: string; units: UnitChoice[] }) {
+export function DeclarationForm({ entrance, units, parties }: { entrance: string; units: UnitChoice[]; parties: string }) {
   const [state, act, pending] = useActionState<DeclarationState, FormData>(file, {});
   const input = state.input;
   return (
@@ -37,7 +37,7 @@ export function DeclarationForm({ entrance, units }: { entrance: string; units: 
           {Object.entries(KIND).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </label>
-      <label className="wide">Номер на декларанта<input type="text" name="declarant" defaultValue={input?.declarant} autoComplete="off" /></label>
+      <label className="wide">Номер на декларанта<input type="text" name="declarant" list={parties} defaultValue={input?.declarant} /></label>
       <div className="wide as-hint">
         Празно — подавате за себе си. Управителят и управителният съвет вписват декларация, предадена им от собственик или ползвател, като посочват номера
         му; системата проверява дали той държи обекта.
