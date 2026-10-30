@@ -959,7 +959,7 @@ def submit_form(web, path, page, marker, fields, files=None):
         attrs = dict((k, html.unescape(v)) for k, v in re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag))
         if attrs.get("type") == "hidden" and "name" in attrs:
             hidden.append((attrs["name"], attrs.get("value", "")))
-    hidden = [(k, v) for k, v in hidden if k not in fields]     # a hidden field a script would fill (a picker's day) is the one given
+    hidden = [(k, v) for k, v in hidden if v or k not in fields]    # an empty hidden field a script would fill (a picker's day) is the one given
     boundary = "----e2e" + uuid.uuid4().hex
     body = b"".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in hidden + list(fields.items()))
     for name, (filename, content) in (files or {}).items():

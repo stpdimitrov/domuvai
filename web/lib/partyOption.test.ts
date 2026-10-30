@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { partyOptions, withMyself } from "./partyOption.ts";
+import { refused, unansweredBy } from "./refusal.ts";
 
 const source = (f: string) => readFileSync(new URL(`../app/(console)/entrance/${f}`, import.meta.url), "utf8");
 const code = (s: string) => s.replace(/\/\*[^]*?\*\/|\/\/.*$/gm, "");          // the rules are quoted in the comments; what is scanned is the code
 const [BORIS, ANA, IVA] = ["3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b", "9a1c7d2e-0b3f-4c5d-8e6a-7f8091a2b3c4", "c0d1e2f3-1111-4222-8333-444455556666"];
-const row = (partyId: string, partyName: string, titleRole = "OWN") => ({ partyId, partyName, titleRole, unitId: "u", share: 0.5 });
+const row = (partyId: string, partyName: string, titleRole = "OWN") => ({ partyId, partyName, titleRole, unitId: "u" });
 
 /** Each form, the page that sets it beside its picker, the fields the picker fills, and the action that reads them. */
 const FORMS = [
@@ -63,13 +64,24 @@ test("PM-BOOK-006 each form's field names its picker's list, the fields stay the
 
 test("PM-BOOK-007 the owners are read on the click, by one action, and no page with a picker reads them on load", () => {
   for (const page of ["assembly/page.tsx", "declarations/page.tsx", "fund/handover/page.tsx"]) {
-    assert.doesNotMatch(code(source(page)), /\/owners"/, `${page} reads the owners on load`);
+    assert.doesNotMatch(code(source(page)), /\/owners"|readParties|\/parties"/, `${page} reads the owners on load`);
   }
+  for (const { form } of FORMS) assert.doesNotMatch(code(source(form)), /\/owners"|\/parties"/, `${form} reads the owners`);
   assert.match(code(source("parties.ts")), /entranceId\}\/owners"/);
   assert.doesNotMatch(code(source("parties.ts")), /\/book"|purpose/, "the owners read needs no typed purpose, and the book is not its source");
   const picker = code(source("PartyPicker.tsx"));
   assert.match(picker, /useActionState<PartiesState, FormData>\(readParties, \{\}\)/);
   assert.doesNotMatch(picker, /useEffect|localStorage|sessionStorage|formAction/, "nothing read on mount, nothing kept in the browser, no field of the form submitted");
+});
+
+test("PM-SEC-001 who may read is the API's: the picker gates on no role, and a refused read is its 403 in its words, no list", () => {
+  const answer = { error: { error: "the owners are read by the board", rule: "PM-BOOK-006" }, response: { status: 403 } };
+  assert.equal(unansweredBy(answer, "собствениците на входа"), "Нямате право да четете собствениците на входа: PM-BOOK-006: the owners are read by the board");
+  assert.equal(refused(answer).status, 403);
+  const [picker, action] = [code(source("PartyPicker.tsx")), code(source("parties.ts"))];
+  assert.doesNotMatch(picker, /\/me"|titleRole|\.partyId \?/, "the control is offered to everyone the form is offered to");
+  assert.match(action, /\{ refused: unansweredBy\(answer, "собствениците на входа"\) \}/);
+  assert.match(action, /\{ refused: unansweredBy\(answer, "мандатите на входа"\) \}/);
 });
 
 test("PM-GA-007 the co-signatory is picked from the owners as of the posting day; the handover from the mandates as of its day", () => {
