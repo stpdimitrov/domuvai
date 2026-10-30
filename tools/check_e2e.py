@@ -1097,8 +1097,7 @@ def assembly_screen(api, web, entrance, signed_in, owner_party=None, owner=None)
 
     failures += proxies_on(api, web, entrance, here, of, owner, owner_party)
     failures += notice_picker(api, web, entrance, here)
-    failures += moved_and_noticed(api, web, here, of, day, place, owner_party)
-    failures += pickers_on(api, web, entrance, here, owner, owner_party)
+    failures += moved_and_noticed(api, web, entrance, here, of, day, place, owner_party, owner)
 
     # an office the person does not hold: refused in the API's words, and nothing convened
     status, location, refused_page = submit_form(web, path, page, 'name="convenedAs"',
@@ -1272,7 +1271,7 @@ def pickers_on(api, web, entrance, here, owner=None, owner_party=None):
     return failures
 
 
-def moved_and_noticed(api, web, here, of, day, place, owner_party):
+def moved_and_noticed(api, web, entrance, here, of, day, place, owner_party, owner=None):
     """
     WEB-28 (PM-GA-004, PM-GA-006, PM-GA-007, PM-SYS-013) on the draft assembly_screen convened: moved through the page's
     own form and stored as asked; a posting act co-signed by a party who owns nothing refused in the API's words, the
@@ -1330,6 +1329,7 @@ def moved_and_noticed(api, web, here, of, day, place, owner_party):
     failures += decision_before_open(api, web, here, of)
     failures += absentee_before_open(api, web, here, of)
     failures += protocol_before_open(api, web, here, of)
+    failures += pickers_on(api, web, entrance, here, owner, owner_party)     # while it is noticed: the move below makes it a draft, with no register
 
     status, back = move(moved_day + datetime.timedelta(days=1), moved_place)
     a = stored()
