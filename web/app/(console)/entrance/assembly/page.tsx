@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, reach, type EntranceAt } from "@/lib/console";
+import { nameFor } from "@/lib/partyName";
 import { FORM, SCOPE } from "@/lib/proxy";
 import { refused, unanswered, type Refused } from "@/lib/refusal";
 import { sofiaLocal, sofiaTime } from "@/lib/sofia";
@@ -19,6 +20,7 @@ import SittingForm from "./SittingForm";
 import VerifyForm from "./VerifyForm";
 import VoteForm from "./VoteForm";
 import NoEntrance from "@/app/(console)/NoEntrance";
+import PartyName from "@/app/(console)/PartyName";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -111,7 +113,7 @@ const CHOICE: Record<string, string> = { FOR: "за", AGAINST: "против", A
 const word = (table: Record<string, string>, code: string) => table[code] ?? code;
 
 const date = (iso: string) => iso.split("-").reverse().join(".");
-/** A party as the API gives it: its id, which no read here pairs with a name. The whole id is on hover. */
+/** A party as the API gives it where no read names it (a unit, an actor — Q4): its id. The whole id is on hover. */
 const Party = ({ id }: { id: string | undefined }) => (id ? <span className="mono" title={id}>{id.slice(0, 8)}</span> : <>—</>);
 const DIM = { color: "#6B6F6C" };
 const FAILED = { color: "#8E2318" };
@@ -177,7 +179,7 @@ function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided:
         {mandates.ok && mandates.data.map((m) => (
           <div key={m.mandateId} className="as-mandates pf-row">
             <div>{word(OFFICE, m.role)}</div>
-            <div><Party id={m.partyId} /></div>
+            <div><PartyName id={m.partyId} name={m.partyName} /></div>
             <div className="num">{date(m.validFrom)}</div>
             <div className="num">{date(m.validTo)}</div>
             <div><Standing s={m.standing} /></div>
@@ -398,11 +400,11 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
         {attendance.ok && attendance.data.length === 0 && <div className="as-register pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Никой не е вписан.</div></div>}
         {attendance.ok && attendance.data.map((l) => (
           <div key={l.id} className="as-register pf-row">
-            <div><Party id={l.attendeePartyId} /></div>
+            <div><PartyName id={l.attendeePartyId} name={nameFor(l.attendeePartyId, l.names)} /></div>
             <div className="num">{l.sessionNo}</div>
             <div>{word(CHANNEL, l.channel)}{l.channel === "VIDEO" && (l.identityVerified ? " · самоличността е проверена" : " · самоличността не е проверена")}</div>
             <div>{l.counted ? "да" : <span style={DIM}>не</span>}</div>
-            <div>{l.represents.length ? l.represents.map((p, i) => <span key={p}>{i > 0 && ", "}<Party id={p} /></span>) : "—"}</div>
+            <div>{l.represents.length ? l.represents.map((p, i) => <span key={p}>{i > 0 && ", "}<PartyName id={p} name={nameFor(p, l.names)} /></span>) : "—"}</div>
             {l.channel === "VIDEO" && !l.identityVerified && (   // Rule: PM-GA-016 — counted only once the api records the verification
               <VerifyForm entrance={entrance} assembly={assembly} attendance={l.id} />
             )}
@@ -415,8 +417,8 @@ function Register({ attendance, proxies, entrance, assembly }: { attendance: Sho
         {proxies.ok && proxies.data.length === 0 && <div className="as-register pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма вписано пълномощно.</div></div>}
         {proxies.ok && proxies.data.map((p) => (
           <div key={p.id} className="as-register pf-row">
-            <div><Party id={p.principalPartyId} /></div>
-            <div><Party id={p.agentPartyId} /></div>
+            <div><PartyName id={p.principalPartyId} name={nameFor(p.principalPartyId, p.names)} /></div>
+            <div><PartyName id={p.agentPartyId} name={nameFor(p.agentPartyId, p.names)} /></div>
             <div>{word(FORM, p.form)}</div>
             <div>{word(SCOPE, p.scope)}{p.scope === "LISTED_ITEMS" && ` ${p.items.join(", ")}`}</div>
             <div className="num">{sofiaTime(p.registeredAt)}</div>
@@ -452,7 +454,7 @@ function Votes({ item, votes, decision, entrance, assembly }: {
         {votes?.ok && votes.data.length === 0 && <div className="as-votes pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма записани гласове.</div></div>}
         {votes?.ok && votes.data.map((r) => (
           <div key={r.id} className="as-votes pf-row" style={r.inEffect ? undefined : DIM}>
-            <div><Party id={r.ownerPartyId} /></div>
+            <div><PartyName id={r.ownerPartyId} name={nameFor(r.ownerPartyId, r.names)} /></div>
             <div><Party id={r.unitId} /></div>
             <div className="num">{r.weight}</div>
             <div>{word(CHOICE, r.choice)}{!r.inEffect && " · поправен"}</div>
