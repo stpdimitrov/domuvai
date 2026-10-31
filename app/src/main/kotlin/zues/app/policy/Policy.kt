@@ -28,6 +28,9 @@ enum class Action(val governedBy: String) {
     /** tying a login to a party, or untying it: saying who a signed-in person is */
     TIE_LOGIN("PM-SEC-001"),
 
+    /** recording a decision the general assembly took on paper, from its protocol: what lets a firm join with a tariff it already has */
+    RECORD_PAPER_DECISION("PM-SEC-001"),
+
     /** recording a mandate of an entrance, or the day it ended: saying who its manager, board, controller or cashier is */
     RECORD_MANDATE("PM-SEC-001"),
 
@@ -191,13 +194,14 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 22
+        const val MATRIX_VERSION = 23
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
          * own data — nobody else. Anonymising it: the manager and the board, who keep it — the controller reads and
-         * does not write (PM-GOV-008). Who a login is, and who holds an entrance's offices: the deployment's administrator —
-         * and nobody else. The owners' petition: an owner of the entrance on the day, signing for themselves, and no
+         * does not write (PM-GOV-008). Who a login is, who holds an entrance's offices, and what the general assembly decided
+         * on paper before the entrance came here: the deployment's administrator — and nobody else (the last the owner's
+         * decision on #396, 2026-10-31). The owners' petition: an owner of the entrance on the day, signing for themselves, and no
          * office as such (PM-GA-003). A holder of a right of use is not among them pending counsel: whether they may
          * demand an assembly is the same open question as whose ideal parts count. Convening in an office: the board,
          * the manager, the control board or controller — and no cashier, firm or owner as such (PM-GA-002). A proxy:
@@ -234,6 +238,7 @@ class Policy(private val sources: List<RoleSource>) {
         val ADMINISTERED: Map<Action, Class<out Resource>> = mapOf(
             Action.TIE_LOGIN to Resource.Deployment::class.java,
             Action.RECORD_MANDATE to Resource.OfEntrance::class.java,
+            Action.RECORD_PAPER_DECISION to Resource.OfEntrance::class.java,
             Action.READ_MANDATES to Resource.OfEntrance::class.java,
             Action.LIST_ENTRANCE to Resource.OfEntrance::class.java,
             Action.REGISTER_PARTY to Resource.Deployment::class.java,
@@ -252,6 +257,7 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.ANONYMISE_BOOK, Role.MB, "PM-BOOK-010"),
             Permit(Action.TIE_LOGIN, Role.SYS_ADMIN, "PM-SEC-001"),
             Permit(Action.RECORD_MANDATE, Role.SYS_ADMIN, "PM-SEC-001"),
+            Permit(Action.RECORD_PAPER_DECISION, Role.SYS_ADMIN, "PM-SEC-001"),
             // TODO(legal): PM-GA-003 — whether a holder of a right of use may demand an assembly (the two lines below)
             Permit(Action.SIGN_PETITION, Role.OWN, "PM-GA-003"),
             Permit(Action.CONVENE_ON_PETITION, Role.OWN, "PM-GA-003"),
