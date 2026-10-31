@@ -130,9 +130,9 @@ class HoldingsPersistenceIT {
         jdbc.update(insert, entranceId, first, null, false, "2026-01-01", null)                 // counted for charges, nobody the port can name
 
         assertThat(holdings.residents(entranceId, LocalDate.parse("2026-03-31")))
-            .containsExactlyInAnyOrder(Resident(resident, first), Resident(child, first))
+            .containsExactlyInAnyOrder(Resident(resident, first, false), Resident(child, first, true))
         val inMay = holdings.residents(entranceId, LocalDate.parse("2026-05-01"))
-        assertThat(inMay).containsExactly(Resident(resident, first))
+        assertThat(inMay).containsExactly(Resident(resident, first, false))
         assertThat(inMay.toString()).doesNotContain("Мария").doesNotContain("7501010010")
         title(entranceId, first, resident, "1", "2026-01-01")
         assertThat(holdings.inForce(entranceId, LocalDate.parse("2026-05-01"), TitleRole.OWN).toString()).doesNotContain("Мария").doesNotContain("7501010010").doesNotContain("ап. 1")

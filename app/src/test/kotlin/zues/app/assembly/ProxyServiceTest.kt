@@ -48,13 +48,16 @@ class ProxyServiceTest {
     private val owners = mutableMapOf<UUID, UUID>()                              // party → unit
     private val holdersOfUse = mutableMapOf<UUID, UUID>()
     private val living = mutableMapOf<UUID, UUID>()
+    private val childrenUnder6 = mutableSetOf<UUID>()
+    private val otherRows = mutableListOf<Resident>()                            // a second row of the book for a party already living somewhere
     private val book = object : Holdings {
         override fun inForce(entranceId: UUID, on: LocalDate, role: TitleRole) = HeldOn(
             (if (role == TitleRole.OWN) owners else holdersOfUse).takeIf { asked(entranceId, on) }.orEmpty()
                 .map { (party, unit) -> Holding(party, unit, role.name, "1", "10", "10", "DECLARED") },
             emptyList(),
         )
-        override fun residents(entranceId: UUID, on: LocalDate) = living.takeIf { asked(entranceId, on) }.orEmpty().map { (party, unit) -> Resident(party, unit) }
+        override fun residents(entranceId: UUID, on: LocalDate) =
+            living.takeIf { asked(entranceId, on) }.orEmpty().map { (party, unit) -> Resident(party, unit, party in childrenUnder6) } + otherRows
 
         /** The book answers for this entrance today in Sofia, and for nothing else: the wrong entrance or day finds it empty. */
         private fun asked(entrance: UUID, on: LocalDate) = entrance == entranceId && on == LocalDate.parse("2026-10-09")
@@ -140,6 +143,50 @@ class ProxyServiceTest {
         // a third party is anybody
         assertThat(proxy(by = stranger, kind = "THIRD_PARTY").agentKind).isEqualTo("THIRD_PARTY")
         assertThat(registered).hasSize(before + 4)
+    }
+
+    private fun recorded(principal: UUID, by: UUID) = service.register(
+        entranceId, assembly.id, RegisterProxy(principal, by, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(UUID.randomUUID()), "5d".repeat(32),
+    )
+
+    @Test
+    fun `PM-GA-009 a child under six of the principal's home is no adult household member, in person or recorded - the same person unflagged is`() {
+        val principal = owner()
+        val child = UUID.randomUUID().also { living[it] = owners.getValue(principal); childrenUnder6 += it }
+        assertThatThrownBy { proxy(principal, by = child, kind = "HOUSEHOLD_MEMBER") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("child under six").hasMessageContaining("PM-GA-009")
+        assertThatThrownBy { recorded(principal, child) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("child under six").hasMessageContaining("PM-GA-009")
+        assertThat(registered).isEmpty()
+
+        childrenUnder6 -= child
+        assertThat(proxy(principal, by = child, kind = "HOUSEHOLD_MEMBER").agentPartyId).isEqualTo(child)
+        val otherPrincipal = owner()
+        val grown = UUID.randomUUID().also { living[it] = owners.getValue(otherPrincipal) }
+        assertThat(recorded(otherPrincipal, grown).agentPartyId).isEqualTo(grown)
+    }
+
+    @Test
+    fun `PM-GA-009 a child of another home is refused as not of this household - the flag is told only of the principal's own home`() {
+        val principal = owner()
+        val nextDoor = UUID.randomUUID().also { living[it] = UUID.randomUUID(); childrenUnder6 += it }
+        assertThatThrownBy { proxy(principal, by = nextDoor, kind = "HOUSEHOLD_MEMBER") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("household").hasMessageNotContaining("child")
+        // flagged elsewhere and not at home: the home's row is what is asked, and an adult there is appointed
+        val atHome = UUID.randomUUID().also { living[it] = owners.getValue(principal) }
+        otherRows += Resident(atHome, UUID.randomUUID(), childUnder6 = true)
+        assertThat(proxy(principal, by = atHome, kind = "HOUSEHOLD_MEMBER").agentPartyId).isEqualTo(atHome)
+    }
+
+    @Test
+    fun `PM-GA-009 two rows of one home that disagree refuse the agent - the book's flag is not outvoted`() {
+        val principal = owner()
+        val home = owners.getValue(principal)
+        val member = UUID.randomUUID().also { living[it] = home }
+        otherRows += Resident(member, home, childUnder6 = true)
+        assertThatThrownBy { proxy(principal, by = member, kind = "HOUSEHOLD_MEMBER") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("child under six")
+        assertThat(registered).isEmpty()
     }
 
     @Test

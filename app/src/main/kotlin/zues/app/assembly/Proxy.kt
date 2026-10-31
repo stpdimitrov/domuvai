@@ -145,7 +145,8 @@ class ProxyService(
      * "An owner or user … MAY appoint a proxy: an adult household member, another owner, or a third party" — as the
      * book stands today in Sofia, through the registry's port: the principal holds a title in the entrance, an agent
      * called an owner owns in it, and an agent called a household member lives in the principal's own household — a
-     * unit the principal holds and lives in too. Anybody else is a third party, and is appointed as one.
+     * unit the principal holds and lives in too — and is no child under six there. Anybody else is a third party, and
+     * is appointed as one.
      */
     // Rule: PM-GA-009
     // TODO(legal): PM-GA-009 — whose household: the narrow reading is taken (the principal's own, where they live); whether
@@ -159,12 +160,16 @@ class ProxyService(
         when (kind) {
             AgentKind.OWNER -> require(owned.any { it.partyId == request.agentPartyId }) { "the representative is called another owner, and owns nothing in the entrance today (PM-GA-009)" }
             AgentKind.HOUSEHOLD_MEMBER -> {
-                // TODO(legal): PM-GA-009 — "adult": the book records no date of birth, and the registry's port does not
-                // publish its one age fact (child under six), so no age is checked
                 val residents = holdings.residents(entranceId, today)
                 val home = residents.filter { it.partyId == request.principalPartyId }.map { it.unitId }.toSet().intersect(principals.map { it.unitId }.toSet())
-                require(residents.any { it.partyId == request.agentPartyId && it.unitId in home }) {
+                val member = residents.filter { it.partyId == request.agentPartyId && it.unitId in home }
+                require(member.isNotEmpty()) {
                     "the representative is called a member of the principal's household, and the book does not have the two living in one of the principal's units today (PM-GA-009)"
+                }
+                // TODO(legal): PM-GA-009 — "adult": the book records no date of birth, only who is a child under six, so
+                // nobody older than that is checked. Asked of the principal's own home alone: the flag is told to nobody else
+                require(member.none { it.childUnder6 }) {
+                    "the representative is a member of the principal's household, and the book has them as a child under six: not an adult (PM-GA-009)"
                 }
             }
             AgentKind.THIRD_PARTY -> Unit                                          // anybody, under a written authorisation: its form is PM-GA-011's

@@ -241,6 +241,10 @@ class ProxyPersistenceIT {
         val acrossTheLanding = person().also { jdbc.update(sofiaDated(resident), entranceId, otherUnit, it) }
         appoint(proxies, owner, acrossTheLanding, member).andExpect(status().isBadRequest)
         appoint(proxies, owner, owner(entrance())).andExpect(status().isBadRequest)
+        // a child under six of this household is no adult: the book's flag, through the registry's port
+        val child = person().also { jdbc.update(sofiaDated(resident.replace("false,", "true,")), entranceId, unit, it) }
+        val refused = appoint(proxies, owner, child, member).andExpect(status().isBadRequest).andReturn().response.contentAsString
+        assertThat(refused).contains("child under six")
         // somebody whose title begins tomorrow is not an owner today: neither appoints nor is "another owner"
         val buyer = person().also {
             jdbc.update(sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date + 1)"), entranceId, unit, it)
