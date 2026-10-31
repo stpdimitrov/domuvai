@@ -209,8 +209,8 @@ class BookAccessService(
     /**
      * The system testing an appointment against the book, for whoever registers it (Rule: PM-BOOK-006, PM-BOOK-007,
      * PM-SEC-004). Nothing gates the test. What this settles is what the one asking may be told: all of it if they are
-     * the [principal] or the policy lets them read the book, and if not, nothing. Entered before the book is asked, as
-     * SERVED or REFUSED, whatever the book goes on to say. In a transaction of its own: the refusal that may follow
+     * the [principal] or the policy lets them read the book, and if not, nothing. Entered before who lives where is read,
+     * as SERVED or REFUSED, whatever the book goes on to say. In a transaction of its own: the refusal that may follow
      * rolls the registration back, and its entry stays.
      */
     // Rule: PM-BOOK-006

@@ -155,6 +155,8 @@ class ProxyService(
      * principal, is told more than that it does not bear the appointment out (Rule: PM-BOOK-006, PM-BOOK-007).
      */
     // Rule: PM-GA-009
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
     // TODO(legal): PM-GA-009 — whose household: the narrow reading is taken (the principal's own, where they live); whether
     // a landlord may name a member of the household living in their unit is not in the catalogue. Nor is which day
     // governs — the day of appointing, taken here, or the day of the meeting.
