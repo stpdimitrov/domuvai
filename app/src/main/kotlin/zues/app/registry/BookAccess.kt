@@ -162,6 +162,8 @@ class BookAccessService(
      * policy refuses is entered as of today and learns nothing of why there was nothing. One it allows is given [nothing]
      * and enters nothing, since nothing of the book was given.
      */
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
     @Transactional
     internal fun <T> unserved(entranceId: UUID, who: Asking, kind: BookAccessKind, action: Action, purpose: String, nothing: T): BookAnswer<T> {
         require(kind in STANDING) { "$kind is not read under a standing purpose: the book and its log are read by somebody who says why" }
