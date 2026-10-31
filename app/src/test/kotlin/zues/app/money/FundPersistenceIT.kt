@@ -100,11 +100,11 @@ class FundPersistenceIT {
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
         pay(entranceId, unitId, 7_000, "CASH")                                         // cash is not in the fund's account
 
-        disburse(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
+        disburse(entranceId, """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}""")
             .andExpect(status().isCreated)
-        disburse(entranceId, """{"amountMinor":30001,"purpose":"WORKS","authorisedBy":"$chair","emergencyJustification":"the roof leaks"}""")
+        disburse(entranceId, """{"amountMinor":30001,"purpose":"WORKS","emergencyJustification":"the roof leaks"}""")
             .andExpect(status().isConflict)                                          // 30 000 is available
-        disburse(entranceId, """{"amountMinor":30000,"purpose":"WORKS","authorisedBy":"$chair","emergencyJustification":"the roof leaks"}""")
+        disburse(entranceId, """{"amountMinor":30000,"purpose":"WORKS","emergencyJustification":"the roof leaks"}""")
             .andExpect(status().isCreated)
 
         mvc.perform(get("/api/money/entrances/$entranceId/fund"))
@@ -164,19 +164,19 @@ class FundPersistenceIT {
     fun `PM-FUND-007 PM-FUND-009 a payout lowers the balance and what is committed alike, a cancellation frees what was committed`() {
         val (entranceId, unitId, chair) = entranceWithFund()
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
-        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
-        val (roof, _) = signedOff(entranceId, """{"amountMinor":10000,"purpose":"WORKS","authorisedBy":"$chair","emergencyJustification":"the roof leaks"}""")
+        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}""")
+        val (roof, _) = signedOff(entranceId, """{"amountMinor":10000,"purpose":"WORKS","emergencyJustification":"the roof leaks"}""")
 
-        act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""")
+        act(entranceId, works, "pay", """{"paidOn":"$signedOn"}""")
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("PAID"))
             .andExpect(jsonPath("$.paidOn").value(signedOn))
             .andExpect(jsonPath("$.paidBy").value(chair.toString()))
-        act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isConflict)   // once
-        act(entranceId, roof, "cancel", """{"cancelledBy":"$chair","reason":"the roofer found no leak"}""")
+        act(entranceId, works, "pay", """{"paidOn":"$signedOn"}""").andExpect(status().isConflict)   // once
+        act(entranceId, roof, "cancel", """{"reason":"the roofer found no leak"}""")
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("CANCELLED"))
-        act(entranceId, roof, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isConflict)    // cancelled stays cancelled
+        act(entranceId, roof, "pay", """{"paidOn":"$signedOn"}""").andExpect(status().isConflict)    // cancelled stays cancelled
 
         mvc.perform(get("/api/money/entrances/$entranceId/fund"))
             .andExpect(status().isOk)
@@ -191,7 +191,7 @@ class FundPersistenceIT {
     @Test
     fun `PM-FUND-007 PM-FUND-009 the table refuses a payout or a cancellation it cannot account for, one check at a time`() {
         val (entranceId, _, chair) = entranceWithFund()
-        val (open, signedOn) = signedOff(entranceId, """{"amountMinor":100,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
+        val (open, signedOn) = signedOff(entranceId, """{"amountMinor":100,"purpose":"WORKS","decisionId":"GA-2026-7"}""")
         val day = "DATE '$signedOn'"
         fun update(set: String) = jdbc.update("UPDATE fund_disbursement SET $set WHERE id = '$open'")
         for ((set, constraint) in listOf(
@@ -219,7 +219,7 @@ class FundPersistenceIT {
         val (entranceId, unitId, chair) = entranceWithFund()
         val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
-        val works = """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}"""
+        val works = """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}"""
         fun count(table: String) = jdbc.queryForObject("SELECT count(*) FROM $table WHERE entrance_id = ?", Long::class.java, entranceId)
 
         val first = json.readTree(disburse(entranceId, works, "k-commit").andExpect(status().isCreated).andReturn().response.contentAsString)
@@ -232,18 +232,18 @@ class FundPersistenceIT {
             .andExpect(jsonPath("$.error").value("Idempotency-Key was already used for a different request"))
         disburse(entranceId, works, " ").andExpect(status().isBadRequest)
 
-        val paying = """{"paidOn":"$signedOn","paidBy":"$chair"}"""
+        val paying = """{"paidOn":"$signedOn"}"""
         act(entranceId, id, "pay", paying, "k-pay").andExpect(status().isOk).andExpect(jsonPath("$.status").value("PAID"))
         act(entranceId, id, "pay", paying, "k-pay").andExpect(status().isOk).andExpect(jsonPath("$.status").value("PAID"))   // the answer, not a 409
         assertThat(jdbc.queryForObject("SELECT count(*) FROM posting WHERE journal_id = ?", Long::class.java, id)).isEqualTo(2)   // one payout journal
-        act(entranceId, id, "cancel", """{"cancelledBy":"$chair","reason":"revoked"}""", "k-pay").andExpect(status().isConflict)   // a payout's key
+        act(entranceId, id, "cancel", """{"reason":"revoked"}""", "k-pay").andExpect(status().isConflict)   // a payout's key
         act(entranceId, id, "pay", paying, "k-commit").andExpect(status().isConflict)                                             // a sign-off's key
         mvc.perform(get("/api/money/entrances/$entranceId/fund")).andExpect(jsonPath("$.balanceMinor").value(30_000))
 
         val roof = UUID.fromString(
             json.readTree(disburse(entranceId, works, "k-roof").andReturn().response.contentAsString).get("id").asText(),
         )
-        val cancelling = """{"cancelledBy":"$chair","reason":"the roofer found no leak"}"""
+        val cancelling = """{"reason":"the roofer found no leak"}"""
         act(entranceId, roof, "cancel", cancelling, "k-cancel").andExpect(status().isOk).andExpect(jsonPath("$.status").value("CANCELLED"))
         act(entranceId, roof, "cancel", cancelling, "k-cancel").andExpect(status().isOk).andExpect(jsonPath("$.status").value("CANCELLED"))
         disburse(entranceId, works, "k-roof").andExpect(status().isCreated).andExpect(jsonPath("$.status").value("CANCELLED"))   // as it stands now
@@ -280,9 +280,9 @@ class FundPersistenceIT {
         val (entranceId, unitId, chair) = entranceWithFund()
         val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
-        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
-        act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isOk)
-        signedOff(entranceId, """{"amountMinor":5000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-8"}""")   // unpaid: inherited
+        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}""")
+        act(entranceId, works, "pay", """{"paidOn":"$signedOn"}""").andExpect(status().isOk)
+        signedOff(entranceId, """{"amountMinor":5000,"purpose":"WORKS","decisionId":"GA-2026-8"}""")   // unpaid: inherited
         val statements = "/api/money/entrances/$entranceId/fund/handover-statements"
         fun issue(incoming: UUID, bank: Long) = mvc.perform(
             post(statements).header("Idempotency-Key", newKey()).contentType(MediaType.APPLICATION_JSON)
@@ -368,8 +368,8 @@ class FundPersistenceIT {
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")                              // dated 2026-09-01
         pay(entranceId, unitId, 12_000, "OPERATING")
         pay(other.entranceId, other.unitId, 9_000, "REPAIR_RENEWAL")                   // another entrance's money
-        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""")
-        act(entranceId, works, "pay", """{"paidOn":"$signedOn","paidBy":"$chair"}""").andExpect(status().isOk)
+        val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}""")
+        act(entranceId, works, "pay", """{"paidOn":"$signedOn"}""").andExpect(status().isOk)
         mvc.perform(                                                                     // October's run, after the payments: a third kind of journal
             post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
                 """{"period":"2026-10","legalDate":"2026-10-01","lines":[{"stream":"REPAIR_FUND","key":"BY_IDEAL_PARTS","decisionId":"GA-2026-7","totalMinor":7000}]}""",

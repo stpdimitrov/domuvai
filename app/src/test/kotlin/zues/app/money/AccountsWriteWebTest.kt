@@ -53,11 +53,13 @@ class AccountsWriteWebTest {
         "/api/money/entrances/$entrance/charge-runs" to run,
         "/api/money/entrances/$entrance/payments" to """{"unitId":"${UUID.randomUUID()}","amountMinor":1000,"valueDate":"2026-05-20","receivedInto":"CASH"}""",
         "/api/money/entrances/$entrance/fund-accounts" to """{"iban":"BG80BNBG96611020345678","purpose":"REPAIR_RENEWAL","holderName":"Мария Иванова","holderKind":"MANAGER"}""",
-        "/api/money/entrances/$entrance/fund/disbursements" to """{"amountMinor":100,"purpose":"WORKS","authorisedBy":"$party","decisionId":"GA-1"}""",
-        "/api/money/entrances/$entrance/fund/disbursements/$disbursement/pay" to """{"paidOn":"2026-05-01","paidBy":"$party"}""",
-        "/api/money/entrances/$entrance/fund/disbursements/$disbursement/cancel" to """{"cancelledBy":"$party","reason":"withdrawn"}""",
+        "/api/money/entrances/$entrance/fund/disbursements" to """{"amountMinor":100,"purpose":"WORKS","decisionId":"GA-1"}""",
+        "/api/money/entrances/$entrance/fund/disbursements/$disbursement/pay" to """{"paidOn":"2026-05-01"}""",
+        "/api/money/entrances/$entrance/fund/disbursements/$disbursement/cancel" to """{"reason":"withdrawn"}""",
         "/api/money/entrances/$entrance/fund/handover-statements" to """{"handoverOn":"2026-05-01","outgoingPartyId":"$party","incomingPartyId":"${UUID.randomUUID()}","bankBalanceMinor":0}""",
     )
+
+    private val SIGNED = 4                                           // a sign-off, a payout, a cancellation and a handover also ask who acts
 
     private fun write(path: String, body: String = "{}") =
         post(path).header("Idempotency-Key", "k-1").contentType(MediaType.APPLICATION_JSON).content(body)
@@ -66,10 +68,12 @@ class AccountsWriteWebTest {
     fun `PM-SEC-001 each write asks about the entrance in the path, and a refusal is a 403 naming the rule — nothing read or written`() {
         whenever(whoAsks.of(null)).thenReturn(asking)
         doThrow(MoneyWriteForbidden("PM-SEC-001")).whenever(access).keep(eq(entrance), eq(asking))
+        doThrow(MoneyWriteForbidden("PM-SEC-001")).whenever(access).keeper(eq(entrance), eq(asking))
         for ((path, body) in writes) {
             mvc.perform(write(path, body)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
         }
-        verify(access, times(writes.size)).keep(entrance, asking)
+        verify(access, times(writes.size - SIGNED)).keep(entrance, asking)
+        verify(access, times(SIGNED)).keeper(entrance, asking)
         verifyNoInteractions(charges, store, payments, accounts, fund, handovers)
     }
 

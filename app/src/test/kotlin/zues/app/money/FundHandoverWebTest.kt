@@ -2,6 +2,7 @@ package zues.app.money
 
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
@@ -60,6 +61,28 @@ class FundHandoverWebTest {
         verify(handovers).issue(entranceId, "k-1", IssueHandover(LocalDate.parse("2026-09-15"), LocalDate.parse("2026-09-01"), chair, successor, 33_000))
         mvc.perform(issue(body.replace(""""from":"2026-09-01",""", ""))).andExpect(status().isCreated)
         verify(handovers).issue(entranceId, "k-1", IssueHandover(LocalDate.parse("2026-09-15"), null, chair, successor, 33_000))   // from the fund's first record
+    }
+
+    @Test
+    fun `PM-FUND-010 who records a statement is the sign-in's party, not a body's word`() {
+        val recorder = UUID.randomUUID()
+        whenever(access.keeper(eq(entranceId), anyOrNull())).thenReturn(recorder)
+        whenever(handovers.issue(eq(entranceId), any(), any())).thenReturn(view)
+        mvc.perform(issue(body.replace("{", """{"recordedBy":"$chair","""))).andExpect(status().isCreated)
+        verify(handovers).issue(entranceId, "k-1", IssueHandover(LocalDate.parse("2026-09-15"), LocalDate.parse("2026-09-01"), chair, successor, 33_000, recorder))
+    }
+
+    @Test
+    fun `PM-SEC-002 a statement is read without its parties or its basis unless the reader may see them, the list and the one alike`() {
+        whenever(handovers.list(entranceId)).thenReturn(listOf(view))
+        whenever(handovers.find(entranceId, view.id)).thenReturn(view)
+        val base = "/api/money/entrances/$entranceId/fund/handover-statements"
+        mvc.perform(get(base)).andExpect(jsonPath("$[0].statement.closingMinor").value(33_200)).andExpect(jsonPath("$[0].statement.outgoingPartyId").doesNotExist())
+            .andExpect(jsonPath("$[0].basis").doesNotExist()).andExpect(jsonPath("$[0].basisHash").value("ab12"))
+        mvc.perform(get("$base/${view.id}")).andExpect(jsonPath("$.statement.incomingPartyId").doesNotExist()).andExpect(jsonPath("$.basis").doesNotExist())
+        whenever(access.seesFundParties(eq(entranceId), anyOrNull())).thenReturn(true)
+        mvc.perform(get(base)).andExpect(jsonPath("$[0].statement.outgoingPartyId").value(chair.toString())).andExpect(jsonPath("$[0].basis").exists())
+        mvc.perform(get("$base/${view.id}")).andExpect(jsonPath("$.statement.incomingPartyId").value(successor.toString())).andExpect(jsonPath("$.basis").exists())
     }
 
     @Test

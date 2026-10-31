@@ -123,14 +123,14 @@ call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-10
 
 # Disbursements from the fund: works on a GA decision, paid; an emergency; a measure, cancelled; one committed
 base = f"/api/money/entrances/{entrance}/fund/disbursements"
-roof = call("POST", base, {"amountMinor": 48_000, "purpose": "WORKS", "authorisedBy": manager, "decisionId": "GA-2026-03-12-3"}, {"Idempotency-Key": str(uuid.uuid4())})
-call("POST", f"{base}/{roof['id']}/pay", {"paidOn": roof["committedOn"], "paidBy": manager}, {"Idempotency-Key": str(uuid.uuid4())})
-call("POST", base, {"amountMinor": 12_500, "purpose": "WORKS", "authorisedBy": manager,
+roof = call("POST", base, {"amountMinor": 48_000, "purpose": "WORKS", "decisionId": "GA-2026-03-12-3"}, {"Idempotency-Key": str(uuid.uuid4())})
+call("POST", f"{base}/{roof['id']}/pay", {"paidOn": roof["committedOn"]}, {"Idempotency-Key": str(uuid.uuid4())})
+call("POST", base, {"amountMinor": 12_500, "purpose": "WORKS",
                     "emergencyJustification": "теч от покрива над ап. 6 след бурята"}, {"Idempotency-Key": str(uuid.uuid4())})
-lift = call("POST", base, {"amountMinor": 9_900, "purpose": "PASSPORT_MEASURE", "authorisedBy": manager,
+lift = call("POST", base, {"amountMinor": 9_900, "purpose": "PASSPORT_MEASURE",
                            "decisionId": "GA-2026-03-12-5", "passportMeasure": "ТП 2019, мярка 4.2 — асансьорна уредба"}, {"Idempotency-Key": str(uuid.uuid4())})
-call("POST", f"{base}/{lift['id']}/cancel", {"cancelledBy": manager, "reason": "изпълнителят се отказа"}, {"Idempotency-Key": str(uuid.uuid4())})
-last = call("POST", base, {"amountMinor": 30_000, "purpose": "GA_PURPOSE", "authorisedBy": manager, "decisionId": "GA-2026-03-12-6"}, {"Idempotency-Key": str(uuid.uuid4())})
+call("POST", f"{base}/{lift['id']}/cancel", {"reason": "изпълнителят се отказа"}, {"Idempotency-Key": str(uuid.uuid4())})
+last = call("POST", base, {"amountMinor": 30_000, "purpose": "GA_PURPOSE", "decisionId": "GA-2026-03-12-6"}, {"Idempotency-Key": str(uuid.uuid4())})
 
 # The handover to the incoming manager, dated on the last commitment — so every open one is inherited, even if the
 # seed ran across midnight — with the bank's balance matching the ledger

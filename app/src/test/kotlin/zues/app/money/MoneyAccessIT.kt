@@ -1,6 +1,7 @@
 package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -202,5 +203,104 @@ class MoneyAccessIT {
         mvc.perform(issue().by("k-manager")).andExpect(status().isCreated)
         mvc.perform(pay("k-1").by("k-board")).andExpect(status().isCreated)
         mvc.perform(account().by("k-board")).andExpect(status().isCreated)
+    }
+
+    private fun send(path: String, body: String, key: String = UUID.randomUUID().toString()) =
+        post(path).header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON).content(body)
+
+    private fun issued(request: MockHttpServletRequestBuilder) = json.readTree(mvc.perform(request).andReturn().response.contentAsString)
+
+    private fun rows(table: String, entrance: UUID) = jdbc.queryForObject("SELECT count(*) FROM money.$table WHERE entrance_id = ?", Int::class.java, entrance)
+
+    @Test
+    fun `PM-FUND-007 PM-FUND-010 who acts is the sign-in's party — a keeper not holding the account is refused whatever the body says, and the record never takes a body's word`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 13", "А", "GA")).entranceId
+        val holder = person("Мария Иванова", "s-manager")
+        val board = person("Петър Колев", "s-board")
+        val stranger = ownership.registerParty(RegisterParty("Някой Друг"))
+        mandate(entrance, "BM", holder)
+        mandate(entrance, "MB", board)
+        val base = "/api/money/entrances/$entrance/fund"
+        mvc.perform(
+            send("/api/money/entrances/$entrance/fund-accounts", """{"iban":"BG53BNBG96611020345679","purpose":"REPAIR_RENEWAL","holderName":"Мария Иванова","holderKind":"MANAGER","holderPartyId":"$holder"}""").by("s-manager"),
+        ).andExpect(status().isCreated)
+
+        // a keeper of the accounts who does not hold the fund's, naming the holder in the body: refused, nothing written
+        val naming = """{"amountMinor":100,"purpose":"WORKS","decisionId":"GA-2026-1","authorisedBy":"$holder"}"""
+        mvc.perform(send("$base/disbursements", naming).by("s-board")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-FUND-007"))
+        assertThat(rows("fund_disbursement", entrance)).isZero()
+
+        // the holder, with a body naming someone else: the record names the holder
+        val paying = issued(send("$base/disbursements", naming.replace("$holder", "$stranger")).by("s-manager"))
+        val cancelling = issued(send("$base/disbursements", naming.replace("$holder", "$stranger")).by("s-manager"))
+        assertThat(paying["authorisedBy"].asText()).isEqualTo("$holder")
+        val on = paying["committedOn"].asText()
+        mvc.perform(send("$base/disbursements/${paying["id"].asText()}/pay", """{"paidOn":"$on","paidBy":"$holder"}""").by("s-board"))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-FUND-007"))
+        mvc.perform(send("$base/disbursements/${cancelling["id"].asText()}/cancel", """{"cancelledBy":"$holder","reason":"отпадна"}""").by("s-board"))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-FUND-007"))
+        mvc.perform(send("$base/disbursements/${paying["id"].asText()}/pay", """{"paidOn":"$on","paidBy":"$stranger"}""").by("s-manager"))
+            .andExpect(status().isOk).andExpect(jsonPath("$.paidBy").value("$holder"))
+        mvc.perform(send("$base/disbursements/${cancelling["id"].asText()}/cancel", """{"cancelledBy":"$stranger","reason":"отпадна"}""").by("s-manager"))
+            .andExpect(status().isOk).andExpect(jsonPath("$.cancelledBy").value("$holder"))
+
+        // a statement is issued by a keeper, who need not be either side: their sign-in goes on the record, outside the basis
+        val statement = issued(
+            send("$base/handover-statements", """{"handoverOn":"$on","outgoingPartyId":"$holder","incomingPartyId":"$stranger","bankBalanceMinor":-100,"recordedBy":"$stranger"}""").by("s-board"),
+        )
+        assertThat(statement["recordedBy"].asText()).isEqualTo("$board")
+        assertThat(statement["basis"].asText()).doesNotContain("recordedBy").doesNotContain("$board")
+        assertThat(jdbc.queryForObject("SELECT recorded_by FROM money.fund_handover_statement WHERE entrance_id = ?", UUID::class.java, entrance)).isEqualTo(board)
+        mvc.perform(get("$base/handover-statements/${statement["id"].asText()}").by("s-manager"))
+            .andExpect(status().isOk).andExpect(jsonPath("$.recordedBy").value("$board"))           // and the hash still checks out
+    }
+
+    @Test
+    fun `PM-SEC-002 PM-SEC-001 PM-GOV-008 an owner reads the fund, its accounts and its statements with no party id, the offices with them, an owner in office as the office`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 15", "А", "GA")).entranceId
+        val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "r-owner"), "OWN", validFrom = "2020-01-01"))
+        val holder = person("Мария Иванова", "r-manager")
+        val board = person("Петър Колев", "r-board")
+        val incoming = person("Елена Колева", "r-controller")
+        val boardOwner = person("Анна Петрова", "r-owner-in-office")
+        ownership.assignTitle(entrance, flat2, AssignTitle(boardOwner, "OWN", validFrom = "2020-01-01"))
+        mandate(entrance, "BM", holder)
+        mandate(entrance, "MB", board)
+        mandate(entrance, "CTL", incoming)
+        mandate(entrance, "MB", boardOwner)
+        val base = "/api/money/entrances/$entrance"
+        for ((iban, purpose) in listOf("BG26BNBG96611020345680" to "REPAIR_RENEWAL", "BG96BNBG96611020345681" to "OPERATING")) {
+            mvc.perform(
+                send("$base/fund-accounts", """{"iban":"$iban","purpose":"$purpose","holderName":"Мария Иванова","holderKind":"MANAGER","holderPartyId":"$holder"}""").by("r-manager"),
+            ).andExpect(status().isCreated)
+        }
+        val works = """{"amountMinor":100,"purpose":"WORKS","decisionId":"GA-2026-1"}"""
+        val paid = issued(send("$base/fund/disbursements", works).by("r-manager"))
+        val on = paid["committedOn"].asText()
+        mvc.perform(send("$base/fund/disbursements/${paid["id"].asText()}/pay", """{"paidOn":"$on"}""").by("r-manager")).andExpect(status().isOk)
+        val cancelled = issued(send("$base/fund/disbursements", works).by("r-manager"))
+        mvc.perform(send("$base/fund/disbursements/${cancelled["id"].asText()}/cancel", """{"reason":"отпадна"}""").by("r-manager")).andExpect(status().isOk)
+        val statement = issued(send("$base/fund/handover-statements", """{"handoverOn":"$on","outgoingPartyId":"$holder","incomingPartyId":"$incoming","bankBalanceMinor":-100}""").by("r-board"))
+        val reads = listOf("fund", "fund-accounts", "fund/handover-statements", "fund/handover-statements/${statement["id"].asText()}").map { "$base/$it" }
+        fun read(path: String, who: String) = mvc.perform(get(path).by(who)).andExpect(status().isOk).andReturn().response.contentAsString
+
+        // the owner: on the whole body, so the basis's text is covered too — every figure, and nobody
+        for (path in reads) assertThat(read(path, "r-owner")).describedAs(path).doesNotContain("$holder", "$board", "$incoming", "$boardOwner")
+        mvc.perform(get("$base/fund").by("r-owner")).andExpect(jsonPath("$.balanceMinor").value(-100)).andExpect(jsonPath("$.disbursements[0].amountMinor").value(100))
+            .andExpect(jsonPath("$.disbursements[0].authorisedBy").doesNotExist()).andExpect(jsonPath("$.disbursements[0].purpose").value("WORKS"))
+        mvc.perform(get("$base/fund/handover-statements/${statement["id"].asText()}").by("r-owner"))
+            .andExpect(jsonPath("$.statement.closingMinor").value(-100)).andExpect(jsonPath("$.statement.handoverOn").value(on))
+            .andExpect(jsonPath("$.basisHash").value(statement["basisHash"].asText())).andExpect(jsonPath("$.basis").doesNotExist())
+
+        // the offices, and the owner who also sits on the board: the ids
+        for (office in listOf("r-manager", "r-board", "r-controller", "r-owner-in-office")) {
+            assertThat(read(reads[0], office)).describedAs(office).contains("\"authorisedBy\":\"$holder\"", "\"paidBy\":\"$holder\"", "\"cancelledBy\":\"$holder\"")
+            assertThat(read(reads[1], office)).describedAs(office).contains("\"holderParty\":\"$holder\"")
+            for (path in reads.drop(2)) assertThat(read(path, office)).describedAs(office).contains("\"outgoingPartyId\":\"$holder\"", "\"recordedBy\":\"$board\"", "\"basis\":")
+        }
+
+        // the operating account names nobody by id, whoever reads it
+        for (reader in listOf("r-owner", "r-manager")) assertThat(read("$base/operating-account", reader)).describedAs(reader).doesNotContain("$holder")
     }
 }

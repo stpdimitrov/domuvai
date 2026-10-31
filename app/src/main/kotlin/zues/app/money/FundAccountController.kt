@@ -58,9 +58,11 @@ class FundAccountController(private val fund: FundAccountService, private val ac
 
     @GetMapping
     fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<FundAccountView> {
-        access.fund(entranceId, who.of(signedIn))
+        val asking = who.of(signedIn)
+        access.fund(entranceId, asking)
+        val parties = access.seesFundParties(entranceId, asking)                       // Rule: PM-SEC-002
         return fund.list(entranceId).map {
-            FundAccountView(it.id, it.iban, it.purpose, it.holderName, it.holderKind, it.holderParty)
+            FundAccountView(it.id, it.iban, it.purpose, it.holderName, it.holderKind, it.holderParty.takeIf { parties })
         }
     }
 

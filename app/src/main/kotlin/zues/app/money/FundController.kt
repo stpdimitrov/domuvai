@@ -17,21 +17,20 @@ import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
-/** A disbursement to sign off (PM-FUND-006…008). Until sign-in exists, the caller names the signatory. */
+/** A disbursement to sign off (PM-FUND-006…008). The signatory is the sign-in's party, never the body's word (#260). */
 data class CommitDisbursementRequest(
     val amountMinor: Long,
     val purpose: String,                          // WORKS | PASSPORT_MEASURE | GA_PURPOSE
-    val authorisedBy: UUID,                       // the party holding the fund's account (PM-FUND-007)
     val decisionId: String? = null,               // the GA decision — or, instead, for WORKS only,
     val emergencyJustification: String? = null,   // an emergency's written justification (PM-FUND-008)
     val passportMeasure: String? = null,          // required for PASSPORT_MEASURE (PM-FUND-006)
 )
 
-/** A payout the fund's bank made: its value date, and the party holding the fund's account (PM-FUND-007). */
-data class PayDisbursementRequest(val paidOn: String, val paidBy: UUID)
+/** A payout the fund's bank made: its value date. Who records it is the sign-in's party (PM-FUND-007). */
+data class PayDisbursementRequest(val paidOn: String)
 
-/** A signed-off disbursement withdrawn by the party holding the fund's account, and why (PM-FUND-007). */
-data class CancelDisbursementRequest(val cancelledBy: UUID, val reason: String)
+/** A signed-off disbursement withdrawn, and why. Who withdraws it is the sign-in's party (PM-FUND-007). */
+data class CancelDisbursementRequest(val reason: String)
 
 /**
  * The repair and renewal fund (Rule: PM-FUND-009): its balance, what is committed and what is
@@ -45,8 +44,9 @@ class FundController(private val fund: FundService, private val access: MoneyAcc
 
     @GetMapping
     fun view(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): FundView {
-        access.fund(entranceId, who.of(signedIn))
-        return fund.view(entranceId)
+        val asking = who.of(signedIn)
+        access.fund(entranceId, asking)
+        return fund.view(entranceId).let { if (access.seesFundParties(entranceId, asking)) it else it.withoutParties() }
     }
 
     @PostMapping("/disbursements")
@@ -57,11 +57,11 @@ class FundController(private val fund: FundService, private val access: MoneyAcc
         @RequestBody request: CommitDisbursementRequest,
         signedIn: JwtAuthenticationToken?,
     ): DisbursementView {
-        access.keep(entranceId, who.of(signedIn))
+        val signatory = access.keeper(entranceId, who.of(signedIn))
         return fund.commit(
             entranceId, idempotencyKey,
             CommitDisbursement(
-                request.amountMinor, request.purpose, request.authorisedBy,
+                request.amountMinor, request.purpose, signatory,
                 request.decisionId, request.emergencyJustification, request.passportMeasure,
             ),
         )
@@ -74,8 +74,8 @@ class FundController(private val fund: FundService, private val access: MoneyAcc
         @RequestBody request: PayDisbursementRequest,
         signedIn: JwtAuthenticationToken?,
     ): DisbursementView {
-        access.keep(entranceId, who.of(signedIn))
-        return fund.pay(entranceId, disbursementId, idempotencyKey, PayDisbursement(LocalDate.parse(request.paidOn), request.paidBy))
+        val signatory = access.keeper(entranceId, who.of(signedIn))
+        return fund.pay(entranceId, disbursementId, idempotencyKey, PayDisbursement(LocalDate.parse(request.paidOn), signatory))
     }
 
     @PostMapping("/disbursements/{disbursementId}/cancel")
@@ -85,11 +85,11 @@ class FundController(private val fund: FundService, private val access: MoneyAcc
         @RequestBody request: CancelDisbursementRequest,
         signedIn: JwtAuthenticationToken?,
     ): DisbursementView {
-        access.keep(entranceId, who.of(signedIn))
-        return fund.cancel(entranceId, disbursementId, idempotencyKey, CancelDisbursement(request.cancelledBy, request.reason))
+        val signatory = access.keeper(entranceId, who.of(signedIn))
+        return fund.cancel(entranceId, disbursementId, idempotencyKey, CancelDisbursement(signatory, request.reason))
     }
 
-    /** An unknown purpose, a missing basis, measure or reason, a date out of bounds, or a party who does not hold the account → 400. */
+    /** An unknown purpose, a missing basis, measure or reason, or a date out of bounds → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid disbursement"))
