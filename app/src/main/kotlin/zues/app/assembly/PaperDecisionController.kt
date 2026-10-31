@@ -22,11 +22,20 @@ import java.util.UUID
 @RequestMapping("/api/assembly/entrances/{entranceId}/paper-decisions")
 class PaperDecisionController(private val decisions: PaperDecisions, private val who: WhoAsks) {
 
+    // Rule: PM-FEE-012
+    // Rule: PM-GA-022
+    // Rule: PM-DOC-007
+    // Rule: PM-SEC-001
+    // Rule: PM-SEC-004
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun record(@PathVariable entranceId: UUID, @RequestBody request: RecordPaperDecision, signedIn: JwtAuthenticationToken?): PaperDecisionView =
         PaperDecisionView.of(decisions.record(who.of(signedIn), entranceId, request), namesCustodian = true)
 
+    // Rule: PM-GA-022
+    // Rule: PM-DOC-007
+    // Rule: PM-SEC-001
+    // Rule: PM-SEC-002
     @GetMapping
     fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<PaperDecisionView> =
         decisions.list(who.of(signedIn), entranceId)

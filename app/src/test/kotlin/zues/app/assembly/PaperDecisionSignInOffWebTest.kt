@@ -41,7 +41,7 @@ class PaperDecisionSignInOffWebTest {
     @MockitoBean lateinit var logins: Logins
 
     @Test
-    fun `PM-FEE-012 with sign-in switched off a decision taken on paper is recorded, naming nobody`() {
+    fun `PM-FEE-012 the decision a charge run will cite can be recorded with sign-in switched off, naming nobody`() {
         whenever(aggregates.insert(any<PaperDecision>())).thenAnswer { it.arguments[0] }
         val content = """{"decisionText":"вноска","protocolDate":"2026-03-14","protocolRef":"Протокол № 3","archiveLocation":"шкаф","custodian":"Иван Иванов"}"""
         mvc.perform(post("/api/assembly/entrances/${UUID.randomUUID()}/paper-decisions").contentType(MediaType.APPLICATION_JSON).content(content))
