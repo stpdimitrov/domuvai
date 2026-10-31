@@ -81,12 +81,6 @@ class MoneyAccess(
     fun seesFundParties(entranceId: UUID, who: Asking): Boolean =
         unasked(who) || policy.decide(who, Action.READ_FUND_PARTIES, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(clock.instant()))).allowed
 
-    /** Rule: PM-BOOK-006 — what the book declares of each unit's persons, beside what a period billed: read as the book is. */
-    fun book(entranceId: UUID, who: Asking) {
-        if (unasked(who)) return
-        require(Action.READ_BOOK, Resource.OfEntrance(entranceId), who)
-    }
-
     /**
      * Rule: PM-SEC-001 — the entrance's accounts are kept by the manager and the board (the owner's decision of
      * 2026-10-21, #250): a charge run issued or previewed, a payment recorded, the fund's account registered, a

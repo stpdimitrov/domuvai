@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -12,7 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import zues.app.identity_org.WhoAsks
-import zues.app.registry.Units
+import zues.app.policy.Asking
+import zues.app.registry.BookAnswer
+import zues.app.registry.BookHeadcounts
 import java.time.LocalDate
 import java.util.UUID
 
@@ -52,25 +53,33 @@ data class HeadcountCheck(
  * basis its run keeps (PM-FEE-014); the persons the book declares are the registry's, read now, for the run's own
  * legal date. They differ when the book was changed afterwards for a date the run had already billed. Nothing is
  * corrected here: an issued period stays as issued (PM-FEE-015), and what to do about a difference is a person's.
+ * Who may read the book, and its record of that read, are the registry's (Rule: PM-BOOK-006, PM-BOOK-007).
  */
 @Service
 class HeadcountCheckService(
     private val runs: ChargeRunRepository,
-    private val units: Units,
+    private val book: BookHeadcounts,
     private val json: ObjectMapper,
 ) {
     private data class Counted(val designation: String, val occupants: Int, val childrenUnder6: Int)
 
+    /**
+     * The book answers before anything is said of the run, so a reader it refuses gets the same 403 whether a run exists
+     * or not. No transaction here: the book keeps its entry in its own, and a refusal thrown inside one would take it back.
+     */
     // Rule: PM-BOOK-012
-    @Transactional(readOnly = true)
-    fun check(entranceId: UUID, period: String): HeadcountCheck {
-        val run = runs.findByEntranceIdAndPeriod(entranceId, period)
-            ?: throw NoSuchElementException("entrance $entranceId has no charge run issued for $period")
+    fun check(entranceId: UUID, period: String, who: Asking): HeadcountCheck {
+        val found = runs.findByEntranceIdAndPeriod(entranceId, period)
+        val answer = when (val read = book.declared(entranceId, who, found?.legalDate)) {
+            is BookAnswer.Refused -> throw MoneyReadForbidden(read.ruleId)
+            is BookAnswer.Served -> read.value
+        }
+        val run = found ?: throw NoSuchElementException("entrance $entranceId has no charge run issued for $period")
         val billed = json.readTree(run.basis.json).path("units").associate {
             UUID.fromString(it.path("unitId").asText()) to
                 Counted(it.path("designation").asText(), it.path("occupants").asInt(), it.path("childrenUnder6").asInt())
         }
-        val declared = units.forEntrance(entranceId, run.legalDate).associate { it.unitId to Counted(it.designation, it.occupants, it.childrenUnder6) }
+        val declared = answer.associate { it.unitId to Counted(it.designation, it.occupants, it.childrenUnder6) }
 
         val mismatches = (billed.keys + declared.keys).mapNotNull { unitId ->
             val b = billed[unitId]
@@ -90,13 +99,11 @@ class HeadcountCheckService(
 /** The period's headcount exception report (Rule: PM-BOOK-012) — a read; it changes nothing. */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/charge-runs/{period}/headcount")
-class HeadcountCheckController(private val headcount: HeadcountCheckService, private val access: MoneyAccess, private val who: WhoAsks) {
+class HeadcountCheckController(private val headcount: HeadcountCheckService, private val who: WhoAsks) {
 
     @GetMapping
-    fun check(@PathVariable entranceId: UUID, @PathVariable period: String, signedIn: JwtAuthenticationToken?): HeadcountCheck {
-        access.book(entranceId, who.of(signedIn))
-        return headcount.check(entranceId, period)
-    }
+    fun check(@PathVariable entranceId: UUID, @PathVariable period: String, signedIn: JwtAuthenticationToken?): HeadcountCheck =
+        headcount.check(entranceId, period, who.of(signedIn))
 
     /** No run issued for the period, or no such entrance → 404. */
     @ExceptionHandler(NoSuchElementException::class)

@@ -20,9 +20,10 @@ import zues.app.policy.Asking
 import java.util.UUID
 
 /**
- * Every entrance-level read of the fund, and the headcount check, asks [MoneyAccess] about the entrance in the path for
- * the person the sign-in names, before anything is read — and a refusal is a 403 naming the rule, the service untouched.
- * Who is allowed is the policy's, proved in [MoneyAccessTest] and end to end in `MoneyAccessIT`.
+ * Every entrance-level read of the fund asks [MoneyAccess] about the entrance in the path for the person the sign-in
+ * names, before anything is read — and a refusal is a 403 naming the rule, the service untouched. Who is allowed is the
+ * policy's, proved in [MoneyAccessTest] and end to end in `MoneyAccessIT`. The headcount check asks the book, through its
+ * service, and answers the same way.
  */
 @WebMvcTest(FundController::class, FundAccountController::class, FundHandoverController::class, LedgerController::class, HeadcountCheckController::class)
 class FundReadWebTest {
@@ -58,16 +59,14 @@ class FundReadWebTest {
         }
         verify(access, org.mockito.kotlin.times(fundReads.size)).fund(entrance, asking)
         verifyNoInteractions(fund, accounts, handovers, ledger)
-        verify(access, never()).book(any(), any())
     }
 
     @Test
-    fun `PM-BOOK-006 the headcount check asks as the book is read, and a refusal is a 403 naming the rule — nothing read`() {
+    fun `PM-BOOK-006 the headcount check is asked for the person the sign-in names, and a refusal is a 403 naming the rule`() {
         whenever(whoAsks.of(null)).thenReturn(asking)
-        doThrow(MoneyReadForbidden("PM-BOOK-006")).whenever(access).book(eq(entrance), eq(asking))
+        whenever(headcount.check(entrance, "2026-05", asking)).thenThrow(MoneyReadForbidden("PM-BOOK-006"))
         mvc.perform(get(headcountRead)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-BOOK-006"))
             .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("the book declares")))
-        verifyNoInteractions(headcount)
         verify(access, never()).fund(any(), any())
     }
 }

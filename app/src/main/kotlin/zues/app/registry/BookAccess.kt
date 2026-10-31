@@ -58,6 +58,8 @@ enum class BookAccessKind {
     RETENTION,
     /** the names beside parties' ids in another module's read — the mandates, the register — were given */
     PARTY_NAMES,
+    /** what the book declares of each unit's persons was read, beside what a period billed */
+    HEADCOUNT_READ,
 }
 
 /** Reads only: an entry is written once, through the aggregate template, and never saved over or deleted. */
@@ -136,23 +138,35 @@ class BookAccessService(
         }
 
     /**
-     * What a console screen is given from the book, or does to it — a names list, the retention pass (Rule:
-     * PM-BOOK-006, PM-BOOK-007, PM-BOOK-010): decided and entered as a read of the book is, under the standing
+     * What a console screen is given from the book, or does to it — a names list, the declared counts, the retention
+     * pass (Rule: PM-BOOK-006, PM-BOOK-007, PM-BOOK-010): decided and entered as a read of the book is, under the standing
      * [purpose] of the list itself, since a screen states none. With sign-in switched off nobody is asking and nothing
-     * can be decided: a names list is still given, as everything else is in that mode, and entered as given to nobody.
+     * can be decided: a names list or the counts are still given, as everything else is in that mode, and entered as given to nobody.
      * The retention pass is not: what cannot be undone never runs with nobody accountable — it is refused like any
      * other caller the policy does not allow. The book itself and its log are never served that way either.
      */
     @Transactional
     internal fun <T> standing(entranceId: UUID, who: Asking, kind: BookAccessKind, action: Action, on: LocalDate, purpose: String, serve: () -> T): BookAnswer<T> {
         require(kind in STANDING) { "$kind is not read under a standing purpose: the book and its log are read by somebody who says why" }
-        if (!(open && kind in LISTS && who.login == null && who.party == null)) return decided(entranceId, who, purpose, kind, on, action, serve)
+        if (!unasked(kind, who)) return decided(entranceId, who, purpose, kind, on, action, serve = serve)
         if (entrances.existsById(entranceId)) {
             aggregates.insert(
                 BookAccessRow(UUID.randomUUID(), entranceId, null, purpose, kind.name, on, clock.instant().truncatedTo(ChronoUnit.MICROS), BookAccessOutcome.OPEN.name, action.governedBy),
             )
         }
         return BookAnswer.Served(serve())
+    }
+
+    /**
+     * A standing read with nothing to give (Rule: PM-BOOK-006, PM-BOOK-007): the reader is answered as ever, so one the
+     * policy refuses is entered as of today and learns nothing of why there was nothing. One it allows is given [nothing]
+     * and enters nothing, since nothing of the book was given.
+     */
+    @Transactional
+    internal fun <T> unserved(entranceId: UUID, who: Asking, kind: BookAccessKind, action: Action, purpose: String, nothing: T): BookAnswer<T> {
+        require(kind in STANDING) { "$kind is not read under a standing purpose: the book and its log are read by somebody who says why" }
+        if (unasked(kind, who)) return BookAnswer.Served(nothing)
+        return decided(entranceId, who, purpose, kind, LocalDate.parse(toSofiaDate(clock.instant())), action, entersServed = false) { nothing }
     }
 
     /**
@@ -192,7 +206,7 @@ class BookAccessService(
      * learns nothing else: not whether the entrance is registered, nor what was wrong with the request. The refusal is
      * entered wherever there is an entrance to enter it under.
      */
-    private fun <T> decided(entranceId: UUID, who: Asking, purpose: String, kind: BookAccessKind, bookDate: LocalDate?, action: Action, serve: () -> T): BookAnswer<T> {
+    private fun <T> decided(entranceId: UUID, who: Asking, purpose: String, kind: BookAccessKind, bookDate: LocalDate?, action: Action, entersServed: Boolean = true, serve: () -> T): BookAnswer<T> {
         val now = clock.instant()
         val decision = policy.decide(who, action, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(now)))
         // A served read is a party's: an allowance to a login tied to no party would have nobody to put on the record.
@@ -204,7 +218,7 @@ class BookAccessService(
             if (why.isEmpty()) throw BookAccessRefused("a purpose is required to read the book (PM-BOOK-007)")
             if (why.length > PURPOSE_MAX) throw BookAccessRefused("a purpose is at most $PURPOSE_MAX characters (PM-BOOK-007)")
         }
-        if (registered) {
+        if (registered && (entersServed || !served)) {
             aggregates.insert(
                 BookAccessRow(
                     UUID.randomUUID(), entranceId, who.party, why.take(PURPOSE_MAX).ifEmpty { NO_PURPOSE_GIVEN }, kind.name, bookDate, now.truncatedTo(ChronoUnit.MICROS),
@@ -215,9 +229,12 @@ class BookAccessService(
         return if (served) BookAnswer.Served(serve()) else BookAnswer.Refused(decision.ruleId)
     }
 
+    /** Nobody asking, of something given with sign-in switched off: given to nobody, undecided. */
+    private fun unasked(kind: BookAccessKind, who: Asking) = open && kind in LISTS && who.login == null && who.party == null
+
     private companion object {
-        /** What is given with sign-in switched off: the two names lists, and nothing else. */
-        val LISTS = setOf(BookAccessKind.OWNERS_LIST, BookAccessKind.OVERDUE_LIST)
+        /** What is given with sign-in switched off: the two names lists and the declared counts, and nothing else. */
+        val LISTS = setOf(BookAccessKind.OWNERS_LIST, BookAccessKind.OVERDUE_LIST, BookAccessKind.HEADCOUNT_READ)
 
         /** What is done under a standing purpose — never the book itself, nor its log. */
         val STANDING = LISTS + BookAccessKind.RETENTION

@@ -13,8 +13,10 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import zues.app.registry.UnitForCharging
-import zues.app.registry.Units
+import zues.app.policy.Asking
+import zues.app.registry.BookAnswer
+import zues.app.registry.BookHeadcounts
+import zues.app.registry.DeclaredHeadcount
 import java.time.LocalDate
 import java.util.UUID
 
@@ -26,8 +28,9 @@ import java.util.UUID
 class HeadcountCheckTest {
 
     private val runs: ChargeRunRepository = mock()
-    private val units: Units = mock()
-    private val service = HeadcountCheckService(runs, units, ObjectMapper())
+    private val book: BookHeadcounts = mock()
+    private val service = HeadcountCheckService(runs, book, ObjectMapper())
+    private val asking = Asking(null, UUID.randomUUID())
 
     private val entranceId = UUID.randomUUID()
     private val on = LocalDate.parse("2026-05-01")
@@ -41,7 +44,7 @@ class HeadcountCheckTest {
         """{"unitId":"$unitId","designation":"$designation","occupants":$occupants,"childrenUnder6":$children,"animals":0,"absentDays":0}"""
 
     private fun declared(unitId: UUID, designation: String, occupants: Int, children: Int) =
-        UnitForCharging(unitId, designation, "20.0000", separateEntrance = false, occupants = occupants, childrenUnder6 = children)
+        DeclaredHeadcount(unitId, designation, occupants, children)
 
     private val run = ChargeRunRow(
         UUID.randomUUID(), entranceId, "2026-05", on,
@@ -52,11 +55,11 @@ class HeadcountCheckTest {
     @Test
     fun `PM-BOOK-012 the report lists the units whose billed persons are not the persons the book declares for the run's date`() {
         whenever(runs.findByEntranceIdAndPeriod(entranceId, "2026-05")).thenReturn(run)
-        whenever(units.forEntrance(entranceId, on)).thenReturn(                         // as of the run's legal date, not today
-            listOf(declared(a, "ап. 1", 2, 0), declared(b, "ап. 2", 3, 0), declared(c, "ап. 3", 2, 0), declared(added, "ап. 4", 1, 0)),
+        whenever(book.declared(entranceId, asking, on)).thenReturn(                      // as of the run's legal date, not today
+            BookAnswer.Served(listOf(declared(a, "ап. 1", 2, 0), declared(b, "ап. 2", 3, 0), declared(c, "ап. 3", 2, 0), declared(added, "ап. 4", 1, 0))),
         )
 
-        val check = service.check(entranceId, "2026-05")
+        val check = service.check(entranceId, "2026-05", asking)
 
         assertThat(listOf(check.period, check.legalDate, check.chargeRunId, check.unitsCompared)).containsExactly("2026-05", on, run.id, 5)
         assertThat(check.mismatches).containsExactly(                                    // ап. 1 agrees, and is not listed
@@ -70,13 +73,25 @@ class HeadcountCheckTest {
     @Test
     fun `PM-BOOK-012 a book that still says what was billed has nothing to report, and a period with no run is not found`() {
         whenever(runs.findByEntranceIdAndPeriod(entranceId, "2026-05")).thenReturn(run)
-        whenever(units.forEntrance(entranceId, on)).thenReturn(
-            listOf(declared(a, "ап. 1", 2, 0), declared(b, "ап. 2", 3, 1), declared(c, "ап. 3", 1, 0), declared(gone, "ап. 9", 2, 0)),
+        whenever(book.declared(entranceId, asking, on)).thenReturn(
+            BookAnswer.Served(listOf(declared(a, "ап. 1", 2, 0), declared(b, "ап. 2", 3, 1), declared(c, "ап. 3", 1, 0), declared(gone, "ап. 9", 2, 0))),
         )
-        val check = service.check(entranceId, "2026-05")
+        val check = service.check(entranceId, "2026-05", asking)
         assertThat(check.mismatches).isEmpty()
         assertThat(check.unitsCompared).isEqualTo(4)
-        assertThatThrownBy { service.check(entranceId, "2026-06") }.isInstanceOf(NoSuchElementException::class.java)
+        whenever(book.declared(entranceId, asking, null)).thenReturn(BookAnswer.Served(emptyList()))
+        assertThatThrownBy { service.check(entranceId, "2026-06", asking) }.isInstanceOf(NoSuchElementException::class.java)
+    }
+
+    @Test
+    fun `PM-BOOK-006 a reader the book refuses is refused the same with a run and without one, and never by the report`() {
+        whenever(runs.findByEntranceIdAndPeriod(entranceId, "2026-05")).thenReturn(run)
+        whenever(book.declared(entranceId, asking, on)).thenReturn(BookAnswer.Refused("PM-BOOK-006"))
+        whenever(book.declared(entranceId, asking, null)).thenReturn(BookAnswer.Refused("PM-BOOK-006"))
+        for (period in listOf("2026-05", "2026-06")) {
+            assertThatThrownBy { service.check(entranceId, period, asking) }.describedAs(period)
+                .isInstanceOfSatisfying(MoneyReadForbidden::class.java) { assertThat(it.ruleId).isEqualTo("PM-BOOK-006") }
+        }
     }
 }
 
@@ -86,15 +101,20 @@ class HeadcountCheckWebTest {
 
     @Autowired lateinit var mvc: MockMvc
     @MockitoBean lateinit var headcount: HeadcountCheckService
-    @MockitoBean lateinit var access: MoneyAccess
     @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
+    private val asking = Asking(null, null)
+
+    @org.junit.jupiter.api.BeforeEach
+    fun signedIn() {
+        whenever(whoAsks.of(null)).thenReturn(asking)
+    }
 
     @Test
     fun `GET the period's headcount report returns the units that differ, each with both counts`() {
         val unitId = UUID.randomUUID()
-        whenever(headcount.check(entranceId, "2026-05")).thenReturn(
+        whenever(headcount.check(entranceId, "2026-05", asking)).thenReturn(
             HeadcountCheck(
                 entranceId, "2026-05", LocalDate.parse("2026-05-01"), UUID.randomUUID(), 6,
                 listOf(
@@ -117,7 +137,7 @@ class HeadcountCheckWebTest {
 
     @Test
     fun `a period with no run issued is a 404`() {
-        whenever(headcount.check(entranceId, "2026-06")).thenThrow(NoSuchElementException("no charge run issued for 2026-06"))
+        whenever(headcount.check(entranceId, "2026-06", asking)).thenThrow(NoSuchElementException("no charge run issued for 2026-06"))
         mvc.perform(get("/api/money/entrances/$entranceId/charge-runs/2026-06/headcount"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error").value("no charge run issued for 2026-06"))
