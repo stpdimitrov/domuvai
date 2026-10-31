@@ -77,11 +77,19 @@ Everything a session needs to take over is in the repository or on its GitHub is
 
 - **A question for the owner is an issue, not a chat message.** Options with the recommended one first, what is blocked meanwhile, and the slice that asks — `python3 tools/lanes.py ask --title … --body-file …`. A session that asks builds the strictest reading meanwhile and says so. The answer is a comment on the issue (the owner's, or relayed verbatim by a coordinator); the session that builds it quotes it in its log entry and the issue is closed. Nobody acts on an answer that exists only in a conversation.
 - **A handover (`H-nn`) is written** by whoever coordinates, after each batch of merged slices, before any `/compact`, and at least once a day while sessions run in parallel. It says, per lane: what merged since the last handover, what is in flight (PR, claim), what is open (findings, owner questions by issue number, counsel questions), and the next slice proposed. A handover restates no decision: it links the entry or issue that holds it.
-- **A coordinator** (optional — one per developer, at most one per machine) starts sessions in their own worktrees with briefs that name the lane, routes questions to the owner through `owner-question` issues, assigns the next slice, and writes the handovers. It writes no slice code. Sessions without a coordinator follow the same rules on their own.
+- **A coordinator** (optional) starts sessions in their own worktrees with briefs that name the lane, puts questions to the owner through `owner-question` issues, assigns the next slice, and writes the handovers. It writes no slice code. **It is a fresh session too, opened on this repository** so the hooks apply: it boots status-only, does its one job and ends. A long-lived coordinator outside the repository escapes the size gates and pays for its whole context on every note it receives (the one that ran 2026-10-01…31 reached 11 MB and retired at H-13). Sessions without a coordinator follow the same rules on their own.
 - **Machine resources are named by the slice**: a scratch database is `domuvai_<slice id>`, created and dropped by the session that needs it; the end-to-end harness's ports (the API's 8081, the web's 3010–3012) belong to one session at a time; a developer's own servers are nobody else's to stop.
 - **A decision a session built is recorded where decisions live** — an ADR or an amendment to one (`zues-adr`) — not only in its log entry.
 - **Nobody audits their own work**: after a batch of parallel slices, `zues-audit` runs in a fresh session over what was merged.
 - **Credentials are each developer's own.** A push refused with an account error is checked first against the identity git actually uses (`git credential fill` — the keychain can hold another account's login), and is never worked around by switching accounts in a session.
+
+## Before you claim, and while you build
+
+- **Claim before you read code.** The claim gate measures the transcript, so a session that reads the module first can be refused before it starts (G-5's first session, 1359k). Contract and plan from the issue or a note, claim, then read only the lines you edit.
+- A new dependency on a controller must also be mocked in `WireFormatTest` and `OpenApiContractTest`.
+- A change to a summary in `tools/build_openapi.py` needs `npm run gen:api` in `web/`: the gates do not do it, and CI's build fails on a stale `schema.d.ts`.
+- The test JVM runs with sign-in off, so a guard is proven only by a `jwt()` test.
+- An owner's answer closes its question; if nothing builds it at once, open a `lane:` issue saying so in the same step (#253, #298 and #254 were answered, closed and then built by nobody until a check found them: #382, #383, #384).
 
 ## Persistence tests without Docker
 
@@ -90,7 +98,7 @@ The `*IT` tests run on a real Postgres through Testcontainers (`@Testcontainers(
 1. `createdb -h localhost -U postgres domuvai_<slice id>` — a scratch database of your own.
 2. Copy the test to `…ScratchLocalIT.kt` beside it: remove the `@Testcontainers(…)` annotation and the `companion object` with the container and its `@DynamicPropertySource`, and rename the class.
 3. `DB_URL='jdbc:postgresql://localhost:5432/domuvai_<slice id>?currentSchema=registry,identity_org,assembly,money,maintenance,compliance,evidence,app,intake,public' ./gradlew :app:test --tests '*ScratchLocalIT'` — then check its report shows the tests **run**, not skipped.
-4. Delete the copy (never commit it) and `dropdb` the scratch database.
+4. Delete the copy (never commit it) and `dropdb` the scratch database. Never leave a copy in the tree while running mutants: without `DB_URL` it runs against your own `domuvai` database.
 
 Gate 9 also refuses a migration that adds a column its table already has — the failure #266 hit — on any machine.
 
