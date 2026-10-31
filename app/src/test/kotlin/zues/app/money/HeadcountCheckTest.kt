@@ -5,6 +5,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -17,6 +18,7 @@ import zues.app.policy.Asking
 import zues.app.registry.BookAnswer
 import zues.app.registry.BookHeadcounts
 import zues.app.registry.DeclaredHeadcount
+import zues.app.registry.Units
 import java.time.LocalDate
 import java.util.UUID
 
@@ -29,7 +31,8 @@ class HeadcountCheckTest {
 
     private val runs: ChargeRunRepository = mock()
     private val book: BookHeadcounts = mock()
-    private val service = HeadcountCheckService(runs, book, ObjectMapper())
+    private val units: Units = mock()
+    private val service = HeadcountCheckService(runs, book, units, ObjectMapper())
     private val asking = Asking(null, UUID.randomUUID())
 
     private val entranceId = UUID.randomUUID()
@@ -79,8 +82,19 @@ class HeadcountCheckTest {
         val check = service.check(entranceId, "2026-05", asking)
         assertThat(check.mismatches).isEmpty()
         assertThat(check.unitsCompared).isEqualTo(4)
+    }
+
+    @Test
+    fun `PM-BOOK-012 a period with no run is told from an entrance that does not exist, and the words a screen reads stay`() {
         whenever(book.declared(entranceId, asking, null)).thenReturn(BookAnswer.Served(emptyList()))
-        assertThatThrownBy { service.check(entranceId, "2026-06", asking) }.isInstanceOf(NoSuchElementException::class.java)
+        whenever(units.entranceExists(entranceId)).thenReturn(true)
+        assertThatThrownBy { service.check(entranceId, "2026-06", asking) }.isInstanceOfSatisfying(NoChargeRun::class.java) {
+            assertThat(it.answer).isEqualTo(NoChargeRunAnswer("entrance $entranceId has no charge run issued for 2026-06", NoChargeRunCode.NO_RUN))
+        }
+        whenever(units.entranceExists(entranceId)).thenReturn(false)
+        assertThatThrownBy { service.check(entranceId, "2026-06", asking) }.isInstanceOfSatisfying(NoChargeRun::class.java) {
+            assertThat(it.answer).isEqualTo(NoChargeRunAnswer("no entrance $entranceId", NoChargeRunCode.NO_ENTRANCE))
+        }
     }
 
     @Test
@@ -92,6 +106,7 @@ class HeadcountCheckTest {
             assertThatThrownBy { service.check(entranceId, period, asking) }.describedAs(period)
                 .isInstanceOfSatisfying(MoneyReadForbidden::class.java) { assertThat(it.ruleId).isEqualTo("PM-BOOK-006") }
         }
+        verifyNoInteractions(units)
     }
 }
 
@@ -136,10 +151,19 @@ class HeadcountCheckWebTest {
     }
 
     @Test
-    fun `a period with no run issued is a 404`() {
-        whenever(headcount.check(entranceId, "2026-06", asking)).thenThrow(NoSuchElementException("no charge run issued for 2026-06"))
+    fun `a period with no run issued is a 404 with its code`() {
+        whenever(headcount.check(entranceId, "2026-06", asking)).thenThrow(NoChargeRun.of(entranceId, "2026-06"))
         mvc.perform(get("/api/money/entrances/$entranceId/charge-runs/2026-06/headcount"))
             .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.error").value("no charge run issued for 2026-06"))
+            .andExpect(jsonPath("$.error").value("entrance $entranceId has no charge run issued for 2026-06"))
+            .andExpect(jsonPath("$.code").value("NO_RUN"))
+    }
+
+    @Test
+    fun `an entrance that does not exist is a 404 with its own code`() {
+        whenever(headcount.check(entranceId, "2026-06", asking)).thenThrow(NoChargeRun.noEntrance(entranceId))
+        mvc.perform(get("/api/money/entrances/$entranceId/charge-runs/2026-06/headcount"))
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("NO_ENTRANCE"))
     }
 }

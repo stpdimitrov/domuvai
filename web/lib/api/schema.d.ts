@@ -614,7 +614,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The periods the entrance has a charge run issued for, the newest first: each run's header, no amount and no person; for the manager, the board and the controller */
+        get: operations["get_money_entrances_entranceId_charge_runs"];
         put?: never;
         /** Issue a charge run — stored with its basis, meter readings included, never altered afterwards */
         post: operations["post_money_entrances_entranceId_charge_runs"];
@@ -1713,6 +1714,13 @@ export interface components {
             /** Format: uuid */
             outgoingPartyId: string;
         };
+        IssuedPeriod: {
+            /** Format: uuid */
+            chargeRunId: string;
+            /** Format: date */
+            legalDate: string;
+            period: string;
+        };
         JournalEntry: {
             /** Format: uuid */
             journalId: string;
@@ -1806,6 +1814,11 @@ export interface components {
             idealParts?: string;
             separateEntrance: boolean;
             unitType: string;
+        };
+        NoChargeRunAnswer: {
+            /** @enum {string} */
+            code: "NO_RUN" | "NO_ENTRANCE";
+            error: string;
         };
         NoticePostingView: {
             /** Format: uuid */
@@ -5009,6 +5022,48 @@ export interface operations {
             };
         };
     };
+    get_money_entrances_entranceId_charge_runs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedPeriod"][];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoChargeRunAnswer"];
+                };
+            };
+        };
+    };
     post_money_entrances_entranceId_charge_runs: {
         parameters: {
             query?: never;
@@ -5176,9 +5231,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["NoChargeRunAnswer"];
                 };
             };
         };

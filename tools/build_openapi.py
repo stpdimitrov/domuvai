@@ -163,6 +163,8 @@ RUNNING = {
  ('post', '/api/money/entrances/{entranceId}/charge-runs'):
    ('Issue a charge run — stored with its basis, meter readings included, never altered afterwards',
     ['PM-FEE-012', 'PM-FEE-014', 'PM-FEE-015', 'PM-FEE-016', 'PM-FEE-017', 'PM-SEC-001']),
+ ('get', '/api/money/entrances/{entranceId}/charge-runs'):
+   ("The periods the entrance has a charge run issued for, the newest first: each run's header, no amount and no person; for the manager, the board and the controller", ['PM-BOOK-012', 'PM-FEE-014', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/charge-runs/{period}/headcount'):
    ("The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed; for the book's readers", ['PM-BOOK-012', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-SEC-004']),
  ('get', '/api/money/units/{unitId}/statement'):

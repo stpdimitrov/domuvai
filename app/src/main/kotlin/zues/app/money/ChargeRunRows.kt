@@ -1,11 +1,16 @@
 package zues.app.money
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.jdbc.repository.query.Query
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
+import org.springframework.data.repository.Repository
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.UUID
+
+/** The status of a run that has been issued. */
+const val RUN_ISSUED = "COMPLETE"
 
 /**
  * A stored charge run — the immutable header carrying the basis that produced it, so a past
@@ -24,6 +29,10 @@ data class ChargeRunRow(
     val engineVersion: String,
     val status: String,
 )
+
+/** A stored run's header alone: never the basis it keeps (Rule: PM-FEE-014). A read of [ChargeRunRow]'s table, with no writes. */
+@Table("charge_run")
+data class ChargeRunHeader(@Id val id: UUID, val period: String, val legalDate: LocalDate)
 
 /**
  * A stored charge line — one typed amount per unit, cost stream and named item (PM-FEE-011). Immutable: an issued
@@ -50,6 +59,12 @@ data class ChargeLineRow(
 interface ChargeRunRepository : ListCrudRepository<ChargeRunRow, UUID> {
     fun existsByEntranceIdAndPeriod(entranceId: UUID, period: String): Boolean
     fun findByEntranceIdAndPeriod(entranceId: UUID, period: String): ChargeRunRow?
+}
+
+interface ChargeRunHeaders : Repository<ChargeRunHeader, UUID> {
+    /** The entrance's issued runs, the newest first. */
+    @Query("SELECT id, period, legal_date FROM charge_run WHERE entrance_id = :entranceId AND status = '$RUN_ISSUED' ORDER BY legal_date DESC, period DESC")
+    fun issued(entranceId: UUID): List<ChargeRunHeader>
 }
 
 interface ChargeLineRepository : ListCrudRepository<ChargeLineRow, UUID> {

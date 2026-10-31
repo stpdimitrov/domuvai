@@ -41,6 +41,9 @@ interface Units {
      * both wrong and irreproducible (PM-FEE-014).
      */
     fun forEntrance(entranceId: UUID, on: LocalDate): List<UnitForCharging>
+
+    /** Whether the entrance is registered: one with no units yet is, one nobody registered is not. */
+    fun entranceExists(entranceId: UUID): Boolean
 }
 
 @Component
@@ -49,7 +52,11 @@ class UnitsAdapter(
     private val household: HouseholdMemberRepository,
     private val animals: AnimalRepository,
     private val absences: AbsenceDeclarationRepository,
+    private val entrances: EntranceRepository,
 ) : Units {
+    // Rule: PM-BOOK-012
+    override fun entranceExists(entranceId: UUID): Boolean = entrances.existsById(entranceId)
+
     override fun forEntrance(entranceId: UUID, on: LocalDate): List<UnitForCharging> {
         // PM-FEE-006 counts absence "in a calendar year"; the run's legal date fixes the year.
         val yearStart = LocalDate.of(on.year, 1, 1)

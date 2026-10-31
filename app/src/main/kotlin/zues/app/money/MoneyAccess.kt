@@ -58,7 +58,7 @@ class MoneyAccess(
         require(Action.READ_UNIT_CHARGES, resource, who)
     }
 
-    /** Rule: PM-SEC-002 — an entrance's arrears or its journal: other persons' debts. */
+    /** Rule: PM-SEC-002 — an entrance's arrears or its journal: other persons' debts; and its issued periods, read beside them. */
     fun entranceArrears(entranceId: UUID, who: Asking) {
         if (unasked(who)) return
         require(Action.READ_ENTRANCE_ARREARS, Resource.OfEntrance(entranceId), who)

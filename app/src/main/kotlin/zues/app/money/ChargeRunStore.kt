@@ -71,7 +71,7 @@ class ChargeRunStore(
                 basisHash = BasisJson.hash(basisJson),
                 lawVersion = run.lawVersion,
                 engineVersion = run.engineVersion,
-                status = "COMPLETE",
+                status = RUN_ISSUED,
             ),
         )
 

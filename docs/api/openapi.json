@@ -1827,6 +1827,27 @@
         ],
         "type": "object"
       },
+      "IssuedPeriod": {
+        "properties": {
+          "chargeRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legalDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chargeRunId",
+          "legalDate",
+          "period"
+        ],
+        "type": "object"
+      },
       "JournalEntry": {
         "properties": {
           "journalId": {
@@ -2158,6 +2179,25 @@
           "designation",
           "separateEntrance",
           "unitType"
+        ],
+        "type": "object"
+      },
+      "NoChargeRunAnswer": {
+        "properties": {
+          "code": {
+            "enum": [
+              "NO_RUN",
+              "NO_ENTRANCE"
+            ],
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "error"
         ],
         "type": "object"
       },
@@ -7809,6 +7849,67 @@
       }
     },
     "/api/money/entrances/{entranceId}/charge-runs": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_charge_runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IssuedPeriod"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoChargeRunAnswer"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "The periods the entrance has a charge run issued for, the newest first: each run's header, no amount and no person; for the manager, the board and the controller",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-BOOK-012",
+          "PM-FEE-014",
+          "PM-SEC-002"
+        ]
+      },
       "post": {
         "operationId": "post_money_entrances_entranceId_charge_runs",
         "parameters": [
@@ -8047,10 +8148,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/NoChargeRunAnswer"
                 }
               }
             },
