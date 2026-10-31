@@ -440,6 +440,7 @@ The repo's `CLAUDE.md` holds the working agreement. It is the single place those
 13. Whether the cashier has a term of office at all, and its length. As built: the same cap as the board's, from a constant marked unconfirmed (`CASHIER_TERM_YEARS`).
 14. PM-GA-017 — which decisions are "the statutorily listed decisions" open to absentee voting, and whether an absent owner's ballot adds their ideal parts to the represented share of a REPRESENTED majority. As built (the owner's decisions, 2026-10-25): an item accepts absentee ballots only when its drafter tags it, the platform names no list; an absent owner's ballot adds their parts to the represented share at the merge (S-G2-02m).
 15. Which article gives the manager and the board access to the fund's records. As built (the owner's decision, 2026-10-27, #254): their matrix lines cite PM-SEC-001, the general rule, which names no fund.
+16. PM-FEE-007 — what counts as *filed* for the grace window: the day the owner hands the paper declaration in, or the day it is entered in the book. As built (the owner's decision, 2026-10-27, #215): the day it was handed in, which the manager states; it is stored beside the day of entry and is never after it, and with none stated it is the day of entry. It has no earlier limit: a paper may be handed in before the absence begins.
 
 ---
 

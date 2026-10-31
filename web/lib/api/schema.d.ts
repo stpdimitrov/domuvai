@@ -1028,7 +1028,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
+        /** File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, with the day the paper was handed in when it came in earlier (never after today, a 400); as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units_unitId_absences"];
         delete?: never;
         options?: never;
@@ -1788,6 +1788,7 @@ export interface components {
         NewAbsenceRequest: {
             absentFrom: string;
             absentTo: string;
+            handedInOn?: string;
         };
         NewAnimalRequest: {
             species: string;
