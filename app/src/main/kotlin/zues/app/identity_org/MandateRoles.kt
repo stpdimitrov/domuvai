@@ -53,29 +53,30 @@ data class Mandate(
 
     /**
      * Whether the mandate counts on [date], given every mandate of its entrance. It runs from `validFrom` up to and not
-     * including `validTo`, and never from the day `succeededAt` records. The manager and the board continue past
-     * `validTo` until a successor (Rule: PM-GOV-004) — the day recorded, or failing that the first day of a mandate
-     * that [succeeds] this one, so a successor nobody stamped still ends the predecessor's stay. With no successor
-     * they continue: an expired member keeps the office until a successor or an end is recorded. The controller and
-     * the cashier do not continue: the rule names the board and the manager only.
+     * including `validTo`, and never from the day `succeededAt` records, nor from the first day of a mandate that
+     * [succeeds] this one (Rule: PM-GOV-004): a successor nobody stamped ends the mandate as one stamped does, within
+     * its term as past it, so a later manager is never in force beside an earlier one. The manager and the board continue past
+     * `validTo` until then — with no successor they continue: an expired member keeps the office until a successor or
+     * an end is recorded. The controller and the cashier do not continue: the rule names the board and the manager only.
      */
     // Rule: PM-GOV-004
     fun inForceOn(date: LocalDate, ofTheEntrance: List<Mandate>): Boolean {
         if (date.isBefore(validFrom)) return false
         if (succeededAt != null && !date.isBefore(succeededAt)) return false
-        if (date.isBefore(validTo)) return true
-        return role in CONTINUING && ofTheEntrance.none { it.succeeds(this) && !it.validFrom.isAfter(date) }
+        if (ofTheEntrance.any { it.succeeds(this) && !it.validFrom.isAfter(date) }) return false
+        return date.isBefore(validTo) || role in CONTINUING
     }
 
     /**
      * The first day this mandate is no longer in force, as far as the record says — the day [inForceOn] turns false:
-     * the day an end is recorded, or, for the manager and the board, the first day of the earliest mandate that
-     * [succeeds] it, and never before its own term ends; for every other office, the day its term ends. Null only for
-     * a manager or a board member nothing on record ends: that one is open.
+     * the day an end is recorded, the first day of the earliest mandate that [succeeds] it, or, for an office that does
+     * not continue, the day its term ends, whichever comes first. Null only for a manager or a board member nothing on
+     * record ends: that one is open.
      */
+    // Rule: PM-GOV-004
     fun endsOnRecord(ofTheEntrance: List<Mandate>): LocalDate? {
-        val byItsOffice = if (role in CONTINUING) ofTheEntrance.filter { it.succeeds(this) }.minOfOrNull { it.validFrom }?.let { maxOf(it, validTo) } else validTo
-        return listOfNotNull(succeededAt, byItsOffice).minOrNull()
+        val successor = ofTheEntrance.filter { it.succeeds(this) }.minOfOrNull { it.validFrom }
+        return listOfNotNull(succeededAt, successor, validTo.takeUnless { role in CONTINUING }).minOrNull()
     }
 
     /**

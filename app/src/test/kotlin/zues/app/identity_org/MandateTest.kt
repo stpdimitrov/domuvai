@@ -86,11 +86,80 @@ class MandateTest {
     }
 
     @Test
-    fun `a successor elected early does not cut a mandate short — within its dates only a recorded day does`() {
-        val incumbent = mandate("BM")
-        val early = mandate("BM", from = from.plusYears(1), to = from.plusYears(3))
-        assertThat(incumbent.inForceOn(to.minusDays(1), listOf(incumbent, early))).isTrue()
-        assertThat(incumbent.inForceOn(to, listOf(incumbent, early))).isFalse()                // and it does not continue past its end
+    fun `PM-GOV-004 two managers on real dates with no end recorded — the later one is the manager from its first day, and they are never in force together`() {
+        val a = mandate("BM", from = day("2025-01-01"), to = day("2027-01-01"))
+        val b = mandate("BM", from = day("2026-03-01"), to = day("2028-03-01"))
+        val both = listOf(a, b)
+        assertThat(a.inForceOn(day("2026-02-28"), both)).isTrue()
+        assertThat(b.inForceOn(day("2026-02-28"), both)).isFalse()
+        assertThat(a.inForceOn(day("2026-03-01"), both)).isFalse()
+        assertThat(b.inForceOn(day("2026-03-01"), both)).isTrue()
+        assertThat(a.inForceOn(day("2026-12-31"), both)).isFalse()                                  // a day inside A's own dates
+        assertThat(a.inForceOn(day("2027-01-01"), both)).isFalse()
+        assertThat(b.inForceOn(day("2028-03-01"), both)).isTrue()                                   // B continues past its term, as any manager
+        generateSequence(day("2024-12-31")) { it.plusDays(1) }.takeWhile { it.isBefore(day("2028-06-01")) }.forEach { date ->
+            assertThat(both.count { it.inForceOn(date, both) }).describedAs("$date").isEqualTo(if (date.isBefore(a.validFrom)) 0 else 1)
+        }
+        // what ends A is B's own first day: a row stamped that day reads the same on every day
+        val stamped = a.copy(succeededAt = b.validFrom)
+        for (date in listOf("2025-06-01", "2026-02-28", "2026-03-01", "2026-12-31", "2027-01-01")) assertThat(a.inForceOn(day(date), both)).describedAs(date).isEqualTo(stamped.inForceOn(day(date), listOf(stamped, b)))
+        // the one pair this does not reach: two beginning the same day succeed neither. The recorder refuses that pair; only SQL can write it
+        val sameDay = mandate("BM", from = a.validFrom, to = a.validTo)
+        assertThat(listOf(a, sameDay).count { it.inForceOn(day("2025-06-01"), listOf(a, sameDay)) }).isEqualTo(2)
+    }
+
+    @Test
+    fun `PM-GOV-004 inside the term a later manager ends a manager or a board member, and a later board member ends a manager — on the successor's first day`() {
+        val first = day("2025-01-01"); val last = day("2027-01-01"); val elected = day("2026-03-01")
+        for ((old, next) in listOf("BM" to "BM", "MB" to "BM", "BM" to "MB")) {
+            val incumbent = mandate(old, from = first, to = last)
+            val successor = mandate(next, from = elected, to = elected.plusYears(2))
+            val all = listOf(incumbent, successor)
+            assertThat(incumbent.inForceOn(elected.minusDays(1), all)).describedAs("$old then $next").isTrue()
+            assertThat(incumbent.inForceOn(elected, all)).describedAs("$old then $next").isFalse()
+            assertThat(incumbent.endsOnRecord(all)).describedAs("$old then $next").isEqualTo(elected)
+            // another entrance's is nothing to this one, and neither is a successor who has not begun
+            val nextDoor = mandate(next, from = elected, to = elected.plusYears(2), at = UUID.randomUUID())
+            assertThat(incumbent.inForceOn(elected, listOf(incumbent, nextDoor))).describedAs("$old then $next, next door").isTrue()
+        }
+    }
+
+    @Test
+    fun `PM-GOV-004 a by-election inside a term ends nobody — both members sit on every day of the overlap, and a board elected whole mid-term sits beside the old one until an end is recorded`() {
+        val a = mandate("MB", from = day("2025-01-01"), to = day("2027-01-01"))
+        val byElected = mandate("MB", from = day("2026-03-01"), to = day("2028-03-01"))
+        val board = listOf(a, byElected)
+        generateSequence(day("2026-03-01")) { it.plusDays(1) }.takeWhile { it.isBefore(day("2027-01-01")) }.forEach { date ->
+            assertThat(board.count { it.inForceOn(date, board) }).describedAs("$date").isEqualTo(2)
+        }
+        // the seats are not on the table, so a whole new board reads as by-elections: nothing ends the old one but a recorded end
+        val newBoard = List(3) { mandate("MB", from = day("2026-03-01"), to = day("2028-03-01")) }
+        assertThat(a.inForceOn(day("2026-03-01"), newBoard + a)).isTrue()
+        val ended = a.copy(succeededAt = day("2026-03-01"))
+        assertThat(ended.inForceOn(day("2026-03-01"), newBoard + ended)).isFalse()
+    }
+
+    @Test
+    fun `PM-GOV-004 a firm's mandate beginning inside a manager's term ends the manager on its first day, and a board member's only as another member would`() {
+        val manager = mandate("BM", from = day("2025-01-01"), to = day("2027-01-01"))
+        val member = mandate("MB", from = day("2025-01-01"), to = day("2027-01-01"))
+        val firm = mandate("PMC", from = day("2026-03-01"), to = day("2028-03-01"))
+        assertThat(manager.inForceOn(day("2026-02-28"), listOf(manager, firm))).isTrue()
+        assertThat(manager.inForceOn(day("2026-03-01"), listOf(manager, firm))).isFalse()
+        assertThat(member.inForceOn(day("2026-03-01"), listOf(member, firm))).isTrue()
+        // the firm holds no role, so from that day nobody is the manager until an end or a successor is on record (asked on #387)
+        val entrance = listOf(manager, firm)
+        assertThat(entrance.filter { it.inForceOn(day("2026-03-01"), entrance) }.mapNotNull { it.role }).isEmpty()
+    }
+
+    @Test
+    fun `PM-GOV-004 a controller or a cashier is cut short by nobody inside their term — only their dates and a recorded end end them`() {
+        for (office in listOf("CTL", "CSH")) {
+            val sitting = mandate(office, from = day("2025-01-01"), to = day("2027-01-01"))
+            val others = listOf("BM", "MB", "CTL", "CSH").map { mandate(it, from = day("2026-03-01"), to = day("2028-03-01")) }
+            assertThat(sitting.inForceOn(day("2026-12-31"), others + sitting)).describedAs(office).isTrue()
+            assertThat(sitting.inForceOn(day("2027-01-01"), others + sitting)).describedAs(office).isFalse()
+        }
     }
 
     private fun day(iso: String) = LocalDate.parse(iso)

@@ -117,6 +117,20 @@ class MandateStandingTest {
     }
 
     @Test
+    fun `PM-GOV-004 a manager followed inside the term is in term up to the successor's first day, and has no standing from it — nobody recorded an end`() {
+        val manager = mandate("BM")
+        val successor = mandate("BM", from = from.plusYears(1), to = from.plusYears(3))
+        assertThat(manager.standing(successor.validFrom.minusDays(1), listOf(successor))).isEqualTo(Standing(StandingKind.IN_TERM, until = successor.validFrom))
+        assertThat(manager.standing(successor.validFrom, listOf(successor))).isNull()
+        assertThat(manager.standing(ends.minusDays(1), listOf(successor))).isNull()
+        assertThat(successor.standing(successor.validFrom, listOf(manager))).isEqualTo(Standing(StandingKind.IN_TERM))
+        // a by-election changes neither member's standing
+        val member = mandate("MB")
+        val byElected = mandate("MB", from = from.plusYears(1), to = from.plusYears(3))
+        assertThat(member.standing(byElected.validFrom, listOf(byElected))).isEqualTo(member.standing(byElected.validFrom))
+    }
+
+    @Test
     fun `a mandate has a standing exactly when it is in force, and 'until' is the first day it no longer is — for every office, with a successor, an end, both or neither`() {
         val later = mandate("BM", from = ends.plusMonths(2), to = ends.plusMonths(14))
         val midTerm = mandate("BM", from = from.plusMonths(8), to = from.plusMonths(20))           // a manager recorded while this one's term runs, never stamped

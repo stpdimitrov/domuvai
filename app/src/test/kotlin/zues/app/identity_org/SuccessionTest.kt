@@ -89,14 +89,18 @@ class SuccessionTest {
     }
 
     @Test
-    fun `PM-GOV-004 while the predecessor holds the office that day nobody has their place — even with a later mandate on record that would follow them`() {
+    fun `PM-GOV-004 while the predecessor holds the office that day nobody has their place — and the place passes on a successor's first day, inside the term too`() {
         // A sits on the board to 2026-01-01, never stamped; a sole manager is recorded from 2025-01-01 by SQL, unstamping nothing
         val a = mandate("MB", ivan, "2024-01-01", "2026-01-01")
         val manager = mandate("BM", maria, "2025-01-01", "2027-01-01")
         record(a, manager)
         assertThat(manager.succeeds(a)).isTrue()
-        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2025-03-01"))).isEmpty()     // A still sits: both cannot be
+        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2024-12-31"))).isEmpty()     // A still sits
+        assertThat(succession.successorsOf(ivan, block, Role.MB, day("2025-01-01")).map { it.partyId }).containsExactly(maria)
         assertThat(succession.successorsOf(ivan, block, Role.MB, day("2026-01-01")).map { it.partyId }).containsExactly(maria)
+        // a colleague by-elected inside A's term has taken nobody's place: A still sits, in term and acting past it
+        record(a, mandate("MB", petar, "2025-03-01", "2027-03-01"))
+        for (on in listOf("2025-03-01", "2025-12-31", "2026-06-01")) assertThat(succession.successorsOf(ivan, block, Role.MB, day(on))).describedAs(on).isEmpty()
         // re-elected, and a colleague elected the same day: the colleague follows A's first seat, and A sits on
         val again = mandate("MB", ivan, "2026-01-01", "2028-01-01")
         val colleague = mandate("MB", petar, "2026-01-01", "2028-01-01")
