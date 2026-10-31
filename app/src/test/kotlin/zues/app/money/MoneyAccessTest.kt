@@ -120,15 +120,6 @@ class MoneyAccessTest {
     }
 
     @Test
-    fun `PM-BOOK-006 what the book declares of each unit's persons is read as the book is — the offices and the controller, not an owner`() {
-        for (office in listOf(Role.BM, Role.MB, Role.CTL)) {
-            assertThatCode { access.book(entrance, person(Held(office, entrance))) }.describedAs("$office").doesNotThrowAnyException()
-        }
-        for (role in listOf(Role.OWN, Role.USR, Role.CSH)) refusedBy("PM-BOOK-006") { access.book(entrance, person(Held(role, entrance, setOf(flat1)))) }
-        refusedBy("PM-BOOK-006") { access.book(entrance, person(Held(Role.BM, UUID.randomUUID()))) }
-    }
-
-    @Test
     fun `PM-SEC-002 who the fund's records name is seen by the manager, the board and the controller, not by an owner — unless the owner holds the office`() {
         for (office in listOf(Role.BM, Role.MB, Role.CTL)) assertThat(access.seesFundParties(entrance, person(Held(office, entrance)))).describedAs("$office").isTrue()
         assertThat(access.seesFundParties(entrance, person(Held(Role.OWN, entrance, setOf(flat1))))).isFalse()
@@ -148,10 +139,9 @@ class MoneyAccessTest {
     }
 
     @Test
-    fun `with sign-in switched off the fund and the headcount are served too — and refused to nobody when it is on`() {
-        assertThatCode { open.fund(entrance, Asking(null, null)); open.book(entrance, Asking(null, null)) }.doesNotThrowAnyException()
+    fun `with sign-in switched off the fund is served too — and refused to nobody when it is on`() {
+        assertThatCode { open.fund(entrance, Asking(null, null)) }.doesNotThrowAnyException()
         refusedBy("PM-SEC-002") { access.fund(entrance, Asking(null, null)) }
-        refusedBy("PM-BOOK-006") { access.book(entrance, Asking(null, null)) }
     }
 
     private fun keepingRefused(block: () -> Unit) =

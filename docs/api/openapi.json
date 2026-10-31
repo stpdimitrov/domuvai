@@ -8060,7 +8060,9 @@
         ],
         "x-rules": [
           "PM-BOOK-012",
-          "PM-BOOK-006"
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-SEC-004"
         ]
       }
     },
