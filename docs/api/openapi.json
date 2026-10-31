@@ -590,16 +590,11 @@
       },
       "CancelDisbursementRequest": {
         "properties": {
-          "cancelledBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "reason": {
             "type": "string"
           }
         },
         "required": [
-          "cancelledBy",
           "reason"
         ],
         "type": "object"
@@ -767,10 +762,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "authorisedBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "decisionId": {
             "type": "string"
           },
@@ -786,7 +777,6 @@
         },
         "required": [
           "amountMinor",
-          "authorisedBy",
           "purpose"
         ],
         "type": "object"
@@ -1130,7 +1120,6 @@
         },
         "required": [
           "amountMinor",
-          "authorisedBy",
           "committedOn",
           "id",
           "purpose",
@@ -1541,12 +1530,10 @@
           "handoverOn",
           "holderName",
           "iban",
-          "incomingPartyId",
           "inherited",
           "issuedAt",
           "issuedOn",
           "openingMinor",
-          "outgoingPartyId",
           "paidOutMinor",
           "receivedMinor",
           "reconciled"
@@ -1571,12 +1558,15 @@
           "lawVersion": {
             "type": "string"
           },
+          "recordedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
           "statement": {
             "$ref": "#/components/schemas/HandoverStatement"
           }
         },
         "required": [
-          "basis",
           "basisHash",
           "engineVersion",
           "id",
@@ -2346,16 +2336,11 @@
       },
       "PayDisbursementRequest": {
         "properties": {
-          "paidBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "paidOn": {
             "type": "string"
           }
         },
         "required": [
-          "paidBy",
           "paidOn"
         ],
         "type": "object"
@@ -7921,7 +7906,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance",
+        "summary": "The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance; an owner reads it without the party ids",
         "tags": [
           "money"
         ],
@@ -8001,7 +7986,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners",
+        "summary": "List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id",
         "tags": [
           "money"
         ],
@@ -8195,7 +8180,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two",
+        "summary": "Sign off a disbursement from the repair fund, by the holder of its account, who is the sign-in — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two",
         "tags": [
           "money"
         ],
@@ -8312,7 +8297,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason",
+        "summary": "Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, who is the sign-in, with the reason",
         "tags": [
           "money"
         ],
@@ -8428,7 +8413,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account",
+        "summary": "Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account, who is the sign-in",
         "tags": [
           "money"
         ],
@@ -8520,7 +8505,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is",
+        "summary": "The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is, an owner without the two parties, the recorder or the basis",
         "tags": [
           "money"
         ],
@@ -8625,7 +8610,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash",
+        "summary": "Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash, and the sign-in's party as who recorded it",
         "tags": [
           "money"
         ],
@@ -8722,7 +8707,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is",
+        "summary": "A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is, an owner without the two parties, the recorder or the basis",
         "tags": [
           "money"
         ],

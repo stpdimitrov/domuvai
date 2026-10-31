@@ -1,5 +1,6 @@
 package zues.app.money
 
+import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -125,6 +126,25 @@ class MoneyAccessTest {
         }
         for (role in listOf(Role.OWN, Role.USR, Role.CSH)) refusedBy("PM-BOOK-006") { access.book(entrance, person(Held(role, entrance, setOf(flat1)))) }
         refusedBy("PM-BOOK-006") { access.book(entrance, person(Held(Role.BM, UUID.randomUUID()))) }
+    }
+
+    @Test
+    fun `PM-SEC-002 who the fund's records name is seen by the manager, the board and the controller, not by an owner — unless the owner holds the office`() {
+        for (office in listOf(Role.BM, Role.MB, Role.CTL)) assertThat(access.seesFundParties(entrance, person(Held(office, entrance)))).describedAs("$office").isTrue()
+        assertThat(access.seesFundParties(entrance, person(Held(Role.OWN, entrance, setOf(flat1))))).isFalse()
+        assertThat(access.seesFundParties(entrance, person(Held(Role.OWN, entrance, setOf(flat1)), Held(Role.MB, entrance)))).isTrue()
+        assertThat(access.seesFundParties(entrance, person(Held(Role.BM, UUID.randomUUID())))).isFalse()
+        assertThat(open.seesFundParties(entrance, Asking(null, null))).isTrue()
+        assertThat(access.seesFundParties(entrance, Asking(null, null))).isFalse()
+    }
+
+    @Test
+    fun `PM-FUND-007 who keeps the accounts is the sign-in's party, nobody with sign-in off, and a refusal when neither can be said`() {
+        val manager = person(Held(Role.BM, entrance))
+        assertThat(access.keeper(entrance, manager)).isEqualTo(manager.party)
+        assertThat(open.keeper(entrance, Asking(null, null))).isNull()
+        assertThatThrownBy { access.keeper(entrance, Asking(null, null)) }.isInstanceOf(MoneyWriteForbidden::class.java)
+        assertThatThrownBy { access.keeper(entrance, person(Held(Role.CTL, entrance))) }.isInstanceOf(MoneyWriteForbidden::class.java)
     }
 
     @Test

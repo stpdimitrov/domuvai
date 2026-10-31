@@ -64,14 +64,14 @@ class FundServiceTest {
 
     private fun newKey() = UUID.randomUUID().toString()
 
-    private fun pay(row: FundDisbursementRow, on: String = "2026-09-29", by: UUID = chair, key: String = newKey()) =
+    private fun pay(row: FundDisbursementRow, on: String = "2026-09-29", by: UUID? = chair, key: String = newKey()) =
         service.pay(entranceId, row.id, key, PayDisbursement(LocalDate.parse(on), by))
 
-    private fun cancel(row: FundDisbursementRow, reason: String = "the GA revoked decision GA-2026-7", by: UUID = chair, key: String = newKey()) =
+    private fun cancel(row: FundDisbursementRow, reason: String = "the GA revoked decision GA-2026-7", by: UUID? = chair, key: String = newKey()) =
         service.cancel(entranceId, row.id, key, CancelDisbursement(by, reason))
 
     private fun commit(
-        amount: Long = 20_000, purpose: String = "WORKS", by: UUID = chair,
+        amount: Long = 20_000, purpose: String = "WORKS", by: UUID? = chair,
         decision: String? = "GA-2026-7", emergency: String? = null, measure: String? = null, key: String = newKey(),
     ) = service.commit(entranceId, key, CommitDisbursement(amount, purpose, by, decision, emergency, measure))
 
@@ -102,7 +102,7 @@ class FundServiceTest {
         assertThat(signed.authorisedBy).isEqualTo(chair)
         assertThat(signed.status).isEqualTo("COMMITTED")
         assertThat(signed.committedOn).isEqualTo(LocalDate.parse("2026-09-29"))             // the Sofia day, not the UTC one
-        assertThatThrownBy { commit(by = UUID.randomUUID()) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { commit(by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)
         assertThatThrownBy { commit(decision = null) }.isInstanceOf(IllegalArgumentException::class.java)   // no decision, no emergency
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(fund.copy(holderParty = null)))
         assertThatThrownBy { commit() }.isInstanceOf(FundUnsignable::class.java)                          // nobody registered can sign
@@ -150,7 +150,7 @@ class FundServiceTest {
     @Test
     fun `PM-FUND-007 only a signed-off disbursement is paid out, once, by the fund account's holder, on the bank's date`() {
         val works = signedOff(20_000)
-        assertThatThrownBy { pay(works, by = UUID.randomUUID()) }.isInstanceOf(IllegalArgumentException::class.java)   // not the holder
+        assertThatThrownBy { pay(works, by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)   // not the holder
         assertThatThrownBy { pay(works, on = "2026-09-30") }.isInstanceOf(IllegalArgumentException::class.java)         // after today
         assertThatThrownBy { pay(works, on = "2026-08-31") }.isInstanceOf(IllegalArgumentException::class.java)         // before the sign-off
         assertThat(journal).isEmpty()                                                                                // a refused payout posts nothing
@@ -180,9 +180,18 @@ class FundServiceTest {
     }
 
     @Test
+    fun `PM-FUND-007 with sign-in off nobody acts by name, so the record names the holder — the only party who could have`() {
+        assertThat(commit(by = null).authorisedBy).isEqualTo(chair)
+        assertThat(pay(signedOff(20_000), by = null).paidBy).isEqualTo(chair)
+        assertThat(cancel(signedOff(20_000), by = null).cancelledBy).isEqualTo(chair)
+        whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(fund.copy(holderParty = null)))
+        assertThatThrownBy { commit(by = null) }.isInstanceOf(FundUnsignable::class.java)                  // no holder, nobody to name
+    }
+
+    @Test
     fun `PM-FUND-007 only the fund account's holder cancels, with a reason, and never a closed disbursement`() {
         val works = signedOff(20_000)
-        assertThatThrownBy { cancel(works, by = UUID.randomUUID()) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { cancel(works, by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)
         assertThatThrownBy { cancel(works, reason = "  ") }.isInstanceOf(IllegalArgumentException::class.java)
         for (closed in listOf(signedOff(status = "PAID"), signedOff(status = "CANCELLED"))) {
             assertThatThrownBy { cancel(closed) }.isInstanceOf(DisbursementClosed::class.java)

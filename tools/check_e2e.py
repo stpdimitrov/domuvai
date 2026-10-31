@@ -169,6 +169,8 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"): 404,     # no animal of this id either (WEB-46)
                      ("POST", "/api/registry/entrances/{entranceId}/book/declarations"): 404,                          # no unit of this id: the seeded book is not written (WEB-47; declarations_screen files through the page)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/absences"): 404}                   # no unit of this id (WEB-46)
+# The same call signed in: the board's member keeps the accounts but does not hold the fund's, and the signatory is the sign-in (G-5, PM-FUND-007).
+REFUSED_TO_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): 403}
 # Never run against the seeded demo: the retention run anonymises for good (PM-BOOK-010; the owner, 2026-10-29, WEB-47). The
 # check asks it only with its own token — the controller's, which the API refuses (403) — and only where it has one.
 NEVER_RUN = {("POST", "/api/registry/entrances/{entranceId}/book/retention")}
@@ -296,14 +298,14 @@ CALLS = {
     ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): lambda e: (
         f"/api/money/entrances/{e}/fund-accounts", {"purpose": "OPERATING", "iban": SEEDED_FUND_IBAN, "holderName": "e2e", "holderKind": "MANAGER"}),
     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): lambda e: (
-        f"/api/money/entrances/{e}/fund/disbursements", {"amountMinor": 1_000_000, "purpose": "WORKS", "authorisedBy": fund_holder(e),
+        f"/api/money/entrances/{e}/fund/disbursements", {"amountMinor": 1_000_000, "purpose": "WORKS",
                                                          "emergencyJustification": "e2e: above what is available"}, {"Idempotency-Key": str(uuid.uuid4())}),
     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay"): lambda e: (
         f"/api/money/entrances/{e}/fund/disbursements/{seeded(e, 'PAID')}/pay",
-        {"paidOn": "2026-10-01", "paidBy": fund_holder(e)}, {"Idempotency-Key": str(uuid.uuid4())}),
+        {"paidOn": "2026-10-01"}, {"Idempotency-Key": str(uuid.uuid4())}),
     ("POST", "/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel"): lambda e: (
         f"/api/money/entrances/{e}/fund/disbursements/{seeded(e, 'CANCELLED')}/cancel",
-        {"cancelledBy": fund_holder(e), "reason": "e2e: cancelled once"}, {"Idempotency-Key": str(uuid.uuid4())}),
+        {"reason": "e2e: cancelled once"}, {"Idempotency-Key": str(uuid.uuid4())}),
 }
 
 # Each live screen, for the seeded entrance, and what it must show — figures that follow from tools/seed_demo.py,
@@ -1592,8 +1594,9 @@ def disbursements_screen(api, web, entrance, signed_in):
     disbursement the API lists is on the page, signed in with a pay and a cancel form each; no paid or cancelled one
     is listed or offered either. A sign-off posted
     through the page's form by the person signed in — a board member (e2e.yml), not the fund's holder — is refused in the
-    API's words naming PM-FUND-007, the form kept, nothing recorded. An emergency above what is available, signed by the
-    holder with the board's token, is the API's 409 naming PM-FUND-008.
+    API's words naming PM-FUND-007, the form kept, nothing recorded. So is the same board member's call to the API, whatever
+    its body says (G-5): the signatory is the sign-in. With no sign-in the record falls to the holder, and an emergency above
+    what is available is the API's 409 naming PM-FUND-008.
     """
     path = f"/entrance/fund/disbursements?entrance={entrance}"
     a_status, raw = fetch(api, f"/api/money/entrances/{entrance}/fund")
@@ -1614,19 +1617,19 @@ def disbursements_screen(api, web, entrance, signed_in):
         fields = {"purpose": "WORKS", "amount": "1,00", "measure": "", "basis": "EMERGENCY", "decision": "", "justification": "e2e: signed by the board"}
         status, _, refused_page = submit_form(web, path, page, 'name="justification"', fields)
         said = visible_text(refused_page)
-        if status != 200 or "Системата не прие това:" not in said or "PM-FUND-007" not in said or 'value="e2e: signed by the board"' not in refused_page:
+        if status != 200 or "Нямате право да подпишете разход от фонда:" not in said or "PM-FUND-007" not in said or 'value="e2e: signed by the board"' not in refused_page:
             failures.append(f"{path}: a sign-off by a party not holding the fund answered HTTP {status} without the API's words, or the form not kept")
         after = fetch(api, f"/api/money/entrances/{entrance}/fund")[1]
         failures += [] if len(json.loads(after)["disbursements"]) == len(listed) else [f"{path}: a refused sign-off recorded a disbursement"]
-    holder = fund_holder(entrance)
     e_status, e_raw = fetch(api, f"/api/money/entrances/{entrance}/fund/disbursements",
-                            {"amountMinor": 1_000_000, "purpose": "WORKS", "authorisedBy": holder, "emergencyJustification": "e2e: above what is available"},
+                            {"amountMinor": 1_000_000, "purpose": "WORKS", "authorisedBy": fund_holder(entrance), "emergencyJustification": "e2e: above what is available"},
                             headers={**(as_board() or {}), "Idempotency-Key": str(uuid.uuid4())})
-    if as_board() and (e_status != 409 or "PM-FUND-008" not in (refusal_words(e_raw) or "")):
-        failures.append(f"POST …/fund/disbursements: an emergency above what is available answers HTTP {e_status} {e_raw[:160]!r}, not the 409 naming PM-FUND-008")
+    want, rule = (403, "PM-FUND-007") if as_board() else (409, "PM-FUND-008")
+    if e_status != want or rule not in (refusal_words(e_raw) or ""):
+        failures.append(f"POST …/fund/disbursements: an emergency above what is available answers HTTP {e_status} {e_raw[:160]!r}, not the {want} naming {rule}")
     print(f"{'ok ' if not failures else 'BAD'} PM-FUND-006…008 the disbursements: {len(committed)} committed listed, "
           f"{len(listed) - len(committed)} closed not; {'a sign-off by a non-holder refused' if signed_in else 'forms NOT checked: no sign-in'}"
-          f"{'' if as_board() else '; the emergency 409 NOT checked: no board token'}")
+          f"{'; a body naming the holder refused to a board member' if as_board() else '; the emergency over what is available refused'}")
     return failures
 
 
@@ -2579,7 +2582,8 @@ def main():
             refused, _ = fetch(api, url, body, headers=sent)
             failures += [] if refused == 403 else [f"{method} {path}: the controller kept the accounts (HTTP {refused}), not refused (PM-SEC-001)"]
         status, raw = fetch(api, url, body, headers={**sent, **(board or {})})
-        if status not in ((REFUSED_BY_DESIGN[(method, path)],) if (method, path) in REFUSED_BY_DESIGN else (200, 201)):
+        wanted = (REFUSED_TO_THE_BOARD if board and (method, path) in REFUSED_TO_THE_BOARD else REFUSED_BY_DESIGN).get((method, path))
+        if status not in ((wanted,) if wanted else (200, 201)):
             failures.append(f"{method} {path}: HTTP {status} {raw[:200]}")
             continue
         validator = Draft202012Validator(response_schema(method, path, status), format_checker=Draft202012Validator.FORMAT_CHECKER)

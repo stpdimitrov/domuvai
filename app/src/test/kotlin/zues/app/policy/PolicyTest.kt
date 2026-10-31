@@ -39,7 +39,7 @@ class PolicyTest {
     fun `PM-SEC-001 the matrix is exactly these lines at this version — a change to it is a change to the number`() {
         val lines = Policy.MATRIX.map { "${it.action} ${it.role} ${it.ruleId}${if (it.ownUnitOnly) " own unit" else ""}" }
         assertThat(Policy.MATRIX_VERSION to lines).isEqualTo(
-            21 to listOf(
+            22 to listOf(
                 "READ_BOOK BM PM-BOOK-006",
                 "READ_BOOK MB PM-BOOK-006",
                 "READ_BOOK CTL PM-BOOK-006",
@@ -91,6 +91,9 @@ class PolicyTest {
                 "READ_FUND MB PM-SEC-001",
                 "READ_FUND CTL PM-GOV-008",
                 "READ_FUND OWN PM-SEC-002",
+                "READ_FUND_PARTIES BM PM-SEC-001",
+                "READ_FUND_PARTIES MB PM-SEC-001",
+                "READ_FUND_PARTIES CTL PM-GOV-008",
                 "KEEP_ACCOUNTS BM PM-SEC-001",
                 "KEEP_ACCOUNTS MB PM-SEC-001",
                 "READ_UNITS OWN PM-SEC-001",

@@ -14,17 +14,17 @@ import java.util.UUID
 data class CommitDisbursement(
     val amountMinor: Long,
     val purpose: String,
-    val authorisedBy: UUID,
+    val authorisedBy: UUID?,
     val decisionId: String? = null,
     val emergencyJustification: String? = null,
     val passportMeasure: String? = null,
 )
 
 /** A payout the fund's bank made on [paidOn], recorded by the party holding the fund's account (PM-FUND-007). */
-data class PayDisbursement(val paidOn: LocalDate, val paidBy: UUID)
+data class PayDisbursement(val paidOn: LocalDate, val paidBy: UUID?)
 
 /** A signed-off disbursement withdrawn, with its reason, by the party holding the fund's account (PM-FUND-007). */
-data class CancelDisbursement(val cancelledBy: UUID, val reason: String)
+data class CancelDisbursement(val cancelledBy: UUID?, val reason: String)
 
 data class DisbursementView(
     val id: UUID,
@@ -33,7 +33,7 @@ data class DisbursementView(
     val decisionId: String?,
     val passportMeasure: String?,
     val emergencyJustification: String?,
-    val authorisedBy: UUID,
+    val authorisedBy: UUID?,
     val status: String,
     val committedOn: LocalDate,
     val paidOn: LocalDate? = null,
@@ -42,6 +42,9 @@ data class DisbursementView(
     val cancelledBy: UUID? = null,
     val cancelReason: String? = null,
 ) {
+    /** Rule: PM-SEC-002 — the disbursement as an owner reads it: what, how much and when, not who signed (#253). */
+    fun withoutParties() = copy(authorisedBy = null, paidBy = null, cancelledBy = null)
+
     companion object {
         fun of(row: FundDisbursementRow) = DisbursementView(
             row.id, row.amountMinor, row.purpose, row.decisionId, row.passportMeasure, row.emergencyJustification,
@@ -59,13 +62,19 @@ data class FundView(
     val committedMinor: Long,
     val availableMinor: Long,
     val disbursements: List<DisbursementView>,
-)
+) {
+    /** Rule: PM-SEC-002 — the fund as an owner reads it: every figure, and nobody the disbursements name (#253). */
+    fun withoutParties() = copy(disbursements = disbursements.map(DisbursementView::withoutParties))
+}
 
 /** An emergency disbursement the fund's available balance does not cover (Rule: PM-FUND-008). */
 class FundShortfall(message: String) : RuntimeException(message)
 
 /** A fund account whose holder is not a registered party, so nobody can sign off a disbursement (Rule: PM-FUND-007). */
 class FundUnsignable(message: String) : RuntimeException(message)
+
+/** A keeper of the accounts who is not the party holding the fund's account (Rule: PM-FUND-007). */
+class NotTheHolder(message: String) : RuntimeException(message)
 
 /** A disbursement already paid out or cancelled: it is closed, and neither can happen twice (Rule: PM-FUND-007). */
 class DisbursementClosed(message: String) : RuntimeException(message)
@@ -100,7 +109,7 @@ class FundService(
         require(purpose != DisbursementPurpose.PASSPORT_MEASURE || !command.passportMeasure.isNullOrBlank()) {
             "a passport-measure disbursement names the measure (PM-FUND-006)"
         }
-        requireHolder(fund, command.authorisedBy, "sign off")                           // Rule: PM-FUND-007
+        val signatory = holder(fund, command.authorisedBy, "sign off")                  // Rule: PM-FUND-007
         val decided = !command.decisionId.isNullOrBlank()
         val emergency = !command.emergencyJustification.isNullOrBlank()
         require(decided != emergency) {
@@ -126,7 +135,7 @@ class FundService(
                 decisionId = command.decisionId.takeIf { decided },
                 passportMeasure = command.passportMeasure?.takeIf { it.isNotBlank() },
                 emergencyJustification = command.emergencyJustification.takeIf { emergency },
-                authorisedBy = command.authorisedBy,
+                authorisedBy = signatory,
                 status = DisbursementStatus.COMMITTED.name,
                 committedOn = today(),
             ),
@@ -148,11 +157,11 @@ class FundService(
         lock(entranceId)
         keys.prior(entranceId, idempotencyKey, FundOperation.PAY, command.asRequest(disbursementId))?.let { return DisbursementView.of(disbursements.findById(it).orElseThrow()) }
         val row = open(entranceId, disbursementId)
-        requireHolder(fundAccount(entranceId), command.paidBy, "pay out")
+        val paidBy = holder(fundAccount(entranceId), command.paidBy, "pay out")
         val today = today()
         require(!command.paidOn.isAfter(today)) { "a payout cannot be dated after today ($today)" }
         require(!command.paidOn.isBefore(row.committedOn)) { "a payout cannot be dated before the sign-off (${row.committedOn})" }
-        val paid = aggregates.update(row.copy(status = DisbursementStatus.PAID.name, paidOn = command.paidOn, paidBy = command.paidBy))
+        val paid = aggregates.update(row.copy(status = DisbursementStatus.PAID.name, paidOn = command.paidOn, paidBy = paidBy))
         Ledger.forPayout(paid, command.paidOn).forEach { aggregates.insert(it) }
         keys.keep(entranceId, idempotencyKey, FundOperation.PAY, command.asRequest(disbursementId), paid.id)
         return DisbursementView.of(paid)
@@ -169,12 +178,12 @@ class FundService(
         lock(entranceId)
         keys.prior(entranceId, idempotencyKey, FundOperation.CANCEL, command.asRequest(disbursementId))?.let { return DisbursementView.of(disbursements.findById(it).orElseThrow()) }
         val row = open(entranceId, disbursementId)
-        requireHolder(fundAccount(entranceId), command.cancelledBy, "cancel")
+        val cancelledBy = holder(fundAccount(entranceId), command.cancelledBy, "cancel")
         require(command.reason.isNotBlank()) { "a cancellation gives its reason (PM-FUND-007)" }
         val cancelled = aggregates.update(
             row.copy(
                 status = DisbursementStatus.CANCELLED.name, cancelledOn = today(),
-                cancelledBy = command.cancelledBy, cancelReason = command.reason,
+                cancelledBy = cancelledBy, cancelReason = command.reason,
             ),
         )
         keys.keep(entranceId, idempotencyKey, FundOperation.CANCEL, command.asRequest(disbursementId), cancelled.id)
@@ -197,11 +206,16 @@ class FundService(
         jdbc.queryForObject("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(?, 0))", Int::class.java, "fund:$entranceId")
     }
 
-    /** Only the party holding the fund's account signs off, pays out or cancels a disbursement (Rule: PM-FUND-007). */
-    private fun requireHolder(fund: FundAccountRow, party: UUID, act: String) {
+    /**
+     * Only the party holding the fund's account signs off, pays out or cancels a disbursement (Rule: PM-FUND-007): the
+     * holder, for the record. [party] is who the sign-in says acts; null with sign-in off, where the holder is the only
+     * party who could have.
+     */
+    private fun holder(fund: FundAccountRow, party: UUID?, act: String): UUID {
         val holder = fund.holderParty
             ?: throw FundUnsignable("the fund account's holder is not a registered party, so nobody can $act a disbursement (PM-FUND-007)")
-        require(party == holder) { "only the party holding the fund's account can $act a disbursement (PM-FUND-007)" }
+        if (party != null && party != holder) throw NotTheHolder("only the party holding the fund's account can $act a disbursement (PM-FUND-007)")
+        return holder
     }
 
     /** The entrance's disbursement, still committed — neither paid out nor cancelled. */
@@ -216,15 +230,15 @@ class FundService(
 
     // What each request asked, field by field, for its Idempotency-Key's hash (DEVBRIEF §8).
     private fun CommitDisbursement.asRequest() = mapOf(
-        "amountMinor" to amountMinor, "purpose" to purpose, "authorisedBy" to authorisedBy.toString(), "decisionId" to decisionId,
+        "amountMinor" to amountMinor, "purpose" to purpose, "authorisedBy" to authorisedBy?.toString(), "decisionId" to decisionId,
         "emergencyJustification" to emergencyJustification, "passportMeasure" to passportMeasure,
     )
 
     private fun PayDisbursement.asRequest(disbursementId: UUID) =
-        mapOf("disbursementId" to disbursementId.toString(), "paidOn" to paidOn.toString(), "paidBy" to paidBy.toString())
+        mapOf("disbursementId" to disbursementId.toString(), "paidOn" to paidOn.toString(), "paidBy" to paidBy?.toString())
 
     private fun CancelDisbursement.asRequest(disbursementId: UUID) =
-        mapOf("disbursementId" to disbursementId.toString(), "cancelledBy" to cancelledBy.toString(), "reason" to reason)
+        mapOf("disbursementId" to disbursementId.toString(), "cancelledBy" to cancelledBy?.toString(), "reason" to reason)
 
     private fun today(): LocalDate = LocalDate.parse(toSofiaDate(clock.instant()))   // a Sofia calendar day (PM-SYS-004)
 

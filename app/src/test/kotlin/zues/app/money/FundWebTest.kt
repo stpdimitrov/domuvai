@@ -1,7 +1,9 @@
 package zues.app.money
 
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -30,7 +32,12 @@ class FundWebTest {
     private val entranceId = UUID.randomUUID()
     private val chair = UUID.randomUUID()
 
-    private fun postDisbursement(body: String = """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""") =
+    @BeforeEach
+    fun `the sign-in is the chair`() {
+        whenever(access.keeper(eq(entranceId), anyOrNull())).thenReturn(chair)
+    }
+
+    private fun postDisbursement(body: String = """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}""") =
         post("/api/money/entrances/$entranceId/fund/disbursements").header("Idempotency-Key", "k-1")
             .contentType(MediaType.APPLICATION_JSON).content(body)
 
@@ -51,7 +58,7 @@ class FundWebTest {
         )
         mvc.perform(
             postDisbursement(
-                """{"amountMinor":20000,"purpose":"PASSPORT_MEASURE","authorisedBy":"$chair",""" +
+                """{"amountMinor":20000,"purpose":"PASSPORT_MEASURE",""" +
                     """"decisionId":"D","emergencyJustification":"E","passportMeasure":"M"}""",
             ),
         )
@@ -89,12 +96,12 @@ class FundWebTest {
         whenever(fund.cancel(eq(entranceId), eq(disbursementId), any(), any())).thenReturn(
             paid.copy(status = "CANCELLED", paidOn = null, cancelledOn = LocalDate.parse("2026-09-29"), cancelledBy = chair, cancelReason = "revoked"),
         )
-        mvc.perform(act("pay", """{"paidOn":"2026-09-15","paidBy":"$chair"}"""))
+        mvc.perform(act("pay", """{"paidOn":"2026-09-15"}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("PAID"))
             .andExpect(jsonPath("$.paidOn").value("2026-09-15"))
         verify(fund).pay(entranceId, disbursementId, "k-2", PayDisbursement(LocalDate.parse("2026-09-15"), chair))
-        mvc.perform(act("cancel", """{"cancelledBy":"$chair","reason":"the GA revoked decision GA-2026-7"}"""))
+        mvc.perform(act("cancel", """{"reason":"the GA revoked decision GA-2026-7"}"""))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("CANCELLED"))
             .andExpect(jsonPath("$.cancelReason").value("revoked"))
@@ -102,17 +109,46 @@ class FundWebTest {
     }
 
     @Test
-    fun `a closed disbursement is a 409, an unknown one a 404, a bad date or signatory a 400`() {
+    fun `PM-FUND-007 the signatory is the sign-in's party — a body naming anyone is not heard — and a keeper not holding the account is a 403 naming the rule`() {
+        val other = UUID.randomUUID()
+        whenever(fund.commit(eq(entranceId), any(), any())).thenThrow(NotTheHolder("only the holder"))
+        mvc.perform(postDisbursement("""{"amountMinor":100,"purpose":"WORKS","authorisedBy":"$other","decisionId":"GA-1"}"""))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-FUND-007"))
+        verify(fund).commit(entranceId, "k-1", CommitDisbursement(100, "WORKS", chair, "GA-1"))
+        whenever(fund.pay(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(NotTheHolder("only the holder"))
+        mvc.perform(act("pay", """{"paidOn":"2026-09-15","paidBy":"$other"}""")).andExpect(status().isForbidden)
+        verify(fund).pay(entranceId, disbursementId, "k-2", PayDisbursement(LocalDate.parse("2026-09-15"), chair))
+        whenever(fund.cancel(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(NotTheHolder("only the holder"))
+        mvc.perform(act("cancel", """{"cancelledBy":"$other","reason":"revoked"}""")).andExpect(status().isForbidden)
+        verify(fund).cancel(entranceId, disbursementId, "k-2", CancelDisbursement(chair, "revoked"))
+    }
+
+    @Test
+    fun `PM-SEC-002 the fund is read without who signed unless the reader may see the parties`() {
+        val spent = DisbursementView(disbursementId, 20_000, "WORKS", "GA-2026-7", null, null, chair, "PAID", LocalDate.parse("2026-09-01"), LocalDate.parse("2026-09-15"), chair)
+        whenever(fund.view(entranceId)).thenReturn(FundView(entranceId, "BG80BNBG96611020345678", "Иван Петров", 50_000, 0, 50_000, listOf(spent)))
+        mvc.perform(get("/api/money/entrances/$entranceId/fund"))
+            .andExpect(jsonPath("$.disbursements[0].amountMinor").value(20_000))
+            .andExpect(jsonPath("$.disbursements[0].authorisedBy").doesNotExist())
+            .andExpect(jsonPath("$.disbursements[0].paidBy").doesNotExist())
+        whenever(access.seesFundParties(eq(entranceId), anyOrNull())).thenReturn(true)
+        mvc.perform(get("/api/money/entrances/$entranceId/fund"))
+            .andExpect(jsonPath("$.disbursements[0].authorisedBy").value(chair.toString()))
+            .andExpect(jsonPath("$.disbursements[0].paidBy").value(chair.toString()))
+    }
+
+    @Test
+    fun `a closed disbursement is a 409, an unknown one a 404, a bad date a 400`() {
         for ((error, expected) in listOf(
             DisbursementClosed("already paid") to 409, NoSuchElementException("no such disbursement") to 404,
             IllegalArgumentException("after today") to 400,
         )) {
             whenever(fund.pay(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(error)
-            mvc.perform(act("pay", """{"paidOn":"2026-09-15","paidBy":"$chair"}""")).andExpect(status().`is`(expected))
+            mvc.perform(act("pay", """{"paidOn":"2026-09-15"}""")).andExpect(status().`is`(expected))
             whenever(fund.cancel(eq(entranceId), eq(disbursementId), any(), any())).thenThrow(error)
-            mvc.perform(act("cancel", """{"cancelledBy":"$chair","reason":"revoked"}""")).andExpect(status().`is`(expected))
+            mvc.perform(act("cancel", """{"reason":"revoked"}""")).andExpect(status().`is`(expected))
         }
-        mvc.perform(act("pay", """{"paidOn":"15.09.2026","paidBy":"$chair"}"""))
+        mvc.perform(act("pay", """{"paidOn":"15.09.2026"}"""))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error").value("paidOn must be an ISO date (YYYY-MM-DD)"))
     }
@@ -121,9 +157,9 @@ class FundWebTest {
     fun `a fund write without an Idempotency-Key is a 400, and a key reused for a different request a 409`() {     // DEVBRIEF §8 (#58)
         val base = "/api/money/entrances/$entranceId/fund/disbursements"
         val bodies = mapOf(
-            base to """{"amountMinor":20000,"purpose":"WORKS","authorisedBy":"$chair","decisionId":"GA-2026-7"}""",
-            "$base/$disbursementId/pay" to """{"paidOn":"2026-09-15","paidBy":"$chair"}""",
-            "$base/$disbursementId/cancel" to """{"cancelledBy":"$chair","reason":"revoked"}""",
+            base to """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}""",
+            "$base/$disbursementId/pay" to """{"paidOn":"2026-09-15"}""",
+            "$base/$disbursementId/cancel" to """{"reason":"revoked"}""",
         )
         for ((path, body) in bodies) {
             mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest)

@@ -647,7 +647,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance */
+        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance; an owner reads it without the party ids */
         get: operations["get_money_entrances_entranceId_fund"];
         put?: never;
         post?: never;
@@ -664,7 +664,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners */
+        /** List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id */
         get: operations["get_money_entrances_entranceId_fund_accounts"];
         put?: never;
         /** Register the entrance's repair-fund account */
@@ -684,7 +684,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two */
+        /** Sign off a disbursement from the repair fund, by the holder of its account, who is the sign-in — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two */
         post: operations["post_money_entrances_entranceId_fund_disbursements"];
         delete?: never;
         options?: never;
@@ -701,7 +701,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason */
+        /** Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, who is the sign-in, with the reason */
         post: operations["post_money_entrances_entranceId_fund_disbursements_disbursementId_cancel"];
         delete?: never;
         options?: never;
@@ -718,7 +718,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account */
+        /** Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account, who is the sign-in */
         post: operations["post_money_entrances_entranceId_fund_disbursements_disbursementId_pay"];
         delete?: never;
         options?: never;
@@ -733,10 +733,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is */
+        /** The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is, an owner without the two parties, the recorder or the basis */
         get: operations["get_money_entrances_entranceId_fund_handover_statements"];
         put?: never;
-        /** Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash */
+        /** Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash, and the sign-in's party as who recorded it */
         post: operations["post_money_entrances_entranceId_fund_handover_statements"];
         delete?: never;
         options?: never;
@@ -751,7 +751,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is */
+        /** A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is, an owner without the two parties, the recorder or the basis */
         get: operations["get_money_entrances_entranceId_fund_handover_statements_statementId"];
         put?: never;
         post?: never;
@@ -1303,8 +1303,6 @@ export interface components {
             unitId: string;
         };
         CancelDisbursementRequest: {
-            /** Format: uuid */
-            cancelledBy: string;
             reason: string;
         };
         ChargeLineResponse: {
@@ -1352,8 +1350,6 @@ export interface components {
         CommitDisbursementRequest: {
             /** Format: int64 */
             amountMinor: number;
-            /** Format: uuid */
-            authorisedBy: string;
             decisionId?: string;
             emergencyJustification?: string;
             passportMeasure?: string;
@@ -1451,7 +1447,7 @@ export interface components {
             /** Format: int64 */
             amountMinor: number;
             /** Format: uuid */
-            authorisedBy: string;
+            authorisedBy?: string;
             cancelReason?: string;
             /** Format: uuid */
             cancelledBy?: string;
@@ -1587,7 +1583,7 @@ export interface components {
             holderName: string;
             iban: string;
             /** Format: uuid */
-            incomingPartyId: string;
+            incomingPartyId?: string;
             inherited: components["schemas"]["InheritedDisbursement"][];
             /** Format: date-time */
             issuedAt: string;
@@ -1596,7 +1592,7 @@ export interface components {
             /** Format: int64 */
             openingMinor: number;
             /** Format: uuid */
-            outgoingPartyId: string;
+            outgoingPartyId?: string;
             /** Format: int64 */
             paidOutMinor: number;
             /** Format: int64 */
@@ -1604,12 +1600,14 @@ export interface components {
             reconciled: boolean;
         };
         HandoverStatementView: {
-            basis: string;
+            basis?: string;
             basisHash: string;
             engineVersion: string;
             /** Format: uuid */
             id: string;
             lawVersion: string;
+            /** Format: uuid */
+            recordedBy?: string;
             statement: components["schemas"]["HandoverStatement"];
         };
         HeadcountCheck: {
@@ -1848,8 +1846,6 @@ export interface components {
             partyId: string;
         };
         PayDisbursementRequest: {
-            /** Format: uuid */
-            paidBy: string;
             paidOn: string;
         };
         PaymentView: {

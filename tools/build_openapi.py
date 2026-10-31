@@ -169,7 +169,7 @@ RUNNING = {
  ('post', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
-   ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
+   ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/journal'):
    ("The entrance's double-entry journal from one date to another, both included — each journal whole, its legs "
     "summing to zero, with what wrote it where money knows; optionally only the journals that touch one account",
@@ -178,22 +178,22 @@ RUNNING = {
    ("The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's "
     "account and the cash box; outflows are not recorded yet, and the response says so — read as the fund is", ['PM-FUND-004', 'PM-FEE-019', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/fund'):
-   ('The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance', ['PM-FUND-004', 'PM-FUND-009', 'PM-GOV-008', 'PM-SEC-002']),
+   ('The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance; an owner reads it without the party ids', ['PM-FUND-004', 'PM-FUND-009', 'PM-GOV-008', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements'):
-   ('Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two',
+   ('Sign off a disbursement from the repair fund, by the holder of its account, who is the sign-in — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two',
     ['PM-FUND-006', 'PM-FUND-007', 'PM-FUND-008', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay'):
-   ("Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account",
+   ("Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account, who is the sign-in",
     ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel'):
-   ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason", ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
+   ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, who is the sign-in, with the reason", ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/handover-statements'):
-   ("Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash",
+   ("Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash, and the sign-in's party as who recorded it",
     ['PM-FUND-010', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund/handover-statements'):
-   ("The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is", ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
+   ("The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is, an owner without the two parties, the recorder or the basis", ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/fund/handover-statements/{statementId}'):
-   ('A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is', ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
+   ('A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is, an owner without the two parties, the recorder or the basis', ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/payments'):
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
     ['PM-DEBT-008', 'PM-SEC-001']),

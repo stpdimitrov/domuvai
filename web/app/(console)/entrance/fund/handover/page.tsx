@@ -69,7 +69,7 @@ export default async function HandoverPage({ searchParams }: { searchParams: Pro
               <div key={id} style={{ borderTop: "1px solid #DEDDD9", padding: "10px 0" }}>
                 <div>
                   {date(s.handoverOn)} · {s.from ? `${date(s.from)} – ${date(s.handoverOn)}` : `до ${date(s.handoverOn)}`}
-                  {" · "}от <code>{s.outgoingPartyId}</code> към <code>{s.incomingPartyId}</code>
+                  {s.outgoingPartyId && <>{" · "}от <code>{s.outgoingPartyId}</code> към <code>{s.incomingPartyId}</code></>}
                 </div>
                 <div>
                   крайно по книгата {eur(s.closingMinor)} · банка {eur(s.bankBalanceMinor)} · разлика {eur(s.differenceMinor)}
@@ -96,15 +96,17 @@ export default async function HandoverPage({ searchParams }: { searchParams: Pro
 /**
  * One statement as the API issued it: the movement of the fund, the two sides, the canonical basis verbatim, its hash,
  * the versions it was made under, and the web's own check of the hash against the text shown (Rule: PM-FUND-010).
+ * An owner gets the figures and the hash, not the two sides or the basis naming them (PM-SEC-002, #253), so there is
+ * no text to check, and no check is shown.
  */
 // Rule: PM-FUND-010
 function Opened({ view: { id, statement: s, basis, basisHash, lawVersion, engineVersion } }: { view: View }) {
-  const ok = matches(basis, basisHash);
+  const ok = basis != null && matches(basis, basisHash);
   return (
     <div style={BODY} data-statement={id}>
       <div className="acct-title">Отчет от {date(s.issuedOn)} · предаване на {date(s.handoverOn)}</div>
       <div className="as-hint">{NOT_SIGNED}</div>
-      <div>Предаваща страна <code>{s.outgoingPartyId}</code> · приемаща страна <code>{s.incomingPartyId}</code></div>
+      {s.outgoingPartyId && <div>Предаваща страна <code>{s.outgoingPartyId}</code> · приемаща страна <code>{s.incomingPartyId}</code></div>}
       <div>Сметка на фонда {s.iban} · {s.holderName}</div>
       <div>
         начално {eur(s.openingMinor)} + постъпления {eur(s.receivedMinor)} − изплатени {eur(s.paidOutMinor)} = крайно {eur(s.closingMinor)}
@@ -119,13 +121,17 @@ function Opened({ view: { id, statement: s, basis, basisHash, lawVersion, engine
       ))}
       <div>закон {lawVersion} · двигател {engineVersion}</div>
       <div>хеш на основата <code>{basisHash}</code></div>
-      <div className={ok ? undefined : "as-refused"} role={ok ? "status" : "alert"}>
-        {ok
-          ? "Хешът съвпада с показания текст на основата (SHA-256, UTF-8)."
-          : "Хешът НЕ съвпада с показания текст на основата — текстът е променен по пътя. Не го използвайте."}
-      </div>
-      <div className="as-hint">Основата, както я е записал системата — всеки може да сметне SHA-256 от този текст:</div>
-      <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", font: "400 11.5px/1.5 'IBM Plex Mono', monospace" }}>{basis}</pre>
+      {basis != null && (
+        <>
+          <div className={ok ? undefined : "as-refused"} role={ok ? "status" : "alert"}>
+            {ok
+              ? "Хешът съвпада с показания текст на основата (SHA-256, UTF-8)."
+              : "Хешът НЕ съвпада с показания текст на основата — текстът е променен по пътя. Не го използвайте."}
+          </div>
+          <div className="as-hint">Основата, както я е записал системата — всеки може да сметне SHA-256 от този текст:</div>
+          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", font: "400 11.5px/1.5 'IBM Plex Mono', monospace" }}>{basis}</pre>
+        </>
+      )}
     </div>
   );
 }

@@ -74,6 +74,13 @@ class MoneyAccess(
         require(Action.READ_FUND, Resource.OfEntrance(entranceId), who)
     }
 
+    /**
+     * Rule: PM-SEC-002 — whether the person reading the fund also sees who its records name: the manager, the board and the
+     * controller do; an owner reads the same records without them (#253). Nobody asking is served as every read is in that mode.
+     */
+    fun seesFundParties(entranceId: UUID, who: Asking): Boolean =
+        unasked(who) || policy.decide(who, Action.READ_FUND_PARTIES, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(clock.instant()))).allowed
+
     /** Rule: PM-BOOK-006 — what the book declares of each unit's persons, beside what a period billed: read as the book is. */
     fun book(entranceId: UUID, who: Asking) {
         if (unasked(who)) return
@@ -89,6 +96,16 @@ class MoneyAccess(
         if (unasked(who)) return
         val decision = policy.decide(who, Action.KEEP_ACCOUNTS, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(clock.instant())))
         if (!decision.allowed) throw MoneyWriteForbidden(decision.ruleId)
+    }
+
+    /**
+     * Rule: PM-FUND-007 — [keep], and who is acting: the sign-in's party, never a body's word (#260). Null only with sign-in
+     * switched off, where nobody is asking and the record falls to the fund account's holder.
+     */
+    fun keeper(entranceId: UUID, who: Asking): UUID? {
+        keep(entranceId, who)
+        if (unasked(who)) return null
+        return who.party ?: throw MoneyWriteForbidden(Action.KEEP_ACCOUNTS.governedBy)
     }
 
     /**
@@ -120,6 +137,11 @@ class MoneyRefusals {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onWriteForbidden(e: MoneyWriteForbidden): Map<String, String> =
         mapOf("error" to "an entrance's accounts are kept by its manager and its board", "rule" to e.ruleId)
+
+    /** A keeper of the accounts who does not hold the fund's account → 403: only its holder signs (Rule: PM-FUND-007). */
+    @ExceptionHandler(NotTheHolder::class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    fun onNotTheHolder(e: NotTheHolder): Map<String, String> = mapOf("error" to (e.message ?: "not the fund account's holder"), "rule" to "PM-FUND-007")
 
     private companion object {
         val REFUSED = mapOf(
