@@ -39,7 +39,7 @@ RUNNING = {
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals'):
    ('Record the animals kept in a unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-005', 'PM-FEE-009']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/absences'):
-   ('File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-FEE-006', 'PM-FEE-007', 'PM-BOOK-005']),
+   ('File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, with the day the paper was handed in when it came in earlier (never after today, a 400); as the sign-in says who is asking; anybody else is a 403', ['PM-FEE-006', 'PM-FEE-007', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end'):
    ('Record or correct the day a resident left — their occupancy range closes — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-008', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end'):

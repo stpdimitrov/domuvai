@@ -85,6 +85,7 @@ data class RegisterAbsencesRequest(val absences: List<NewAbsenceRequest>)
 data class NewAbsenceRequest(
     val absentFrom: String,      // ISO date, inclusive
     val absentTo: String,        // ISO date, exclusive — the first day back
+    val handedInOn: String? = null,   // ISO date the paper was handed in; none means today (PM-FEE-007)
 )
 
 data class AbsencesRegisteredResponse(val absenceIds: List<UUID>)
@@ -179,7 +180,7 @@ class RegistryController(private val registrations: Registrations, private val b
         val ids = book.absences(
             entranceId,
             unitId,
-            request.absences.map { RegisterAbsence(it.absentFrom, it.absentTo) },
+            request.absences.map { RegisterAbsence(it.absentFrom, it.absentTo, it.handedInOn) },
             who.of(signedIn),
         )
         return AbsencesRegisteredResponse(ids)

@@ -70,11 +70,13 @@ data class RegisterAnimal(
 
 /**
  * One filed absence to record for a unit — a closed span `[absentFrom, absentTo)` of non-use
- * (Rule: PM-FEE-006/007). Both bounds are required; the filing date is stamped by the system.
+ * (Rule: PM-FEE-006/007). Both bounds are required. [handedInOn] is the day the paper declaration
+ * was handed in, when that was before today; the day of entry is stamped by the system.
  */
 data class RegisterAbsence(
     val absentFrom: String,
     val absentTo: String,
+    val handedInOn: String? = null,
 )
 
 /**
@@ -300,10 +302,11 @@ class RegistryService(
 
     /**
      * File absence declarations for a unit — the record a per-person exemption requires (Rule:
-     * PM-FEE-007; the exemption itself is PM-FEE-006). Each is a closed span; `filedOn` is
-     * stamped from the clock as the Sofia calendar day (PM-SYS-004), so timeliness turns on when
-     * the system received the filing, not on a date the caller claims. The unit must exist and
-     * belong to the entrance.
+     * PM-FEE-007; the exemption itself is PM-FEE-006). Each is a closed span; `filedOn`, the day
+     * of entry, is stamped from the clock as the Sofia calendar day (PM-SYS-004). The manager states
+     * the day the paper was handed in, on which timeliness turns; it may not be after the day of
+     * entry, and with none stated it is that day. One refused refuses them all, and nothing is
+     * stored. The unit must exist and belong to the entrance.
      */
     @Transactional
     fun registerAbsence(entranceId: UUID, unitId: UUID, declarations: List<RegisterAbsence>): List<UUID> {
@@ -311,21 +314,23 @@ class RegistryService(
         units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
             ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
         val filedOn = LocalDate.parse(toSofiaDate(clock.instant()))             // a Sofia calendar day (PM-SYS-004)
-        return declarations.map { declaration ->
+        val rows = declarations.map { declaration ->
             val from = LocalDate.parse(declaration.absentFrom)
             val to = LocalDate.parse(declaration.absentTo)
             require(to.isAfter(from)) { "absentTo ($to) must be after absentFrom ($from)" }
-            aggregates.insert(
-                AbsenceDeclaration(
-                    id = UUID.randomUUID(),
-                    entranceId = entranceId,
-                    unitId = unitId,
-                    absentFrom = from,
-                    absentTo = to,
-                    filedOn = filedOn,
-                ),
-            ).id
+            val handedInOn = declaration.handedInOn?.let(LocalDate::parse) ?: filedOn
+            require(!handedInOn.isAfter(filedOn)) { "PM-FEE-007: handedInOn ($handedInOn) must not be after the day it is entered ($filedOn)" }
+            AbsenceDeclaration(
+                id = UUID.randomUUID(),
+                entranceId = entranceId,
+                unitId = unitId,
+                absentFrom = from,
+                absentTo = to,
+                filedOn = filedOn,
+                handedInOn = handedInOn,
+            )
         }
+        return rows.map { aggregates.insert(it).id }
     }
 
     /**

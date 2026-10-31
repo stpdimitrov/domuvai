@@ -1,12 +1,14 @@
 package zues.app.registry
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
@@ -51,7 +53,35 @@ class LegalTodayTest {
         registry.registerAbsence(entranceId, unit.id, listOf(RegisterAbsence("2026-07-01", "2026-08-15")))
 
         val filed = inserted().filterIsInstance<AbsenceDeclaration>().single()
-        assertThat(filed.filedOn).isEqualTo(sofiaDay)          // PM-FEE-007 judges the filing's timeliness on this day
+        assertThat(filed.filedOn).isEqualTo(sofiaDay)
+        assertThat(filed.handedInOn).isEqualTo(sofiaDay)       // none stated: PM-FEE-007 judges the filing's timeliness on this day
+    }
+
+    @Test
+    fun `PM-FEE-007 the day handed in is stored as stated, beside the day of entry the system stamps`() {
+        registry.registerAbsence(entranceId, unit.id, listOf(RegisterAbsence("2026-03-01", "2026-05-01", "2026-05-20")))
+
+        val filed = inserted().filterIsInstance<AbsenceDeclaration>().single()
+        assertThat(filed.handedInOn).isEqualTo(LocalDate.parse("2026-05-20"))
+        assertThat(filed.filedOn).isEqualTo(sofiaDay)
+    }
+
+    @Test
+    fun `PM-FEE-007 PM-SYS-004 the day handed in may be the Sofia day of entry`() {
+        registry.registerAbsence(entranceId, unit.id, listOf(RegisterAbsence("2026-03-01", "2026-05-01", sofiaDay.toString())))
+
+        assertThat(inserted().filterIsInstance<AbsenceDeclaration>().single().handedInOn).isEqualTo(sofiaDay)
+    }
+
+    @Test
+    fun `PM-FEE-007 a day handed in after the day of entry refuses the whole list and stores nothing`() {
+        val valid = RegisterAbsence("2026-03-01", "2026-05-01", "2026-05-20")
+        val tomorrow = RegisterAbsence("2026-03-01", "2026-05-01", sofiaDay.plusDays(1).toString())
+
+        assertThatThrownBy { registry.registerAbsence(entranceId, unit.id, listOf(valid, tomorrow)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("PM-FEE-007")
+        verify(aggregates, never()).insert(any<Any>())
     }
 
     @Test

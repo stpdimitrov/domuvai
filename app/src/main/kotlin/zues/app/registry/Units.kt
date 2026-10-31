@@ -80,11 +80,12 @@ class UnitsAdapter(
 
     /**
      * PM-FEE-007 — the exemption "MUST NOT [be applied] retroactively beyond the configured
-     * window." A declaration filed more than [graceDays] after the absence ends is late and is
-     * not applied. Timeliness turns on `filedOn`, which the system stamps, not the caller.
+     * window." A declaration handed in more than [graceDays] after the absence ends is late and
+     * is not applied. Timeliness turns on `handedInOn`, not on the day it was entered.
      */
+    // Rule: PM-FEE-007
     private fun timely(d: AbsenceDeclaration, graceDays: Long) =
-        !d.filedOn.isAfter(d.absentTo.plusDays(graceDays))
+        !d.handedInOn.isAfter(d.absentTo.plusDays(graceDays))
 
     /** The declared days that fall in the run's calendar year, clipped to it (PM-FEE-006). */
     private fun daysInYear(d: AbsenceDeclaration, yearStart: LocalDate, yearEnd: LocalDate): Long {

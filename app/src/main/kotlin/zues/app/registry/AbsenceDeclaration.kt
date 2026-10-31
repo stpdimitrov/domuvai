@@ -12,9 +12,11 @@ import java.util.UUID
  * animal, an absence is a closed interval `[absentFrom, absentTo)` (half-open; `absentTo` is
  * the first day back), because the owner declares a definite period of non-use.
  *
- * `filedOn` is stamped by the system when the declaration is recorded, never supplied by the
- * caller: PM-FEE-007 forbids applying the exemption retroactively beyond the configured
- * window, and only the true filing date can decide whether a filing is timely.
+ * `filedOn` is the day the declaration was entered, stamped by the system, never supplied by the
+ * caller. `handedInOn` is the day the paper declaration was handed in, which the manager states
+ * and which is never after `filedOn`; with none stated it is `filedOn`. PM-FEE-007 forbids applying
+ * the exemption retroactively beyond the configured window, and that window turns on `handedInOn`:
+ * an owner who declared in time is not late because the entry was (the owner's answer on #215).
  */
 @Table("absence_declaration")
 data class AbsenceDeclaration(
@@ -24,6 +26,7 @@ data class AbsenceDeclaration(
     val absentFrom: LocalDate,
     val absentTo: LocalDate,
     val filedOn: LocalDate,
+    val handedInOn: LocalDate,
 )
 
 interface AbsenceDeclarationRepository : ListCrudRepository<AbsenceDeclaration, UUID> {

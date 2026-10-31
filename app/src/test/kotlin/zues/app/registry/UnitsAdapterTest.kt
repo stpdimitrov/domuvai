@@ -42,8 +42,8 @@ class UnitsAdapterTest {
     private fun animal(from: LocalDate = LocalDate.of(2026, 1, 1), to: LocalDate? = null) =
         Animal(UUID.randomUUID(), entranceId, unitId, "cat", "VP-1", from, to)
 
-    private fun absence(from: LocalDate, to: LocalDate, filedOn: LocalDate) =
-        AbsenceDeclaration(UUID.randomUUID(), entranceId, unitId, from, to, filedOn)
+    private fun absence(from: LocalDate, to: LocalDate, filedOn: LocalDate, handedInOn: LocalDate = filedOn) =
+        AbsenceDeclaration(UUID.randomUUID(), entranceId, unitId, from, to, filedOn, handedInOn)
 
     private val exemptionDays = numberOn("ABSENCE_EXEMPTION_DAYS", period.toString()).toInt()
     private val graceDays = numberOn("ABSENCE_DECLARATION_GRACE_DAYS", period.toString()).toLong()
@@ -139,6 +139,29 @@ class UnitsAdapterTest {
         whenever(absences.findByUnitId(unitId)).thenReturn(listOf(absence(from, to, filedOn = cutoff)))
         assertThat(adapter.forEntrance(entranceId, period).single().absentDays)
             .isEqualTo(ChronoUnit.DAYS.between(from, to).toInt())
+    }
+
+    @Test
+    fun `PM-FEE-007 a declaration handed in on time and entered after the window earns the exemption`() {
+        val from = LocalDate.of(2026, 1, 1)
+        val to = LocalDate.of(2026, 3, 1)
+        val cutoff = to.plusDays(graceDays)
+        val enteredLate = cutoff.plusDays(10)
+
+        whenever(absences.findByUnitId(unitId)).thenReturn(listOf(absence(from, to, filedOn = enteredLate, handedInOn = cutoff)))
+        assertThat(adapter.forEntrance(entranceId, period).single().absentDays)
+            .isEqualTo(ChronoUnit.DAYS.between(from, to).toInt())
+            .isGreaterThan(exemptionDays)
+    }
+
+    @Test
+    fun `PM-FEE-007 a declaration handed in after the window is not applied, however soon it was entered`() {
+        val from = LocalDate.of(2026, 1, 1)
+        val to = LocalDate.of(2026, 3, 1)
+        val oneDayLate = to.plusDays(graceDays + 1)
+
+        whenever(absences.findByUnitId(unitId)).thenReturn(listOf(absence(from, to, filedOn = oneDayLate, handedInOn = oneDayLate)))
+        assertThat(adapter.forEntrance(entranceId, period).single().absentDays).isEqualTo(0)
     }
 
     @Test

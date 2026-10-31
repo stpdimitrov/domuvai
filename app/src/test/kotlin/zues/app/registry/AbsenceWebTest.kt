@@ -3,6 +3,7 @@ package zues.app.registry
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -47,6 +48,21 @@ class AbsenceWebTest {
         mvc.perform(postAbsences())
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.absenceIds.length()").value(1))
+    }
+
+    @Test
+    fun `PM-FEE-007 the day handed in reaches the book, and leaving it out still files`() {
+        whenever(registry.registerAbsence(any(), any(), any())).thenReturn(listOf(UUID.randomUUID()))
+        fun filing(absence: String) = mvc.perform(
+            post("/api/registry/entrances/$entranceId/units/$unitId/absences")
+                .contentType(MediaType.APPLICATION_JSON).content("""{"absences":[$absence]}"""),
+        ).andExpect(status().isCreated)
+
+        filing("""{"absentFrom":"2026-06-01","absentTo":"2026-08-01","handedInOn":"2026-08-20"}""")
+        filing("""{"absentFrom":"2026-06-01","absentTo":"2026-08-01"}""")
+
+        verify(registry).registerAbsence(entranceId, unitId, listOf(RegisterAbsence("2026-06-01", "2026-08-01", "2026-08-20")))
+        verify(registry).registerAbsence(entranceId, unitId, listOf(RegisterAbsence("2026-06-01", "2026-08-01", null)))
     }
 
     @Test
