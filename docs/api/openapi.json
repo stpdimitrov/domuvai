@@ -2322,6 +2322,55 @@
         ],
         "type": "object"
       },
+      "PaperDecisionView": {
+        "properties": {
+          "archiveLocation": {
+            "type": "string"
+          },
+          "basisHash": {
+            "type": "string"
+          },
+          "custodian": {
+            "type": "string"
+          },
+          "decisionText": {
+            "type": "string"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lawVersion": {
+            "type": "string"
+          },
+          "protocolDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "protocolRef": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archiveLocation",
+          "basisHash",
+          "decisionText",
+          "engineVersion",
+          "id",
+          "lawVersion",
+          "protocolDate",
+          "protocolRef",
+          "recordedAt"
+        ],
+        "type": "object"
+      },
       "PartyRegisteredResponse": {
         "properties": {
           "partyId": {
@@ -2771,6 +2820,27 @@
           },
           "validTo": {
             "format": "date",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RecordPaperDecision": {
+        "properties": {
+          "archiveLocation": {
+            "type": "string"
+          },
+          "custodian": {
+            "type": "string"
+          },
+          "decisionText": {
+            "type": "string"
+          },
+          "protocolDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "protocolRef": {
             "type": "string"
           }
         },
@@ -5896,6 +5966,172 @@
           "PM-GA-014",
           "PM-GA-015",
           "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/paper-decisions": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_paper_decisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaperDecisionView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-022",
+          "PM-DOC-007",
+          "PM-SEC-001",
+          "PM-SEC-002"
+        ]
+      },
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_paper_decisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPaperDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperDecisionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-FEE-012",
+          "PM-GA-022",
+          "PM-DOC-007",
+          "PM-SEC-001",
+          "PM-SEC-004"
         ]
       }
     },

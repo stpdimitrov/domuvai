@@ -132,6 +132,12 @@ RUNNING = {
    ('Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first — read as an assembly is', ['PM-GA-001', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-002', 'PM-GA-005', 'PM-SEC-001']),
+ ('post', '/api/assembly/entrances/{entranceId}/paper-decisions'):
+   ("Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001",
+    ['PM-FEE-012', 'PM-GA-022', 'PM-DOC-007', 'PM-SEC-001', 'PM-SEC-004']),
+ ('get', '/api/assembly/entrances/{entranceId}/paper-decisions'):
+   ("List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403",
+    ['PM-GA-022', 'PM-DOC-007', 'PM-SEC-001', 'PM-SEC-002']),
  # ---- identity
  ('get', '/api/identity/me'):
    ("Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do", ['PM-SEC-001']),
