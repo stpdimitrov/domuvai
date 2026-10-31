@@ -23,7 +23,8 @@ class UnitsAdapterTest {
     private val household: HouseholdMemberRepository = mock()
     private val animals: AnimalRepository = mock()
     private val absences: AbsenceDeclarationRepository = mock()
-    private val adapter = UnitsAdapter(units, household, animals, absences)
+    private val entrances: EntranceRepository = mock()
+    private val adapter = UnitsAdapter(units, household, animals, absences, entrances)
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
@@ -178,5 +179,13 @@ class UnitsAdapterTest {
         assertThat(view.map { Triple(it.designation, it.businessUse, it.separateEntrance) }).containsExactly(
             Triple("магазин 1", true, false), Triple("магазин 2", true, true), Triple("ап. 1", false, true), Triple("ап. 2", false, false),
         )
+    }
+
+    @Test
+    fun `PM-BOOK-012 an entrance is registered or it is not, whatever units it has`() {
+        val registered = UUID.randomUUID()
+        whenever(entrances.existsById(registered)).thenReturn(true)
+        assertThat(adapter.entranceExists(registered)).isTrue()
+        assertThat(adapter.entranceExists(UUID.randomUUID())).isFalse()
     }
 }

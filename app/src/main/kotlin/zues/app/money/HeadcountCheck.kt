@@ -14,6 +14,7 @@ import zues.app.identity_org.WhoAsks
 import zues.app.policy.Asking
 import zues.app.registry.BookAnswer
 import zues.app.registry.BookHeadcounts
+import zues.app.registry.Units
 import java.time.LocalDate
 import java.util.UUID
 
@@ -59,6 +60,7 @@ data class HeadcountCheck(
 class HeadcountCheckService(
     private val runs: ChargeRunRepository,
     private val book: BookHeadcounts,
+    private val units: Units,
     private val json: ObjectMapper,
 ) {
     private data class Counted(val designation: String, val occupants: Int, val childrenUnder6: Int)
@@ -74,7 +76,7 @@ class HeadcountCheckService(
             is BookAnswer.Refused -> throw MoneyReadForbidden(read.ruleId)
             is BookAnswer.Served -> read.value
         }
-        val run = found ?: throw NoSuchElementException("entrance $entranceId has no charge run issued for $period")
+        val run = found ?: throw if (units.entranceExists(entranceId)) NoChargeRun.of(entranceId, period) else NoChargeRun.noEntrance(entranceId)
         val billed = json.readTree(run.basis.json).path("units").associate {
             UUID.fromString(it.path("unitId").asText()) to
                 Counted(it.path("designation").asText(), it.path("occupants").asInt(), it.path("childrenUnder6").asInt())
@@ -105,8 +107,8 @@ class HeadcountCheckController(private val headcount: HeadcountCheckService, pri
     fun check(@PathVariable entranceId: UUID, @PathVariable period: String, signedIn: JwtAuthenticationToken?): HeadcountCheck =
         headcount.check(entranceId, period, who.of(signedIn))
 
-    /** No run issued for the period, or no such entrance → 404. */
-    @ExceptionHandler(NoSuchElementException::class)
+    /** No run issued for the period, or no such entrance → 404, its code saying which. */
+    @ExceptionHandler(NoChargeRun::class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
+    fun onMissing(e: NoChargeRun): NoChargeRunAnswer = e.answer
 }

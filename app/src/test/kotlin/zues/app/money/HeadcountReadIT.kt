@@ -92,11 +92,15 @@ class HeadcountReadIT {
             "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (?, ?, 'BM', ?, ?, ?)",
             UUID.randomUUID(), entrance, manager, today.minusMonths(1), today.plusYears(1),
         )
+        issue(entrance, "2026-05", legalDate)
+        return entrance
+    }
+
+    private fun issue(entrance: UUID, period: String, on: LocalDate) {
         val run = json.writeValueAsString(
-            StoredChargeRunRequest(period = "2026-05", legalDate = legalDate.toString(), lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500))),
+            StoredChargeRunRequest(period = period, legalDate = on.toString(), lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500))),
         )
         mvc.perform(post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(run)).andExpect(status().isCreated)
-        return entrance
     }
 
     private fun entries(entrance: UUID): List<Map<String, Any?>> =
@@ -148,5 +152,40 @@ class HeadcountReadIT {
         jdbc.update("UPDATE book_access SET purpose = 'нищо' WHERE entrance_id = ?", entrance)
         jdbc.update("DELETE FROM book_access WHERE entrance_id = ?", entrance)
         assertThat(entries(entrance).single()["purpose"]).isEqualTo(BookHeadcountsAdapter.PURPOSE)
+    }
+
+    @Test
+    fun `PM-BOOK-012 PM-SEC-002 the issued periods read from the store newest first, for the manager and not for an owner`() {
+        val entrance = issued(person("Мария Иванова", "login-manager"))
+        person("Иван Петров", "login-owner")
+        issue(entrance, "2026-04", LocalDate.parse("2026-04-01"))
+        jdbc.update(
+            "INSERT INTO money.charge_run (id, entrance_id, period, legal_date, basis, basis_hash, law_version, engine_version, status) VALUES (?, ?, '2026-06', '2026-06-01', '{}'::jsonb, 'h', '1.3', '0.3.0', 'FAILED')",
+            UUID.randomUUID(), entrance,
+        )
+        val periods = "/api/money/entrances/$entrance/charge-runs"
+
+        mvc.perform(get(periods).by("login-manager")).andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].period").value("2026-05")).andExpect(jsonPath("$[0].legalDate").value("2026-05-01"))
+            .andExpect(jsonPath("$[0].chargeRunId").isNotEmpty)
+            .andExpect(jsonPath("$[1].period").value("2026-04"))
+        mvc.perform(get(periods).by("login-owner")).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+    }
+
+    @Test
+    fun `PM-BOOK-012 a period with no run and an entrance that does not exist answer in their own codes`() {
+        val entrance = issued(person("Мария Иванова", "login-manager"))
+        val unknown = UUID.randomUUID()
+
+        mvc.perform(get(report(entrance, "2026-06")).by("login-manager")).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("NO_RUN"))
+        // No token here is sign-in switched off, as in `issued`: nobody is asking. A signed-in reader is refused below.
+        mvc.perform(get(report(unknown))).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("NO_ENTRANCE"))
+        mvc.perform(get("/api/money/entrances/$unknown/charge-runs")).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("NO_ENTRANCE"))
+        mvc.perform(get(report(unknown)).by("login-manager")).andExpect(status().isForbidden)
     }
 }
