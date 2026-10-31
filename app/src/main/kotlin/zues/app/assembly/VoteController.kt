@@ -52,6 +52,7 @@ class VoteActs(
     private val reads: AssemblyReads,
     private val agenda: AgendaItemRepository,
     private val recorded: VoteRepository,
+    private val ballots: AbsenteeBallotRepository,
     private val aggregates: JdbcAggregateTemplate,
     private val clock: Clock,
 ) {
@@ -74,22 +75,44 @@ class VoteActs(
     // Rule: PM-SEC-004
     @Transactional(noRollbackFor = [ActRefused::class])
     fun read(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID): List<Vote> {
+        answered(who, entranceId, assemblyId, itemId, VoteReadOf.VOTES)
+        return recorded.findByAgendaItemId(itemId).sortedWith(compareBy({ it.castAt }, { it.id.toString() }))   // as Postgres orders a uuid: by its hex
+    }
+
+    /**
+     * Every absentee ballot on [itemId], in the order entered. A ballot is how an owner voted (the owner's answer on
+     * #298, 2026-10-27): asked and entered as [read] is, the owner whose ballot it is refused like any other, and the
+     * entry names the ballots, not the votes.
+     */
+    // Rule: PM-SEC-002
+    // Rule: PM-SEC-001
+    // Rule: PM-GOV-008
+    // Rule: PM-SEC-004
+    @Transactional(noRollbackFor = [ActRefused::class])
+    fun readBallots(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID): List<AbsenteeBallot> {
+        answered(who, entranceId, assemblyId, itemId, VoteReadOf.ABSENTEE_BALLOTS)
+        return ballots.findByAgendaItemId(itemId).sortedWith(compareBy({ it.recordedAt }, { it.id.toString() }))   // as Postgres orders a uuid: by its hex
+    }
+
+    /** The policy's answer on how each owner voted, entered whatever it is; returns only where the read may go on. */
+    // Rule: PM-SEC-002
+    // Rule: PM-SEC-004
+    private fun answered(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID, readOf: VoteReadOf) {
         val decision = reads.decided(entranceId, who, Action.READ_VOTES)
         if (decision != null && !decision.allowed) {
-            entered(entranceId, itemId, who, VoteReadOutcome.REFUSED, decision.ruleId)
+            entered(entranceId, itemId, readOf, who, VoteReadOutcome.REFUSED, decision.ruleId)
             throw ActRefused(decision.ruleId)
         }
         agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
-        if (decision == null) entered(entranceId, itemId, who, VoteReadOutcome.OPEN, null)
-        else entered(entranceId, itemId, who, VoteReadOutcome.SERVED, decision.ruleId)
-        return recorded.findByAgendaItemId(itemId).sortedWith(compareBy({ it.castAt }, { it.id.toString() }))   // as Postgres orders a uuid: by its hex
+        if (decision == null) entered(entranceId, itemId, readOf, who, VoteReadOutcome.OPEN, null)
+        else entered(entranceId, itemId, readOf, who, VoteReadOutcome.SERVED, decision.ruleId)
     }
 
     // Rule: PM-SEC-004
-    private fun entered(entranceId: UUID, itemId: UUID, who: Asking, outcome: VoteReadOutcome, ruleId: String?) {
+    private fun entered(entranceId: UUID, itemId: UUID, readOf: VoteReadOf, who: Asking, outcome: VoteReadOutcome, ruleId: String?) {
         aggregates.insert(
-            VoteRead(UUID.randomUUID(), entranceId, itemId, who.party, who.login?.issuer, who.login?.subject, clock.instant().truncatedTo(ChronoUnit.MICROS), outcome.name, ruleId),
+            VoteRead(UUID.randomUUID(), entranceId, itemId, readOf.name, who.party, who.login?.issuer, who.login?.subject, clock.instant().truncatedTo(ChronoUnit.MICROS), outcome.name, ruleId),
         )
     }
 }

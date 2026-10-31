@@ -4139,6 +4139,115 @@
       }
     },
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AbsenteeBallotView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "How each absent owner voted on an item, ballot by ballot in the order entered — their choice for each unit, its weight and the declaration it came from; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002, and every read is entered",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-SEC-001",
+          "PM-SEC-002",
+          "PM-SEC-004",
+          "PM-GOV-008"
+        ]
+      },
       "post": {
         "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots",
         "parameters": [

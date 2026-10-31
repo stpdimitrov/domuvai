@@ -3,6 +3,7 @@ package zues.app.assembly
 import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -31,11 +32,13 @@ data class AbsenteeBallotView(
 /**
  * Absent owners' ballots on an item tagged for them (PM-GA-017): entered after its sitting, by day 7, from a
  * handwritten-signed declaration (PM-GA-018), by whoever runs the assembly, signed in — anybody else, the owner
- * included, is a 403 naming the rule (PM-SEC-001).
+ * included, is a 403 naming the rule (PM-SEC-001). Read, as how each owner voted, by the manager, the board and the
+ * controller only; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002 (the owner's answer
+ * on #298, 2026-10-27), and every read is entered (PM-SEC-004).
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots")
-class AbsenteeBallotController(private val ballots: AbsenteeBallotService, private val who: WhoAsks) {
+class AbsenteeBallotController(private val ballots: AbsenteeBallotService, private val acts: VoteActs, private val who: WhoAsks) {
 
     // Rule: PM-GA-017
     // Rule: PM-GA-018
@@ -45,9 +48,18 @@ class AbsenteeBallotController(private val ballots: AbsenteeBallotService, priva
     fun enter(
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, @RequestBody request: BallotRequest,
         signedIn: JwtAuthenticationToken?,
-    ): List<AbsenteeBallotView> = ballots.enter(who.of(signedIn), entranceId, assemblyId, itemId, request).map {
-        AbsenteeBallotView(it.id, it.partyId, it.unitId, it.weight.stripTrailingZeros().toPlainString(), it.choice, it.signature, it.documentRef, it.documentSha256, it.receivedOn.toString(), it.recordedBy, it.recordedAt)
-    }
+    ): List<AbsenteeBallotView> = ballots.enter(who.of(signedIn), entranceId, assemblyId, itemId, request).map { it.view() }
+
+    // Rule: PM-SEC-002
+    // Rule: PM-SEC-001
+    // Rule: PM-GOV-008
+    // Rule: PM-SEC-004
+    @GetMapping
+    fun read(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): List<AbsenteeBallotView> =
+        acts.readBallots(who.of(signedIn), entranceId, assemblyId, itemId).map { it.view() }
+
+    private fun AbsenteeBallot.view() =
+        AbsenteeBallotView(id, partyId, unitId, weight.stripTrailingZeros().toPlainString(), choice, signature, documentRef, documentSha256, receivedOn.toString(), recordedBy, recordedAt)
 
     @ExceptionHandler(ActRefused::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)

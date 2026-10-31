@@ -44,13 +44,15 @@ enum class VoteChoice { FOR, AGAINST, ABSTAIN }
 
 /**
  * One read of how each owner voted on an item (Rule: PM-SEC-004): who asked — the sign-in's party and login, either
- * may be missing on a refusal — which item, when, and how it was decided. Insert-only: the table refuses to change.
+ * may be missing on a refusal — which item, [readOf] its votes or its absentee ballots, when, and how it was decided.
+ * Insert-only: the table refuses to change.
  */
 @Table("vote_read")
 data class VoteRead(
     @Id val id: UUID,
     val entranceId: UUID,
     val agendaItemId: UUID,
+    val readOf: String,             // VoteReadOf
     val actor: UUID?,
     val loginIssuer: String?,
     val loginSubject: String?,
@@ -58,6 +60,11 @@ data class VoteRead(
     val outcome: String,            // VoteReadOutcome
     val ruleId: String?,
 )
+
+enum class VoteReadOf {
+    VOTES,
+    ABSENTEE_BALLOTS,
+}
 
 enum class VoteReadOutcome {
     SERVED,

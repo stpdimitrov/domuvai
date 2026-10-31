@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActions
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
@@ -517,6 +518,82 @@ class VotePersistenceIT {
             ballot(m, m.owners[2], today, hash = "").andExpect(status().isBadRequest)
         }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", Long::class.java, m.item)).isZero()
+    }
+
+    private fun ballots(m: Meeting, item: String = m.item): ResultActions = read("${m.base}/agenda/$item/absentee-ballots")
+
+    /** An item tagged for absent owners and closed, with the third owner's ballot entered by the manager. */
+    private fun ballotted(): Meeting = opened(absenteeEligible = true).also { m ->
+        signedIn(m.manager) {
+            close(m).andExpect(status().isCreated)
+            ballot(m, m.owners[2], toSofiaDate(Instant.now()), choice = "AGAINST").andExpect(status().isCreated)
+        }
+    }
+
+    @Test
+    fun `PM-SEC-002 how an absent owner voted is read by the manager and the board - an owner, the ballot's own included, and a stranger are a 403 naming the rule`() {
+        val m = ballotted()
+        val (ana, boris, absent) = m.owners
+        val stored = jdbc.queryForObject("SELECT id::text FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", String::class.java, m.item)
+        for (reader in listOf(m.manager, mandated(m, "MB"))) {
+            signedIn(reader) {
+                ballots(m).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].id").value(stored)).andExpect(jsonPath("$[0].ownerPartyId").value(absent.toString()))
+                    .andExpect(jsonPath("$[0].choice").value("AGAINST")).andExpect(jsonPath("$[0].weight").value("25"))
+            }
+        }
+        for (who in listOf(absent, ana, boris, person())) {
+            signedIn(who) {
+                ballots(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("AGAINST"))))
+            }
+        }
+    }
+
+    @Test
+    fun `PM-SEC-001 the ballots are read entrance by entrance - another entrance's manager is a 403, its item asked through this one a 404`() {
+        val m = ballotted()
+        val elsewhere = ballotted()
+        signedIn(elsewhere.manager) { ballots(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002")) }
+        signedIn(m.manager) {
+            ballots(m, elsewhere.item).andExpect(status().isNotFound)
+            ballots(m, UUID.randomUUID().toString()).andExpect(status().isNotFound)
+        }
+    }
+
+    @Test
+    fun `PM-GOV-008 the controller reads the absentee ballots and enters none`() {
+        val m = ballotted()
+        signedIn(mandated(m, "CTL")) {
+            ballots(m).andExpect(status().isOk).andExpect(jsonPath("$[0].ownerPartyId").value(m.owners[2].toString()))
+            ballot(m, m.owners[2], toSofiaDate(Instant.now())).andExpect(status().isForbidden)
+        }
+    }
+
+    @Test
+    fun `PM-SEC-004 every read of the absentee ballots is entered, apart from the votes' - served or refused, who and when - and an item not there enters nothing`() {
+        val m = ballotted()
+        val stranger = person()
+        val entries = { jdbc.queryForList("SELECT actor, login_subject, agenda_item_id, read_of, outcome, rule_id, at FROM assembly.vote_read WHERE entrance_id = ?::uuid ORDER BY at, id", m.entranceId) }
+        assertThat(entries()).isEmpty()                                                                      // entering a ballot reads nothing
+        signedIn(m.manager) {
+            ballots(m).andExpect(status().isOk)
+            read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk)                                // the votes' read names the votes
+        }
+        signedIn(m.owners[2]) { ballots(m).andExpect(status().isForbidden) }                                 // their own ballot: refused, and entered so
+        signedIn(m.manager) { ballots(m, UUID.randomUUID().toString()).andExpect(status().isNotFound) }      // nothing there, nothing served, nothing entered
+        val unknown = UUID.randomUUID()
+        signedIn(stranger) { ballots(m, unknown.toString()).andExpect(status().isForbidden) }                // refused before anything is looked up: entered as asked
+        ballots(m).andExpect(status().isOk)                                                                  // sign-in switched off: given to nobody, and entered so
+        val log = entries()
+        assertThat(log.map { listOf(it["actor"], it["login_subject"], it["agenda_item_id"], it["read_of"], it["outcome"], it["rule_id"]) }).containsExactly(
+            listOf(m.manager, "login-${m.manager}", UUID.fromString(m.item), "ABSENTEE_BALLOTS", "SERVED", "PM-SEC-001"),
+            listOf(m.manager, "login-${m.manager}", UUID.fromString(m.item), "VOTES", "SERVED", "PM-SEC-001"),
+            listOf(m.owners[2], "login-${m.owners[2]}", UUID.fromString(m.item), "ABSENTEE_BALLOTS", "REFUSED", "PM-SEC-002"),
+            listOf(stranger, "login-$stranger", unknown, "ABSENTEE_BALLOTS", "REFUSED", "PM-SEC-002"),
+            listOf(null, null, UUID.fromString(m.item), "ABSENTEE_BALLOTS", "OPEN", null),
+        )
+        assertThat(log.map { it["at"] as java.sql.Timestamp }).allSatisfy { assertThat(it.toInstant()).isBetween(Instant.now().minusSeconds(60), Instant.now()) }
     }
 
     private fun merge(m: Meeting): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/absentee-merge", ""))

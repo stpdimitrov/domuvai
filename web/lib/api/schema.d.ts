@@ -63,7 +63,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** How each absent owner voted on an item, ballot by ballot in the order entered — their choice for each unit, its weight and the declaration it came from; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002, and every read is entered */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots"];
         put?: never;
         /** Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots"];
@@ -2566,6 +2567,74 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbsenteeBallotView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
