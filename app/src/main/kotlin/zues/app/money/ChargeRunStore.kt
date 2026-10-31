@@ -4,6 +4,7 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import zues.app.assembly.GaDecisions
 import zues.app.registry.UnitForCharging
 import zues.law.AllocationKey
 import java.math.BigDecimal
@@ -37,12 +38,15 @@ class ChargeRunStore(
     private val chargeRuns: ChargeRunRepository,
     private val aggregates: JdbcAggregateTemplate,
     private val events: ApplicationEventPublisher,
+    private val decisions: GaDecisions,
 ) {
+    // Rule: PM-FEE-012
     @Transactional
     fun issue(entranceId: UUID, request: StoredChargeRunRequest): ChargeRunIssued {
         if (chargeRuns.existsByEntranceIdAndPeriod(entranceId, request.period)) {
             throw ChargeRunAlreadyIssued("entrance $entranceId already has a charge run for ${request.period}")
         }
+        requireDecisions(entranceId, request)
         val computed = runs.compute(entranceId, request)
         val run = computed.run
         if (run.missingReadings.isNotEmpty()) {                                         // Rule: PM-FEE-017
@@ -106,6 +110,14 @@ class ChargeRunStore(
 
         events.publishEvent(ChargeRunPersisted(runId, entranceId, run.period))
         return ChargeRunIssued(runId, entranceId, run.period, run.total.amountMinor, lineCount)
+    }
+
+    /** Every line, metered ones too, cites a decision of this entrance's assembly that passed: the whole issue is refused on one that does not. */
+    // Rule: PM-FEE-012
+    private fun requireDecisions(entranceId: UUID, request: StoredChargeRunRequest) {
+        val cited = request.lines.map { it.decisionId } + request.consumption.orEmpty().map { it.decisionId }
+        val without = cited.distinct().filterNot { decisions.passed(entranceId, it) }
+        require(without.isEmpty()) { "no passed GA decision of this entrance is ${without.joinToString()}: nothing is billed without one (PM-FEE-012)" }
     }
 
     /** The quantity of the allocation key this line covers for the unit (numeric(12,6)). */

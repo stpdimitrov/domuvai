@@ -53,7 +53,8 @@ E2E-01 — the whole chain, checked: the real Next.js server, over the real API,
     recorded and committed through the page (COMMITTING), and its revert through the import's page is the API's answer.
 17. WEB-38 (PM-FEE-012, PM-FEE-015, PM-SEC-001): the charges screen's issue form offers, as decisions to cite, exactly the
     entrance's PASSED decisions the assembly API stores (none: it says no run can be issued); an issue posted through it
-    citing a decision that is not one is refused by the web, and the API then holds no run for that period. The issue
+    citing a decision that is not one is refused by the web, and by the API when posted to it directly (FEE-01), which
+    then holds no run for that period. The issue
     call is validated against its 409 (the seeded period is billed) with the board's token, and refused for the controller.
 
 Expects the entrance tools/seed_demo.py creates, and the build in web/.next (or --next-dir).
@@ -1496,8 +1497,9 @@ def charges_issue(api, web, entrance):
     WEB-38 (PM-FEE-012, PM-FEE-015, PM-SEC-001) — the issue form on `/entrance/charges`: the decisions it offers are the
     entrance's PASSED ones as the assembly API stores them, read here the same way; with none it says no run is issued.
     An issue posted through the form, as a browser with no script posts it, citing a decision that is not one (the demo
-    basis's) is refused by the web, and the API then holds no run for the period. A passed decision cannot be reached in
-    CI (the API's clock is real, WEB-32), so an issue through the page is not; the API's own refusals are its tests.
+    basis's) is refused by the web, and the same id posted straight to the API by the board is refused there, naming the
+    rule (FEE-01); the API then holds no run for the period. A passed decision cannot be reached in CI (the API's clock is
+    real, WEB-32), so an issue through the page is not; the seed's own runs issue on a paper decision (DEC-01).
     """
     period = "2027-01"
     path = f"/entrance/charges?period={period}&entrance={entrance}"
@@ -1519,9 +1521,13 @@ def charges_issue(api, web, entrance):
     text = visible_text(answered)
     if status != 200 or "Ред 1: изберете прието решение" not in text or "Издадено:" in text:
         failures.append(f"{path}: an issue citing no passed decision answered HTTP {status} without the web's refusal")
+    run = {"period": period, "legalDate": f"{period}-01", "lines": DEMO_BASIS}
+    status, raw = fetch(api, f"/api/money/entrances/{entrance}/charge-runs", run, headers=as_board())
+    if status != 400 or "PM-FEE-012" not in raw or "GA-2026-03-12-4" not in raw:
+        failures.append(f"{period}: PM-FEE-012 — the API answered HTTP {status} to an issue on a made-up decision: {raw[:200]!r}")
     held = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/{period}/headcount", headers=as_board())[0]
     failures += [] if held == 404 else [f"{period}: PM-FEE-012 — the API holds a run (headcount HTTP {held}) after an issue citing no passed decision"]
-    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} passed decision(s) offered; an issue on none refused, no run held")
+    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} passed decision(s) offered; an issue on none refused by the web and the API, no run held")
     return failures
 
 

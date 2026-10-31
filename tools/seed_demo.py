@@ -98,11 +98,18 @@ call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
 call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
     "purpose": "OPERATING", "iban": iban("UNCR70001512345678"), "holderName": "Мария Иванова", "holderKind": "MANAGER", "holderPartyId": manager})
 
-# September's charges, issued on the demo decision — the same basis the charges screen previews
+# The tariff, as the assembly set it on paper: recorded from its protocol, so the runs below cite a decision of this
+# entrance (PM-FEE-012, DEC-01). The demo's sign-in is off, so the record names nobody.
+tariff = call("POST", f"/api/assembly/entrances/{entrance}/paper-decisions", {
+    "decisionText": "Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.",
+    "protocolDate": "2026-03-12", "protocolRef": "Протокол на ОС от 12.03.2026, т. 4",
+    "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"})["id"]
+
+# September's charges, issued on that decision — the same basis the charges screen previews
 call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01", "lines": [
-    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 600},
-    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 450},
-    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": "GA-2026-03-12-4", "totalMinor": 60_000},
+    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 600},
+    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 450},
+    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": tariff, "totalMinor": 60_000},
 ]})
 
 # Payments: four units pay into the fund's account, two into the operating one
@@ -116,9 +123,9 @@ for unit, amount, into in zip(unit_ids, [30_000, 25_000, 20_000, 30_000, 4_000, 
 # so the debts screen has something to net (WEB-18): a payment settles only debts raised by its own date, and an
 # advance is not applied to a later charge.
 call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-10", "legalDate": "2026-10-01", "lines": [
-    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 600},
-    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 450},
-    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": "GA-2026-03-12-4", "totalMinor": 60_000},
+    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 600},
+    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 450},
+    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": tariff, "totalMinor": 60_000},
 ]})
 
 # Disbursements from the fund: works on a GA decision, paid; an emergency; a measure, cancelled; one committed

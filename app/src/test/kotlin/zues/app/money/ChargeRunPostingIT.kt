@@ -2,13 +2,17 @@ package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -17,6 +21,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import java.util.UUID
+import zues.app.assembly.GaDecisions
 
 /**
  * Postings against real PostgreSQL: issuing a run writes a journal whose deferred trigger
@@ -46,6 +51,10 @@ class ChargeRunPostingIT {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var postings: PostingRepository
+    @MockitoBean lateinit var decisions: GaDecisions
+
+    @BeforeEach
+    fun everyCitedDecisionPassed() { whenever(decisions.passed(any(), any())).thenReturn(true) }
 
     private fun createEntrance(): UUID {
         val response = mvc.perform(

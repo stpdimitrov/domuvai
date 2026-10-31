@@ -2,7 +2,10 @@ package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
@@ -11,6 +14,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -21,6 +25,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import zues.app.assembly.GaDecisions
 import zues.app.identity_org.Logins
 import zues.app.registry.AssignTitle
 import zues.app.registry.OwnershipService
@@ -63,6 +68,10 @@ class MoneyAccessIT {
     @Autowired lateinit var ownership: OwnershipService
     @Autowired lateinit var logins: Logins
     @Autowired lateinit var jdbc: JdbcTemplate
+    @MockitoBean lateinit var decisions: GaDecisions
+
+    @BeforeEach
+    fun everyCitedDecisionPassed() { whenever(decisions.passed(any(), any())).thenReturn(true) }
 
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
     private val today: LocalDate get() = LocalDate.parse(toSofiaDate(Instant.now()))
