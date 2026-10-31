@@ -153,8 +153,8 @@ class MandateAdministrationTest {
         // and a spread of first days around E's last. Two rows of the table are then read on every day that matters:
         //  · as recorded — E stamped with L's first day where the recorder ended it;
         //  · as if nobody had stamped anything — the reader finding the successor by itself.
-        // Past E's own dates the two agree on every day: the recorder ends exactly what the reader would. Within E's
-        // dates only the stamp ends it — that is the one difference, and it is the recorder's alone.
+        // The two agree on every day, within E's dates as past them: the recorder ends exactly what the reader would. A
+        // firm's mandate is the reader's alone to pass over — the recorder never stamps one, and it holds no role.
         val begins = LocalDate.parse("2024-01-01")
         val runsTo = LocalDate.parse("2026-01-01")
         var endedInTerm = 0; var endedPastTerm = 0; var leftAlone = 0
@@ -174,9 +174,9 @@ class MandateAdministrationTest {
             for (day in listOf(laterFrom.minusDays(1), laterFrom, runsTo.minusDays(1), runsTo, maxOf(runsTo, laterFrom).plusDays(1), runsTo.plusYears(3))) {
                 val asRecorded = stamped.inForceOn(day, listOf(stamped, later))
                 val byTheReaderAlone = unstamped.inForceOn(day, listOf(unstamped, later))
-                if (!day.isBefore(runsTo)) assertThat(asRecorded).describedAs("$case, on $day").isEqualTo(byTheReaderAlone)
-                else assertThat(byTheReaderAlone).describedAs("$case, on $day: within its dates only a recorded end ends it").isTrue()
+                assertThat(asRecorded).describedAs("$case, on $day").isEqualTo(byTheReaderAlone)
                 if (ended && !day.isBefore(laterFrom)) assertThat(asRecorded).describedAs("$case, on $day").isFalse()
+                if (!later.succeeds(unstamped) && day.isBefore(runsTo)) assertThat(byTheReaderAlone).describedAs("$case, on $day: nobody took its place").isTrue()
             }
             if (ended && laterFrom.isBefore(runsTo)) endedInTerm++ else if (ended) endedPastTerm++ else leftAlone++
         }

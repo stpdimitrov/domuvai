@@ -175,10 +175,8 @@ class MandateAdministration(
             throw explained(e, entranceId, party)
         }
         acts.record(MandateAct("RECORDED", entranceId, login, GOVERNED_BY, id, body, party, from, to, protocolRef = protocol))
-        // Which mandates the new one ends is [Mandate.succeeds]' to say — the same question the reading side asks. Asked
-        // here the day the successor is recorded, so a manager or a board member is ended even within their own dates;
-        // the reading side asks it only of a mandate whose dates have run out and that nobody ended. A firm's mandate
-        // is not this api's to end.
+        // Which mandates the new one ends is [Mandate.succeeds]' to say — the same question the reading side asks, of a
+        // manager or a board member within their own dates as past them. A firm's mandate is not this api's to end.
         val recorded = Mandate(id, entranceId, body, party, from, to, null)
         val succeeded = mandates.ofEntrance(entranceId)
             .filter { it.succeededAt == null && it.body in EXECUTIVE && recorded.succeeds(it) }.map { it.id }.filter { mandates.end(it, from) }

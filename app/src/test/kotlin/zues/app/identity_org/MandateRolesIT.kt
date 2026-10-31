@@ -104,6 +104,21 @@ class MandateRolesIT {
     }
 
     @Test
+    fun `PM-GOV-004 two managers on the table with no end recorded — one manager on every date, and the read and the roles say the same one`() {
+        val block = entrance()
+        val ivan = party(); val maria = party()
+        mandate(block, "BM", ivan, "2025-01-01", "2027-01-01")
+        mandate(block, "BM", maria, "2026-03-01", "2028-03-01")
+        fun manager(on: String) = roles.holdersOn(block, day(on)).filter { it.role == Role.BM }.map { it.partyId }
+        assertThat(manager("2026-02-28")).containsExactly(ivan)
+        for (on in listOf("2026-03-01", "2026-12-31", "2027-01-01", "2028-03-01")) assertThat(manager(on)).describedAs(on).containsExactly(maria)
+        assertThat(roles.held(Asking(null, ivan), block, day("2026-02-28"))).containsExactly(Held(Role.BM, block))
+        assertThat(roles.held(Asking(null, ivan), block, day("2026-03-01"))).isEmpty()
+        for (on in listOf("2026-02-28", "2026-03-01", "2027-01-01"))
+            assertThat(standing.of(block, day(on)).map { it.partyId }).describedAs(on).containsExactlyElementsOf(manager(on))
+    }
+
+    @Test
     fun `PM-SEC-011 a mandate in one entrance is no role in another`() {
         val block = entrance()
         val next = entrance()
