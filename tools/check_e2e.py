@@ -169,6 +169,8 @@ REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end"): 404,     # no animal of this id either (WEB-46)
                      ("POST", "/api/registry/entrances/{entranceId}/book/declarations"): 404,                          # no unit of this id: the seeded book is not written (WEB-47; declarations_screen files through the page)
                      ("POST", "/api/registry/entrances/{entranceId}/units/{unitId}/absences"): 404}                   # no unit of this id (WEB-46)
+# The same call signed in: the board's member keeps the accounts but does not hold the fund's, and the signatory is the sign-in (G-5, PM-FUND-007).
+REFUSED_TO_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/fund/disbursements"): 403}
 # Never run against the seeded demo: the retention run anonymises for good (PM-BOOK-010; the owner, 2026-10-29, WEB-47). The
 # check asks it only with its own token — the controller's, which the API refuses (403) — and only where it has one.
 NEVER_RUN = {("POST", "/api/registry/entrances/{entranceId}/book/retention")}
@@ -1615,7 +1617,7 @@ def disbursements_screen(api, web, entrance, signed_in):
         fields = {"purpose": "WORKS", "amount": "1,00", "measure": "", "basis": "EMERGENCY", "decision": "", "justification": "e2e: signed by the board"}
         status, _, refused_page = submit_form(web, path, page, 'name="justification"', fields)
         said = visible_text(refused_page)
-        if status != 200 or "Системата не прие това:" not in said or "PM-FUND-007" not in said or 'value="e2e: signed by the board"' not in refused_page:
+        if status != 200 or "Нямате право да подпишете разход от фонда:" not in said or "PM-FUND-007" not in said or 'value="e2e: signed by the board"' not in refused_page:
             failures.append(f"{path}: a sign-off by a party not holding the fund answered HTTP {status} without the API's words, or the form not kept")
         after = fetch(api, f"/api/money/entrances/{entrance}/fund")[1]
         failures += [] if len(json.loads(after)["disbursements"]) == len(listed) else [f"{path}: a refused sign-off recorded a disbursement"]
@@ -2580,7 +2582,8 @@ def main():
             refused, _ = fetch(api, url, body, headers=sent)
             failures += [] if refused == 403 else [f"{method} {path}: the controller kept the accounts (HTTP {refused}), not refused (PM-SEC-001)"]
         status, raw = fetch(api, url, body, headers={**sent, **(board or {})})
-        if status not in ((REFUSED_BY_DESIGN[(method, path)],) if (method, path) in REFUSED_BY_DESIGN else (200, 201)):
+        wanted = (REFUSED_TO_THE_BOARD if board and (method, path) in REFUSED_TO_THE_BOARD else REFUSED_BY_DESIGN).get((method, path))
+        if status not in ((wanted,) if wanted else (200, 201)):
             failures.append(f"{method} {path}: HTTP {status} {raw[:200]}")
             continue
         validator = Draft202012Validator(response_schema(method, path, status), format_checker=Draft202012Validator.FORMAT_CHECKER)
