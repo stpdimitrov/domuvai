@@ -17,9 +17,11 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
 import zues.app.identity_org.Logins
+import zues.app.registry.BookHouseholdsAdapter
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
@@ -141,6 +143,86 @@ class ProxyPersistenceIT {
         signedIn(principal) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(appointing(agent, rest))) }
 
     private fun entranceOf(proxies: String) = UUID.fromString(Regex("entrances/([^/]+)").find(proxies)!!.groupValues[1])
+
+    private fun householdChecks(entranceId: UUID): List<List<Any?>> =
+        jdbc.queryForList("SELECT actor, purpose, book_date, outcome, rule_id FROM registry.book_access WHERE entrance_id = ? AND kind = 'HOUSEHOLD_CHECK' ORDER BY at, id", entranceId)
+            .map { it.values.toList() }
+
+    private fun proxiesOf(entranceId: UUID) = jdbc.queryForObject("SELECT count(*) FROM assembly.proxy WHERE entrance_id = ?", Int::class.java, entranceId)
+
+    private val aHouseholdMember = """"agentKind":"HOUSEHOLD_MEMBER","scope":"WHOLE_AGENDA","form":"WRITTEN""""
+
+    /** Somebody the book has living in [unit], flagged a child under six or not. */
+    private fun living(entranceId: UUID, unit: UUID, party: UUID = person(), child: Boolean = false) = party.also {
+        jdbc.update(
+            sofiaDated("INSERT INTO registry.household_member (id, entrance_id, unit_id, party_id, is_child_under_6, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, ?, current_date - 100, NULL)"),
+            entranceId, unit, it, child,
+        )
+    }
+
+    @Test
+    fun `PM-SEC-004 a household check's entry survives the 400 that rolls the registration back, the export lists it, and it cannot be changed or removed`() {
+        val proxies = assembly(entrance())
+        val entranceId = entranceOf(proxies)
+        val manager = jdbc.queryForObject("SELECT party_id FROM identity_org.management_mandate WHERE entrance_id = ?", UUID::class.java, entranceId)!!
+        val principal = owner(entranceId)
+        val unit = jdbc.queryForObject("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)!!
+        living(entranceId, unit, principal)
+        val today = java.sql.Date.valueOf(toSofiaDate(Instant.now()))
+
+        appoint(proxies, principal, person(), aHouseholdMember).andExpect(status().isBadRequest)
+        assertThat(proxiesOf(entranceId)).isZero()
+        val entry = listOf(principal, BookHouseholdsAdapter.PURPOSE, today, "SERVED", "PM-BOOK-006")
+        assertThat(householdChecks(entranceId)).containsExactly(entry)
+
+        val refused = appoint(proxies, principal, living(entranceId, unit, child = true), aHouseholdMember).andExpect(status().isBadRequest).andReturn().response.contentAsString
+        assertThat(refused).contains("child under six")
+        assertThat(proxiesOf(entranceId)).isZero()
+        assertThat(householdChecks(entranceId)).containsExactly(entry, entry)
+
+        appoint(proxies, principal, living(entranceId, unit), aHouseholdMember).andExpect(status().isCreated)
+        assertThat(proxiesOf(entranceId)).isOne()
+        assertThat(householdChecks(entranceId)).containsExactly(entry, entry, entry)
+
+        // a proxy of another kind asks the book nothing about who lives where
+        appoint(proxies, owner(entranceId), party(), """"agentKind":"THIRD_PARTY","scope":"WHOLE_AGENDA","form":"NOTARISED"""").andExpect(status().isCreated)
+        assertThat(householdChecks(entranceId)).hasSize(3)
+
+        mvc.perform(get("/api/registry/entrances/$entranceId/book/access-log").param("purpose", "проверка на КЗЛД").with(jwt().jwt { it.subject("login-$manager").issuer(realm) }))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[?(@.kind == 'HOUSEHOLD_CHECK')].actor").value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.equalTo("$principal"))))
+
+        jdbc.update("UPDATE registry.book_access SET purpose = 'нищо' WHERE entrance_id = ?", entranceId)
+        jdbc.update("DELETE FROM registry.book_access WHERE entrance_id = ?", entranceId)
+        assertThat(householdChecks(entranceId)).containsExactly(entry, entry, entry)
+    }
+
+    @Test
+    fun `PM-BOOK-006 an owner running an assembly on a petition records nothing the book does not bear out, and hears no word of the flag`() {
+        val entranceId = entrance()
+        val principal = owner(entranceId)
+        val unit = jdbc.queryForObject("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)!!
+        living(entranceId, unit, principal)
+        val recorder = owner(entranceId)
+        val petitions = "/api/assembly/entrances/$entranceId/petitions"
+        val meeting = """{"scheduledAt":"$meets","place":"фоайето на вх. А","mode":"IN_PERSON","demandUnmet":"Искането е връчено на управителя; събрание не е свикано."}"""
+        val convened = signedIn(recorder) {
+            val petition = created(petitions, """{"subject":"Ремонт на покрива"}""").get("id").asText()
+            created("$petitions/$petition/assembly", meeting).get("assemblyId").asText()
+        }
+        val proxies = "/api/assembly/entrances/$entranceId/assemblies/$convened/proxies"
+        val written = { agent: UUID -> """{"principalPartyId":"$principal","authorisationHash":"${"5d".repeat(32)}","agentPartyId":"$agent",$aHouseholdMember}""" }
+        val record = { agent: UUID -> signedIn(recorder) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(written(agent))) } }
+
+        val child = record(living(entranceId, unit, child = true)).andExpect(status().isBadRequest).andReturn().response.contentAsString
+        val stranger = record(person()).andExpect(status().isBadRequest).andReturn().response.contentAsString
+
+        assertThat(child).contains("does not bear that out").doesNotContain("child").isEqualTo(stranger)
+        record(living(entranceId, unit)).andExpect(status().isCreated)
+        val today = java.sql.Date.valueOf(toSofiaDate(Instant.now()))
+        assertThat(householdChecks(entranceId).toSet()).containsExactly(listOf(recorder, BookHouseholdsAdapter.PURPOSE, today, "REFUSED", "PM-BOOK-006"))
+        assertThat(householdChecks(entranceId)).hasSize(3)
+    }
 
     @Test
     fun `PM-GA-009 an appointed proxy reads back with its principal, agent, scope and form, names its sign-in, and the table refuses a malformed one`() {

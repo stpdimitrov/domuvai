@@ -6,9 +6,15 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import zues.law.constantOn
+import zues.app.policy.Asking
+import zues.app.policy.Login
+import zues.app.registry.BookAccessService
+import zues.app.registry.BookHouseholdsAdapter
 import zues.app.registry.HeldOn
 import zues.app.registry.Holding
 import zues.app.registry.Holdings
@@ -62,7 +68,10 @@ class ProxyServiceTest {
         /** The book answers for this entrance today in Sofia, and for nothing else: the wrong entrance or day finds it empty. */
         private fun asked(entrance: UUID, on: LocalDate) = entrance == entranceId && on == LocalDate.parse("2026-10-09")
     }
-    private val service = ProxyService(aggregates, assemblies, agenda, proxies, book, Clock.fixed(now, ZoneOffset.UTC))
+    /** Whether the book lets the one registering be told; the entry and the decision are `BookHouseholdsTest`'s. */
+    private var told = true
+    private val access: BookAccessService = mock { on { tested(any(), any(), any(), any(), any()) } doAnswer { told } }
+    private val service = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), Clock.fixed(now, ZoneOffset.UTC))
 
     private fun actor(party: UUID) = Actor(party, "https://id.example.test/realms/domuvai", "login-$party")
     /** An owner of a unit of their own, living in it. */
@@ -190,13 +199,71 @@ class ProxyServiceTest {
     }
 
     @Test
+    fun `PM-BOOK-006 a recorder the book does not let read gets one plain refusal, with no word of the flag or of who lives where`() {
+        told = false
+        val principal = owner()
+        val child = UUID.randomUUID().also { living[it] = owners.getValue(principal); childrenUnder6 += it }
+        val nextDoor = UUID.randomUUID().also { living[it] = UUID.randomUUID() }
+
+        val refusals = listOf(child, nextDoor).map { agent ->
+            assertThatThrownBy { recorded(principal, agent) }.isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("does not bear that out").hasMessageContaining("PM-GA-009").hasMessageNotContaining("child").hasMessageNotContaining("living")
+            runCatching { recorded(principal, agent) }.exceptionOrNull()!!.message
+        }
+        assertThat(refusals.toSet()).hasSize(1)
+        assertThat(registered).isEmpty()
+
+        val grown = UUID.randomUUID().also { living[it] = owners.getValue(principal) }
+        assertThat(recorded(principal, grown).agentPartyId).isEqualTo(grown)
+    }
+
+    @Test
+    fun `PM-BOOK-006 a recorder the book lets read keeps today's two refusals`() {
+        val principal = owner()
+        val child = UUID.randomUUID().also { living[it] = owners.getValue(principal); childrenUnder6 += it }
+        val nextDoor = UUID.randomUUID().also { living[it] = UUID.randomUUID() }
+
+        assertThatThrownBy { recorded(principal, child) }.hasMessageContaining("child under six")
+        assertThatThrownBy { recorded(principal, nextDoor) }.hasMessageContaining("does not have the two living in one of the principal's units")
+    }
+
+    @Test
+    fun `PM-BOOK-007 a household member is tested once, as the sign-in, of the principal, today in Sofia`() {
+        val principal = owner()
+        val atHome = UUID.randomUUID().also { living[it] = owners.getValue(principal) }
+
+        proxy(principal, by = atHome, kind = "HOUSEHOLD_MEMBER")
+
+        val asking = Asking(Login("https://id.example.test/realms/domuvai", "login-$principal"), principal)
+        verify(access).tested(entranceId, asking, principal, LocalDate.parse("2026-10-09"), BookHouseholdsAdapter.PURPOSE)
+
+        // recorded from a document: the recorder is who asked, and the household is still the principal's
+        val other = owner()
+        val member = UUID.randomUUID().also { living[it] = owners.getValue(other) }
+        val recorder = UUID.randomUUID()
+        service.register(entranceId, assembly.id, RegisterProxy(other, member, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(recorder), "5d".repeat(32))
+
+        val theRecorder = Asking(Login("https://id.example.test/realms/domuvai", "login-$recorder"), recorder)
+        verify(access).tested(entranceId, theRecorder, other, LocalDate.parse("2026-10-09"), BookHouseholdsAdapter.PURPOSE)
+    }
+
+    @Test
+    fun `PM-BOOK-007 a proxy of another kind asks nothing about residents and enters nothing`() {
+        proxy(kind = "OWNER")
+        proxy(by = UUID.randomUUID(), kind = "THIRD_PARTY")
+
+        assertThat(registered).hasSize(2)
+        verify(access, never()).tested(any(), any(), any(), any(), any())
+    }
+
+    @Test
     fun `PM-GA-009 the book is asked about this entrance, today in Sofia - an owner elsewhere or on another day is not one here`() {
         val principal = owner()
         val elsewhere = UUID.randomUUID()
         whenever(assemblies.lock(any(), any())).thenReturn(assembly.copy(entranceId = elsewhere))
         assertThatThrownBy { service.register(elsewhere, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
-        val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
+        val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
         whenever(assemblies.lock(any(), any())).thenReturn(assembly)
         assertThatThrownBy { tomorrow.register(entranceId, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")

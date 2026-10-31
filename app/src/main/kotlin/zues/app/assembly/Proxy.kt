@@ -7,7 +7,11 @@ import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import zues.app.policy.Asking
+import zues.app.policy.Login
+import zues.app.registry.BookHouseholds
 import zues.app.registry.Holdings
+import zues.app.registry.HouseholdAnswer
 import zues.app.registry.TitleRole
 import zues.kernel.toSofiaDate
 import zues.law.constantOn
@@ -83,6 +87,7 @@ class ProxyService(
     private val agenda: AgendaItemRepository,
     private val proxies: ProxyRepository,
     private val holdings: Holdings,
+    private val households: BookHouseholds,
     private val clock: Clock,
 ) {
     // Rule: PM-GA-009
@@ -121,7 +126,7 @@ class ProxyService(
         check(registered.none { it.agentPartyId == request.principalPartyId }) { "the principal represents others at this assembly, and cannot be represented (PM-GA-010)" }
         // The book is asked only after what this assembly already holds: somebody who has their one proxy learns
         // nothing more about who owns or lives where by trying again.
-        requireWhoTheRuleNames(entranceId, request, kind)
+        requireWhoTheRuleNames(entranceId, request, kind, by)
         // TODO(legal): PM-GA-010 — the number is unconfirmed, and so is what it counts: here, the principals (owners or
         // users alike) one party represents at one assembly, whatever kind of representative it is for each. "One
         // person" is one party of the book: a person registered twice is not recognised as one.
@@ -146,13 +151,14 @@ class ProxyService(
      * book stands today in Sofia, through the registry's port: the principal holds a title in the entrance, an agent
      * called an owner owns in it, and an agent called a household member lives in the principal's own household — a
      * unit the principal holds and lives in too — and is no child under six there. Anybody else is a third party, and
-     * is appointed as one.
+     * is appointed as one. Who lives where is the book's to answer, on its record: only somebody it lets read, or the
+     * principal, is told more than that it does not bear the appointment out (Rule: PM-BOOK-006, PM-BOOK-007).
      */
     // Rule: PM-GA-009
     // TODO(legal): PM-GA-009 — whose household: the narrow reading is taken (the principal's own, where they live); whether
     // a landlord may name a member of the household living in their unit is not in the catalogue. Nor is which day
     // governs — the day of appointing, taken here, or the day of the meeting.
-    private fun requireWhoTheRuleNames(entranceId: UUID, request: RegisterProxy, kind: AgentKind) {
+    private fun requireWhoTheRuleNames(entranceId: UUID, request: RegisterProxy, kind: AgentKind, by: Actor) {
         val today = LocalDate.parse(toSofiaDate(clock.instant()))                  // a Sofia calendar day (PM-SYS-004)
         val owned = holdings.inForce(entranceId, today, TitleRole.OWN).holdings
         val principals = (owned + holdings.inForce(entranceId, today, TitleRole.USR).holdings).filter { it.partyId == request.principalPartyId }
@@ -160,16 +166,18 @@ class ProxyService(
         when (kind) {
             AgentKind.OWNER -> require(owned.any { it.partyId == request.agentPartyId }) { "the representative is called another owner, and owns nothing in the entrance today (PM-GA-009)" }
             AgentKind.HOUSEHOLD_MEMBER -> {
-                val residents = holdings.residents(entranceId, today)
-                val home = residents.filter { it.partyId == request.principalPartyId }.map { it.unitId }.toSet().intersect(principals.map { it.unitId }.toSet())
-                val member = residents.filter { it.partyId == request.agentPartyId && it.unitId in home }
-                require(member.isNotEmpty()) {
-                    "the representative is called a member of the principal's household, and the book does not have the two living in one of the principal's units today (PM-GA-009)"
-                }
-                // TODO(legal): PM-GA-009 — "adult": the book records no date of birth, only who is a child under six, so
-                // nobody older than that is checked. Asked of the principal's own home alone: the flag is told to nobody else
-                require(member.none { it.childUnder6 }) {
-                    "the representative is a member of the principal's household, and the book has them as a child under six: not an adult (PM-GA-009)"
+                val asking = Asking(Login(by.loginIssuer, by.loginSubject), by.party)
+                when (households.member(entranceId, asking, request.principalPartyId, request.agentPartyId, principals.map { it.unitId }.toSet(), today)) {
+                    HouseholdAnswer.MEMBER -> Unit
+                    HouseholdAnswer.NOT_LIVING_THERE -> throw IllegalArgumentException(
+                        "the representative is called a member of the principal's household, and the book does not have the two living in one of the principal's units today (PM-GA-009)",
+                    )
+                    HouseholdAnswer.CHILD_UNDER_6 -> throw IllegalArgumentException(
+                        "the representative is a member of the principal's household, and the book has them as a child under six: not an adult (PM-GA-009)",
+                    )
+                    HouseholdAnswer.NOT_BORNE_OUT -> throw IllegalArgumentException(
+                        "the representative is called a member of the principal's household, and the book does not bear that out (PM-GA-009)",
+                    )
                 }
             }
             AgentKind.THIRD_PARTY -> Unit                                          // anybody, under a written authorisation: its form is PM-GA-011's
