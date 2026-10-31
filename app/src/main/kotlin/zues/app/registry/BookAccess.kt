@@ -6,6 +6,7 @@ import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.Repository
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import zues.app.policy.Action
 import zues.app.policy.Asking
@@ -60,6 +61,8 @@ enum class BookAccessKind {
     PARTY_NAMES,
     /** what the book declares of each unit's persons was read, beside what a period billed */
     HEADCOUNT_READ,
+    /** who lives with a principal was tested, for a proxy called a member of their household; REFUSED where the one registering it is told nothing */
+    HOUSEHOLD_CHECK,
 }
 
 /** Reads only: an entry is written once, through the aggregate template, and never saved over or deleted. */
@@ -201,6 +204,30 @@ class BookAccessService(
             ),
         )
         return parties.findAllById(ids.toSet()).associate { it.id to it.fullName }
+    }
+
+    /**
+     * The system testing an appointment against the book, for whoever registers it (Rule: PM-BOOK-006, PM-BOOK-007,
+     * PM-SEC-004). Nothing gates the test. What this settles is what the one asking may be told: all of it if they are
+     * the [principal] or the policy lets them read the book, and if not, nothing. Entered before who lives where is read,
+     * as SERVED or REFUSED, whatever the book goes on to say. In a transaction of its own: the refusal that may follow
+     * rolls the registration back, and its entry stays.
+     */
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
+    // Rule: PM-SEC-004
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    internal fun tested(entranceId: UUID, who: Asking, principal: UUID, on: LocalDate, purpose: String): Boolean {
+        val now = clock.instant()
+        val decision = policy.decide(who, Action.READ_BOOK, Resource.OfEntrance(entranceId), LocalDate.parse(toSofiaDate(now)))
+        val told = who.party != null && (who.party == principal || decision.allowed)
+        aggregates.insert(
+            BookAccessRow(
+                UUID.randomUUID(), entranceId, who.party, purpose, BookAccessKind.HOUSEHOLD_CHECK.name, on, now.truncatedTo(ChronoUnit.MICROS),
+                (if (told) BookAccessOutcome.SERVED else BookAccessOutcome.REFUSED).name, decision.ruleId, who.login?.issuer, who.login?.subject,
+            ),
+        )
+        return told
     }
 
     /**
