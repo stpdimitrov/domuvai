@@ -105,7 +105,7 @@ class MandateWebTest {
         send(pretending, """{"on":"2026-03-01","protocolRef":"Протокол № 4"}""", "$url/${UUID.randomUUID()}/end").andExpect(status().isForbidden)
         send(bearer(issuer, "login-of-nobody")).andExpect(status().isForbidden)
         verifyNoInteractions(store)
-        verify(acts).record(argThat { act == "RECORD_REFUSED" && by.subject == "login-owner" && partyId == maria && entranceId == entrance })
+        verify(acts).record(argThat { act == "RECORD_REFUSED" && by?.subject == "login-owner" && partyId == maria && entranceId == entrance })
         verify(acts, never()).record(argThat { act == "RECORDED" || act == "ENDED" })
     }
 
@@ -132,7 +132,7 @@ class MandateWebTest {
     }
 }
 
-/** Sign-in switched off: there is no login, so there is no administrator — whatever is sent. */
+/** Sign-in switched off: nobody is asking, so a mandate is recorded, naming nobody. There is still no administrator to end one. */
 @WebMvcTest(MandateController::class)
 @Import(WhoAsks::class, MandateAdministration::class, MandateReading::class, MandateStanding::class, Policy::class, Administrators::class)
 class MandateOpenTest {
@@ -148,11 +148,21 @@ class MandateOpenTest {
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var names: PartyNames         // the registry's; unanswered here, so the ids alone
 
+    private val entrance = UUID.randomUUID()
+    private val url = "/api/identity/entrances/$entrance/mandates"
+
     @Test
-    fun `PM-SEC-001 with sign-in switched off nobody is the administrator — a 403, nothing is recorded and nothing written`() {
-        val url = "/api/identity/entrances/${UUID.randomUUID()}/mandates"
-        val body = """{"body":"BM","partyId":"${UUID.randomUUID()}","validFrom":"2026-05-10","validTo":"2028-05-10","protocolRef":"x"}"""
-        mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(body).header(HttpHeaders.AUTHORIZATION, "Bearer anything")).andExpect(status().isForbidden)
+    fun `PM-SEC-001 with sign-in switched off a mandate is recorded, and the act is on the record naming nobody`() {
+        val maria = UUID.randomUUID()
+        val body = """{"body":"BM","partyId":"$maria","validFrom":"2026-05-10","validTo":"2028-05-10","protocolRef":"x"}"""
+        mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(body).header(HttpHeaders.AUTHORIZATION, "Bearer anything"))
+            .andExpect(status().isOk).andExpect(jsonPath("$.mandateId").isNotEmpty)
+        verify(store).add(any(), org.mockito.kotlin.eq(entrance), org.mockito.kotlin.eq("BM"), org.mockito.kotlin.eq(maria), any(), any(), org.mockito.kotlin.eq("x"))
+        verify(acts).record(argThat { act == "RECORDED" && by == null && partyId == maria && entranceId == entrance })
+    }
+
+    @Test
+    fun `PM-SEC-001 with sign-in switched off a mandate's end is still a 403 — nothing is looked at and nothing written`() {
         mvc.perform(post("$url/${UUID.randomUUID()}/end").contentType(MediaType.APPLICATION_JSON).content("""{"on":"2026-03-01","protocolRef":"Протокол № 4"}""")).andExpect(status().isForbidden)
         verifyNoInteractions(store, acts)
     }

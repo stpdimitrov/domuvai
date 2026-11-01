@@ -80,9 +80,45 @@ class MandateAdministrationTest {
         verify(acts).record(MandateAct("RECORD_REFUSED", entrance, manager.login!!, "PM-SEC-001", body = "BM", partyId = maria))
         verify(acts).record(MandateAct("END_REFUSED", entrance, owner.login!!, "PM-SEC-001", someMandate, onDay = from))
         verify(acts, never()).record(argThat { act == "RECORDED" || act == "ENDED" })
-        verify(acts, never()).record(argThat { by.subject.isEmpty() })                              // nobody signed in: nobody to enter
+        verify(acts, never()).record(argThat { by == null })                              // nobody signed in: nobody to enter
         administration.record(owner, entrance, RecordMandate("B\u0000M\n" + "x".repeat(200), maria))
         verify(acts).record(argThat { act == "RECORD_REFUSED" && body == "BM" + "x".repeat(62) })   // kept as a short line of ordinary characters
+    }
+
+    @Test
+    fun `PM-SEC-001 nobody asking is refused unless sign-in is switched off in so many words — nothing recorded and nothing written`() {
+        for (mode in listOf("", " ", "on", "of", "false", "off please")) {
+            val closed = MandateAdministration(store, policy, acts, clock, mode)
+            assertThat(closed.record(Asking(null, null), entrance, aMandate())).describedAs("mode '$mode'").isEqualTo(MandateAnswer.Refused("PM-SEC-001"))
+        }
+        verifyNoInteractions(store, acts)
+    }
+
+    @Test
+    fun `PM-SEC-001 with sign-in switched off only nobody asking is served — whoever is somebody is decided, and an end is refused`() {
+        val open = MandateAdministration(store, policy, acts, clock, "off")
+        assertThat(open.record(manager, entrance, aMandate())).isEqualTo(MandateAnswer.Refused("PM-SEC-001"))
+        assertThat(open.record(Asking(null, UUID.randomUUID()), entrance, aMandate())).isEqualTo(MandateAnswer.Refused("PM-SEC-001"))
+        assertThat(open.end(Asking(null, null), entrance, UUID.randomUUID(), from, "Протокол")).isEqualTo(MandateAnswer.Refused("PM-SEC-001"))
+        verifyNoInteractions(store)
+        verify(acts).record(MandateAct("RECORD_REFUSED", entrance, manager.login!!, "PM-SEC-001", body = "BM", partyId = maria))   // the attempt of the one with a login
+        verify(acts, never()).record(argThat { by == null })
+        // the administrator is named as always, the mode changing nothing for a login
+        val done = (open.record(operator, entrance, aMandate("CTL")) as MandateAnswer.Done).value
+        verify(acts).record(argThat { act == "RECORDED" && mandateId == done.mandateId && by == operator.login })
+    }
+
+    @Test
+    fun `PM-SEC-004 with sign-in switched off a mandate and the ends it brings are each an entry naming nobody`() {
+        val open = MandateAdministration(store, policy, acts, clock, " OFF ")
+        val earlier = held("BM", "2024-05-10", "2026-05-10")
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(earlier))
+        whenever(store.end(earlier.id, from)).thenReturn(true)
+        val done = (open.record(Asking(null, null), entrance, aMandate()) as MandateAnswer.Done).value
+        assertThat(done.succeeded).containsExactly(earlier.id)
+        verify(store).add(done.mandateId, entrance, "BM", maria, from, to, "Протокол № 3 от 10.05.2026")
+        verify(acts).record(MandateAct("RECORDED", entrance, null, "PM-SEC-001", done.mandateId, "BM", maria, from, to, protocolRef = "Протокол № 3 от 10.05.2026"))
+        verify(acts).record(MandateAct("ENDED", entrance, null, "PM-GOV-004", earlier.id, onDay = from, succeededBy = done.mandateId))
     }
 
     /** A mandate of the test's entrance as the table would hold it, open unless [ended]. */

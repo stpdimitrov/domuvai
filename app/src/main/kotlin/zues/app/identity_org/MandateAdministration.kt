@@ -1,5 +1,6 @@
 package zues.app.identity_org
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
@@ -18,7 +19,7 @@ import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
 
-/** A mandate to record, as the protocol gives it. Each field may be missing: what is missing is said only to the administrator. */
+/** A mandate to record, as the protocol gives it. Each field may be missing: what is missing is said only to whoever may record. */
 data class RecordMandate(
     val body: String? = null,
     val partyId: UUID? = null,
@@ -91,11 +92,11 @@ class MandateStore(private val jdbc: JdbcClient) {
         jdbc.sql("UPDATE identity_org.management_mandate SET succeeded_at = ? WHERE id = ? AND succeeded_at IS NULL").params(on, mandateId).update() == 1
 }
 
-/** One entry of the record of who was given which office (Rule: PM-SEC-004). */
+/** One entry of the record of who was given which office (Rule: PM-SEC-004). [by] is who did it: nobody only with sign-in switched off. */
 data class MandateAct(
     val act: String,
     val entranceId: UUID,
-    val by: Login,
+    val by: Login?,
     val ruleId: String,
     val mandateId: UUID? = null,
     val body: String? = null,
@@ -118,7 +119,7 @@ class MandateActLog(private val jdbc: JdbcClient, private val clock: Clock) {
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ).params(
             UUID.randomUUID(), entry.act, entry.entranceId, entry.mandateId, entry.body, entry.partyId, entry.validFrom, entry.validTo, entry.onDay,
-            entry.succeededBy, entry.protocolRef, entry.by.issuer, entry.by.subject, entry.ruleId, Timestamp.from(clock.instant()),
+            entry.succeededBy, entry.protocolRef, entry.by?.issuer, entry.by?.subject, entry.ruleId, Timestamp.from(clock.instant()),
         ).update()
     }
 }
@@ -128,7 +129,9 @@ class MandateActLog(private val jdbc: JdbcClient, private val clock: Clock) {
  * administrator — the policy decides, as at today in Sofia, before anything else is looked at, and a refused caller
  * learns nothing else. The mandate's own dates are the protocol's. Every record and end, the ends a new mandate
  * brings among them, and every refused attempt of a signed-in login is an entry that stays (Rule: PM-SEC-004),
- * written in the act's own transaction: no entry, no mandate.
+ * written in the act's own transaction: no entry, no mandate. With sign-in switched off in so many words
+ * (`DOMUVAI_AUTH=off`) nobody is asking and nothing can be decided, so a mandate is recorded, its entries naming nobody
+ * (the owner, 2026-11-01, #429). An end is not: nothing needs it there.
  */
 @Service
 class MandateAdministration(
@@ -136,7 +139,10 @@ class MandateAdministration(
     private val policy: Policy,
     private val acts: MandateActLog,
     private val clock: Clock,
+    @Value("\${domuvai.auth.mode:}") mode: String = "",
 ) {
+    private val open = mode.trim().equals("off", ignoreCase = true)
+
     /**
      * Records a mandate, and ends the ones it succeeds on its first day (Rule: PM-GOV-004 — the incumbent continues
      * until a successor). Which those are is [Mandate.succeeds]' to say, among the manager and the board only: a manager
@@ -148,7 +154,7 @@ class MandateAdministration(
     // Rule: PM-GOV-004
     @Transactional
     fun record(by: Asking, entranceId: UUID, request: RecordMandate): MandateAnswer<MandateRecorded> {
-        val login = allowed(by, entranceId) ?: return refused(by, MandateAct("RECORD_REFUSED", entranceId, NOBODY, GOVERNED_BY, body = request.body?.let(::kept), partyId = request.partyId))
+        val login = if (unasked(by)) null else (allowed(by, entranceId) ?: return refused(by, MandateAct("RECORD_REFUSED", entranceId, null, GOVERNED_BY, body = request.body?.let(::kept), partyId = request.partyId)))
         val body = request.body?.takeIf { it in OFFICES } ?: throw IllegalArgumentException("the office is one of ${OFFICES.joinToString()}")
         val party = requireNotNull(request.partyId) { "the party the mandate is given to is required" }
         val from = requireNotNull(request.validFrom) { "the mandate's first day is required" }
@@ -188,7 +194,7 @@ class MandateAdministration(
     // Rule: PM-SEC-001
     @Transactional
     fun end(by: Asking, entranceId: UUID, mandateId: UUID, on: LocalDate?, basis: String?): MandateAnswer<MandateEnded> {
-        val login = allowed(by, entranceId) ?: return refused(by, MandateAct("END_REFUSED", entranceId, NOBODY, GOVERNED_BY, mandateId, onDay = on))
+        val login = allowed(by, entranceId) ?: return refused(by, MandateAct("END_REFUSED", entranceId, null, GOVERNED_BY, mandateId, onDay = on))
         val day = requireNotNull(on) { "the day the mandate ended is required" }
         // An end is something that happened: a day yet to come would park the mandate where no successor could end it.
         require(!day.isAfter(LocalDate.parse(toSofiaDate(clock.instant())))) { "the day a mandate ended is not in the future" }
@@ -227,6 +233,10 @@ class MandateAdministration(
         return by.login?.takeIf { decision.allowed }
     }
 
+    /** Sign-in switched off, and nobody signed in: there is nobody to ask the policy about. */
+    // Rule: PM-SEC-001
+    private fun unasked(who: Asking) = open && who.login == null && who.party == null
+
     /** A refused attempt is entered as the login that made it; with nobody signed in there is nobody to enter, and nothing is written. */
     private fun <T> refused(by: Asking, attempt: MandateAct): MandateAnswer<T> {
         by.login?.let { acts.record(attempt.copy(by = it)) }
@@ -255,7 +265,6 @@ class MandateAdministration(
         val OFFICES = listOf("BM", "MB", "CTL", "CSH")
         val EXECUTIVE = listOf("BM", "MB")
         val GOVERNED_BY = Action.RECORD_MANDATE.governedBy
-        val NOBODY = Login("", "")
         const val KEPT_MAX = 64
         const val FOREIGN_KEY_VIOLATION = "23503"
 

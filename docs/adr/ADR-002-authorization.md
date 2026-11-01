@@ -142,7 +142,7 @@ Everything else is refused. *Owner* (2026-10-10, #178): the two names lists are 
 | the book, its access log | refused (*session*, AUTH-04b) |
 | the owners list, the overdue-declarations list | served, and entered as given to nobody — outcome `OPEN` (*owner*, Q3) |
 | the retention pass | **refused** — "an act that cannot be undone never runs with nobody accountable" (*owner*, Q3) |
-| tying a login, recording a mandate | refused: there is no login, so no administrator (*session*) |
+| tying a login, recording a mandate | refused: there is no login, so no administrator (*session*). **Recording a mandate: amended 2026-11-01, below** |
 
 The lists stay served so that the console works on a developer's machine, where no identity provider runs. The cost, accepted: one more thing that depends on that switch being off in production — the application refuses to start open unless told, and says so loudly when it is.
 
@@ -186,3 +186,11 @@ The 2026-10-11 amendment left one difference between the two sides: the recordin
 
 - **§1's table — "past `valid_to` until a successor (PM-GOV-004)".** The reader now asks `Mandate.succeeds` on every day, not only past `valid_to`, and the two sides have no difference left (GOV-02). A later manager ends every earlier executive mandate and a later board member ends an earlier manager, on the later mandate's first day, the day the recorder stamps. *Owner* (2026-10-31, "go 1 3 4", on the reading of 2026-10-10 and 2026-10-11): the overlap is not refused, since a new executive mandate stamps the predecessor. A by-election during the term still succeeds nobody.
 - **Not settled, built strictest, asked on #387.** A board replaced mid-term reads as by-elections: the old members hold until an end is recorded for each. A firm's mandate beginning inside a manager's term ends the manager from its first day, the reading that leaves the fewest holding the powers (*session*, as on 2026-10-11, the firm's reading is not the owner's). No endpoint records a firm's mandate.
+
+## Amendment · 2026-11-01 · With sign-in off a mandate is recorded with nobody named
+
+§4 refused a mandate with sign-in off. So nobody could record one on a machine with no identity provider, and the demo seed could not give its fund account the manager FUND-02 (#428) needs. *Owner* (2026-11-01, #429, option A): "Yes to all three".
+
+- **§4's row.** With sign-in off, in so many words, and nobody asking, a mandate is recorded, as a paper decision is (DEC-01). Its entry, and the entry of each mandate it ends, is written in the act's own transaction and names nobody (GOV-03). The open mode sits beside the policy, as in `MoneyAccess`, so `Policy.MATRIX` does not change. With sign-in on nothing changes.
+- **Still refused with sign-in off.** Tying a login, and ending a mandate, which the seed does not need (*session*, the contract of GOV-03). A refused attempt with nobody signed in writes nothing.
+- **The cost.** One more write depends on the switch being off in production. §4's guard answers it as before: the application refuses to start open unless told, and beside an issuer it refuses to start open at all.
