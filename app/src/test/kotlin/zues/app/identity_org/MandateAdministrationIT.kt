@@ -267,7 +267,8 @@ class MandateAdministrationIT {
             "SET valid_to = valid_to + 1", "SET body = 'CTL'", "SET succeeded_at = current_date, valid_to = valid_to + 1",
         )) assertThatThrownBy { jdbc.update("UPDATE identity_org.management_mandate $change WHERE id = ?", recorded) }.describedAs(change).isInstanceOf(DataIntegrityViolationException::class.java)
         assertThatThrownBy { jdbc.update("DELETE FROM identity_org.management_mandate WHERE id = ?", recorded) }.isInstanceOf(DataIntegrityViolationException::class.java)
-        assertThatThrownBy { jdbc.execute("TRUNCATE identity_org.management_mandate") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThatThrownBy { jdbc.execute("TRUNCATE identity_org.management_mandate") }.hasMessageContaining("foreign key")                                  // a fund account's reference refuses it first
+        assertThatThrownBy { jdbc.execute("TRUNCATE identity_org.management_mandate CASCADE") }.isInstanceOf(DataIntegrityViolationException::class.java)   // past the reference, the table's own trigger
         assertThat((administration.end(operator, block, recorded, today, "Протокол № 6") as MandateAnswer.Done).value.on).isEqualTo(today)
         assertThatThrownBy { jdbc.update("UPDATE identity_org.management_mandate SET succeeded_at = current_date - 30 WHERE id = ?", recorded) }.isInstanceOf(DataIntegrityViolationException::class.java)   // not moved
         assertThatThrownBy { jdbc.update("UPDATE identity_org.management_mandate SET succeeded_at = NULL WHERE id = ?", recorded) }.isInstanceOf(DataIntegrityViolationException::class.java)               // nor taken back
