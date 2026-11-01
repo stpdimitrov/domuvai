@@ -1515,8 +1515,9 @@ def paper_decisions_screen(api, web, entrance, signed_in, owner=None, administra
     on the page with where its paper is kept, and the page says the paper is the original. Signed in as a board member, who
     is told the custodian, recording one is the API's 403 in its words, the form kept, nothing recorded. Signed in as the
     seeded owner, who reads assemblies but not mandates, the custodian is said in words on every record and named on none.
-    Signed in as the administrator, the list is the API's 403 in its words and the form stays; a date left out is the API's
-    refusal in its words, nothing recorded; the record then made is shown from the POST's answer and is in the API's list.
+    Signed in as the administrator, the list is the API's 403 in its words and the form stays; a date, a location or a
+    custodian left out is the API's refusal in its words, nothing recorded; the record then made is shown from the POST's
+    answer and is in the API's list.
     """
     path = f"/entrance/paper-decisions?entrance={entrance}"
     listed = lambda: json.loads(fetch(api, f"/api/assembly/entrances/{entrance}/paper-decisions")[1])
@@ -1552,8 +1553,9 @@ def paper_decisions_screen(api, web, entrance, signed_in, owner=None, administra
         status, page = fetch(web, path)
         if status != 200 or "Нямате право да четете решенията от хартиени протоколи:" not in visible_text(page) or "Впиши решението" not in page:
             failures.append(f"{path}: the administrator's page answered HTTP {status} without the API's 403 in its words, or without the form")
-        s, _, answered = submit_form(web, path, page, "Впиши решението", {**fields, "protocolDate": ""})
-        failures += [] if s == 200 and "Системата не прие това: the protocol's date is required" in visible_text(answered) and f'value="{protocol}"' in answered else [f"{path}: a record with no date answered HTTP {s} without the API's refusal in its words, or the form not kept"]
+        for missing, words in (("protocolDate", "the protocol's date is required"), ("archiveLocation", "where the paper original is kept is required"), ("custodian", "who keeps the paper original is required")):
+            s, _, answered = submit_form(web, path, page, "Впиши решението", {**fields, missing: ""})
+            failures += [] if s == 200 and f"Системата не прие това: {words}" in visible_text(answered) and f'value="{protocol}"' in answered else [f"{path}: a record with no {missing} answered HTTP {s} without the API's refusal in its words, or the form not kept"]
         failures += [] if listed() == before else [f"{path}: a refused record changed the API's paper decisions"]
         s, _, answered = submit_form(web, path, page, "Впиши решението", fields)
         said, after = visible_text(answered), listed()

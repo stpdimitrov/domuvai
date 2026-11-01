@@ -12,7 +12,8 @@ export type Passed = { id: string; label: string };
  * each agenda item, its decision where one is stored (an item not closed is a 404) and its outcome PASSED — then those
  * it took on paper, recorded from their protocols (WEB-54), which have no outcome: being recorded is what they show.
  * Read again on every step, so the form never vouches for a decision. A read the API refuses, any part of it, is said in
- * its words and offers nothing: the form vouches for nothing partial.
+ * its words and offers nothing: the form vouches for nothing partial. The API reads the paper list as it reads an
+ * assembly, so whoever may read one may read the other: a change there would stop this person's sign-off and issue too.
  */
 // Rule: PM-FEE-012, PM-FUND-007, PM-SEC-001
 export async function passedDecisions(entranceId: string): Promise<{ passed: Passed[] } | { refused: string }> {
