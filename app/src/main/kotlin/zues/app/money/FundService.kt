@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
+import zues.app.assembly.GaDecisions
 import zues.kernel.toSofiaDate
 import java.time.Clock
 import java.time.LocalDate
@@ -95,6 +96,7 @@ class FundService(
     private val disbursements: FundDisbursementRepository,
     private val postings: PostingRepository,
     private val keys: FundRequestKeys,
+    private val decisions: GaDecisions,
     private val jdbc: JdbcTemplate,
     private val clock: Clock,
 ) {
@@ -122,6 +124,10 @@ class FundService(
             val available = view(entranceId).availableMinor
             if (command.amountMinor > available) {
                 throw FundShortfall("an emergency disbursement of ${command.amountMinor} exceeds the ${available} available (PM-FUND-008)")
+            }
+        } else {                                                                        // Rule: PM-FUND-007
+            require(decisions.passed(entranceId, command.decisionId.orEmpty())) {
+                "no passed GA decision of this entrance is ${command.decisionId}: nothing is signed off without one (PM-FUND-007)"
             }
         }
         val row = aggregates.insert(

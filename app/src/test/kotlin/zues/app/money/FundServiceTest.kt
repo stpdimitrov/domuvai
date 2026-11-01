@@ -7,11 +7,16 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
+import zues.app.assembly.GaDecisions
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -35,7 +40,8 @@ class FundServiceTest {
     private val jdbc: JdbcTemplate = mock()
     private val keyRows: FundRequestKeyRepository = mock()
     private val lateNight = Clock.fixed(Instant.parse("2026-09-28T21:30:00Z"), ZoneOffset.UTC)   // 00:30 on 29 September in Sofia
-    private val service = FundService(aggregates, accounts, disbursements, postings, FundRequestKeys(keyRows, aggregates), jdbc, lateNight)
+    private val decisions: GaDecisions = mock()
+    private val service = FundService(aggregates, accounts, disbursements, postings, FundRequestKeys(keyRows, aggregates), decisions, jdbc, lateNight)
 
     private val entranceId = UUID.randomUUID()
     private val chair = UUID.randomUUID()
@@ -79,6 +85,7 @@ class FundServiceTest {
     fun fundWithMoney() {
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(operating, fund))     // the operating account comes first
         holding(inAccount = 50_000)
+        whenever(decisions.passed(any(), any())).thenReturn(true)
         whenever(aggregates.insert(any<FundDisbursementRow>())).thenAnswer { (it.arguments[0] as FundDisbursementRow).also { row -> inserted += row } }
         whenever(aggregates.update(any<FundDisbursementRow>())).thenAnswer { (it.arguments[0] as FundDisbursementRow).also { row -> updated += row } }
         whenever(aggregates.insert(any<PostingRow>())).thenAnswer { (it.arguments[0] as PostingRow).also { row -> journal += row } }
@@ -106,6 +113,51 @@ class FundServiceTest {
         assertThatThrownBy { commit(decision = null) }.isInstanceOf(IllegalArgumentException::class.java)   // no decision, no emergency
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(fund.copy(holderParty = null)))
         assertThatThrownBy { commit() }.isInstanceOf(FundUnsignable::class.java)                          // nobody registered can sign
+    }
+
+    @Test
+    fun `PM-FUND-007 a decision that is no passed one of this entrance is refused by name, and nothing is stored or kept`() {
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)
+        assertThatThrownBy { commit() }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("GA-2026-7").hasMessageContaining("PM-FUND-007")
+        assertThat(inserted).isEmpty()
+        verify(aggregates, never()).insert(any<FundRequestKeyRow>())
+    }
+
+    @Test
+    fun `PM-FUND-007 the decision is asked after for this entrance and the id as cited`() {
+        commit(decision = "6b1f0c1e-a1d2-4a57-9d6e-0c7a1f6e2b11")
+        verify(decisions).passed(entranceId, "6b1f0c1e-a1d2-4a57-9d6e-0c7a1f6e2b11")
+    }
+
+    @Test
+    fun `PM-FUND-007 a decision is checked after the signatory, so a stranger is refused as a stranger`() {
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)
+        assertThatThrownBy { commit(by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)
+        verifyNoInteractions(decisions)
+    }
+
+    @Test
+    fun `PM-FUND-007 a repeat with its key returns the first disbursement without asking again`() {
+        remembering()
+        val first = commit(key = "k-1")
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)                   // it has since fallen
+        assertThat(commit(key = "k-1")).isEqualTo(first)
+        verify(decisions, times(1)).passed(entranceId, "GA-2026-7")
+    }
+
+    @Test
+    fun `PM-FUND-006 a passport measure still rests on a decision that passed`() {
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)
+        assertThatThrownBy { commit(purpose = "PASSPORT_MEASURE", measure = "ТП-2024 т. 3.2") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-FUND-007")
+        assertThat(inserted).isEmpty()
+    }
+
+    @Test
+    fun `PM-FUND-008 an emergency is signed off without asking after a decision`() {
+        commit(decision = null, emergency = "a burst riser floods the stairwell")
+        verifyNoInteractions(decisions)
     }
 
     @Test
