@@ -130,6 +130,36 @@ class MoneyAccessIT {
     }
 
     @Test
+    fun `PM-SEC-002 a unit's open debts are read as its arrears — its owner and the offices, nobody else, and a unit with nothing posted is refused`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 4", "А", "GA")).entranceId
+        val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "owner-1"), "OWN", validFrom = "2020-01-01"))
+        mandate(entrance, "BM", person("Мария Иванова", "manager"))
+        mandate(entrance, "CTL", person("Елена Колева", "controller"))
+        mandate(entrance, "CSH", person("Стефан Илиев", "cashier"))
+        val quietEntrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 6", "А", "GA")).entranceId
+        val quiet = registry.registerUnits(quietEntrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        ownership.assignTitle(quietEntrance, quiet, AssignTitle(person("Георги Стоянов", "owner-2"), "OWN", validFrom = "2020-01-01"))
+        mvc.perform(
+            post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
+                json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)))),
+            ),
+        ).andExpect(status().isCreated)
+
+        fun openDebts(unit: UUID) = get("/api/money/units/$unit/open-debts").param("asOf", "2026-05-20")
+
+        mvc.perform(openDebts(flat1).by("owner-1")).andExpect(status().isOk).andExpect(jsonPath("$[0].outstandingMinor").value(6_000))
+        mvc.perform(openDebts(flat2).by("owner-1")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        for (office in listOf("manager", "controller")) {
+            mvc.perform(openDebts(flat2).by(office)).andExpect(status().isOk).andExpect(jsonPath("$[0].outstandingMinor").value(4_000))
+        }
+        for (nobody in listOf("cashier", "a-login-tied-to-nobody")) {
+            mvc.perform(openDebts(flat1).by(nobody)).andExpect(status().isForbidden)
+        }
+        mvc.perform(openDebts(quiet).by("owner-2")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+    }
+
+    @Test
     fun `PM-SEC-002 a payment is read back by its unit's owner, not another, and an owner learns nothing of a payment that is not there`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 5", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))

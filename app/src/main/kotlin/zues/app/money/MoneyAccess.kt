@@ -38,7 +38,7 @@ class MoneyAccess(
     private val open = mode.trim().equals("off", ignoreCase = true)
 
     /**
-     * Rule: PM-SEC-002 — one unit's charges: its statement, its arrears. The entrance is that of the unit's first posting:
+     * Rule: PM-SEC-002 — one unit's charges: its statement, its arrears, its open debts. The entrance is that of the unit's first posting:
      * every writer stamps a unit's postings with the one entrance the registry holds it in (#209 item 4).
      */
     fun unitCharges(unitId: UUID, who: Asking) {
