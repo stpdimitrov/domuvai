@@ -14,12 +14,12 @@ const WORDS = {
  * The field stays what it was, and the one its action reads: it names this `id` as its `list`, so what is chosen in it is the whole
  * party id, and it can still be typed. Nothing is read until the click: a page view enters nothing in the book's access log, and an
  * owner's 403 is one they asked for, shown in the API's words (Rule: PM-BOOK-006, PM-BOOK-007, PM-SEC-002). `dayField` names the
- * form's own day when the read is as of it; the read is then the day typed there at the click (Rule: PM-GA-007). `myself` is
- * `/me`'s party, offered from the start. Nothing is stored in the browser.
+ * form's own day when the read is as of it; the read is then the day typed there at the click (Rule: PM-GA-007). `offices` narrows
+ * the mandates read to those offices (Rule: PM-FUND-004). `myself` is `/me`'s party, offered from the start. Nothing is stored in the browser.
  */
-// Rule: PM-BOOK-006, PM-BOOK-007, PM-SEC-001, PM-SEC-002, PM-GA-007
-export default function PartyPicker({ id, entrance, source = "owners", role, dayField, myself, margin = "0 0 12px" }: {
-  id: string; entrance: string; source?: "owners" | "mandates"; role?: "OWN"; dayField?: string; myself?: string; margin?: string;
+// Rule: PM-BOOK-006, PM-BOOK-007, PM-SEC-001, PM-SEC-002, PM-GA-007, PM-FUND-004
+export default function PartyPicker({ id, entrance, source = "owners", role, offices, dayField, myself, margin = "0 0 12px" }: {
+  id: string; entrance: string; source?: "owners" | "mandates"; role?: "OWN"; offices?: string[]; dayField?: string; myself?: string; margin?: string;
 }) {
   const [state, act, pending] = useActionState<PartiesState, FormData>(readParties, {});
   const on = useRef<HTMLInputElement>(null);
@@ -32,6 +32,7 @@ export default function PartyPicker({ id, entrance, source = "owners", role, day
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="source" value={source} />
       {role && <input type="hidden" name="role" value={role} />}
+      {offices && <input type="hidden" name="offices" value={offices.join(",")} />}
       {dayField && <input type="hidden" name="on" ref={on} />}
       <div className="wide">
         <button type="submit" className="chip" disabled={pending}>{pending ? "Чете се…" : WORDS[source].read}</button>

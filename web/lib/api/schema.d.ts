@@ -683,10 +683,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id */
+        /** List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id or mandate */
         get: operations["get_money_entrances_entranceId_fund_accounts"];
         put?: never;
-        /** Register the entrance's repair-fund account */
+        /** Register the entrance's repair-fund account; opened in the manager's name, its holder must stand on a manager's or board member's mandate of the entrance that day, and the account stores it */
         post: operations["post_money_entrances_entranceId_fund_accounts"];
         delete?: never;
         options?: never;
@@ -1582,6 +1582,8 @@ export interface components {
             iban: string;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            mandateId?: string;
             purpose: string;
         };
         FundView: {

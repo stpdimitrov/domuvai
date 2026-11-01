@@ -179,9 +179,9 @@ RUNNING = {
    ("The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day "
     "its oldest open debt fell due — and their total", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/fund-accounts'):
-   ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005', 'PM-SEC-001']),
+   ("Register the entrance's repair-fund account; opened in the manager's name, its holder must stand on a manager's or board member's mandate of the entrance that day, and the account stores it", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
-   ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
+   ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id or mandate", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/journal'):
    ("The entrance's double-entry journal from one date to another, both included — each journal whole, its legs "
     "summing to zero, with what wrote it where money knows; optionally only the journals that touch one account",

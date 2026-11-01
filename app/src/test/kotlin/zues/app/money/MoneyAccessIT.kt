@@ -232,7 +232,7 @@ class MoneyAccessIT {
         fun pay(key: String) = post("/api/money/entrances/$entrance/payments").header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON)
             .content("""{"unitId":"$flat1","amountMinor":1000,"valueDate":"2026-05-20","receivedInto":"CASH"}""")
         fun account() = post("/api/money/entrances/$entrance/fund-accounts").contentType(MediaType.APPLICATION_JSON)
-            .content("""{"iban":"BG80BNBG96611020345678","purpose":"REPAIR_RENEWAL","holderName":"Мария Иванова","holderKind":"MANAGER"}""")
+            .content("""{"iban":"BG80BNBG96611020345678","purpose":"REPAIR_RENEWAL","holderName":"Мария Иванова","holderKind":"ASSOCIATION"}""")
 
         for (nobody in listOf("k-controller", "k-cashier", "k-owner", "a-login-tied-to-nobody")) {
             mvc.perform(issue().by(nobody)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
@@ -261,7 +261,7 @@ class MoneyAccessIT {
         mandate(entrance, "MB", board)
         val base = "/api/money/entrances/$entrance/fund"
         mvc.perform(
-            send("/api/money/entrances/$entrance/fund-accounts", """{"iban":"BG53BNBG96611020345679","purpose":"REPAIR_RENEWAL","holderName":"Мария Иванова","holderKind":"MANAGER","holderPartyId":"$holder"}""").by("s-manager"),
+            send("/api/money/entrances/$entrance/fund-accounts", """{"iban":"BG53BNBG96611020345679","purpose":"REPAIR_RENEWAL","holderName":"Мария Иванова","holderKind":"ASSOCIATION","holderPartyId":"$holder"}""").by("s-manager"),
         ).andExpect(status().isCreated)
 
         // a keeper of the accounts who does not hold the fund's, naming the holder in the body: refused, nothing written

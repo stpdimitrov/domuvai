@@ -1,11 +1,16 @@
 package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -17,13 +22,17 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import zues.kernel.toSofiaDate
+import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Fund-account persistence against real PostgreSQL. Proves the table's own guards: one account
  * per entrance per purpose and one IBAN across all entrances, so the fund is distinct from the
- * operating account (PM-FUND-004) and monies are not commingled (PM-FUND-005). Docker-gated.
+ * operating account (PM-FUND-004) and monies are not commingled (PM-FUND-005); and the mandate a
+ * fund's account is opened under is stored, read back, and held to that account. Docker-gated.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -53,6 +62,7 @@ class FundAccountPersistenceIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var jdbc: JdbcTemplate
 
     private fun createEntrance(): UUID {
         val response = mvc.perform(
@@ -65,7 +75,7 @@ class FundAccountPersistenceIT {
     private fun register(entranceId: UUID, iban: String, purpose: String) =
         mvc.perform(
             post("/api/money/entrances/$entranceId/fund-accounts").contentType(MediaType.APPLICATION_JSON)
-                .content("""{"iban":"$iban","purpose":"$purpose","holderName":"Иван Петров","holderKind":"MANAGER"}"""),
+                .content("""{"iban":"$iban","purpose":"$purpose","holderName":"Иван Петров","holderKind":"ASSOCIATION"}"""),
         )
 
     @Test
@@ -88,26 +98,74 @@ class FundAccountPersistenceIT {
         register(entranceId, freshIban(), "REPAIR_RENEWAL").andExpect(status().isConflict)
     }
 
-    @Test
-    fun `PM-FUND-004 the holder is linked to a book party and read back`() {
-        val entranceId = createEntrance()
-        val partyResponse = mvc.perform(
+    private fun party(): String {
+        val response = mvc.perform(
             post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"fullName":"Иван Петров","idType":"EGN","idValue":"7501010010"}"""),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
-        val partyId = json.readTree(partyResponse).get("partyId").asText()
+        return json.readTree(response).get("partyId").asText()
+    }
 
-        val iban = freshIban()
-        mvc.perform(
-            post("/api/money/entrances/$entranceId/fund-accounts").contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """{"iban":"$iban","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"MANAGER","holderPartyId":"$partyId"}""",
-                ),
-        ).andExpect(status().isCreated)
+    /** A mandate in force, as the table holds it: recording one through the api is the administrator's, and has its own tests. */
+    private fun mandate(entranceId: UUID, partyId: String, body: String = "BM"): UUID = UUID.randomUUID().also {
+        val today = LocalDate.parse(toSofiaDate(Instant.now()))
+        jdbc.update(
+            "INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (?, ?, ?, ?, ?, ?)",
+            it, entranceId, body, UUID.fromString(partyId), today.minusMonths(1), today.plusMonths(11),
+        )
+    }
+
+    private fun registerManagers(entranceId: UUID, partyId: String) = mvc.perform(
+        post("/api/money/entrances/$entranceId/fund-accounts").contentType(MediaType.APPLICATION_JSON).content(
+            """{"iban":"${freshIban()}","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"MANAGER","holderPartyId":"$partyId"}""",
+        ),
+    )
+
+    @Test
+    fun `PM-FUND-004 the holder and the mandate are stored and read back`() {
+        val entranceId = createEntrance()
+        val partyId = party()
+        val mandate = mandate(entranceId, partyId)
+        registerManagers(entranceId, partyId).andExpect(status().isCreated)
 
         mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$[0].holderParty").value(partyId))
+            .andExpect(jsonPath("$[0].mandateId").value(mandate.toString()))
+    }
+
+    @Test
+    fun `PM-FUND-004 a fund's manager standing on no mandate is a 400 and nothing is stored`() {
+        val entranceId = createEntrance()
+        val partyId = party()
+        val elsewhere = createEntrance()
+        mandate(elsewhere, partyId)
+        mandate(entranceId, partyId, "CTL")
+        registerManagers(entranceId, partyId)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value(containsString("PM-FUND-004")))
+        mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts")).andExpect(jsonPath("$.length()").value(0))
+    }
+
+    @Test
+    fun `PM-FUND-004 an account stored before the mandate was kept reads as having none`() {
+        val entranceId = createEntrance()
+        register(entranceId, freshIban(), "REPAIR_RENEWAL").andExpect(status().isCreated)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM money.fund_account WHERE entrance_id = ? AND mandate_id IS NULL", Long::class.java, entranceId)).isEqualTo(1)
+        mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].mandateId").doesNotExist())
+    }
+
+    @Test
+    fun `PM-FUND-004 the table holds a mandate only on a manager's fund account`() {
+        val entranceId = createEntrance()
+        val partyId = party()
+        val mandate = mandate(entranceId, partyId)
+        register(entranceId, freshIban(), "OPERATING").andExpect(status().isCreated)
+        assertThatThrownBy {
+            jdbc.update("UPDATE money.fund_account SET mandate_id = ? WHERE entrance_id = ?", mandate, entranceId)
+        }.isInstanceOf(DataIntegrityViolationException::class.java).hasMessageContaining("fund_account_mandate_is_the_managers_of_the_fund")
     }
 
     @Test

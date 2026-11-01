@@ -21,6 +21,10 @@ export function partyOptions(rows: Row[] | undefined, role?: string): PartyOptio
   return [...parties.values()].sort((a, b) => a.label.localeCompare(b.label, "bg"));
 }
 
+/** Only the mandates of these offices, and the option's row is the mandate's: `partyOptions` then takes what is left as it takes any rows. */
+// Rule: PM-FUND-004
+export const ofOffices = <R extends { role?: string }>(rows: R[], offices: string[]): R[] => rows.filter((r) => r.role !== undefined && offices.includes(r.role));
+
 /** The login's own party first, from `/me` and so no read of the book; it never adds a name, and stands once. No party, nothing added. */
 // Rule: PM-SEC-002
 export function withMyself(options: PartyOption[], myself: string | undefined): PartyOption[] {

@@ -29,6 +29,7 @@ data class FundAccountView(
     val holderName: String,
     val holderKind: String,
     val holderParty: UUID?,
+    val mandateId: UUID?,
 )
 
 /**
@@ -62,11 +63,11 @@ class FundAccountController(private val fund: FundAccountService, private val ac
         access.fund(entranceId, asking)
         val parties = access.seesFundParties(entranceId, asking)                       // Rule: PM-SEC-002
         return fund.list(entranceId).map {
-            FundAccountView(it.id, it.iban, it.purpose, it.holderName, it.holderKind, it.holderParty.takeIf { parties })
+            FundAccountView(it.id, it.iban, it.purpose, it.holderName, it.holderKind, it.holderParty.takeIf { parties }, it.mandateId.takeIf { parties })
         }
     }
 
-    /** A malformed IBAN, an unknown purpose or holder kind, or a blank holder → 400. */
+    /** A malformed IBAN, an unknown purpose or holder kind, a blank holder, or a fund's manager with no mandate → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> =

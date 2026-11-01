@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { accountOf, byPurpose, fundMissing, registrationRefused, unheld, type Account, type AccountInput } from "./fundAccount.ts";
+import { accountOf, byPurpose, FUND_OFFICES, fundMissing, registrationRefused, unheld, type Account, type AccountInput } from "./fundAccount.ts";
 
 const fund: Account = { id: "a-1", purpose: "REPAIR_RENEWAL", iban: "BG80BNBG96611020345678", holderName: "Иван Петров", holderKind: "MANAGER" };
 const operating: Account = { id: "a-2", purpose: "OPERATING", iban: "BG18RZBB91550123456789", holderName: "СС „Изгрев 5“", holderKind: "ASSOCIATION" };
@@ -20,6 +20,13 @@ test("PM-FUND-004 the account is in a named holder's name, one per purpose, the 
     [["REPAIR_RENEWAL", ["a-1"]], ["OPERATING", ["a-2"]]]);
   assert.deepEqual(byPurpose([{ ...fund, purpose: "SAVINGS" }]).map((g) => [g.purpose, g.accounts.length]),
     [["REPAIR_RENEWAL", 0], ["OPERATING", 0], ["SAVINGS", 1]]);
+});
+
+test("PM-FUND-004 the holder's party goes to the API when given, and its mandate is the API's to find", () => {
+  const sent = accountOf(typed({ holderPartyId: " 3f2b8c1e-0000-4000-8000-000000000001 " }));
+  assert.deepEqual(sent, { purpose: "REPAIR_RENEWAL", iban: "BG80 BNBG 9661 1020 3456 78", holderName: "Иван Петров", holderKind: "MANAGER", holderPartyId: "3f2b8c1e-0000-4000-8000-000000000001" });
+  for (const blank of [undefined, "", "  "]) assert.ok(!("holderPartyId" in accountOf(typed({ holderPartyId: blank }))), "none given, none sent");
+  assert.deepEqual(FUND_OFFICES, ["BM", "MB"]);
 });
 
 test("PM-FUND-001 an entrance with no repair-and-renewal account is flagged, and that purpose is offered first", () => {
