@@ -98,12 +98,14 @@ call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
 call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
     "purpose": "OPERATING", "iban": iban("UNCR70001512345678"), "holderName": "Мария Иванова", "holderKind": "MANAGER", "holderPartyId": manager})
 
-# The tariff, as the assembly set it on paper: recorded from its protocol, so the runs below cite a decision of this
-# entrance (PM-FEE-012, DEC-01). The demo's sign-in is off, so the record names nobody.
-tariff = call("POST", f"/api/assembly/entrances/{entrance}/paper-decisions", {
-    "decisionText": "Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.",
-    "protocolDate": "2026-03-12", "protocolRef": "Протокол на ОС от 12.03.2026, т. 4",
-    "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"})["id"]
+# The assembly's decisions, as it took them on paper: recorded from the protocol, so the runs and disbursements below
+# cite decisions of this entrance (PM-FEE-012, PM-FUND-007, DEC-01). The demo's sign-in is off, so a record names nobody.
+def paper_decision(text, item):
+    return call("POST", f"/api/assembly/entrances/{entrance}/paper-decisions", {
+        "decisionText": text, "protocolDate": "2026-03-12", "protocolRef": f"Протокол на ОС от 12.03.2026, т. {item}",
+        "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"})["id"]
+
+tariff = paper_decision("Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.", 4)
 
 # September's charges, issued on that decision — the same basis the charges screen previews
 call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01", "lines": [
@@ -130,14 +132,17 @@ call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-10
 
 # Disbursements from the fund: works on a GA decision, paid; an emergency; a measure, cancelled; one committed
 base = f"/api/money/entrances/{entrance}/fund/disbursements"
-roof = call("POST", base, {"amountMinor": 48_000, "purpose": "WORKS", "decisionId": "GA-2026-03-12-3"}, {"Idempotency-Key": str(uuid.uuid4())})
+roof = call("POST", base, {"amountMinor": 48_000, "purpose": "WORKS",
+                           "decisionId": paper_decision("Ремонт на покрива от фонд „Ремонт и обновяване“.", 3)}, {"Idempotency-Key": str(uuid.uuid4())})
 call("POST", f"{base}/{roof['id']}/pay", {"paidOn": roof["committedOn"]}, {"Idempotency-Key": str(uuid.uuid4())})
 call("POST", base, {"amountMinor": 12_500, "purpose": "WORKS",
                     "emergencyJustification": "теч от покрива над ап. 6 след бурята"}, {"Idempotency-Key": str(uuid.uuid4())})
 lift = call("POST", base, {"amountMinor": 9_900, "purpose": "PASSPORT_MEASURE",
-                           "decisionId": "GA-2026-03-12-5", "passportMeasure": "ТП 2019, мярка 4.2 — асансьорна уредба"}, {"Idempotency-Key": str(uuid.uuid4())})
+                           "decisionId": paper_decision("Мярка 4.2 от техническия паспорт — асансьорна уредба.", 5),
+                           "passportMeasure": "ТП 2019, мярка 4.2 — асансьорна уредба"}, {"Idempotency-Key": str(uuid.uuid4())})
 call("POST", f"{base}/{lift['id']}/cancel", {"reason": "изпълнителят се отказа"}, {"Idempotency-Key": str(uuid.uuid4())})
-last = call("POST", base, {"amountMinor": 30_000, "purpose": "GA_PURPOSE", "decisionId": "GA-2026-03-12-6"}, {"Idempotency-Key": str(uuid.uuid4())})
+last = call("POST", base, {"amountMinor": 30_000, "purpose": "GA_PURPOSE",
+                           "decisionId": paper_decision("Разход за цел, решена от общото събрание.", 6)}, {"Idempotency-Key": str(uuid.uuid4())})
 
 # The handover to the incoming manager, dated on the last commitment — so every open one is inherited, even if the
 # seed ran across midnight — with the bank's balance matching the ledger
