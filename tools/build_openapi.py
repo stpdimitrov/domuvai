@@ -171,6 +171,10 @@ RUNNING = {
    ("The unit's itemised statement, showing how each number was derived — a metered line with its reading and item", ['PM-FEE-017', 'PM-FEE-018', 'PM-SEC-002']),
  ('get', '/api/money/units/{unitId}/arrears'):
    ("The unit's arrears, aged as of a date, with the day its oldest open debt fell due", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),
+ ('get', '/api/money/units/{unitId}/open-debts'):
+   ("The debts a payment valued on the date can settle, the oldest first, each with its date, the day it fell due and "
+    "what is outstanding — the dates a payer can designate. Not the arrears of that date: a credit recorded after it has "
+    "already closed its debt here, so for a past date this can show less than the arrears read", ['PM-DEBT-008', 'PM-DEBT-002', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/arrears'):
    ("The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day "
     "its oldest open debt fell due — and their total", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),

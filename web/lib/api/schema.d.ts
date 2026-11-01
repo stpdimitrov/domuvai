@@ -865,6 +865,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/units/{unitId}/open-debts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The debts a payment valued on the date can settle, the oldest first, each with its date, the day it fell due and what is outstanding — the dates a payer can designate. Not the arrears of that date: a credit recorded after it has already closed its debt here, so for a past date this can show less than the arrears read */
+        get: operations["get_money_units_unitId_open_debts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/units/{unitId}/statement": {
         parameters: {
             query?: never;
@@ -1840,6 +1857,14 @@ export interface components {
             dueOn: string;
             /** Format: int64 */
             overdueDays: number;
+        };
+        OpenDebt: {
+            /** Format: date */
+            debtDate: string;
+            /** Format: date */
+            dueOn: string;
+            /** Format: int64 */
+            outstandingMinor: number;
         };
         OpenPetitionRequest: {
             subject: string;
@@ -6112,6 +6137,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnitArrears"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_units_unitId_open_debts: {
+        parameters: {
+            query: {
+                asOf: string;
+            };
+            header?: never;
+            path: {
+                unitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenDebt"][];
                 };
             };
             /** @description Bad Request */

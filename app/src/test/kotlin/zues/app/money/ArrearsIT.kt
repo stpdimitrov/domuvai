@@ -184,4 +184,52 @@ class ArrearsIT {
             .andExpect(jsonPath("$.totalMinor").value(0))
             .andExpect(jsonPath("$.oldestDebt").doesNotExist())
     }
+
+    private fun openDebts(unitId: UUID, asOf: String) = get("/api/money/units/$unitId/open-debts").param("asOf", asOf)
+
+    private fun dueOn(debtDate: String) = LocalDate.parse(debtDate).plusDays(numberOn("PAYMENT_TERM_DAYS", debtDate).toLong())   // PM-DEBT-002
+
+    @Test
+    fun `PM-DEBT-008 every date the open-debts read offers is one a payment can designate — and a unit left with nothing open has an empty list`() {
+        val entranceId = createEntrance()
+        val units = registerUnits(entranceId)
+        issue(entranceId, "2026-05")
+        issue(entranceId, "2026-06")
+        pay(entranceId, units[0], 8_000, "2026-06-10")                   // ап. 1: May's 18_000 is 10_000 now
+
+        val read = mvc.perform(openDebts(units[0], "2026-06-20"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].debtDate").value("2026-05-01"))
+            .andExpect(jsonPath("$[0].dueOn").value(dueOn("2026-05-01").toString()))
+            .andExpect(jsonPath("$[0].outstandingMinor").value(10_000))
+            .andExpect(jsonPath("$[1].debtDate").value("2026-06-01"))
+            .andExpect(jsonPath("$[1].dueOn").value(dueOn("2026-06-01").toString()))
+            .andExpect(jsonPath("$[1].outstandingMinor").value(18_000))
+            .andReturn().response.contentAsString
+
+        for (debt in json.readTree(read).reversed()) {                   // the newest first, so each is a real designation
+            mvc.perform(
+                post("/api/money/entrances/$entranceId/payments").header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"unitId":"${units[0]}","amountMinor":${debt.get("outstandingMinor").asLong()},"receivedInto":"CASH","valueDate":"2026-06-20","designatedDebtDate":"${debt.get("debtDate").asText()}"}"""),
+            ).andExpect(status().isCreated).andExpect(jsonPath("$.allocationRule").value("DESIGNATED"))
+        }
+
+        mvc.perform(openDebts(units[0], "2026-06-20")).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(0))
+    }
+
+    @Test
+    fun `PM-DEBT-008 for a past date the list is what a payment of that date can settle — the arrears of that date still count a later credit`() {
+        val entranceId = createEntrance()
+        val units = registerUnits(entranceId)
+        issue(entranceId, "2026-05")
+        issue(entranceId, "2026-06")
+        pay(entranceId, units[1], 12_000, "2026-06-10")                  // ап. 2 pays May's 12_000 in full, after the read date
+
+        mvc.perform(openDebts(units[1], "2026-05-20")).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(0))
+        mvc.perform(get("/api/money/units/${units[1]}/arrears").param("asOf", "2026-05-20"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalMinor").value(12_000))
+    }
 }
