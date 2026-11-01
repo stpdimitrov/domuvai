@@ -21,7 +21,8 @@ data class EndMandate(val on: LocalDate? = null, val protocolRef: String? = null
  * Who holds an entrance's offices — its manager, board, controller, cashier — said by the deployment's administrator
  * from the protocol that elected them, and by nobody else (PM-SEC-001). The administrator is the login of the request's
  * token, never a parameter; everybody else gets a 403. A new manager or board ends the mandates it succeeds
- * (PM-GOV-004). Every act, and every refused attempt, is on the record (PM-SEC-004).
+ * (PM-GOV-004). Every act, and every refused attempt, is on the record (PM-SEC-004). With sign-in switched off in so
+ * many words a mandate is recorded, naming nobody; its end is not.
  */
 @RestController
 @RequestMapping("/api/identity/entrances/{entranceId}/mandates")

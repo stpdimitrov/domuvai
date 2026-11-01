@@ -273,3 +273,80 @@ class MandateAdministrationIT {
         assertThatThrownBy { jdbc.update("UPDATE identity_org.management_mandate SET succeeded_at = NULL WHERE id = ?", recorded) }.isInstanceOf(DataIntegrityViolationException::class.java)               // nor taken back
     }
 }
+
+/**
+ * The same tables with sign-in switched off in so many words, as the seed runs: a mandate and the end it brings are
+ * recorded over HTTP with no login, each entry stored naming nobody and kept as any other (PM-SEC-001, PM-SEC-004).
+ */
+@Testcontainers(disabledWithoutDocker = true)
+@SpringBootTest(properties = ["domuvai.auth.mode=off", "domuvai.auth.issuer-uri=", "domuvai.auth.audience=", "domuvai.auth.admins="])
+@AutoConfigureMockMvc
+class MandateOpenIT {
+
+    companion object {
+        @Container
+        @JvmStatic
+        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer(DockerImageName.parse("postgres:16"))
+
+        @DynamicPropertySource
+        @JvmStatic
+        fun datasource(registry: DynamicPropertyRegistry) {
+            val schemas = "registry,identity_org,assembly,money,maintenance,compliance,evidence,app,intake,public"
+            registry.add("spring.datasource.url") { "${postgres.jdbcUrl}&currentSchema=$schemas" }
+            registry.add("spring.datasource.username", postgres::getUsername)
+            registry.add("spring.datasource.password", postgres::getPassword)
+        }
+    }
+
+    @Autowired lateinit var mvc: MockMvc
+    @Autowired lateinit var jdbc: JdbcTemplate
+
+    private val today: LocalDate get() = LocalDate.parse(toSofiaDate(Instant.now()))
+
+    private fun entrance(): UUID {
+        val condominium = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.condominium (id, address) VALUES (?, ?)", it, "ул. Шипка ${UUID.randomUUID()}") }
+        return UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'А', 'GA')", it, condominium) }
+    }
+
+    private fun party(name: String): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, full_name) VALUES (?, ?)", it, name) }
+
+    private fun record(entrance: UUID, party: UUID, from: LocalDate) = mvc.perform(
+        post("/api/identity/entrances/$entrance/mandates").contentType(MediaType.APPLICATION_JSON)
+            .content("""{"body":"BM","partyId":"$party","validFrom":"$from","validTo":"${from.plusYears(1)}","protocolRef":"Протокол от $from"}"""),
+    )
+
+    private fun entries(entrance: UUID) =
+        jdbc.queryForList("SELECT act, by_issuer, by_subject FROM identity_org.mandate_act WHERE entrance_id = ? ORDER BY act DESC", entrance).map { it.values.toList() }
+
+    @Test
+    fun `PM-SEC-004 with sign-in switched off a mandate and the end it brings are stored naming nobody, and kept`() {
+        val block = entrance()
+        record(block, party("Мария Иванова"), today.minusMonths(6)).andExpect(status().isOk)
+        record(block, party("Иван Петров"), today).andExpect(status().isOk).andExpect(jsonPath("$.succeeded.length()").value(1))
+        val named = listOf(listOf("RECORDED", null, null), listOf("RECORDED", null, null), listOf("ENDED", null, null))
+        assertThat(entries(block)).isEqualTo(named)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM identity_org.management_mandate WHERE entrance_id = ? AND succeeded_at = ?", Long::class.java, block, java.sql.Date.valueOf(today))).isEqualTo(1)
+
+        jdbc.update("UPDATE identity_org.mandate_act SET by_issuer = 'i', by_subject = 'somebody-else' WHERE entrance_id = ?", block)   // ignored
+        jdbc.update("DELETE FROM identity_org.mandate_act WHERE entrance_id = ?", block)                                                // ignored
+        assertThat(entries(block)).isEqualTo(named)
+    }
+
+    @Test
+    fun `PM-SEC-004 a login is named whole or not at all, and a refusal always names one — the table refuses anything else`() {
+        val row = "INSERT INTO identity_org.mandate_act (id, act, entrance_id, mandate_id, on_day, protocol_ref, by_issuer, by_subject, rule_id, at) " +
+            "VALUES (gen_random_uuid(), 'ENDED', ?, ?, current_date, 'п', ?, ?, 'PM-SEC-001', now())"
+        val block = entrance()
+        val mandate = UUID.randomUUID()
+        for ((issuer, subject) in listOf("i" to null, null to "op")) {
+            assertThatThrownBy { jdbc.update(row, block, mandate, issuer, subject) }.describedAs("$issuer $subject").isInstanceOf(DataIntegrityViolationException::class.java)
+        }
+        jdbc.update(row, block, mandate, null, null)
+        jdbc.update(row, block, mandate, "i", "op")
+        for (refusal in listOf("RECORD_REFUSED", "END_REFUSED")) {   // a refusal names who was refused: with nobody signed in none is written
+            val nobody = "INSERT INTO identity_org.mandate_act (id, act, entrance_id, rule_id, at) VALUES (gen_random_uuid(), ?, ?, 'PM-SEC-001', now())"
+            assertThatThrownBy { jdbc.update(nobody, refusal, block) }.describedAs(refusal).isInstanceOf(DataIntegrityViolationException::class.java)
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM identity_org.mandate_act WHERE entrance_id = ?", Long::class.java, block)).isEqualTo(2)
+    }
+}
