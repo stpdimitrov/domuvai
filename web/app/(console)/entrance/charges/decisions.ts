@@ -1,6 +1,7 @@
 import "server-only";
 import { api } from "@/lib/api/client";
 import { inTurn, reach } from "@/lib/console";
+import { PAPER_DECISIONS, paperOffer } from "@/lib/paperDecision";
 import { unansweredBy } from "@/lib/refusal";
 
 /** A decision a tariff line may cite: its id, and what the person sees to choose it. */
@@ -8,10 +9,12 @@ export type Passed = { id: string; label: string };
 
 /**
  * Rule: PM-FEE-012 — the decisions this entrance's assembly passed, as the assembly API stores them: every assembly,
- * each agenda item, its decision where one is stored (an item not closed is a 404) and its outcome PASSED. Read again
- * on every step, so the form never vouches for a decision. A read the API refuses is said in its words.
+ * each agenda item, its decision where one is stored (an item not closed is a 404) and its outcome PASSED — then those
+ * it took on paper, recorded from their protocols (WEB-54), which have no outcome: being recorded is what they show.
+ * Read again on every step, so the form never vouches for a decision. A read the API refuses, any part of it, is said in
+ * its words and offers nothing: the form vouches for nothing partial.
  */
-// Rule: PM-FEE-012, PM-SEC-001
+// Rule: PM-FEE-012, PM-FUND-007, PM-SEC-001
 export async function passedDecisions(entranceId: string): Promise<{ passed: Passed[] } | { refused: string }> {
   const listed = await reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies", { params: { path: { entranceId } } }));
   if (!listed?.data) return { refused: unansweredBy(listed, "общите събрания на входа") };
@@ -30,12 +33,17 @@ export async function passedDecisions(entranceId: string): Promise<{ passed: Pas
   }));
   const failed = decided.find(({ read }) => !read || (!read.data && read.response.status !== 404));
   if (failed) return { refused: unansweredBy(failed.read, "решенията на общото събрание") };
+  const paper = await reach(() => api.GET("/api/assembly/entrances/{entranceId}/paper-decisions", { params: { path: { entranceId } } }));
+  if (!paper?.data) return { refused: unansweredBy(paper, PAPER_DECISIONS) };
   return {
-    passed: decided
-      .filter(({ read }) => read?.data?.outcome === "PASSED")
-      .map(({ summary, item, read }) => ({
-        id: read!.data!.id,
-        label: `ОС ${summary.scheduledAt.slice(0, 10)}, т. ${item.ordinal}: ${item.text} — ${read!.data!.result} (${read!.data!.status})`,
-      })),
+    passed: [
+      ...decided
+        .filter(({ read }) => read?.data?.outcome === "PASSED")
+        .map(({ summary, item, read }) => ({
+          id: read!.data!.id,
+          label: `ОС ${summary.scheduledAt.slice(0, 10)}, т. ${item.ordinal}: ${item.text} — ${read!.data!.result} (${read!.data!.status})`,
+        })),
+      ...paper.data.map(paperOffer),
+    ],
   };
 }

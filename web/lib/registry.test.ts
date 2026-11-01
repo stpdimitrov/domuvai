@@ -63,5 +63,5 @@ test("PM-SEC-001 the empty-list words (#363) are one component, said no more tha
   const old = walk(consoleDir).filter((f) => /\.tsx?$/.test(f) && readFileSync(f, "utf8").includes("Няма регистриран вход"));
   assert.deepEqual(old, [], "the old words are gone from every screen");
   const used = walk(consoleDir).filter((f) => /page\.tsx$/.test(f) && readFileSync(f, "utf8").includes('kind === "none" && <NoEntrance />'));
-  assert.equal(used.length, 20);
+  assert.equal(used.length, 21);
 });

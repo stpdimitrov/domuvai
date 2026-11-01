@@ -12,9 +12,9 @@ export const metadata: Metadata = { title: "Начисления — Етаж" }
 type UnitCharge = Schemas["UnitChargeResponse"];
 
 /**
- * The basis a run is computed from — a general-assembly decision (PM-FEE-012). The assembly module
- * does not serve decisions yet, and the API takes the tariff with the request, so this page posts
- * the design's decision as a DEMO basis and says so on screen. Never bill from it (ADR-012 §7).
+ * The basis the table below is previewed on (PM-FEE-012). The API takes the tariff with the request and checks
+ * its decisions on issue only, so this page posts the design's decision as a DEMO basis and says so on screen. A run is
+ * issued from the form, on a decision the assembly took (`passedDecisions`); never bill from this one (ADR-012 §7).
  */
 const DEMO_BASIS = {
   decision: "Решение на ОС от 12.03.2026, т. 4",
@@ -201,7 +201,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
               {[DEMO_BASIS.decision, ...DEMO_BASIS.lines.map(describe)].join(" · ")}
             </div>
             <div style={{ font: "400 11.5px/1.5 'IBM Plex Mono', monospace", color: "#6B6F6C", marginTop: 4 }}>
-              Демо базис: модулът „Общи събрания“ ще подава решенията. Не се начислява от него.
+              Демо базис за прегледа на тази страница, не решение на общото събрание. Не се начислява от него.
             </div>
             <div style={{ font: "400 12.5px/1.6 'IBM Plex Sans'", color: "#3D413E", marginTop: 8 }}>
               {multiple.value != null
