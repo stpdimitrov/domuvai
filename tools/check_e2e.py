@@ -279,6 +279,7 @@ CALLS = {
     ("GET", "/api/money/entrances/{entranceId}/arrears"): lambda e: (f"/api/money/entrances/{e}/arrears?asOf=2026-09-30", None),
     ("GET", "/api/money/units/{unitId}/statement"): lambda e: (f"/api/money/units/{a_unit(e)}/statement", None),
     ("GET", "/api/money/units/{unitId}/arrears"): lambda e: (f"/api/money/units/{a_unit(e)}/arrears?asOf=2026-09-30", None),
+    ("GET", "/api/money/units/{unitId}/open-debts"): lambda e: (f"/api/money/units/{a_unit(e)}/open-debts?asOf=2026-09-30", None),   # the payment form's pick list (WEB-53)
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies"): lambda e: (f"/api/assembly/entrances/{e}/assemblies", None),
     ("GET", "/api/assembly/entrances/{entranceId}/years/{year}"): lambda e: (f"/api/assembly/entrances/{e}/years/{sofia_year()}", None),
     ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"): lambda e: (
