@@ -21,7 +21,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function registerAccount(_: AccountState, form: FormData): Promise<AccountState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string) : "");
   const entranceId = text("entrance").trim();
-  const input: AccountInput = { purpose: text("purpose"), iban: text("iban"), holderName: text("holderName"), holderKind: text("holderKind") };
+  const input: AccountInput = { purpose: text("purpose"), iban: text("iban"), holderName: text("holderName"), holderKind: text("holderKind"), holderPartyId: text("holderPartyId") };
   if (!UUID.test(entranceId)) return { input, refused: "Входът не е посочен." };
   const body = accountOf(input);
   if ("refused" in body) return { input, refused: body.refused };

@@ -6,8 +6,8 @@
 import { refused, undone } from "./refusal.ts";
 
 export type Account = { id: string; purpose: string; iban: string; holderName: string; holderKind: string; holderParty?: string };
-export type AccountInput = { purpose: string; iban: string; holderName: string; holderKind: string };
-export type AccountBody = { purpose: string; iban: string; holderName: string; holderKind: string };
+export type AccountInput = { purpose: string; iban: string; holderName: string; holderKind: string; holderPartyId?: string };
+export type AccountBody = { purpose: string; iban: string; holderName: string; holderKind: string; holderPartyId?: string };
 
 /** The purposes an entrance keeps one account each for, the fund's first (PM-FUND-001), the API's codes in words. */
 export const PURPOSE: Record<string, string> = {
@@ -19,6 +19,8 @@ export const HOLDER: Record<string, string> = {
   MANAGER: "председателя на управителния съвет (управителя)",
   ASSOCIATION: "сдружението на собствениците",
 };
+/** The offices whose holder the fund's account may be opened by (PM-FUND-004): no office marks a chair, so any board member, as the API reads it. */
+export const FUND_OFFICES = ["BM", "MB"];
 
 /**
  * Rule: PM-FUND-004 — the fund's account is kept apart from the operating account: each purpose is listed on its own,
@@ -41,16 +43,17 @@ export const fundMissing = (accounts: Account[]): boolean => !accounts.some((a) 
 
 /**
  * Rule: PM-FUND-004 — the account is in someone's name: the holder's name and kind are required. The IBAN is sent as
- * typed; the API normalises it, checks it and refuses one already registered (PM-FUND-005).
+ * typed; the API normalises it, checks it and refuses one already registered (PM-FUND-005). The holder's party is sent when
+ * given: whether it stands on a mandate is the API's, which refuses in its own words.
  */
 // Rule: PM-FUND-004
 export function accountOf(input: AccountInput): AccountBody | { refused: string } {
-  const [iban, holderName] = [input.iban.trim(), input.holderName.trim()];
+  const [iban, holderName, holderPartyId] = [input.iban.trim(), input.holderName.trim(), input.holderPartyId?.trim()];
   if (!(input.purpose in PURPOSE)) return { refused: "Изберете за какво е сметката." };
   if (!iban) return { refused: "Въведете IBAN на сметката." };
   if (!holderName) return { refused: "Въведете на чие име е открита сметката." };
   if (!(input.holderKind in HOLDER)) return { refused: "Изберете дали сметката е на името на управителя или на сдружението." };
-  return { purpose: input.purpose, iban, holderName, holderKind: input.holderKind };
+  return { purpose: input.purpose, iban, holderName, holderKind: input.holderKind, ...(holderPartyId && { holderPartyId }) };
 }
 
 /**

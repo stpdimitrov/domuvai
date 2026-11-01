@@ -93,6 +93,10 @@ for unit, names in zip(unit_ids, OWNERS):
 
 manager = parties["Мария Иванова"]  # the домоуправител, who holds both accounts (чл. 50)
 incoming = party("Красимир Ангелов")  # the manager taking over at the handover
+# The fund's account is opened on the manager's mandate (PM-FUND-004). The demo's sign-in is off, so the record names nobody (GOV-03).
+# Its first day stays before those of the end-to-end run's offices: mandates are recorded in the order they began, and its first board member ends this one.
+call("POST", f"/api/identity/entrances/{entrance}/mandates", {
+    "body": "BM", "partyId": manager, "validFrom": "2026-03-12", "validTo": "2027-03-12", "protocolRef": "Протокол на ОС от 12.03.2026, т. 2"})
 call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
     "purpose": "REPAIR_RENEWAL", "iban": iban("UNCR70001512998102"), "holderName": "Мария Иванова", "holderKind": "MANAGER", "holderPartyId": manager})
 call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {

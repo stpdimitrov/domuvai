@@ -98,7 +98,7 @@ class FundPersistenceIT {
         val iban = "BG80BNBG${"%014d".format(System.nanoTime() % 100_000_000_000_000)}"
         val fundAccountId = postFor(
             "/api/money/entrances/$entranceId/fund-accounts",
-            """{"iban":"$iban","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"MANAGER","holderPartyId":"$chair"}""", "fundAccountId",
+            """{"iban":"$iban","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"ASSOCIATION","holderPartyId":"$chair"}""", "fundAccountId",
         )
         return Seeded(entranceId, unitId, chair, fundAccountId)
     }

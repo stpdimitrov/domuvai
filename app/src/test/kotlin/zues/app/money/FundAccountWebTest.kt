@@ -47,13 +47,25 @@ class FundAccountWebTest {
     @Test
     fun `PM-SEC-002 an account is read without its holder's party id unless the reader may see the parties, its holder's name and IBAN alike`() {
         val holder = UUID.randomUUID()
-        whenever(fund.list(entranceId)).thenReturn(listOf(FundAccountRow(UUID.randomUUID(), entranceId, "BG80BNBG96611020345678", "REPAIR_RENEWAL", "Иван Петров", "MANAGER", holder)))
+        val mandate = UUID.randomUUID()
+        whenever(fund.list(entranceId)).thenReturn(listOf(FundAccountRow(UUID.randomUUID(), entranceId, "BG80BNBG96611020345678", "REPAIR_RENEWAL", "Иван Петров", "MANAGER", holder, mandate)))
         mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts"))
             .andExpect(jsonPath("$[0].holderParty").doesNotExist())
+            .andExpect(jsonPath("$[0].mandateId").doesNotExist())
             .andExpect(jsonPath("$[0].holderName").value("Иван Петров"))
             .andExpect(jsonPath("$[0].iban").value("BG80BNBG96611020345678"))
         whenever(access.seesFundParties(eq(entranceId), anyOrNull())).thenReturn(true)
-        mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts")).andExpect(jsonPath("$[0].holderParty").value(holder.toString()))
+        mvc.perform(get("/api/money/entrances/$entranceId/fund-accounts"))
+            .andExpect(jsonPath("$[0].holderParty").value(holder.toString()))
+            .andExpect(jsonPath("$[0].mandateId").value(mandate.toString()))
+    }
+
+    @Test
+    fun `PM-FUND-004 a fund's manager with no mandate is a 400 in the service's words`() {
+        whenever(fund.register(any(), any())).thenThrow(IllegalArgumentException("no standing mandate (PM-FUND-004)"))
+        mvc.perform(postFund())
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("no standing mandate (PM-FUND-004)"))
     }
 
     @Test

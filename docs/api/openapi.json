@@ -1382,6 +1382,10 @@
             "format": "uuid",
             "type": "string"
           },
+          "mandateId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "purpose": {
             "type": "string"
           }
@@ -8347,7 +8351,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id",
+        "summary": "List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id or mandate",
         "tags": [
           "money"
         ],
@@ -8433,7 +8437,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register the entrance's repair-fund account",
+        "summary": "Register the entrance's repair-fund account; opened in the manager's name, its holder must stand on a manager's or board member's mandate of the entrance that day, and the account stores it",
         "tags": [
           "money"
         ],

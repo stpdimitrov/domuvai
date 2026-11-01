@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, reach } from "@/lib/console";
-import { byPurpose, fundMissing, HOLDER, PURPOSE, unheld, type Account } from "@/lib/fundAccount";
+import { byPurpose, FUND_OFFICES, fundMissing, HOLDER, PURPOSE, unheld, type Account } from "@/lib/fundAccount";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import AccountForm from "./AccountForm";
 import NoEntrance from "@/app/(console)/NoEntrance";
+import PartyPicker from "../../PartyPicker";
 
 export const metadata: Metadata = { title: "Банкови сметки — Етаж" };
 
@@ -47,7 +48,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           {accounts && <Accounts accounts={accounts} registered={asked.registered} />}
           {/* the list unread: every purpose is offered, and the API says which is held */}
           {(accounts ? unheld(accounts) : Object.keys(PURPOSE)).length > 0 && (
-            <AccountForm entrance={view.entrance.id} purposes={accounts ? unheld(accounts) : Object.keys(PURPOSE)} />
+            <>
+              <PartyPicker id="parties-fund-holder" entrance={view.entrance.id} source="mandates" offices={FUND_OFFICES} margin="16px 24px 0" />
+              <AccountForm entrance={view.entrance.id} purposes={accounts ? unheld(accounts) : Object.keys(PURPOSE)} parties="parties-fund-holder" />
+            </>
           )}
           <div style={{ margin: "0 24px 16px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             <Link href={`/entrance/fund?entrance=${view.entrance.id}`}>Към касата и фонда</Link>

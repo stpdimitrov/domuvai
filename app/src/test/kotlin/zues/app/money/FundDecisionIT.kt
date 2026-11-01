@@ -66,7 +66,7 @@ class FundDecisionIT {
         val iban = "BG80BNBG${"%014d".format(System.nanoTime() % 100_000_000_000_000)}"
         created(
             "/api/money/entrances/$entrance/fund-accounts",
-            """{"iban":"$iban","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"MANAGER","holderPartyId":"$chair"}""", "fundAccountId",
+            """{"iban":"$iban","purpose":"REPAIR_RENEWAL","holderName":"Иван Петров","holderKind":"ASSOCIATION","holderPartyId":"$chair"}""", "fundAccountId",
         )
         mvc.perform(
             post("/api/money/entrances/$entrance/payments").header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON)

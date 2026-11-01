@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { partyOptions, withMyself } from "./partyOption.ts";
+import { ofOffices, partyOptions, withMyself } from "./partyOption.ts";
 import { refused, unansweredBy } from "./refusal.ts";
 
 const source = (f: string) => readFileSync(new URL(`../app/(console)/entrance/${f}`, import.meta.url), "utf8");
@@ -91,4 +91,10 @@ test("PM-GA-007 the co-signatory is picked from the owners as of the posting day
   assert.match(page, /id=\{`parties-ballot-\$\{item\.id\}`\} entrance=\{entrance\} role="OWN" \/>/);
   assert.match(page, /id="parties-attendance" entrance=\{entrance\} myself=\{myself\}/);
   assert.match(code(source("fund/handover/page.tsx")), /<PartyPicker id="parties-handover" entrance=\{view\.entrance\.id\} source="mandates" dayField="handoverOn"/);
+});
+
+test("PM-FUND-004 a form offers only the offices it asks for, and a mandate with no office offers nothing", () => {
+  const mandates = [{ partyId: BORIS, partyName: "Борис Петров", role: "BM" }, { partyId: ANA, partyName: "Ана Иванова", role: "MB" }, { partyId: IVA, partyName: "Ива Тодорова", role: "CTL" }, { partyId: IVA }];
+  assert.deepEqual(partyOptions(ofOffices(mandates, ["BM", "MB"])).map((o) => o.partyId), [ANA, BORIS]);
+  assert.deepEqual(ofOffices(mandates, []), []);
 });
