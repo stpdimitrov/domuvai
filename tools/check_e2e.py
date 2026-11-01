@@ -189,6 +189,8 @@ ON_A_PETITION = {("POST", "/api/assembly/entrances/{entranceId}/petitions"), ("G
 # itself, against the API's own list. Listed here so that the web calls nothing this check does not cover.
 ON_A_MANDATE = {("POST", "/api/identity/entrances/{entranceId}/mandates"), ("POST", "/api/identity/entrances/{entranceId}/mandates/{mandateId}/end"),
                 ("POST", "/api/identity/logins"), ("POST", "/api/identity/logins/untie")}
+# A paper decision is recorded by the deployment's administrator through the page (WEB-54): paper_decisions_screen checks it against the API's own list.
+ON_A_PAPER_DECISION = {("POST", "/api/assembly/entrances/{entranceId}/paper-decisions")}
 # An entrance and a party are registered through the page (WEB-50): registry_screen checks them itself, against the API's own list.
 # Units are registered through the page (WEB-50b): units_screen and registry_screen check them against the API's own list.
 ON_A_REGISTRATION = {("POST", "/api/registry/entrances"), ("POST", "/api/registry/parties"), ("POST", "/api/registry/entrances/{entranceId}/units")}
@@ -234,6 +236,7 @@ NO_ONE = "00000000-0000-0000-0000-000000000000"   # an id nothing has: a call on
 API = [""]   # the api's base, set in main() before CALLS is run
 CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
+    ("GET", "/api/assembly/entrances/{entranceId}/paper-decisions"): lambda e: (f"/api/assembly/entrances/{e}/paper-decisions", None),
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
     ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
@@ -396,6 +399,12 @@ SCREENS = {
         "ул. Шипка 14, вх. Б · 6 об. — — — €156,50 €570,00 €145,00 — —",
         "ул. Шипка 16, вх. А · 2 об. — — — €0,00 няма сметка — —",          # nothing issued; no fund account — said, not an error
         "Общо 2 входа показани всички",
+    ],
+    # WEB-54 (PM-GA-022, PM-DOC-007) — the seed's paper decisions: the paper said to be the original, where it is and who keeps it
+    "/entrance/paper-decisions?entrance={e}": [
+        "Оригиналът е хартиеният протокол",
+        "Протокол на ОС от 12.03.2026, т. 4 от 12.03.2026 · Месечни вноски: управление 6,00 € на лице",
+        "Оригиналът на хартия е в: Папка „Протоколи“ у управителя · пази го: Мария Иванова",
     ],
     "/portfolio?asOf=2026-10-20": ["ул. Шипка 14, вх. Б · 6 об. — — — €393,00 €570,00 €145,00 — —"],   # owed moves with the date
     "/portfolio?asOf=2026-09-30&show=owing": ["ул. Шипка 14, вх. Б · 6 об.", "Общо 2 входа показани 1 от 2"],
@@ -1493,14 +1502,84 @@ def presets(page):
     return [chosen(options) for _, options in sorted(selects, key=lambda s: int(s[0]))]
 
 
+def decisions_offered(page, name):
+    """The decision ids the select [name] offers, read from its options whatever order their attributes come in."""
+    select = next(iter(re.findall(rf'<select\b[^>]*\bname="{name}"[^>]*>(.*?)</select>', page, re.S)), "")
+    values = [dict(re.findall(r'(\w[\w$:-]*)="([^"]*)"', tag)).get("value") for tag in re.findall(r"<option\b[^>]*>", select)]
+    return [v for v in values if v]
+
+
+def paper_decisions_screen(api, web, entrance, signed_in, owner=None, administrator=None):
+    """
+    WEB-54 (PM-GA-022, PM-DOC-007, PM-SEC-001, PM-SEC-002) — `/entrance/paper-decisions`. Every decision the API lists is
+    on the page with where its paper is kept, and the page says the paper is the original. Signed in as a board member, who
+    is told the custodian, recording one is the API's 403 in its words, the form kept, nothing recorded. Signed in as the
+    seeded owner, who reads assemblies but not mandates, the custodian is said in words on every record and named on none.
+    Signed in as the administrator, the list is the API's 403 in its words and the form stays; a date, a location or a
+    custodian left out is the API's refusal in its words, nothing recorded; the record then made is shown from the POST's
+    answer and is in the API's list.
+    """
+    path = f"/entrance/paper-decisions?entrance={entrance}"
+    listed = lambda: json.loads(fetch(api, f"/api/assembly/entrances/{entrance}/paper-decisions")[1])
+    before = listed()
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    failures = [f"{path}: HTTP {status}"] if status != 200 else []
+    failures += [f"{path}: does not show {d['id']} with where its paper is kept" for d in before if d["id"] not in text or f"Оригиналът на хартия е в: {d['archiveLocation']}" not in text]
+    if not signed_in:
+        print("—   /entrance/paper-decisions  NOT checked: no sign-in")
+        return failures
+    failures += [f"{path}: a board member is not told who keeps {d['id']}" for d in before if d.get("custodian") and f"пази го: {d['custodian']}" not in text]
+    protocol = f"e2e: протокол {uuid.uuid4().hex[:6]}"
+    fields = {"decisionText": "e2e: решение на хартия", "protocolDate": "2026-03-12", "protocolRef": protocol, "archiveLocation": "e2e: шкаф", "custodian": "e2e: пазител"}
+    s, _, refused = submit_form(web, path, page, "Впиши решението", fields)
+    said = visible_text(refused)
+    failures += [] if s == 200 and "Нямате право да впишете решение от хартиен протокол:" in said and "PM-SEC-001" in said and f'value="{protocol}"' in refused else [f"{path}: a board member recording answered HTTP {s} without the API's 403 in its words, or the form not kept"]
+    failures += [] if listed() == before else [f"{path}: a refused attempt changed the API's paper decisions"]
+    board = CARRIED.get(web)
+    try:
+        if owner:
+            CARRIED[web] = owner                            # the page, signed in as the owner
+            status, page = fetch(web, path)
+            text = visible_text(page)
+            failures += [] if status == 200 and text.count("пази го: не се показва на вашата роля") == len(before) else [f"{path}: an owner is not told in words, on every record, that the custodian is not shown (HTTP {status})"]
+            failures += [f"{path}: an owner is told who keeps {d['id']}" for d in before if d.get("custodian") and d["custodian"] in text]
+        else:
+            print("—   /entrance/paper-decisions  the owner's path NOT checked: no --owner-user")
+        if not administrator:
+            print("—   /entrance/paper-decisions  the administrator's path NOT checked: no --admin-user")
+            return failures
+        CARRIED[web] = administrator                        # the page, signed in as the administrator
+        status, page = fetch(web, path)
+        if status != 200 or "Нямате право да четете решенията от хартиени протоколи:" not in visible_text(page) or "Впиши решението" not in page:
+            failures.append(f"{path}: the administrator's page answered HTTP {status} without the API's 403 in its words, or without the form")
+        for missing, words in (("protocolDate", "the protocol's date is required"), ("archiveLocation", "where the paper original is kept is required"), ("custodian", "who keeps the paper original is required")):
+            s, _, answered = submit_form(web, path, page, "Впиши решението", {**fields, missing: ""})
+            failures += [] if s == 200 and f"Системата не прие това: {words}" in visible_text(answered) and f'value="{protocol}"' in answered else [f"{path}: a record with no {missing} answered HTTP {s} without the API's refusal in its words, or the form not kept"]
+        failures += [] if listed() == before else [f"{path}: a refused record changed the API's paper decisions"]
+        s, _, answered = submit_form(web, path, page, "Впиши решението", fields)
+        said, after = visible_text(answered), listed()
+        made = [d for d in after if d["protocolRef"] == protocol]
+        if s != 200 or len(after) != len(before) + 1 or len(made) != 1:
+            failures.append(f"{path}: the administrator's record answered HTTP {s}, and the API lists {len(made)} under its protocol")
+        elif "Решението е вписано." not in said or made[0]["id"] not in said or "Оригиналът на хартия е в: e2e: шкаф · пази го: e2e: пазител" not in said:
+            failures.append(f"{path}: the record the API answered with is not shown whole")
+    finally:
+        CARRIED[web] = board
+    print(f"{'ok ' if not failures else 'BAD'} PM-DOC-007 the paper decisions: {len(before)} shown with where the paper is; refused to a board member, recorded by the administrator")
+    return failures
+
+
 def charges_issue(api, web, entrance):
     """
     WEB-38 (PM-FEE-012, PM-FEE-015, PM-SEC-001) — the issue form on `/entrance/charges`: the decisions it offers are the
-    entrance's PASSED ones as the assembly API stores them, read here the same way; with none it says no run is issued.
+    entrance's PASSED ones as the assembly API stores them, read here the same way, and those it recorded from paper (WEB-54);
+    with none it says no run is issued.
     An issue posted through the form, as a browser with no script posts it, citing a decision that is not one (the demo
     basis's) is refused by the web, and the same id posted straight to the API by the board is refused there, naming the
-    rule (FEE-01); the API then holds no run for the period. A passed decision cannot be reached in CI (the API's clock is
-    real, WEB-32), so an issue through the page is not; the seed's own runs issue on a paper decision (DEC-01).
+    rule (FEE-01); the API then holds no run for the period. A paper decision of the seed is previewed through the form,
+    and the API computes it. A sitting's passed decision cannot be reached in CI (the API's clock is real, WEB-32), and
+    a period is not issued here; the seed's own runs issue on a paper decision (DEC-01).
     """
     period = "2027-01"
     path = f"/entrance/charges?period={period}&entrance={entrance}"
@@ -1513,8 +1592,16 @@ def charges_issue(api, web, entrance):
         for item in json.loads(fetch(api, f"{of}/{a['id']}")[1]).get("agenda", []):
             st, raw = fetch(api, f"{of}/{a['id']}/agenda/{item['id']}/decision")
             passed += [json.loads(raw)["id"]] if st == 200 and json.loads(raw).get("outcome") == "PASSED" else []
-    offered = re.findall(r'<option value="([0-9a-f-]{36})"', next(iter(re.findall(r'<select[^>]*name="decision-0".*?</select>', page, re.S)), ""))
-    failures = [] if sorted(offered) == sorted(passed) else [f"{path}: offers the decisions {offered}, the API's PASSED ones are {passed}"]
+    paper = [d["id"] for d in json.loads(fetch(api, f"/api/assembly/entrances/{entrance}/paper-decisions")[1] or "[]")]
+    passed += paper
+    offered = decisions_offered(page, "decision-0")
+    failures = [] if sorted(offered) == sorted(passed) else [f"{path}: offers the decisions {offered}, the API's passed and paper ones are {passed}"]
+    if paper:
+        fields = {"stream-0": "MANAGEMENT", "key-0": "PER_PERSON", "per-0": "rate", "amount-0": "6,00", "decision-0": paper[0], "step": "preview"}
+        status, _, answered = submit_form(web, path, page, "Издаване на начисленията", fields)
+        text = visible_text(answered)
+        if status != 200 or "Изчислено от API за" not in text or "Издадено:" in text:
+            failures.append(f"{path}: a preview on the paper decision {paper[0]} answered HTTP {status} without the API's figures")
     if not passed and "Няма прието решение на общото събрание" not in visible_text(page):
         failures.append(f"{path}: with no passed decision, does not say no run can be issued")
     fields = {"stream-0": "MANAGEMENT", "key-0": "PER_PERSON", "per-0": "rate", "amount-0": "6,00", "decision-0": "GA-2026-03-12-4", "step": "issue"}
@@ -1528,7 +1615,7 @@ def charges_issue(api, web, entrance):
         failures.append(f"{period}: PM-FEE-012 — the API answered HTTP {status} to an issue on a made-up decision: {raw[:200]!r}")
     held = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/{period}/headcount", headers=as_board())[0]
     failures += [] if held == 404 else [f"{period}: PM-FEE-012 — the API holds a run (headcount HTTP {held}) after an issue citing no passed decision"]
-    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} passed decision(s) offered; an issue on none refused by the web and the API, no run held")
+    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} decision(s) offered, {len(paper)} of them on paper, one previewed; an issue on none refused by the web and the API, no run held")
     return failures
 
 
@@ -1621,6 +1708,10 @@ def disbursements_screen(api, web, entrance, signed_in):
     failures += [f"{path}: the {d['status'].lower()} {d['id']} is offered a pay or cancel form" for d in listed if d["status"] != "COMMITTED" and d["id"] in page]
     if signed_in:
         failures += [f"{path}: the committed {d['id']} has no pay and cancel form" for d in committed if page.count(f'value="{d["id"]}"') != 2]
+        offered = decisions_offered(page, "decision")       # WEB-54 (PM-FUND-007) — the seed's paper decisions, by the id a sign-off cites
+        paper = json.loads(fetch(api, f"/api/assembly/entrances/{entrance}/paper-decisions")[1])
+        failures += [] if paper else [f"{path}: the seed recorded no paper decision to offer"]
+        failures += [f"{path}: the paper decision {d['id']} is not offered" for d in paper if d["id"] not in offered]
         fields = {"purpose": "WORKS", "amount": "1,00", "measure": "", "basis": "EMERGENCY", "decision": "", "justification": "e2e: signed by the board"}
         status, _, refused_page = submit_form(web, path, page, 'name="justification"', fields)
         said = visible_text(refused_page)
@@ -2566,8 +2657,8 @@ def main():
 
     (called, unreadable), checked = web_calls(), set(CALLS)
     failures += unreadable
-    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT - ON_A_PETITION - ON_A_MANDATE - ON_A_REGISTRATION)]
-    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT | ON_A_PETITION | ON_A_MANDATE | ON_A_REGISTRATION) - called)]
+    failures += [f"the web calls {m} {p}, which this check does not validate — add it to CALLS" for m, p in sorted(called - checked - ON_AN_ASSEMBLY - ON_A_PAYMENT - ON_A_PETITION - ON_A_MANDATE - ON_A_PAPER_DECISION - ON_A_REGISTRATION)]
+    failures += [f"CALLS lists {m} {p}, which no screen calls any more — remove it" for m, p in sorted((checked | ON_AN_ASSEMBLY | ON_A_PAYMENT | ON_A_PETITION | ON_A_MANDATE | ON_A_PAPER_DECISION | ON_A_REGISTRATION) - called)]
 
     for (method, path), call in CALLS.items():
         url, body, *sent = call(entrance)              # a third element: headers the call needs (an Idempotency-Key)
@@ -2628,7 +2719,8 @@ def main():
     failures += declarations_screen(api, web, entrance, signed_in=bool(args.user), owner_party=args.owner_party)
     failures += petitions_screen(api, web, entrance, signed_in=bool(args.user), owner=owner)
     failures += mandates_screen(api, web, entrance, signed_in=bool(args.user), administrator=administrator, spare_party=args.spare_party)
-    failures += charges_issue(api, web, entrance)
+    failures += paper_decisions_screen(api, web, entrance, signed_in=bool(args.user), owner=owner, administrator=administrator)
+    failures += charges_issue(api, web, entrance)      # after: what the administrator just recorded is offered too
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own
