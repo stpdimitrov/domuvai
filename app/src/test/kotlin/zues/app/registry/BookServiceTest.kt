@@ -25,13 +25,20 @@ class BookServiceTest {
     private val titles: TitleRepository = mock()
     private val entrances: EntranceRepository = mock()
     private val ownership = OwnershipService(mock<JdbcAggregateTemplate>(), parties, titles, units, Clock.fixed(Instant.parse("2026-05-01T00:00:00Z"), ZoneOffset.UTC))
-    private val service = BookService(units, ownership, mock(), mock(), entrances)
+    private val household: HouseholdMemberRepository = mock()
+    private val service = BookService(units, ownership, household, mock(), entrances, parties)
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
     private val titleId = UUID.randomUUID()
     private val partyId = UUID.randomUUID()
     private val egn = "7501020018"
+
+    private val bookDate = LocalDate.of(2026, 5, 1)
+
+    private fun member(partyId: UUID?, from: String, to: String? = null, child: Boolean = false, id: UUID = UUID.randomUUID()) = HouseholdMember(
+        id, entranceId, unitId, partyId, child, LocalDate.parse(from), to?.let(LocalDate::parse),
+    )
 
     private fun theBook(): CondominiumBook {
         whenever(entrances.existsById(entranceId)).thenReturn(true)
@@ -42,7 +49,7 @@ class BookServiceTest {
             listOf(Title(titleId, entranceId, unitId, partyId, "OWN", BigDecimal("1.000000"), LocalDate.of(2026, 1, 1), null)),
         )
         whenever(parties.findAllById(any<Iterable<UUID>>())).thenReturn(listOf(Party(partyId, "Иван Петров", "EGN", egn)))
-        return service.forEntrance(entranceId, LocalDate.of(2026, 5, 1))
+        return service.forEntrance(entranceId, bookDate)
     }
 
     @Test
@@ -55,5 +62,37 @@ class BookServiceTest {
         assertThat(json).contains(partyId.toString()).doesNotContain(egn).doesNotContain("idValue").doesNotContain("idType")
         assertThat(ObjectMapper().valueToTree<com.fasterxml.jackson.databind.JsonNode>(party).fieldNames().asSequence().toSet())
             .isEqualTo(setOf("partyId", "name", "role", "share"))
+    }
+
+    @Test
+    fun `PM-BOOK-002 the book names who lives in a unit on its date — a member entered with no party unnamed, one gone or not yet come absent, the count the list's size`() {
+        val named = member(partyId, "2026-01-01", id = UUID.fromString("00000000-0000-0000-0000-00000000000a"))
+        val unnamed = member(null, "2026-02-01", child = true)
+        val leaving = member(null, "2026-01-01", to = "2026-05-02", id = UUID.fromString("00000000-0000-0000-0000-00000000000b"))
+        val gone = member(partyId, "2025-01-01", to = "2026-05-01")
+        val coming = member(null, "2026-05-02")
+        whenever(household.findByEntranceId(entranceId)).thenReturn(listOf(coming, unnamed, gone, leaving, named))
+
+        val entry = theBook().units.single()
+
+        assertThat(entry.household).containsExactlyInAnyOrder(
+            BookMember(named.id, partyId, "Иван Петров", false, LocalDate.of(2026, 1, 1), null),
+            BookMember(leaving.id, null, null, false, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 5, 2)),
+            BookMember(unnamed.id, null, null, true, LocalDate.of(2026, 2, 1), null),
+        )
+        assertThat(entry.household.map { it.memberId })                  // oldest stay first, a tie by id
+            .containsExactly(named.id, leaving.id, unnamed.id)
+        assertThat(entry.householdCount).isEqualTo(entry.household.size).isEqualTo(3)
+    }
+
+    @Test
+    fun `PM-BOOK-011 a household member is served by id and name — no identity number`() {
+        whenever(household.findByEntranceId(entranceId)).thenReturn(listOf(member(partyId, "2026-01-01")))
+        val members = theBook().units.single().household
+        assertThat(members.single().name).isEqualTo("Иван Петров")
+        val json = ObjectMapper().findAndRegisterModules().writeValueAsString(members)
+        assertThat(json).contains(partyId.toString()).doesNotContain(egn).doesNotContain("idValue").doesNotContain("idType")
+        assertThat(ObjectMapper().findAndRegisterModules().valueToTree<com.fasterxml.jackson.databind.JsonNode>(members.single()).fieldNames().asSequence().toSet())
+            .isEqualTo(setOf("memberId", "partyId", "name", "childUnder6", "from", "to"))
     }
 }

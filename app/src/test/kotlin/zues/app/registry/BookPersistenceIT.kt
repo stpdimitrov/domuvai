@@ -127,6 +127,7 @@ class BookPersistenceIT {
         assertThat(e1.idealParts).isEqualTo("60.0000")
         assertThat(e1.parties.first { it.name == "Иван Петров" }.role).isEqualTo("OWN")
         assertThat(e1.householdCount).isEqualTo(2)
+        assertThat(e1.household).allSatisfy { assertThat(it.name).isNull(); assertThat(it.from).isEqualTo("2026-01-01") }
         assertThat(e1.nonUse).hasSize(1)
         assertThat(e1.complete).isTrue()                       // PM-BOOK-002: ideal parts + an owner named
 

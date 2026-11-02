@@ -1313,6 +1313,18 @@ export interface components {
             purpose: string;
             ruleId?: string;
         };
+        BookMember: {
+            childUnder6: boolean;
+            /** Format: date */
+            from: string;
+            /** Format: uuid */
+            memberId: string;
+            name?: string;
+            /** Format: uuid */
+            partyId?: string;
+            /** Format: date */
+            to?: string;
+        };
         BookNonUse: {
             /** Format: date */
             from: string;
@@ -1330,6 +1342,7 @@ export interface components {
             builtAreaM2?: string;
             complete: boolean;
             designation: string;
+            household: components["schemas"]["BookMember"][];
             /** Format: int32 */
             householdCount: number;
             idealParts: string;

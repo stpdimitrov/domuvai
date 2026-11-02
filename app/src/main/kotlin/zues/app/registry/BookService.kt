@@ -18,17 +18,23 @@ class BookService(
     private val household: HouseholdMemberRepository,
     private val absences: AbsenceDeclarationRepository,
     private val entrances: EntranceRepository,
+    private val partyRepository: PartyRepository,
 ) {
     // Rule: PM-BOOK-002, PM-BOOK-011
     @Transactional(readOnly = true)
     fun forEntrance(entranceId: UUID, on: LocalDate): CondominiumBook {
         if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
         val ownersByUnit = ownership.ownersAsOf(entranceId, on).groupBy { it.unitId }
+        val residents = household.findByEntranceId(entranceId).filter { current(it.validFrom, it.validTo, on) }
+        val nameById = partyRepository.findAllById(residents.mapNotNull { it.partyId }.distinct()).associate { it.id to it.fullName }
+        val householdByUnit = residents.groupBy { it.unitId }
         val entries = units.findByEntranceId(entranceId).map { unit ->
             val parties = (ownersByUnit[unit.id] ?: emptyList())
                 .map { BookParty(it.partyId, it.partyName, it.titleRole, it.share.toPlainString()) }
             val ownerNames = parties.filter { it.role == TitleRole.OWN.name }.map { it.name }
-            val residents = household.findByUnitId(unit.id).count { current(it.validFrom, it.validTo, on) }
+            val members = (householdByUnit[unit.id] ?: emptyList())
+                .sortedWith(compareBy({ it.validFrom }, { it.id.toString() }))
+                .map { BookMember(it.id, it.partyId, it.partyId?.let(nameById::get), it.isChildUnder6, it.validFrom, it.validTo) }
             val nonUse = absences.findByUnitId(unit.id).map { BookNonUse(it.absentFrom, it.absentTo) }
             BookUnitEntry(
                 unitId = unit.id,
@@ -36,7 +42,8 @@ class BookService(
                 builtAreaM2 = unit.areaM2?.toPlainString(),
                 idealParts = unit.idealPartsPct.toPlainString(),
                 parties = parties,
-                householdCount = residents,
+                householdCount = members.size,
+                household = members,
                 nonUse = nonUse,
                 complete = BookCompleteness.complete(unit.idealPartsPct.toPlainString(), ownerNames),
             )

@@ -501,6 +501,38 @@
         ],
         "type": "object"
       },
+      "BookMember": {
+        "properties": {
+          "childUnder6": {
+            "type": "boolean"
+          },
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "memberId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "childUnder6",
+          "from",
+          "memberId"
+        ],
+        "type": "object"
+      },
       "BookNonUse": {
         "properties": {
           "from": {
@@ -553,6 +585,12 @@
           "designation": {
             "type": "string"
           },
+          "household": {
+            "items": {
+              "$ref": "#/components/schemas/BookMember"
+            },
+            "type": "array"
+          },
           "householdCount": {
             "format": "int32",
             "type": "integer"
@@ -580,6 +618,7 @@
         "required": [
           "complete",
           "designation",
+          "household",
           "householdCount",
           "idealParts",
           "nonUse",
