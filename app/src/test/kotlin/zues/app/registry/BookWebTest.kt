@@ -93,7 +93,7 @@ class BookWebTest {
 
     private fun aBook(on: LocalDate = LocalDate.parse("2026-06-01")) = CondominiumBook(
         entranceId, on,
-        listOf(BookUnitEntry(UUID.randomUUID(), "ап. 1", "72.50", "60.0000", listOf(BookParty(ivan, "Иван Петров", "OWN", "1")), 2, emptyList(), complete = true)),
+        listOf(BookUnitEntry(UUID.randomUUID(), "ап. 1", "72.50", "60.0000", listOf(BookParty(ivan, "Иван Петров", "OWN", "1")), 2, emptyList(), emptyList(), complete = true)),
         complete = true,
     )
 
