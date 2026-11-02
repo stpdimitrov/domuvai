@@ -2,6 +2,8 @@ package zues.app.registry
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.junit.jupiter.api.Test
@@ -59,6 +61,22 @@ class HouseholdWebTest {
         whenever(registry.registerHousehold(any(), any(), any()))
             .thenThrow(NoSuchElementException("no unit $unitId"))
         mvc.perform(postHousehold()).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `PM-BOOK-002 a member's party is passed through to the entry, and an unknown one is a 400 naming the rule`() {
+        val party = UUID.randomUUID()
+        val named = post("/api/registry/entrances/$entranceId/units/$unitId/household")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"members":[{"partyId":"$party","validFrom":"2026-01-01"}]}""")
+        whenever(registry.registerHousehold(any(), any(), any())).thenReturn(listOf(UUID.randomUUID()))
+        mvc.perform(named).andExpect(status().isCreated)
+        verify(registry).registerHousehold(eq(entranceId), eq(unitId), eq(listOf(RegisterMember(false, "2026-01-01", party))))
+
+        whenever(registry.registerHousehold(any(), any(), any())).thenThrow(IllegalArgumentException("PM-BOOK-002: no party $party"))
+        mvc.perform(named)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("PM-BOOK-002: no party $party"))
     }
 
     private fun endStay(memberId: UUID, on: String) =

@@ -55,10 +55,15 @@ data class ImportedUnit(
     val ownerName: String? = null,
 )
 
-/** One resident to register in a unit's household. `validFrom` defaults to today in Sofia (PM-SYS-004). */
+/**
+ * One resident to register in a unit's household. `validFrom` defaults to today in Sofia (PM-SYS-004).
+ * [partyId] names the resident by a party already registered — the name stays in `party` alone
+ * (PM-BOOK-011); null enters a resident the headcount counts and nobody can name.
+ */
 data class RegisterMember(
     val isChildUnder6: Boolean = false,
     val validFrom: String? = null,
+    val partyId: UUID? = null,
 )
 
 /** One animal to register in a unit. `validFrom` defaults to today in Sofia (PM-SYS-004). */
@@ -251,13 +256,19 @@ class RegistryService(
     /**
      * Register residents in a unit's household — the headcount a per-person charge builds on
      * (Rule: PM-FEE-008). Children under six are flagged for separate treatment (Rule:
-     * PM-FEE-005). The unit must exist and belong to the entrance.
+     * PM-FEE-005). The unit must exist and belong to the entrance. A member may be named by a registered
+     * party, so the book names who lives there (Rule: PM-BOOK-002) and a household proxy can be checked
+     * (Rule: PM-GA-009); an unknown party refuses the whole list, nothing stored.
      */
     @Transactional
     fun registerHousehold(entranceId: UUID, unitId: UUID, members: List<RegisterMember>): List<UUID> {
         // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
         units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
             ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
+        // Rule: PM-BOOK-002 — every named party is checked before any member is stored
+        val named = members.mapNotNull { it.partyId }.distinct()
+        val known = parties.findAllById(named).map { it.id }.toSet()
+        require(known.containsAll(named)) { "PM-BOOK-002: no party ${(named - known).joinToString()}" }
         val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
         return members.map { member ->
             aggregates.insert(
@@ -265,7 +276,7 @@ class RegistryService(
                     id = UUID.randomUUID(),
                     entranceId = entranceId,
                     unitId = unitId,
-                    partyId = null,
+                    partyId = member.partyId,
                     isChildUnder6 = member.isChildUnder6,
                     validFrom = member.validFrom?.let { LocalDate.parse(it) } ?: today,
                     validTo = null,
