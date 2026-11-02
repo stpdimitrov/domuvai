@@ -18,7 +18,7 @@ class BookService(
     private val household: HouseholdMemberRepository,
     private val absences: AbsenceDeclarationRepository,
     private val entrances: EntranceRepository,
-    private val parties: PartyRepository,
+    private val partyRepository: PartyRepository,
 ) {
     // Rule: PM-BOOK-002, PM-BOOK-011
     @Transactional(readOnly = true)
@@ -26,7 +26,7 @@ class BookService(
         if (!entrances.existsById(entranceId)) throw NoSuchElementException("no entrance $entranceId")
         val ownersByUnit = ownership.ownersAsOf(entranceId, on).groupBy { it.unitId }
         val residents = household.findByEntranceId(entranceId).filter { current(it.validFrom, it.validTo, on) }
-        val nameById = parties.findAllById(residents.mapNotNull { it.partyId }.distinct()).associate { it.id to it.fullName }
+        val nameById = partyRepository.findAllById(residents.mapNotNull { it.partyId }.distinct()).associate { it.id to it.fullName }
         val householdByUnit = residents.groupBy { it.unitId }
         val entries = units.findByEntranceId(entranceId).map { unit ->
             val parties = (ownersByUnit[unit.id] ?: emptyList())

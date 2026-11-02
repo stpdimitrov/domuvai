@@ -36,8 +36,8 @@ class BookServiceTest {
 
     private val bookDate = LocalDate.of(2026, 5, 1)
 
-    private fun member(partyId: UUID?, from: String, to: String? = null, child: Boolean = false) = HouseholdMember(
-        UUID.randomUUID(), entranceId, unitId, partyId, child, LocalDate.parse(from), to?.let(LocalDate::parse),
+    private fun member(partyId: UUID?, from: String, to: String? = null, child: Boolean = false, id: UUID = UUID.randomUUID()) = HouseholdMember(
+        id, entranceId, unitId, partyId, child, LocalDate.parse(from), to?.let(LocalDate::parse),
     )
 
     private fun theBook(): CondominiumBook {
@@ -66,9 +66,9 @@ class BookServiceTest {
 
     @Test
     fun `PM-BOOK-002 the book names who lives in a unit on its date — a member entered with no party unnamed, one gone or not yet come absent, the count the list's size`() {
-        val named = member(partyId, "2026-01-01")
+        val named = member(partyId, "2026-01-01", id = UUID.fromString("00000000-0000-0000-0000-00000000000a"))
         val unnamed = member(null, "2026-02-01", child = true)
-        val leaving = member(null, "2026-01-01", to = "2026-05-02")
+        val leaving = member(null, "2026-01-01", to = "2026-05-02", id = UUID.fromString("00000000-0000-0000-0000-00000000000b"))
         val gone = member(partyId, "2025-01-01", to = "2026-05-01")
         val coming = member(null, "2026-05-02")
         whenever(household.findByEntranceId(entranceId)).thenReturn(listOf(coming, unnamed, gone, leaving, named))
@@ -80,7 +80,8 @@ class BookServiceTest {
             BookMember(leaving.id, null, null, false, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 5, 2)),
             BookMember(unnamed.id, null, null, true, LocalDate.of(2026, 2, 1), null),
         )
-        assertThat(entry.household.map { it.from }).isSorted()
+        assertThat(entry.household.map { it.memberId })                  // oldest stay first, a tie by id
+            .containsExactly(named.id, leaving.id, unnamed.id)
         assertThat(entry.householdCount).isEqualTo(entry.household.size).isEqualTo(3)
     }
 
