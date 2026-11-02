@@ -136,6 +136,7 @@ class RegistryController(private val registrations: Registrations, private val b
         return UnitsCreatedResponse(ids)
     }
 
+    // Rule: PM-BOOK-002, PM-GA-009 — a member named by a registered party
     @PostMapping("/{entranceId}/units/{unitId}/household")
     @ResponseStatus(HttpStatus.CREATED)
     fun registerHousehold(
