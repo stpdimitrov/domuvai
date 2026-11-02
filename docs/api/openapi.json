@@ -2187,6 +2187,10 @@
           "isChildUnder6": {
             "type": "boolean"
           },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "validFrom": {
             "type": "string"
           }
@@ -11013,14 +11017,16 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a registered party, so the book names them and a household proxy can be checked; an unknown party is a 400 and nothing is stored",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-FEE-005",
           "PM-FEE-008",
-          "PM-BOOK-005"
+          "PM-BOOK-005",
+          "PM-BOOK-002",
+          "PM-GA-009"
         ]
       }
     },

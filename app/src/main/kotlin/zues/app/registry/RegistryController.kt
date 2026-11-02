@@ -66,6 +66,7 @@ data class RegisterHouseholdRequest(val members: List<NewMemberRequest>)
 data class NewMemberRequest(
     val isChildUnder6: Boolean = false,
     val validFrom: String? = null,   // ISO date; defaults to today
+    val partyId: UUID? = null,       // PM-BOOK-002 — a registered party naming the resident; never a name or an ЕГН (PM-BOOK-011)
 )
 
 data class HouseholdRegisteredResponse(val memberIds: List<UUID>)
@@ -135,6 +136,7 @@ class RegistryController(private val registrations: Registrations, private val b
         return UnitsCreatedResponse(ids)
     }
 
+    // Rule: PM-BOOK-002, PM-GA-009 — a member named by a registered party
     @PostMapping("/{entranceId}/units/{unitId}/household")
     @ResponseStatus(HttpStatus.CREATED)
     fun registerHousehold(
@@ -146,7 +148,7 @@ class RegistryController(private val registrations: Registrations, private val b
         val ids = book.household(
             entranceId,
             unitId,
-            request.members.map { RegisterMember(it.isChildUnder6, it.validFrom) },
+            request.members.map { RegisterMember(it.isChildUnder6, it.validFrom, it.partyId) },
             who.of(signedIn),
         )
         return HouseholdRegisteredResponse(ids)

@@ -137,4 +137,17 @@ class HoldingsPersistenceIT {
         title(entranceId, first, resident, "1", "2026-01-01")
         assertThat(holdings.inForce(entranceId, LocalDate.parse("2026-05-01"), TitleRole.OWN).toString()).doesNotContain("Мария").doesNotContain("7501010010").doesNotContain("ап. 1")
     }
+
+    @Test
+    fun `PM-GA-009 a member entered through the API with a party is a resident the proxy's household check finds`() {
+        val entranceId = entrance()
+        val (first, _) = units(entranceId)
+        val resident = party("Мария Георгиева")
+        created(
+            "/api/registry/entrances/$entranceId/units/$first/household",
+            """{"members":[{"partyId":"$resident","validFrom":"2026-01-01"},{"isChildUnder6":true,"validFrom":"2026-01-01"}]}""",
+        )
+
+        assertThat(holdings.residents(entranceId, LocalDate.parse("2026-03-31"))).containsExactly(Resident(resident, first, false))
+    }
 }

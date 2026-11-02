@@ -1097,7 +1097,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
+        /** Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a registered party, so the book names them and a household proxy can be checked; an unknown party is a 400 and nothing is stored */
         post: operations["post_registry_entrances_entranceId_units_unitId_household"];
         delete?: never;
         options?: never;
@@ -1837,6 +1837,8 @@ export interface components {
         };
         NewMemberRequest: {
             isChildUnder6: boolean;
+            /** Format: uuid */
+            partyId?: string;
             validFrom?: string;
         };
         NewUnitRequest: {

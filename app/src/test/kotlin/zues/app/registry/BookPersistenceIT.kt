@@ -143,6 +143,24 @@ class BookPersistenceIT {
     }
 
     @Test
+    fun `PM-BOOK-002 a member entered with a registered party is served by name, and an unknown party stores nothing`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 11", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val maria = ownership.registerParty(RegisterParty("Мария Георгиева", "EGN", "7501010010"))
+        val rows = "SELECT count(*) FROM registry.household_member WHERE unit_id = ?"
+
+        assertThatThrownBy { registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = UUID.randomUUID()))) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-BOOK-002")
+        assertThat(jdbc.queryForObject(rows, Int::class.java, flat)).isZero()
+
+        registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria), RegisterMember(validFrom = "2026-01-01")))
+
+        val line = book.forEntrance(entrance, LocalDate.parse("2026-06-01")).units.single()
+        assertThat(line.household.map { it.partyId to it.name }).containsExactlyInAnyOrder(maria to "Мария Георгиева", null to null)
+        assertThat(line.household.toString()).doesNotContain("7501010010")   // PM-BOOK-011
+    }
+
+    @Test
     fun `PM-BOOK-006 owner A asking for the book is a 403 and an entry, the manager in office reads it, and one no longer in office does not`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 9", "А", "GA")).entranceId
         val other = registry.registerEntrance(RegisterEntrance("ул. Раковски 9", "Б", "GA")).entranceId
