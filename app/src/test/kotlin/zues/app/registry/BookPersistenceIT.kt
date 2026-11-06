@@ -66,6 +66,7 @@ class BookPersistenceIT {
     @MockitoSpyBean lateinit var book: BookService          // the real one; one test makes it fail after the entry is written
     @Autowired lateinit var declarations: DeclarationService
     @Autowired lateinit var jdbc: JdbcTemplate
+    @Autowired lateinit var headcounts: Units
     @Autowired lateinit var logins: Logins
 
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
@@ -158,6 +159,29 @@ class BookPersistenceIT {
         val line = book.forEntrance(entrance, LocalDate.parse("2026-06-01")).units.single()
         assertThat(line.household.map { it.partyId to it.name }).containsExactlyInAnyOrder(maria to "Мария Георгиева", null to null)
         assertThat(line.household.toString()).doesNotContain("7501010010")   // PM-BOOK-011
+    }
+
+    @Test
+    fun `PM-FEE-008 a refused repeat of a member leaves the unit's headcount unchanged, and one who moved out is entered again`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 13", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val maria = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        fun occupants(on: String) = headcounts.forEntrance(entrance, LocalDate.parse(on)).single().occupants
+        val member = registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria))).single()
+
+        for (repeat in listOf(
+            listOf(RegisterMember(validFrom = "2026-02-01"), RegisterMember(validFrom = "2026-02-01", partyId = maria)),  // already living there
+            listOf(RegisterMember(validFrom = "2025-06-01", partyId = maria)),                                            // an earlier start overlaps too
+        )) {
+            assertThatThrownBy { registry.registerHousehold(entrance, flat, repeat) }
+                .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-BOOK-002").hasMessageContaining(maria.toString())
+        }
+        assertThat(occupants("2026-06-01")).isEqualTo(1)
+
+        registry.endHouseholdStay(entrance, flat, member, LocalDate.parse("2026-04-01"))
+        registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-04-01", partyId = maria)))
+        assertThat(occupants("2026-03-31")).isEqualTo(1)
+        assertThat(occupants("2026-06-01")).isEqualTo(1)
     }
 
     @Test
