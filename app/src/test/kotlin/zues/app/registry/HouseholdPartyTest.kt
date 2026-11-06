@@ -11,7 +11,9 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
+import java.sql.SQLException
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
@@ -118,5 +120,20 @@ class HouseholdPartyTest {
         registry.registerHousehold(entranceId, unit.id, listOf(RegisterMember(), RegisterMember(isChildUnder6 = true)))
 
         verify(aggregates, times(2)).insert(any<HouseholdMember>())
+    }
+
+    @Test
+    fun `PM-BOOK-002 the table's refusal of an overlapping stay, met when a concurrent entry got past the read, is a refusal naming the rule and the party`() {
+        val overlap = SQLException("conflicting key value violates exclusion constraint \"household_member_party_stays_no_overlap\"", "23P01")
+        whenever(aggregates.insert(any<Any>())).thenThrow(DataIntegrityViolationException("insert", overlap))
+
+        assertThatThrownBy { registry.registerHousehold(entranceId, unit.id, listOf(RegisterMember(partyId = maria.id))) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("PM-BOOK-002")
+            .hasMessageContaining(maria.id.toString())
+
+        val other = DataIntegrityViolationException("insert", SQLException("violates foreign key constraint", "23503"))
+        whenever(aggregates.insert(any<Any>())).thenThrow(other)
+        assertThatThrownBy { registry.registerHousehold(entranceId, unit.id, listOf(RegisterMember(partyId = maria.id))) }.isSameAs(other)
     }
 }

@@ -1,12 +1,14 @@
 package zues.app.registry
 
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.core.NestedExceptionUtils
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.kernel.IdealParts
 import zues.kernel.toSofiaDate
 import java.math.BigDecimal
+import java.sql.SQLException
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
@@ -289,13 +291,13 @@ class RegistryService(
         // unnamed member is never checked — a headcount needs no name.
         val repeated = entered.mapNotNull { it.partyId }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
         require(repeated.isEmpty()) { "PM-BOOK-002: party ${repeated.joinToString()} named more than once" }
-        // ponytail: read-then-insert — two concurrent entries can both pass; a DB exclusion constraint closes it
+        // Two concurrent entries can both pass this read; the table's exclusion constraint refuses the second (BOOK-02d).
         val stays = household.findByUnitId(unitId).filter { it.partyId != null }.groupBy { it.partyId }
         val already = entered.filter { it.partyId != null }.filter { new ->
             stays[new.partyId].orEmpty().any { it.validTo == null || it.validTo > new.validFrom }
         }.map { it.partyId }
         require(already.isEmpty()) { "PM-BOOK-002: party ${already.joinToString()} is already a member of unit $unitId" }
-        return entered.map { aggregates.insert(it).id }
+        return entered.map { member -> oneStayAtATime(unitId, member.partyId) { aggregates.insert(member).id } }
     }
 
     /**
@@ -370,7 +372,28 @@ class RegistryService(
             ?.takeIf { it.entranceId == entranceId && it.unitId == unitId }
             ?: throw NoSuchElementException("no resident $memberId in unit $unitId")
         require(on > member.validFrom) { "the move-out ($on) must be after the move-in (${member.validFrom})" }
-        return aggregates.update(member.copy(validTo = on, endRecordedOn = LocalDate.parse(toSofiaDate(clock.instant()))))
+        // Rule: PM-BOOK-002 — a corrected move-out that runs into a later stay of the same party is refused by the table
+        return oneStayAtATime(unitId, member.partyId) {
+            aggregates.update(member.copy(validTo = on, endRecordedOn = LocalDate.parse(toSofiaDate(clock.instant()))))
+        }
+    }
+
+    /**
+     * Rule: PM-BOOK-002, PM-FEE-008 — the table's refusal of two overlapping stays of one party in one unit
+     * (`household_member_party_stays_no_overlap`), said as a 400 naming the rule and the party; nothing is stored, the
+     * transaction rolls back. Any other refusal is passed on.
+     */
+    private fun <T> oneStayAtATime(unitId: UUID, partyId: UUID?, write: () -> T): T = try {
+        write()
+    } catch (e: RuntimeException) {      // Spring Data JDBC wraps the violation in a DbActionExecutionException, no DataAccessException
+        val cause = NestedExceptionUtils.getRootCause(e) as? SQLException
+        if (cause?.sqlState != EXCLUSION_VIOLATION || STAYS_NO_OVERLAP !in cause.message.orEmpty()) throw e
+        throw IllegalArgumentException("PM-BOOK-002: party $partyId already has a stay in unit $unitId that this one overlaps")
+    }
+
+    private companion object {
+        const val EXCLUSION_VIOLATION = "23P01"
+        const val STAYS_NO_OVERLAP = "household_member_party_stays_no_overlap"
     }
 
     /** Record, or correct, the day an animal left the unit — as for a resident (Rule: PM-BOOK-005, PM-BOOK-008). */
