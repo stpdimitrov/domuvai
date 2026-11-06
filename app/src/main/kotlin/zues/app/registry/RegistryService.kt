@@ -258,7 +258,8 @@ class RegistryService(
      * (Rule: PM-FEE-008). Children under six are flagged for separate treatment (Rule:
      * PM-FEE-005). The unit must exist and belong to the entrance. A member may be named by a registered
      * party, so the book names who lives there (Rule: PM-BOOK-002) and a household proxy can be checked
-     * (Rule: PM-GA-009); an unknown party refuses the whole list, nothing stored.
+     * (Rule: PM-GA-009); an unknown party, a party named twice, or one already a member of the unit for an
+     * overlapping stay refuses the whole list, nothing stored (#442).
      */
     @Transactional
     fun registerHousehold(entranceId: UUID, unitId: UUID, members: List<RegisterMember>): List<UUID> {
@@ -270,19 +271,31 @@ class RegistryService(
         val known = parties.findAllById(named).map { it.id }.toSet()
         require(known.containsAll(named)) { "PM-BOOK-002: no party ${(named - known).joinToString()}" }
         val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
-        return members.map { member ->
-            aggregates.insert(
-                HouseholdMember(
-                    id = UUID.randomUUID(),
-                    entranceId = entranceId,
-                    unitId = unitId,
-                    partyId = member.partyId,
-                    isChildUnder6 = member.isChildUnder6,
-                    validFrom = member.validFrom?.let { LocalDate.parse(it) } ?: today,
-                    validTo = null,
-                ),
-            ).id
+        val entered = members.map { member ->
+            HouseholdMember(
+                id = UUID.randomUUID(),
+                entranceId = entranceId,
+                unitId = unitId,
+                partyId = member.partyId,
+                isChildUnder6 = member.isChildUnder6,
+                validFrom = member.validFrom?.let { LocalDate.parse(it) } ?: today,
+                validTo = null,
+            )
         }
+        // Rule: PM-BOOK-002, PM-FEE-008 — a member is a person and the headcount counts persons: a party
+        // named twice in the list, or already a member of the unit for a stay the new open-ended one
+        // overlaps, would count one person twice. Stays are half-open [validFrom, validTo), as `current`
+        // reads them, so one whose stay ended on or before the new validFrom may be entered again. An
+        // unnamed member is never checked — a headcount needs no name.
+        val repeated = entered.mapNotNull { it.partyId }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        require(repeated.isEmpty()) { "PM-BOOK-002: party ${repeated.joinToString()} named more than once" }
+        // ponytail: read-then-insert — two concurrent entries can both pass; a DB exclusion constraint closes it
+        val stays = household.findByUnitId(unitId).filter { it.partyId != null }.groupBy { it.partyId }
+        val already = entered.filter { it.partyId != null }.filter { new ->
+            stays[new.partyId].orEmpty().any { it.validTo == null || it.validTo > new.validFrom }
+        }.map { it.partyId }
+        require(already.isEmpty()) { "PM-BOOK-002: party ${already.joinToString()} is already a member of unit $unitId" }
+        return entered.map { aggregates.insert(it).id }
     }
 
     /**
