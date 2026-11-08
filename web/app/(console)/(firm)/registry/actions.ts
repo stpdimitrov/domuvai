@@ -27,9 +27,9 @@ export async function registerEntrance(_: RegistryState<{ entranceId: string; co
 /** A party registered (WEB-50). Rule: PM-BOOK-011 — the identity number is sent and not kept: it is left out of the values the form holds after an answer. Rule: PM-SEC-001 — who may is the API's. */
 // Rule: PM-BOOK-011, PM-SEC-001
 export async function registerParty(_: RegistryState<{ partyId: string; fullName: string }>, form: FormData): Promise<RegistryState<{ partyId: string; fullName: string }>> {
-  const typed = fields(form, ["fullName", "idType", "idValue"]);
+  const typed = fields(form, ["entranceId", "fullName", "idType", "idValue"]);
   const { idValue: _kept, ...values } = typed;
-  const body = partyOf({ fullName: typed.fullName, idType: typed.idType, idValue: typed.idValue });
+  const body = partyOf({ entranceId: typed.entranceId, fullName: typed.fullName, idType: typed.idType, idValue: typed.idValue });
   if ("refused" in body) return { values, refused: body.refused };
   const answer = await reach(() => api.POST("/api/registry/parties", { body }));
   if (!answer) return { values, refused: unknownOutcome("регистрирането на лицето") };

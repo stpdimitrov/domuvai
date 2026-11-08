@@ -64,7 +64,8 @@ class RegistrationsIT {
     private val run = UUID.randomUUID().toString().take(8)
     private val today: LocalDate get() = LocalDate.parse(toSofiaDate(Instant.now()))
 
-    private fun person(subject: String): UUID = ownership.registerParty(RegisterParty("Лице $subject")).also { logins.tie(REGISTRATIONS_REALM_IT, "$subject-$run", it) }
+    private val aside by lazy { registry.registerEntrance(RegisterEntrance("ул. Другаде 1", "Б", "GA")).entranceId }   // BOOK-02e: a party is registered in an entrance
+    private fun person(subject: String, entrance: UUID = aside): UUID = ownership.registerParty(RegisterParty(entrance, "Лице $subject")).also { logins.tie(REGISTRATIONS_REALM_IT, "$subject-$run", it) }
 
     private fun mandate(entrance: UUID, body: String, party: UUID, endedToday: Boolean = false) {
         jdbc.update(
@@ -97,10 +98,10 @@ class RegistrationsIT {
     fun `PM-SEC-001 each person lists only the entrances where they hold a role today — the administrator every one, a login tied to nobody none`() {
         val (a, flatA) = entrance()
         val (b, flatB) = entrance()
-        person("owner").also { ownership.assignTitle(a, flatA, AssignTitle(it, "OWN", "1")) }
+        person("owner", a).also { ownership.assignTitle(a, flatA, AssignTitle(it, "OWN", "1")) }
         person("manager").also { mandate(b, "BM", it) }
         person("ended").also { mandate(a, "BM", it, endedToday = true) }
-        person("future").also { ownership.assignTitle(b, flatB, AssignTitle(it, "OWN", "1", validFrom = today.plusDays(1).toString())) }
+        person("future", b).also { ownership.assignTitle(b, flatB, AssignTitle(it, "OWN", "1", validFrom = today.plusDays(1).toString())) }
 
         assertThat(listed("owner")).containsExactly(a)
         assertThat(listed("manager")).containsExactly(b)
@@ -111,35 +112,39 @@ class RegistrationsIT {
     }
 
     @Test
-    fun `PM-BOOK-005 the manager or the board of any entrance registers the party a title will name`() {
+    fun `PM-BOOK-005 PM-BOOK-011 the manager or the board of an entrance registers in it the party a title there will name, and no other entrance's book takes it`() {
         val (a, flatA) = entrance()
         val (b, _) = entrance()
         person("p-manager").also { mandate(a, "BM", it) }
         person("p-board").also { mandate(b, "MB", it) }
-        for (subject in listOf("p-manager", "p-board", "operator-r")) {
+        for ((subject, entrance) in listOf("p-manager" to a, "p-board" to b, "operator-r" to a)) {
             val name = "Нов собственик $subject $run"
-            send("/api/registry/parties", subject, """{"fullName":"$name"}""").andExpect(status().isCreated).andExpect(jsonPath("$.partyId").exists())
+            send("/api/registry/parties", subject, """{"entranceId":"$entrance","fullName":"$name"}""").andExpect(status().isCreated).andExpect(jsonPath("$.partyId").exists())
             assertThat(parties(name)).describedAs(subject).isEqualTo(1)
         }
-        val named = mvc.perform(
-            post("/api/registry/parties").with(signed("p-board")).contentType(MediaType.APPLICATION_JSON).content("""{"fullName":"Купувач $run"}"""),
-        ).andReturn().response.contentAsString.let { json.readTree(it)["partyId"].asText() }
-        send("/api/registry/entrances/$a/units/$flatA/titles", "p-manager", """{"partyId":"$named","titleRole":"OWN","share":"1"}""").andExpect(status().isCreated)
+        send("/api/registry/parties", "p-manager", """{"entranceId":"$b","fullName":"Чужд $run"}""").andExpect(status().isForbidden)   // not in an entrance they do not hold
+        fun registered(by: String, entrance: UUID) = send("/api/registry/parties", by, """{"entranceId":"$entrance","fullName":"Купувач $run"}""")
+            .andReturn().response.contentAsString.let { json.readTree(it)["partyId"].asText() }
+        val ofB = registered("p-board", b)
+        send("/api/registry/entrances/$a/units/$flatA/titles", "p-manager", """{"partyId":"$ofB","titleRole":"OWN","share":"1"}""")
+            .andExpect(status().isBadRequest).andExpect(jsonPath("$.error").value("PM-BOOK-011: no party $ofB"))
+        val ofA = registered("p-manager", a)
+        send("/api/registry/entrances/$a/units/$flatA/titles", "p-manager", """{"partyId":"$ofA","titleRole":"OWN","share":"1"}""").andExpect(status().isCreated)
     }
 
     @Test
     fun `PM-SEC-001 the owner, the user, the controller, the cashier and a login tied to nobody register no party — each a 403 naming the rule, and no party written`() {
         val (a, flatA) = entrance()
-        person("r-owner").also { ownership.assignTitle(a, flatA, AssignTitle(it, "OWN", "0.5")) }
-        person("r-user").also { ownership.assignTitle(a, flatA, AssignTitle(it, "USR", "1")) }
+        person("r-owner", a).also { ownership.assignTitle(a, flatA, AssignTitle(it, "OWN", "0.5")) }
+        person("r-user", a).also { ownership.assignTitle(a, flatA, AssignTitle(it, "USR", "1")) }
         person("r-controller").also { mandate(a, "CTL", it) }
         person("r-cashier").also { mandate(a, "CSH", it) }
         for (subject in listOf("r-owner", "r-user", "r-controller", "r-cashier", "r-untied")) {
             val name = "Отказан $subject $run"
-            send("/api/registry/parties", subject, """{"fullName":"$name"}""")
+            send("/api/registry/parties", subject, """{"entranceId":"$a","fullName":"$name"}""")
                 .andExpect(status().isForbidden)
                 .andExpect(jsonPath("$.rule").value("PM-SEC-001"))
-                .andExpect(jsonPath("$.error").value("a party is registered by the deployment's administrator, or by the manager or the board of an entrance"))
+                .andExpect(jsonPath("$.error").value("a party is registered in an entrance by the deployment's administrator, or by the manager or the board of that entrance"))
             assertThat(parties(name)).describedAs(subject).isZero()
         }
     }

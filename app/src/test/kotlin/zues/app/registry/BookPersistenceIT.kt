@@ -80,7 +80,8 @@ class BookPersistenceIT {
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
 
     /** A registered party with a login of its own, tied to it. */
-    private fun person(name: String, subject: String): UUID = ownership.registerParty(RegisterParty(name)).also { logins.tie(realm, subject, it) }
+    private val aside by lazy { registry.registerEntrance(RegisterEntrance("ул. Другаде 1", "Б", "GA")).entranceId }   // BOOK-02e: a party is registered in an entrance
+    private fun person(name: String, subject: String, entrance: UUID = aside): UUID = ownership.registerParty(RegisterParty(entrance, name)).also { logins.tie(realm, subject, it) }
 
     /** A mandate as the assembly's protocol would give it; nothing writes one through the api yet. */
     private fun mandate(entrance: UUID, body: String, party: UUID, from: LocalDate, to: LocalDate, succeededAt: LocalDate? = null) {
@@ -100,7 +101,7 @@ class BookPersistenceIT {
     fun `PM-BOOK-003 PM-BOOK-004 a filed declaration persists with its template version and clears what was owed`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 3", "А", "GA")).entranceId
         val unit = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        val party = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        val party = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
         ownership.assignTitle(entrance, unit, AssignTitle(party, "OWN", validFrom = "2020-01-01"))
         val dayAfterDeadline = LocalDate.parse("2020-01-17")         // acquired 1 Jan 2020; the window closed on the 16th
         assertThat(declarations.overdue(entrance, dayAfterDeadline).single().partyName).isEqualTo("Мария Георгиева")
@@ -122,7 +123,7 @@ class BookPersistenceIT {
             ),
         )
         val unit1 = unitIds[0]
-        val party = ownership.registerParty(RegisterParty("Иван Петров"))
+        val party = ownership.registerParty(RegisterParty(entrance, "Иван Петров"))
         ownership.assignTitle(entrance, unit1, AssignTitle(party, "OWN", validFrom = "2026-01-01"))
         registry.registerHousehold(
             entrance, unit1, listOf(RegisterMember(validFrom = "2026-01-01"), RegisterMember(validFrom = "2026-01-01")),
@@ -155,7 +156,7 @@ class BookPersistenceIT {
     fun `PM-BOOK-002 a member entered with a registered party is served by name, and an unknown party stores nothing`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 11", "А", "GA")).entranceId
         val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        val maria = ownership.registerParty(RegisterParty("Мария Георгиева", "EGN", "7501010010"))
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева", "EGN", "7501010010"))
         val rows = "SELECT count(*) FROM registry.household_member WHERE unit_id = ?"
 
         assertThatThrownBy { registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = UUID.randomUUID()))) }
@@ -173,7 +174,7 @@ class BookPersistenceIT {
     fun `PM-FEE-008 a refused repeat of a member leaves the unit's headcount unchanged, and one who moved out is entered again`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 13", "А", "GA")).entranceId
         val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        val maria = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
         fun occupants(on: String) = headcounts.forEntrance(entrance, LocalDate.parse(on)).single().occupants
         val member = registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria))).single()
 
@@ -196,7 +197,7 @@ class BookPersistenceIT {
     fun `PM-BOOK-002 PM-FEE-008 two concurrent entries of one party into one unit store exactly one row, the other a 400, and count her once`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 15", "А", "GA")).entranceId
         val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        val maria = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
         mandate(entrance, "BM", person("Мария Иванова", "login-manager"), today.minusMonths(1), today.plusMonths(11))
         val second = Executors.newSingleThreadExecutor()
         var blocked = false
@@ -235,7 +236,7 @@ class BookPersistenceIT {
     fun `PM-BOOK-002 a corrected move-out that runs into a later stay of the same party is a 400 and changes nothing`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 17", "А", "GA")).entranceId
         val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        val maria = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
         mandate(entrance, "BM", person("Мария Иванова", "login-manager"), today.minusMonths(1), today.plusMonths(11))
         val first = registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria))).single()
         registry.endHouseholdStay(entrance, flat, first, LocalDate.parse("2026-04-01"))
@@ -258,7 +259,7 @@ class BookPersistenceIT {
     fun `PM-BOOK-002 against the table a party whose stay ended before the new validFrom is entered, and unnamed members are never refused`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 19", "А", "GA")).entranceId
         val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        val maria = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
         val first = registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria))).single()
         registry.endHouseholdStay(entrance, flat, first, LocalDate.parse("2026-03-01"))
 
@@ -276,8 +277,8 @@ class BookPersistenceIT {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 9", "А", "GA")).entranceId
         val other = registry.registerEntrance(RegisterEntrance("ул. Раковски 9", "Б", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        val ownerA = person("Иван Петров", "login-owner-a")
-        val ownerB = person("Георги Стоянов", "login-owner-b")
+        val ownerA = person("Иван Петров", "login-owner-a", entrance)
+        val ownerB = person("Георги Стоянов", "login-owner-b", entrance)
         ownership.assignTitle(entrance, flat1, AssignTitle(ownerA, "OWN", validFrom = "2020-01-01"))
         ownership.assignTitle(entrance, flat2, AssignTitle(ownerB, "OWN", validFrom = "2020-01-01"))
         registry.registerHousehold(entrance, flat2, listOf(RegisterMember(validFrom = "2020-01-01")))
@@ -349,9 +350,9 @@ class BookPersistenceIT {
     fun `PM-BOOK-006 the owners list, the overdue list and the retention pass are the manager's and the board's — the controller reads and does not anonymise, an owner gets none`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 11", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        val ownerA = person("Иван Петров", "login-11-owner-a")
+        val ownerA = person("Иван Петров", "login-11-owner-a", entrance)
         ownership.assignTitle(entrance, flat1, AssignTitle(ownerA, "OWN", validFrom = "2020-01-01"))
-        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "login-11-owner-b"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "login-11-owner-b", entrance), "OWN", validFrom = "2020-01-01"))
         val manager = person("Мария Иванова", "login-11-manager")
         val controller = person("Елена Колева", "login-11-controller")
         mandate(entrance, "BM", manager, today.minusMonths(1), today.plusMonths(11))

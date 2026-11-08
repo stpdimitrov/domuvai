@@ -73,7 +73,8 @@ class AttendancePersistenceIT {
         registered("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText(),
     )
 
-    private fun party() = UUID.fromString(registered("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private val aside by lazy { entrance() }   // BOOK-02e: a party is registered in an entrance; one in no book here is registered aside
+    private fun party(entranceId: UUID = aside) = UUID.fromString(registered("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Иван Петров"}""").get("partyId").asText())
 
     @Autowired lateinit var logins: Logins
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
@@ -84,7 +85,7 @@ class AttendancePersistenceIT {
     private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     /** A party with a login of its own, tied to it. */
-    private fun person(): UUID = party().also { logins.tie(realm, "login-$it", it) }
+    private fun person(entranceId: UUID = aside): UUID = party(entranceId).also { logins.tie(realm, "login-$it", it) }
 
     private fun <T> signedIn(party: UUID?, act: () -> T): T {
         val before = signedInAs
@@ -102,7 +103,7 @@ class AttendancePersistenceIT {
     }
 
     /** An owner of a unit of the entrance since the start of last year — the whole entrance, the first time it is asked for. */
-    private fun owner(entranceId: UUID): UUID = person().also {
+    private fun owner(entranceId: UUID): UUID = person(entranceId).also {
         val existing = jdbc.queryForList("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)
         val unit = existing.firstOrNull() ?: UUID.fromString(
             created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")

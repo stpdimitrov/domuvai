@@ -98,10 +98,10 @@ class FundAccountPersistenceIT {
         register(entranceId, freshIban(), "REPAIR_RENEWAL").andExpect(status().isConflict)
     }
 
-    private fun party(): String {
+    private fun party(entranceId: UUID): String {
         val response = mvc.perform(
             post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON)
-                .content("""{"fullName":"Иван Петров","idType":"EGN","idValue":"7501010010"}"""),
+                .content("""{"entranceId":"$entranceId","fullName":"Иван Петров","idType":"EGN","idValue":"7501010010"}"""),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
         return json.readTree(response).get("partyId").asText()
     }
@@ -124,7 +124,7 @@ class FundAccountPersistenceIT {
     @Test
     fun `PM-FUND-004 the holder and the mandate are stored and read back`() {
         val entranceId = createEntrance()
-        val partyId = party()
+        val partyId = party(entranceId)
         val mandate = mandate(entranceId, partyId)
         registerManagers(entranceId, partyId).andExpect(status().isCreated)
 
@@ -137,7 +137,7 @@ class FundAccountPersistenceIT {
     @Test
     fun `PM-FUND-004 a fund's manager standing on no mandate is a 400 and nothing is stored`() {
         val entranceId = createEntrance()
-        val partyId = party()
+        val partyId = party(entranceId)
         val elsewhere = createEntrance()
         mandate(elsewhere, partyId)
         mandate(entranceId, partyId, "CTL")
@@ -160,7 +160,7 @@ class FundAccountPersistenceIT {
     @Test
     fun `PM-FUND-004 the table holds a mandate only on a manager's fund account`() {
         val entranceId = createEntrance()
-        val partyId = party()
+        val partyId = party(entranceId)
         val mandate = mandate(entranceId, partyId)
         register(entranceId, freshIban(), "OPERATING").andExpect(status().isCreated)
         assertThatThrownBy {

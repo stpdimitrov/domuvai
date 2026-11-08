@@ -35,7 +35,7 @@ RUNNING = {
  ('get', '/api/registry/entrances/{entranceId}/units'):
    ('List the units of an entrance — for anyone holding a role in it: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-ORG-001', 'PM-ORG-002', 'PM-ORG-003', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household'):
-   ("Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a registered party, so the book names them and a household proxy can be checked; an unknown party is a 400 and nothing is stored", ['PM-FEE-005', 'PM-FEE-008', 'PM-BOOK-005', 'PM-BOOK-002', 'PM-GA-009']),
+   ("Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a party registered in the entrance, so the book names them and a household proxy can be checked; an unknown party, or one of another entrance, is a 400 and nothing is stored", ['PM-FEE-005', 'PM-FEE-008', 'PM-BOOK-005', 'PM-BOOK-002', 'PM-BOOK-011', 'PM-GA-009']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals'):
    ('Record the animals kept in a unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-005', 'PM-FEE-009']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/absences'):
@@ -57,9 +57,9 @@ RUNNING = {
  ('get', '/api/registry/entrances/{entranceId}/book/declarations/overdue'):
    ("Owners and users past their declaration deadline on a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-BOOK-003', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/parties'):
-   ("Register a party — a person or company that can hold a title — by the deployment's administrator, or by the manager or the board of any entrance, as the sign-in says who is asking; anybody else is a 403", ['PM-BOOK-002', 'PM-BOOK-005', 'PM-SEC-001']),
+   ("Register a party — a person or company that can hold a title — in an entrance, whose book alone may name them, by the deployment's administrator, or by the manager or the board of that entrance, as the sign-in says who is asking; anybody else is a 403", ['PM-BOOK-002', 'PM-BOOK-005', 'PM-BOOK-011', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/titles'):
-   ('Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included', ['PM-ORG-005', 'PM-ORG-011', 'PM-BOOK-005']),
+   ('Record a title to a unit — effective-dated, with its share, naming a party of the entrance (one of another entrance is answered as unknown, 400) — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included', ['PM-ORG-005', 'PM-ORG-011', 'PM-BOOK-005', 'PM-BOOK-011']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
    ("The owners and users of an entrance's units as of a date — each party's id beside the name, never an identity number; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  # ---- assembly

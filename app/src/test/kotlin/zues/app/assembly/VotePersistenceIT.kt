@@ -111,7 +111,8 @@ class VotePersistenceIT {
         try { return act() } finally { signedInAs = before }
     }
 
-    private fun person(): UUID = UUID.fromString(registered("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private val aside by lazy { UUID.fromString(registered("/api/registry/entrances", """{"address":"ул. Раковски 3","label":"Б","managementForm":"GA"}""").get("entranceId").asText()) }   // BOOK-02e
+    private fun person(entranceId: UUID = aside): UUID = UUID.fromString(registered("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Иван Петров"}""").get("partyId").asText())
         .also { logins.tie(realm, "login-$it", it) }
 
     /** An entrance of one unit of 100% — owned a half by the first owner, a quarter by each of the next two. */
@@ -125,7 +126,7 @@ class VotePersistenceIT {
                 .get("unitIds")[0].asText(),
         )
         val owners = listOf("0.5", "0.25", "0.25").map { share ->
-            person().also { created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"$share","validFrom":"2025-01-01"}""") }
+            person(entranceId).also { created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"$share","validFrom":"2025-01-01"}""") }
         }
         val manager = person()
         jdbc.update(
@@ -328,7 +329,7 @@ class VotePersistenceIT {
         val m = opened()
         signedIn(m.manager) {
             vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
-            created("/api/registry/entrances/${m.entranceId}/units/${m.unit}/titles", """{"partyId":"${person()}","titleRole":"USR","share":"1","validFrom":"2025-01-01"}""")
+            created("/api/registry/entrances/${m.entranceId}/units/${m.unit}/titles", """{"partyId":"${person(m.entranceId)}","titleRole":"USR","share":"1","validFrom":"2025-01-01"}""")
             close(m).andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("right of use")))
         }
         assertThat(decisions(m)).isEmpty()

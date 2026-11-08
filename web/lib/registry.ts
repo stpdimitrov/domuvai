@@ -34,18 +34,20 @@ export function entranceOf(t: { label: string; managementForm: string; address: 
 }
 
 /** The request's `RegisterPartyRequest`, as typed. */
-export type NewParty = { fullName: string; idType?: string; idValue?: string };
+export type NewParty = { entranceId: string; fullName: string; idType?: string; idValue?: string };
 
 /**
  * Rule: PM-BOOK-011 — a party as typed: the full name, and optionally what identifies them. The identity number goes to the
- * API and nowhere else: it is not kept in the form after an answer, and not shown back.
+ * API and nowhere else: it is not kept in the form after an answer, and not shown back. A party is registered in an entrance,
+ * whose book alone may name them (BOOK-02e).
  */
 // Rule: PM-BOOK-011
-export function partyOf(t: { fullName: string; idType: string; idValue: string }): NewParty | { refused: string } {
-  const [fullName, idType, idValue] = [t.fullName.trim(), t.idType.trim(), t.idValue.trim()];
+export function partyOf(t: { entranceId: string; fullName: string; idType: string; idValue: string }): NewParty | { refused: string } {
+  const [entranceId, fullName, idType, idValue] = [t.entranceId.trim(), t.fullName.trim(), t.idType.trim(), t.idValue.trim()];
+  if (!entranceId) return { refused: "Посочете номера на входа." };
   if (!fullName) return { refused: "Посочете пълното име." };
   if (idType && !Object.hasOwn(ID_TYPE, idType)) return { refused: `„${idType}“ не е вид на идентификатора.` };
-  return { fullName, ...(idType && { idType }), ...(idValue && { idValue }) };
+  return { entranceId, fullName, ...(idType && { idType }), ...(idValue && { idValue }) };
 }
 
 type Answer = { error?: unknown; response: { status: number } };

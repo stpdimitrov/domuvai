@@ -76,7 +76,8 @@ class MoneyAccessIT {
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
     private val today: LocalDate get() = LocalDate.parse(toSofiaDate(Instant.now()))
 
-    private fun person(name: String, subject: String): UUID = ownership.registerParty(RegisterParty(name)).also { logins.tie(realm, subject, it) }
+    private val aside by lazy { registry.registerEntrance(RegisterEntrance("ул. Другаде 1", "Б", "GA")).entranceId }   // BOOK-02e: a party is registered in an entrance
+    private fun person(name: String, subject: String, entrance: UUID = aside): UUID = ownership.registerParty(RegisterParty(entrance, name)).also { logins.tie(realm, subject, it) }
 
     private fun mandate(entrance: UUID, body: String, party: UUID) {
         jdbc.update(
@@ -91,8 +92,8 @@ class MoneyAccessIT {
     fun `PM-SEC-002 PM-DEBT-007 PM-DEBT-003 PM-GOV-008 an owner reads their own unit only, the offices read the entrance and its journal, the cashier nothing`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 3", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "owner-1"), "OWN", validFrom = "2020-01-01"))
-        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "owner-2"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "owner-1", entrance), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "owner-2", entrance), "OWN", validFrom = "2020-01-01"))
         mandate(entrance, "BM", person("Мария Иванова", "manager"))
         mandate(entrance, "CTL", person("Елена Колева", "controller"))
         mandate(entrance, "CSH", person("Стефан Илиев", "cashier"))
@@ -133,13 +134,13 @@ class MoneyAccessIT {
     fun `PM-SEC-002 a unit's open debts are read as its arrears — its owner and the offices, nobody else, and a unit with nothing posted is refused`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 4", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "owner-1"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "owner-1", entrance), "OWN", validFrom = "2020-01-01"))
         mandate(entrance, "BM", person("Мария Иванова", "manager"))
         mandate(entrance, "CTL", person("Елена Колева", "controller"))
         mandate(entrance, "CSH", person("Стефан Илиев", "cashier"))
         val quietEntrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 6", "А", "GA")).entranceId
         val quiet = registry.registerUnits(quietEntrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        ownership.assignTitle(quietEntrance, quiet, AssignTitle(person("Георги Стоянов", "owner-2"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(quietEntrance, quiet, AssignTitle(person("Георги Стоянов", "owner-2", quietEntrance), "OWN", validFrom = "2020-01-01"))
         mvc.perform(
             post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
                 json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)))),
@@ -163,8 +164,8 @@ class MoneyAccessIT {
     fun `PM-SEC-002 a payment is read back by its unit's owner, not another, and an owner learns nothing of a payment that is not there`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 5", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "p-owner-1"), "OWN", validFrom = "2020-01-01"))
-        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "p-owner-2"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "p-owner-1", entrance), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "p-owner-2", entrance), "OWN", validFrom = "2020-01-01"))
         mandate(entrance, "BM", person("Мария Иванова", "p-manager"))
         mvc.perform(
             post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
@@ -189,15 +190,15 @@ class MoneyAccessIT {
     fun `PM-SEC-002 PM-SEC-001 PM-GOV-008 PM-BOOK-006 the fund is read by the offices and the entrance's owners, the headcount by the offices only`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 7", "А", "GA")).entranceId
         val (flat1) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
-        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "f-owner"), "OWN", validFrom = "2020-01-01"))
-        ownership.assignTitle(entrance, flat1, AssignTitle(person("Анна Петрова", "f-user"), "USR", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "f-owner", entrance), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Анна Петрова", "f-user", entrance), "USR", validFrom = "2020-01-01"))
         mandate(entrance, "BM", person("Мария Иванова", "f-manager"))
         mandate(entrance, "MB", person("Петър Колев", "f-board"))
         mandate(entrance, "CTL", person("Елена Колева", "f-controller"))
         mandate(entrance, "CSH", person("Стефан Илиев", "f-cashier"))
         val elsewhere = registry.registerEntrance(RegisterEntrance("ул. Шипка 9", "А", "GA")).entranceId
         val (flatElsewhere) = registry.registerUnits(elsewhere, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
-        ownership.assignTitle(elsewhere, flatElsewhere, AssignTitle(person("Георги Стоянов", "f-owner-elsewhere"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(elsewhere, flatElsewhere, AssignTitle(person("Георги Стоянов", "f-owner-elsewhere", elsewhere), "OWN", validFrom = "2020-01-01"))
 
         val fundReads = listOf("fund-accounts", "fund/handover-statements").map { "/api/money/entrances/$entrance/$it" }
         // allowed, and then told there is nothing: no fund account, no operating account, no such statement
@@ -222,7 +223,7 @@ class MoneyAccessIT {
     fun `PM-SEC-001 the entrance's accounts are kept by its manager and its board — the controller, the cashier and an owner are refused`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 11", "А", "GA")).entranceId
         val (flat1) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
-        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "k-owner"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "k-owner", entrance), "OWN", validFrom = "2020-01-01"))
         mandate(entrance, "BM", person("Мария Иванова", "k-manager"))
         mandate(entrance, "MB", person("Петър Колев", "k-board"))
         mandate(entrance, "CTL", person("Елена Колева", "k-controller"))
@@ -256,7 +257,7 @@ class MoneyAccessIT {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 13", "А", "GA")).entranceId
         val holder = person("Мария Иванова", "s-manager")
         val board = person("Петър Колев", "s-board")
-        val stranger = ownership.registerParty(RegisterParty("Някой Друг"))
+        val stranger = ownership.registerParty(RegisterParty(entrance, "Някой Друг"))
         mandate(entrance, "BM", holder)
         mandate(entrance, "MB", board)
         val base = "/api/money/entrances/$entrance/fund"
@@ -298,11 +299,11 @@ class MoneyAccessIT {
     fun `PM-SEC-002 PM-SEC-001 PM-GOV-008 an owner reads the fund, its accounts and its statements with no party id, the offices with them, an owner in office as the office`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 15", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "r-owner"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "r-owner", entrance), "OWN", validFrom = "2020-01-01"))
         val holder = person("Мария Иванова", "r-manager")
         val board = person("Петър Колев", "r-board")
         val incoming = person("Елена Колева", "r-controller")
-        val boardOwner = person("Анна Петрова", "r-owner-in-office")
+        val boardOwner = person("Анна Петрова", "r-owner-in-office", entrance)
         ownership.assignTitle(entrance, flat2, AssignTitle(boardOwner, "OWN", validFrom = "2020-01-01"))
         mandate(entrance, "BM", holder)
         mandate(entrance, "MB", board)

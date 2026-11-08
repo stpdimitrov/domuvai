@@ -46,8 +46,11 @@ class Registrations(
 
     // Rule: PM-BOOK-005
     // Rule: PM-SEC-001
+    // Rule: PM-BOOK-011
     fun party(command: RegisterParty, who: Asking): UUID {
-        if (!unasked(who)) allowed(policy.decideInAny(who, Action.REGISTER_PARTY, registry.listEntrances().map { it.id }, today()), PARTY_REFUSED)
+        // decided for the entrance it is registered in: the manager or board of another entrance is refused before
+        // they learn whether that entrance exists
+        if (!unasked(who)) allowed(policy.decideInAny(who, Action.REGISTER_PARTY, listOf(command.entranceId), today()), PARTY_REFUSED)
         return ownership.registerParty(command)
     }
 
@@ -61,6 +64,6 @@ class Registrations(
 
     private companion object {
         const val ENTRANCE_REFUSED = "an entrance is registered by the deployment's administrator"
-        const val PARTY_REFUSED = "a party is registered by the deployment's administrator, or by the manager or the board of an entrance"
+        const val PARTY_REFUSED = "a party is registered in an entrance by the deployment's administrator, or by the manager or the board of that entrance"
     }
 }

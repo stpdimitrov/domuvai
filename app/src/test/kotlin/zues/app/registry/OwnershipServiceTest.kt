@@ -38,7 +38,7 @@ class OwnershipServiceTest {
         whenever(units.findById(unitId)).thenReturn(
             Optional.of(PropertyUnit(unitId, entranceId, "ап. 1", "FLAT", null, BigDecimal("100.0000"), false)),
         )
-        whenever(parties.existsById(partyId)).thenReturn(true)
+        whenever(parties.findById(partyId)).thenReturn(Optional.of(Party(partyId, "Иван Петров", null, null, entranceId = entranceId)))
     }
 
     private fun unit(parts: String) = PropertyUnit(UUID.randomUUID(), entranceId, "об.", "FLAT", null, BigDecimal(parts), false)
@@ -86,16 +86,24 @@ class OwnershipServiceTest {
     }
 
     @Test
-    fun `PM-BOOK-002 a party is registered with its name`() {
+    fun `PM-BOOK-002 a party is registered with its name, in its entrance`() {
         val captor = argumentCaptor<Party>()
+        whenever(aggregates.existsById(entranceId, Entrance::class.java)).thenReturn(true)
         whenever(aggregates.insert(captor.capture())).thenAnswer { it.getArgument<Party>(0) }
-        service.registerParty(RegisterParty("Иван Петров", "EGN", "7501010010"))
+        service.registerParty(RegisterParty(entranceId, "Иван Петров", "EGN", "7501010010"))
         assertThat(captor.firstValue.fullName).isEqualTo("Иван Петров")
+        assertThat(captor.firstValue.entranceId).isEqualTo(entranceId)
+    }
+
+    @Test
+    fun `PM-BOOK-011 a party is registered only in an entrance there is`() {
+        assertThatThrownBy { service.registerParty(RegisterParty(entranceId, "Иван Петров")) }
+            .isInstanceOf(NoSuchElementException::class.java).hasMessage("no entrance $entranceId")
     }
 
     @Test
     fun `an unknown id type is rejected`() {
-        assertThatThrownBy { service.registerParty(RegisterParty("Иван", "SSN")) }
+        assertThatThrownBy { service.registerParty(RegisterParty(entranceId, "Иван", "SSN")) }
             .isInstanceOf(IllegalArgumentException::class.java)
     }
 
@@ -109,13 +117,18 @@ class OwnershipServiceTest {
     }
 
     @Test
-    fun `a title for an unknown party is not found`() {
+    fun `PM-BOOK-011 a title naming a party of another entrance is refused as one naming an unknown party`() {
         whenever(units.findById(unitId)).thenReturn(
             Optional.of(PropertyUnit(unitId, entranceId, "ап. 1", "FLAT", null, BigDecimal("100.0000"), false)),
         )
-        whenever(parties.existsById(partyId)).thenReturn(false)
-        assertThatThrownBy { service.assignTitle(entranceId, unitId, AssignTitle(partyId, "OWN")) }
-            .isInstanceOf(NoSuchElementException::class.java)
+        val stranger = UUID.randomUUID()
+        whenever(parties.findById(partyId)).thenReturn(Optional.of(Party(partyId, "Иван Петров", null, null, entranceId = UUID.randomUUID())))
+        whenever(parties.findById(stranger)).thenReturn(Optional.empty())
+        val elsewhere = runCatching { service.assignTitle(entranceId, unitId, AssignTitle(partyId, "OWN")) }.exceptionOrNull()
+        val unknown = runCatching { service.assignTitle(entranceId, unitId, AssignTitle(stranger, "OWN")) }.exceptionOrNull()
+        assertThat(elsewhere).isInstanceOf(IllegalArgumentException::class.java).hasMessage("PM-BOOK-011: no party $partyId")
+        assertThat(unknown).isInstanceOf(IllegalArgumentException::class.java).hasMessage("PM-BOOK-011: no party $stranger")
+        org.mockito.kotlin.verify(aggregates, org.mockito.kotlin.never()).insert(any<Title>())
     }
 
     @Test

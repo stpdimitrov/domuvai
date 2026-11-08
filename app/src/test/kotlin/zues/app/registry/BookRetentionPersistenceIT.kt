@@ -75,7 +75,7 @@ class BookRetentionPersistenceIT {
             "/api/registry/entrances/$entranceId/units",
             """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""", "unitIds",
         )
-        val partyId = postFor("/api/registry/parties", """{"fullName":"Петър Илиев"}""", "partyId")
+        val partyId = postFor("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Петър Илиев"}""", "partyId")
         val resident = aggregates.insert(
             HouseholdMember(UUID.randomUUID(), entranceId, unitId, partyId, false, LocalDate.parse("2026-01-01"), null),
         )

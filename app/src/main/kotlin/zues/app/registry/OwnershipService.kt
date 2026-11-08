@@ -9,8 +9,9 @@ import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
 
-/** Register a party the book will record (Rule: PM-BOOK-002). Identity is optional. */
+/** Register a party the book of [entranceId] will record (Rule: PM-BOOK-002) — and only that book (PM-BOOK-011). Identity is optional. */
 data class RegisterParty(
+    val entranceId: UUID,
     val fullName: String,
     val idType: String? = null,
     val idValue: String? = null,
@@ -58,19 +59,20 @@ class OwnershipService(
     fun registerParty(command: RegisterParty): UUID {
         require(command.fullName.isNotBlank()) { "fullName must not be blank" }
         command.idType?.let { enumValueOf<IdType>(it) }   // unknown id type -> 400
+        if (!aggregates.existsById(command.entranceId, Entrance::class.java)) throw NoSuchElementException("no entrance ${command.entranceId}")
         return aggregates.insert(
-            Party(UUID.randomUUID(), command.fullName, command.idType, command.idValue),
+            Party(UUID.randomUUID(), command.fullName, command.idType, command.idValue, entranceId = command.entranceId),
         ).id
     }
 
+    // Rule: PM-BOOK-011
     @Transactional
     fun assignTitle(entranceId: UUID, unitId: UUID, command: AssignTitle): UUID {
         // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
         units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
             ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
-        if (!parties.existsById(command.partyId)) {
-            throw NoSuchElementException("no party ${command.partyId}")
-        }
+        // Rule: PM-BOOK-011 — a party of another entrance is answered as one unknown: an id from elsewhere tells nothing
+        require(parties.findById(command.partyId).orElse(null)?.entranceId == entranceId) { "PM-BOOK-011: no party ${command.partyId}" }
         val role = enumValueOf<TitleRole>(command.titleRole)                  // unknown role -> 400
         val share = BigDecimal(command.share)
         require(share > BigDecimal.ZERO && share <= BigDecimal.ONE) {         // Rule: PM-ORG-005

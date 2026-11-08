@@ -2230,7 +2230,7 @@ def units_in(web, entrance, administrator, owner, owner_party, party, party_name
     return failures
 
 
-def registry_screen(api, web, signed_in, administrator=None, owner=None, nobody=None, owner_party=None):
+def registry_screen(api, web, signed_in, entrance, administrator=None, owner=None, nobody=None, owner_party=None):
     """
     WEB-50 (PM-SEC-001, PM-ORG-001, PM-BOOK-011, #363) — `/registry`. Both forms are offered, with the API's closed lists. Signed in as a
     board member (`--user`, not the administrator), a party is registered through the page and shown by its number, never its
@@ -2253,7 +2253,7 @@ def registry_screen(api, web, signed_in, administrator=None, owner=None, nobody=
     tag = uuid.uuid4().hex[:6]
     label = f"ЯЯЯ e2e {tag}"
     entrance_form = {"label": label, "managementForm": "GA", "address": f"ул. e2e {tag} 1", "condominiumId": ""}
-    party_form = {"fullName": f"e2e {tag}", "idType": "EGN", "idValue": f"E2E{tag}"}
+    party_form = {"entranceId": entrance, "fullName": f"e2e {tag}", "idType": "EGN", "idValue": f"E2E{tag}"}   # in the board member's entrance (BOOK-02e)
     board = CARRIED.get(web)
 
     def as_(who, marker, form):          # the page signed in as [who], and one form posted
@@ -2790,7 +2790,7 @@ def main():
     print(f"{'ok ' if shown else 'BAD'} /entrance/fund  the fund's payout in the journal of its month")
 
     failures += units_screen(api, web, entrance, signed_in=bool(args.user), owner=owner)
-    failures += registry_screen(web=web, api=api, signed_in=bool(args.user), administrator=administrator, owner=owner, nobody=nobody, owner_party=args.owner_party)   # last: it registers an entrance
+    failures += registry_screen(web=web, api=api, signed_in=bool(args.user), entrance=entrance, administrator=administrator, owner=owner, nobody=nobody, owner_party=args.owner_party)   # last: it registers an entrance
 
     if browser:
         failures += sign_out(web, args.issuer.rstrip("/"), browser)

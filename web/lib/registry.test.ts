@@ -27,9 +27,10 @@ test("PM-BOOK-011 a party is sent with an optional identity that is not kept in 
   // IdType in Party.kt: the same four, in the same order
   const kotlin = read("../../app/src/main/kotlin/zues/app/registry/Party.kt");
   assert.deepEqual(Object.keys(ID_TYPE), /enum class IdType \{([^}]*)\}/.exec(kotlin)?.[1].split(",").map((s) => s.trim()));
-  assert.deepEqual(partyOf({ fullName: " Иван Петров ", idType: "", idValue: "" }), { fullName: "Иван Петров" });
-  assert.deepEqual(partyOf({ fullName: "Иван", idType: "EGN", idValue: " 7501010001 " }), { fullName: "Иван", idType: "EGN", idValue: "7501010001" });
-  for (const bad of [{ fullName: " " }, { idType: "SSN" }]) assert.ok("refused" in partyOf({ fullName: "Иван", idType: "", idValue: "", ...bad }), JSON.stringify(bad));
+  const e = "0e1f6c2a-0000-4000-8000-000000000001";
+  assert.deepEqual(partyOf({ entranceId: e, fullName: " Иван Петров ", idType: "", idValue: "" }), { entranceId: e, fullName: "Иван Петров" });
+  assert.deepEqual(partyOf({ entranceId: ` ${e} `, fullName: "Иван", idType: "EGN", idValue: " 7501010001 " }), { entranceId: e, fullName: "Иван", idType: "EGN", idValue: "7501010001" });
+  for (const bad of [{ entranceId: " " }, { fullName: " " }, { idType: "SSN" }]) assert.ok("refused" in partyOf({ entranceId: e, fullName: "Иван", idType: "", idValue: "", ...bad }), JSON.stringify(bad));
   // the value is dropped from what the form holds after an answer, and the success line names the person, never the number
   assert.match(code(actions), /const \{ idValue: _kept, \.\.\.values \} = typed;/);
   assert.doesNotMatch(code(forms), /defaultValue=\{v\.idValue\}|state\.done\.idValue/);

@@ -79,7 +79,13 @@ class MandateAdministrationIT {
         return UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'А', 'GA')", it, condominium) }
     }
 
-    private fun party(name: String): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, full_name) VALUES (?, ?)", it, name) }
+    /** BOOK-02e: a party is registered in an entrance; these hold no title here, so they are registered in one aside. */
+    private val aside: UUID by lazy {
+        val condominium = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.condominium (id, address) VALUES (?, ?)", it, "ул. Другаде 1") }
+        UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'Б', 'GA')", it, condominium) }
+    }
+
+    private fun party(name: String): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, entrance_id, full_name) VALUES (?, ?, ?)", it, aside, name) }
 
     private fun MockHttpServletRequestBuilder.by(subject: String) = with(jwt().jwt { it.subject(subject).issuer(MANDATE_REALM_IT) })
     private fun json(path: String, body: String) = post(path).contentType(MediaType.APPLICATION_JSON).content(body)
@@ -309,7 +315,13 @@ class MandateOpenIT {
         return UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'А', 'GA')", it, condominium) }
     }
 
-    private fun party(name: String): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, full_name) VALUES (?, ?)", it, name) }
+    /** BOOK-02e: a party is registered in an entrance; these hold no title here, so they are registered in one aside. */
+    private val aside: UUID by lazy {
+        val condominium = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.condominium (id, address) VALUES (?, ?)", it, "ул. Другаде 1") }
+        UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'Б', 'GA')", it, condominium) }
+    }
+
+    private fun party(name: String): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, entrance_id, full_name) VALUES (?, ?, ?)", it, aside, name) }
 
     private fun record(entrance: UUID, party: UUID, from: LocalDate) = mvc.perform(
         post("/api/identity/entrances/$entrance/mandates").contentType(MediaType.APPLICATION_JSON)

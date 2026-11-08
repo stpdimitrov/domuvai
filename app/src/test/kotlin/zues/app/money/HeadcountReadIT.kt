@@ -79,7 +79,8 @@ class HeadcountReadIT {
     private val today: LocalDate get() = LocalDate.parse(toSofiaDate(Instant.now()))
     private val legalDate = LocalDate.parse("2026-05-01")
 
-    private fun person(name: String, subject: String): UUID = ownership.registerParty(RegisterParty(name)).also { logins.tie(realm, subject, it) }
+    private val aside by lazy { registry.registerEntrance(RegisterEntrance("ул. Другаде 1", "Б", "GA")).entranceId }   // BOOK-02e: a party is registered in an entrance
+    private fun person(name: String, subject: String, entrance: UUID = aside): UUID = ownership.registerParty(RegisterParty(entrance, name)).also { logins.tie(realm, subject, it) }
 
     private fun MockHttpServletRequestBuilder.by(subject: String) = with(jwt().jwt { it.subject(subject).issuer(realm) })
 

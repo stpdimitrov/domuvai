@@ -82,8 +82,8 @@ class AssemblyNamesIT {
         try { return act() } finally { signedInAs = before }
     }
 
-    private fun person(name: String, egn: String? = null): UUID =
-        UUID.fromString(registered("/api/registry/parties", """{"fullName":"$name"${egn?.let { ""","idType":"EGN","idValue":"$it"""" }.orEmpty()}}""").get("partyId").asText())
+    private fun person(name: String, egn: String? = null, entranceId: UUID): UUID =
+        UUID.fromString(registered("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"$name"${egn?.let { ""","idType":"EGN","idValue":"$it"""" }.orEmpty()}}""").get("partyId").asText())
             .also { logins.tie(realm, "login-$it", it) }
 
     private fun mandate(entranceId: UUID, body: String, party: UUID) = jdbc.update(
@@ -97,11 +97,11 @@ class AssemblyNamesIT {
      */
     private inner class Meeting {
         val entranceId = UUID.fromString(registered("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText())
-        val ana = person("Ана Колева", EGN)
-        val boris = person("Борис Недев")
-        val vera = person("Вера Стоянова")
-        val manager = person("Иван Петров")
-        val controller = person("Мария Иванова")
+        val ana = person("Ана Колева", EGN, entranceId)
+        val boris = person("Борис Недев", entranceId = entranceId)
+        val vera = person("Вера Стоянова", entranceId = entranceId)
+        val manager = person("Иван Петров", entranceId = entranceId)
+        val controller = person("Мария Иванова", entranceId = entranceId)
         val base: String
         val item: String
 

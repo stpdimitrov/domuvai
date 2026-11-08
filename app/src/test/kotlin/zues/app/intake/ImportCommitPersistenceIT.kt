@@ -206,7 +206,7 @@ class ImportCommitPersistenceIT {
 
         // A title recorded after the commit points at an imported unit, and is not the import's to drop.
         val later = json.readTree(
-            mvc.perform(post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON).content("""{"fullName":"Нов Собственик"}"""))
+            mvc.perform(post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON).content("""{"entranceId":"$entranceId","fullName":"Нов Собственик"}"""))
                 .andExpect(status().isCreated).andReturn().response.contentAsString,
         ).get("partyId").asText()
         mvc.perform(
