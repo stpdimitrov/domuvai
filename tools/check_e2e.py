@@ -2169,7 +2169,7 @@ def units_in(web, entrance, administrator, owner, owner_party, party, party_name
     that entrance only (through the mandates page, as WEB-49), so the seeded owner's login may enter its book; the owner
     is refused a set summing to 99.98% (PM-ORG-002), then registers two units with the ideal parts left out (derived by area,
     PM-ORG-003), reads them back on the page, and is refused a second set. WEB-51: the owner records a title in one of the
-    two units for `party` (the one `registry_screen` registered, held by nobody else) — a share of 1.5 and a party nothing has
+    two units for `party` (the one `registry_screen` has the administrator register in that entrance, held by nobody else) — a share of 1.5 and a party nothing has
     are the API's words, the form kept; the title lands, its number is shown and the unit's owners are read back by name, role and
     share. The mandate is ended on its own first day, so the seeded demo is as it was: the units, the party and the title
     are in this entrance only, which holds no other unit.
@@ -2299,7 +2299,10 @@ def registry_screen(api, web, signed_in, entrance, administrator=None, owner=Non
             failures += [] if sees(administrator, entrance) else [f"/entrance/mandates?entrance={entrance}: the administrator's screen does not show the entrance registered"]
             failures += [] if not sees(board, entrance) else [f"/entrance/mandates?entrance={entrance}: the board member sees an entrance they hold no role in"]
         if registered and owner and owner_party:
-            failures += units_in(web, registered[0], administrator, owner, owner_party, registered_party.group(1), f"e2e {tag}") if registered_party else [f"{path}: the party registered above has no number, so no title is checked in the new entrance"]
+            # a title names a party of its own entrance only (PM-BOOK-011, BOOK-02e): the administrator registers one in the new entrance
+            s, made = as_(administrator, "Регистрирай лицето", {"entranceId": registered[0], "fullName": f"e2e {tag} нов вход", "idType": "", "idValue": ""})
+            here = re.search(rf"Лицето e2e {tag} нов вход е регистрирано\. Номер: ([0-9a-f-]{{36}})", visible_text(made))
+            failures += units_in(web, registered[0], administrator, owner, owner_party, here.group(1), f"e2e {tag} нов вход") if s == 200 and here else [f"{path}: the administrator registering a party in the new entrance answered HTTP {s} without its number: {visible_text(made)[:200]!r}"]
         elif registered:
             print("—   /entrance/units  the units of a registered entrance NOT checked: no --owner-user or --owner-party")
     else:
