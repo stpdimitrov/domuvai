@@ -72,7 +72,7 @@ class HouseholdPartyTest {
             registry.registerHousehold(entranceId, unit.id, listOf(RegisterMember(partyId = maria.id), RegisterMember(partyId = stranger)))
         }
             .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("PM-BOOK-002")
+            .hasMessageContaining("PM-BOOK-011")
             .hasMessageContaining(stranger.toString())
             .hasMessageNotContaining(maria.id.toString())
         verify(aggregates, never()).insert(any<Any>())
@@ -86,7 +86,7 @@ class HouseholdPartyTest {
                 .exceptionOrNull()
         }
         assertThat(answers).allSatisfy { assertThat(it).isInstanceOf(IllegalArgumentException::class.java) }
-        assertThat(answers.map { it!!.message }).containsExactly("PM-BOOK-002: no party ${ofAnother.id}", "PM-BOOK-002: no party $stranger")
+        assertThat(answers.map { it!!.message }).containsExactly("PM-BOOK-011: no party ${ofAnother.id}", "PM-BOOK-011: no party $stranger")
         verify(aggregates, never()).insert(any<Any>())
     }
 

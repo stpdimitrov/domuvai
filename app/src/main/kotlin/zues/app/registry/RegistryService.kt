@@ -263,6 +263,7 @@ class RegistryService(
      * (Rule: PM-GA-009); an unknown party, a party named twice, or one already a member of the unit for an
      * overlapping stay refuses the whole list, nothing stored (#442).
      */
+    // Rule: PM-BOOK-002, PM-BOOK-011
     @Transactional
     fun registerHousehold(entranceId: UUID, unitId: UUID, members: List<RegisterMember>): List<UUID> {
         // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
@@ -272,7 +273,7 @@ class RegistryService(
         // answered as one unknown, so an id from elsewhere tells nothing (Rule: PM-BOOK-011)
         val named = members.mapNotNull { it.partyId }.distinct()
         val known = parties.findAllById(named).filter { it.entranceId == entranceId }.map { it.id }.toSet()
-        require(known.containsAll(named)) { "PM-BOOK-002: no party ${(named - known).joinToString()}" }
+        require(known.containsAll(named)) { "PM-BOOK-011: no party ${(named - known).joinToString()}" }
         val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
         val entered = members.map { member ->
             HouseholdMember(

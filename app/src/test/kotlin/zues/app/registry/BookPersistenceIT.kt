@@ -160,7 +160,7 @@ class BookPersistenceIT {
         val rows = "SELECT count(*) FROM registry.household_member WHERE unit_id = ?"
 
         assertThatThrownBy { registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = UUID.randomUUID()))) }
-            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-BOOK-002")
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-BOOK-011")
         assertThat(jdbc.queryForObject(rows, Int::class.java, flat)).isZero()
 
         registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria), RegisterMember(validFrom = "2026-01-01")))

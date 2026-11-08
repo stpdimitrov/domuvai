@@ -86,7 +86,7 @@ class PartyOfItsEntrancePersistenceIT {
             post("/api/registry/entrances/$a/units/$flatA/titles", """{"partyId":"$named","titleRole":"OWN","share":"1"}""")
                 .andExpect(status().isBadRequest).andExpect(jsonPath("$.error").value("PM-BOOK-011: no party $named"))
             post("/api/registry/entrances/$a/units/$flatA/household", """{"members":[{"partyId":"$named"}]}""")
-                .andExpect(status().isBadRequest).andExpect(jsonPath("$.error").value("PM-BOOK-002: no party $named"))
+                .andExpect(status().isBadRequest).andExpect(jsonPath("$.error").value("PM-BOOK-011: no party $named"))
         }
         assertThat(rows("title", flatA) to rows("household_member", flatA)).isEqualTo(0 to 0)
 

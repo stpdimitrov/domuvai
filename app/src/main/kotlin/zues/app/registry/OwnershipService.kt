@@ -55,6 +55,7 @@ class OwnershipService(
     private val units: PropertyUnitRepository,
     private val clock: Clock,
 ) {
+    // Rule: PM-BOOK-011 — a party is registered in one entrance, and only that entrance's book may name it
     @Transactional
     fun registerParty(command: RegisterParty): UUID {
         require(command.fullName.isNotBlank()) { "fullName must not be blank" }
