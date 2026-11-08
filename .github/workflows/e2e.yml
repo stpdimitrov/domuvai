@@ -153,7 +153,8 @@ jobs:
           offices = [("MB", os.environ["SUBJECT"], "Иван Петров (управителен съвет)"), ("MB", os.environ["MANAGER_SUBJECT"], "Проверката (управителен съвет)"),
                      ("CTL", os.environ["CHECK_SUBJECT"], "Проверката (контрольор)")]
           for office, subject, name in offices:
-              party = call("POST", "/api/registry/parties", {"fullName": name})["partyId"]
+              # a party is registered in one entrance (PM-BOOK-011): the check's entrance; its mandates still name it in each
+              party = call("POST", "/api/registry/parties", {"entranceId": os.environ["ENTRANCE"], "fullName": name})["partyId"]
               call("POST", "/api/identity/logins", {"subject": subject, "partyId": party})
               for entrance in call("GET", "/api/registry/entrances"):
                   call("POST", f"/api/identity/entrances/{entrance['id']}/mandates",
@@ -161,7 +162,7 @@ jobs:
           # … and the seeded owner Стефан Димов is who the login stefan is: an owner by his title, holding no office (WEB-48)
           call("POST", "/api/identity/logins", {"subject": os.environ["OWNER_SUBJECT"], "partyId": os.environ["OWNER_PARTY"]})
           # … and one party holds no login and no office (WEB-49b ties a throwaway login to it): the administrator, signed in as admin, gives it a mandate and ends it in the same run (WEB-49)
-          spare = call("POST", "/api/registry/parties", {"fullName": "Проверката (резервно лице)"})["partyId"]
+          spare = call("POST", "/api/registry/parties", {"entranceId": os.environ["ENTRANCE"], "fullName": "Проверката (резервно лице)"})["partyId"]
           with open(os.environ["GITHUB_ENV"], "a") as env:
               env.write(f"SPARE_PARTY={spare}\n")
           PY
@@ -189,7 +190,7 @@ jobs:
           # … and registering is the administrator's (AUTH-05e, PM-SEC-001): the controller registers no entrance and no party.
           register() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $1" -H 'Content-Type: application/json' -d "$3" "http://localhost:8080/api/registry/$2"; }
           test "$(register "$check" entrances '{"address":"ул. Проверка 1","label":"Х","managementForm":"GA"}')" = 403
-          test "$(register "$check" parties '{"fullName":"Проверката (отказано лице)"}')" = 403
+          test "$(register "$check" parties "{\"entranceId\":\"$entrance\",\"fullName\":\"Проверката (отказано лице)\"}")" = 403
 
       - name: Start the web against the API — signing people in, with nothing set, with a bad address, told to run without sign-in (PM-DEBT-011, #79)
         working-directory: web
