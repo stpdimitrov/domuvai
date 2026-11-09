@@ -12,7 +12,7 @@ import { castVote, type VoteState } from "./actions";
 // Rule: PM-VOTE-001
 // Rule: PM-VOTE-014
 // Rule: PM-ORG-005
-export default function VoteForm({ entrance, assembly, item, parties }: { entrance: string; assembly: string; item: string; parties: string }) {
+export default function VoteForm({ entrance, assembly, item, parties, mintedKey }: { entrance: string; assembly: string; item: string; parties: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<VoteState, FormData>(castVote, {});
   const v = state.values ?? {};
   return (
@@ -20,6 +20,7 @@ export default function VoteForm({ entrance, assembly, item, parties }: { entran
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="assembly" value={assembly} />
       <input type="hidden" name="item" value={item} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <label>
         Собственик
         <input type="text" name="ownerPartyId" list={parties} defaultValue={v.ownerPartyId} required placeholder="идентификатор на собственика" maxLength={36} />

@@ -1416,7 +1416,7 @@ def votes_before_open(api, web, here, of, owner_party):
         return [f"{of}: the noticed assembly has no agenda item to vote on (HTTP {st})"]
     votes = f"{of}/agenda/{agenda[0]['id']}/votes"
     # posted as the board's other member (E2E_MANAGER_TOKEN): of the same office, but not the person who convened it
-    status, said = fetch(api, votes, body={"ownerPartyId": owner_party, "choice": "FOR"}, headers=as_board())
+    status, said = fetch(api, votes, body={"ownerPartyId": owner_party, "choice": "FOR"}, headers={**as_board(), "Idempotency-Key": str(uuid.uuid4())})   # PM-SYS-014
     st, raw = fetch(api, votes)
     record = json.loads(raw) if st == 200 else None
     if status != 403 or "PM-SEC-001" not in said or record != []:

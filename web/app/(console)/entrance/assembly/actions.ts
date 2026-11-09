@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { reach } from "@/lib/console";
@@ -226,7 +226,7 @@ export async function verifyIdentity(_: VerifyState, form: FormData): Promise<Ve
   redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
 }
 
-export type VoteState = { refused?: string; values?: Record<string, string> };
+export type VoteState = { refused?: string; values?: Record<string, string>; key?: string };
 
 /**
  * Recording how an owner present at the sitting voted on an item, or correcting it (Rule: PM-VOTE-001, PM-VOTE-014,
@@ -234,25 +234,32 @@ export type VoteState = { refused?: string; values?: Record<string, string> };
  * is its day, whether the owner is present, which units they vote for and with what weight, and whether the item is
  * closed are all the api's. A second vote for the same owner is a correction: it carries the why the form asks for,
  * and the api records it as a reversal — the web edits nothing. A refusal is shown in its words, the form kept.
+ * Rule: PM-SYS-014 — the vote carries an Idempotency-Key minted once per form: a refusal recorded nothing, so the form
+ * comes back under a new key; an answer lost keeps the key, so the same form sent again is the same vote, never a second.
  */
 // Rule: PM-VOTE-001
 // Rule: PM-VOTE-014
 // Rule: PM-ORG-005
 // Rule: PM-SEC-001
+// Rule: PM-SYS-014
 export async function castVote(_: VoteState, form: FormData): Promise<VoteState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
   const values = Object.fromEntries(["entrance", "assembly", "item", "ownerPartyId", "choice", "correction"].map((n) => [n, text(n)]));
-  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item)) return { refused: "Точката от дневния ред не е посочена.", values };
-  if (!UUID.test(values.ownerPartyId)) return { refused: "Посочете идентификатора на собственика, чийто глас записвате.", values };
+  const key = text("key");
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item) || !UUID.test(key)) return { refused: "Точката от дневния ред не е посочена.", values, key: randomUUID() };
+  if (!UUID.test(values.ownerPartyId)) return { refused: "Посочете идентификатора на собственика, чийто глас записвате.", values, key: randomUUID() };
 
   const answer = await reach(() =>
     api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", {
-      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item } },
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item }, header: { "Idempotency-Key": key } },
       body: { ownerPartyId: values.ownerPartyId, choice: values.choice, correction: values.correction || undefined },
     }),
   );
   if (!answer?.data) {
-    return { refused: answer ? undoneBy(answer, "запишете гласа") : unknownOutcome("записването на гласа"), values };
+    // the vote may be recorded before its answer is lost, or behind a 5xx: the same form, sent again, carries the same key
+    return answer && answer.response.status < 500
+      ? { refused: undoneBy(answer, "запишете гласа"), values, key: randomUUID() }
+      : { refused: answer ? undoneBy(answer, "запишете гласа") : unknownOutcome("записването на гласа"), values, key };
   }
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
 }

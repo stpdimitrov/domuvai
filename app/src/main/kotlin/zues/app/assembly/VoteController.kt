@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -17,6 +18,7 @@ import zues.app.identity_org.PartyNames
 import zues.app.identity_org.WhoAsks
 import zues.app.policy.Action
 import zues.app.policy.Asking
+import zues.kernel.IdempotencyKey
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
@@ -57,10 +59,11 @@ class VoteActs(
     private val clock: Clock,
 ) {
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @Transactional
-    fun record(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID, request: RecordVoteRequest): List<Vote> {
-        val by = acts.runBy(who, entranceId, assemblyId, Action.RECORD_VOTE)
-        return votes.record(entranceId, assemblyId, itemId, by, request.ownerPartyId, request.choice, request.correction)
+    fun record(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID, key: String, request: RecordVoteRequest): List<Vote> {
+        val by = acts.runBy(who, entranceId, assemblyId, Action.RECORD_VOTE)                                // asked before the key is looked up
+        return votes.record(entranceId, assemblyId, itemId, by, request.ownerPartyId, request.choice, request.correction, IdempotencyKey(key))
     }
 
     /**
@@ -121,7 +124,9 @@ class VoteActs(
  * The votes on an item of the agenda (PM-VOTE-001, PM-VOTE-014, PM-ORG-005). Recorded by whoever runs the assembly,
  * signed in — never by a field of the request — and anybody else is a 403 naming the rule (PM-SEC-001). Read, row by
  * row, by the manager, the board and the controller only; anybody else is a 403 naming PM-SEC-002 (the owner's
- * decision of 2026-10-24) and reads the item's decision instead.
+ * decision of 2026-10-24) and reads the item's decision instead. A vote is recorded under an `Idempotency-Key`
+ * (PM-SYS-014): the same request sent again — a device's queue replayed — records nothing more and is answered with the
+ * votes it first made; the same key for another request is a 409.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes")
@@ -131,12 +136,14 @@ class VoteController(private val acts: VoteActs, private val who: WhoAsks, priva
     // Rule: PM-VOTE-014
     // Rule: PM-ORG-005
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun record(
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, @RequestBody request: RecordVoteRequest,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String,
         signedIn: JwtAuthenticationToken?,
-    ): List<VoteView> = views(acts.record(who.of(signedIn), entranceId, assemblyId, itemId, request), reversed = emptySet())
+    ): List<VoteView> = views(acts.record(who.of(signedIn), entranceId, assemblyId, itemId, idempotencyKey, request), reversed = emptySet())
 
     // Rule: PM-VOTE-014
     // Rule: PM-SEC-001
@@ -175,7 +182,7 @@ class VoteController(private val acts: VoteActs, private val who: WhoAsks, priva
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
-    /** Not open, not the sitting's day, a vote already recorded with no why, a unit that is not weighed. */
+    /** Not open, not the sitting's day, a vote already recorded with no why, a unit that is not weighed, a key used for another request. */
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))

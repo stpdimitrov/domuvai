@@ -4967,6 +4967,14 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5046,7 +5054,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the votes it first made, even once the item has closed; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
@@ -5054,7 +5062,8 @@
           "PM-VOTE-001",
           "PM-VOTE-014",
           "PM-ORG-005",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },

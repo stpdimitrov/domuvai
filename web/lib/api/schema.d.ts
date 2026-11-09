@@ -119,7 +119,7 @@ export interface paths {
         /** How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002. Each row carries the owner's name beside the id, given by the book and entered in its access log once a read */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
         put?: never;
-        /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the votes it first made, even once the item has closed; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
         delete?: never;
         options?: never;
@@ -3055,7 +3055,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;
