@@ -41,10 +41,12 @@ class IdempotencyKeyReused(message: String) : IllegalStateException(message)
 @Component
 class VoteRequestKeys(private val keys: VoteRequestKeyRepository, private val aggregates: JdbcAggregateTemplate, private val clock: Clock) {
 
+    // Rule: PM-SYS-014
     /** Apply, Replay (naming the kept key's id, which the votes it made carry) or Reused — found by entrance and key together. Rule: PM-SYS-014 */
     fun decide(entranceId: UUID, key: IdempotencyKey, requestHash: String): KeyDecision =
         decideKey(keys.findByEntranceIdAndIdempotencyKey(entranceId, key.value)?.let { KeptKey(it.operation, it.requestHash, it.id.toString()) }, OPERATION, requestHash)
 
+    // Rule: PM-SYS-014
     /** Keeps the key and returns the id its votes name; a key a racing request took first is refused, and this write rolled back. Rule: PM-SYS-014 */
     fun keep(entranceId: UUID, key: IdempotencyKey, requestHash: String): UUID {
         val row = VoteRequestKeyRow(UUID.randomUUID(), entranceId, key.value, OPERATION, requestHash, clock.instant().truncatedTo(ChronoUnit.MICROS))
@@ -59,6 +61,7 @@ class VoteRequestKeys(private val keys: VoteRequestKeyRepository, private val ag
     companion object {
         private const val OPERATION = "RECORD_VOTE"
 
+        // Rule: PM-SYS-014
         /** Each field length-prefixed and a missing one apart from any text, so two requests hash alike only when they are alike. */
         fun hash(vararg fields: Any?): String =
             fields.joinToString("") { it?.toString()?.let { s -> "${s.length}:$s" } ?: "-" }

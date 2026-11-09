@@ -275,7 +275,7 @@ class VotePersistenceIT {
             // a correction queued under its own key is replayed as one reversal
             val fix = UUID.randomUUID().toString()
             val reversal = ids(vote(m, ana, "AGAINST", correction = "грешка", key = fix))
-            assertThat(ids(vote(m, ana, "AGAINST", correction = "грешка", key = fix))).isEqualTo(reversal)
+            assertThat(ids(vote(m, ana, "AGAINST", correction = " грешка ", key = fix))).isEqualTo(reversal)          // the why as stored
         }
         signedIn(boris) { vote(m, ana, "FOR", key = queued).andExpect(status().isForbidden) }                       // a replay is answered only to who may record it
         assertThat(rows(m).map { it["choice"] }).containsExactly("FOR", "AGAINST")
@@ -290,6 +290,10 @@ class VotePersistenceIT {
         // the kept key is never edited or removed
         assertThat(jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE entrance_id = ?", m.entranceId)).isZero()
         assertThat(jdbc.update("DELETE FROM assembly.vote_request_key WHERE entrance_id = ?", m.entranceId)).isZero()
+        // a key a racing request took first is refused by the table itself: one key per entrance
+        assertThatThrownBy {
+            jdbc.update("INSERT INTO assembly.vote_request_key (id, entrance_id, idempotency_key, operation, request_hash, kept_at) VALUES (gen_random_uuid(), ?, ?, 'RECORD_VOTE', 'x', now())", m.entranceId, queued)
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
     @Test

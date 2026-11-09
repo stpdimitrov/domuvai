@@ -236,6 +236,8 @@ export type VoteState = { refused?: string; values?: Record<string, string>; key
  * and the api records it as a reversal — the web edits nothing. A refusal is shown in its words, the form kept.
  * Rule: PM-SYS-014 — the vote carries an Idempotency-Key minted once per form: a refusal recorded nothing, so the form
  * comes back under a new key; an answer lost keeps the key, so the same form sent again is the same vote, never a second.
+ * A page reloaded mints a new key: a vote sent again from it is a new request, and a second first vote for the owner is
+ * refused by the api as a correction with no why. The resident's queue, which keeps its keys, is #455.
  */
 // Rule: PM-VOTE-001
 // Rule: PM-VOTE-014

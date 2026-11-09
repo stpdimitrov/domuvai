@@ -113,7 +113,7 @@ class VoteService(
     fun record(entranceId: UUID, assemblyId: UUID, itemId: UUID, by: Actor, owner: UUID, choice: String, correction: String?, key: IdempotencyKey): List<Vote> {
         val chose = VoteChoice.entries.firstOrNull { it.name == choice } ?: throw IllegalArgumentException("a vote is FOR, AGAINST or ABSTAIN, not \"$choice\"")
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
-        val asked = VoteRequestKeys.hash(assemblyId, itemId, by.party, owner, choice, correction)
+        val asked = VoteRequestKeys.hash(assemblyId, itemId, by.party, owner, choice, correction?.trim()?.takeIf { it.isNotEmpty() })   // the why as it is stored
         when (val decided = keys.decide(entranceId, key, asked)) {                                           // decided under the assembly's lock
             is KeyDecision.Replay -> return votes.findByRequestKeyId(UUID.fromString(decided.resultId)).sortedWith(compareBy({ it.castAt }, { it.id.toString() }))
             KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key ${key.value} was used for another request (PM-SYS-014)")
