@@ -6,26 +6,23 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **95** (41%) |
-| Remaining | **138** |
+| Proved by a test named after the rule | **98** (42%) |
+| Remaining | **135** |
 | Proposed slices at ~10 rules each | **18** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-18 rule(s) remaining across 3 slice(s).
+15 rule(s) remaining across 3 slice(s).
 
-### S-G1-01 · `kernel` · SYS · 9 rule(s) · ⚠ 1 unconfirmed
+### S-G1-01 · `kernel` · SYS · 6 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-SYS-009` | MUST ⚠ | Fine ranges are configuration; the UI states they must be verified. |
-| `PM-SYS-006` | MUST | Overrides are evidence, not silence. |
 | `PM-SYS-007` | MUST | Physical posting remains a first-class, recorded action. |
-| `PM-SYS-012` | MUST | Snapshot-based reporting. |
 | `PM-SYS-013` | MUST | Marking a notice "sent by push" does not advance the assembly out of `DRAFT`; only a recorded posting act does. |
-| `PM-SYS-014` | MUST | A queued vote renders as "изпраща се", never as cast; replaying the queue twice produces one vote. |
 | `PM-SYS-015` | MUST | Budget is a dated config value; a bundle regression breaks the build, not the pilot. |
 | `PM-SYS-008` | SHOULD | One number a manager can act on. |
 | `PM-SYS-011` | SHOULD | Tasks appear without anyone remembering to create them. |
