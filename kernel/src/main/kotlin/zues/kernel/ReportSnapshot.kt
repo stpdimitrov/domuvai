@@ -14,14 +14,20 @@ data class ReportLine(val key: String, val amount: Money) {
 }
 
 /**
- * A report as it was exported: its period, its lines in key order, and the SHA-256 of their canonical form. The
- * same figures give the same hash whatever order they arrive in. Rule: PM-SYS-012
+ * A report as it was exported: its period, its lines in key order, when it was exported, and the SHA-256 of the
+ * canonical form of its period and lines. The same figures give the same hash whatever order they arrive in, and
+ * whenever they are exported. Rule: PM-SYS-012
  */
-class ReportSnapshot private constructor(val period: String, val lines: List<ReportLine>, val hash: String) {
+class ReportSnapshot private constructor(
+    val period: String,
+    val lines: List<ReportLine>,
+    val exportedAt: Instant,
+    val hash: String,
+) {
 
     companion object {
         /** Rule: PM-SYS-012 */
-        fun of(period: String, lines: List<ReportLine>): ReportSnapshot {
+        fun of(period: String, lines: List<ReportLine>, exportedAt: Instant): ReportSnapshot {
             require(period.isNotBlank() && period.none { it == '\n' }) { "a report names its period (PM-SYS-012)" }
             val sorted = lines.sortedBy { it.key }
             val dup = sorted.zipWithNext().firstOrNull { (a, b) -> a.key == b.key }
@@ -31,7 +37,7 @@ class ReportSnapshot private constructor(val period: String, val lines: List<Rep
                 sorted.forEach { append(it.key).append('\t').append(it.amount.amountMinor).append('\n') }
             }
             val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(Charsets.UTF_8))
-            return ReportSnapshot(period, sorted, HexFormat.of().formatHex(digest))
+            return ReportSnapshot(period, sorted, exportedAt, HexFormat.of().formatHex(digest))
         }
     }
 }
@@ -57,7 +63,8 @@ class ReportNotReproduced(val period: String, val unexplained: Set<String>) :
 
 /**
  * Accepts a re-export of [original]'s period only if it has the same figures, or every line that differs —
- * changed, added or gone — is named by a correction for that period. Rule: PM-SYS-012
+ * changed, added or gone — is named by a correction for that period recorded after the original was exported: a
+ * correction that intervened. Rule: PM-SYS-012
  */
 fun verifyReexport(
     original: ReportSnapshot,
@@ -71,7 +78,7 @@ fun verifyReexport(
     val before = original.lines.associate { it.key to it.amount }
     val after = reexport.lines.associate { it.key to it.amount }
     val changed = (before.keys + after.keys).filterTo(mutableSetOf()) { before[it] != after[it] }
-    val covered = corrections.filter { it.period == original.period }.flatMapTo(mutableSetOf()) { it.changedKeys }
+    val covered = corrections.filter { it.period == original.period && it.recordedAt.isAfter(original.exportedAt) }.flatMapTo(mutableSetOf()) { it.changedKeys }
     val unexplained = changed - covered
     if (unexplained.isNotEmpty()) throw ReportNotReproduced(original.period, unexplained)
     return reexport

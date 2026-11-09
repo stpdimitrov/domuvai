@@ -61,7 +61,8 @@ sealed interface KeyDecision {
 
 /**
  * The server's decision for a keyed write, given what it kept for that key. A replayed queue meets
- * [KeyDecision.Replay] for every action already applied, so it applies each action once. Rule: PM-SYS-014
+ * [KeyDecision.Replay] for every action already applied, so it applies each action once. A key is unique only within
+ * its scope: the caller finds [kept] by the entrance and the key together, never by the key alone. Rule: PM-SYS-014
  */
 fun decideKey(kept: KeptKey?, operation: String, requestHash: String): KeyDecision = when {
     kept == null -> KeyDecision.Apply

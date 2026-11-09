@@ -34,15 +34,16 @@ class SysPrimitivesTest {
         assertThrows(PreconditionNotMet::class.java) { checkPrecondition("notice-posted", met = false, deviation = other) }
     }
 
-    private fun report(vararg lines: Pair<String, Long>) = ReportSnapshot.of("2026-10", lines.map { ReportLine(it.first, eur(it.second)) })
+    private fun report(vararg lines: Pair<String, Long>, exportedAt: Instant = at) =
+        ReportSnapshot.of("2026-10", lines.map { ReportLine(it.first, eur(it.second)) }, exportedAt)
 
     @Test
     fun `PM-SYS-012 the same period re-exported yields the same figures and the same hash`() {
         val first = report("unit-1" to 4250, "unit-2" to 3100)
-        val again = report("unit-2" to 3100, "unit-1" to 4250)
+        val again = report("unit-2" to 3100, "unit-1" to 4250, exportedAt = at.plusSeconds(86_400))
         assertEquals(first.hash, again.hash)
         assertSame(again, verifyReexport(first, again))
-        assertNotEquals(first.hash, ReportSnapshot.of("2026-11", first.lines).hash)
+        assertNotEquals(first.hash, ReportSnapshot.of("2026-11", first.lines, at).hash)
         assertThrows(IllegalArgumentException::class.java) { report("unit-1" to 1, "unit-1" to 2) }
     }
 
@@ -54,14 +55,18 @@ class SysPrimitivesTest {
         val refused = assertThrows(ReportNotReproduced::class.java) { verifyReexport(first, changed) }
         assertEquals(setOf("unit-1", "unit-2", "unit-3"), refused.unexplained)
 
-        val partial = ReportCorrection("2026-10", setOf("unit-1"), "late payment posted", "manager-1", at)
+        val partial = ReportCorrection("2026-10", setOf("unit-1"), "late payment posted", "manager-1", at.plusSeconds(60))
         val stillOpen = assertThrows(ReportNotReproduced::class.java) { verifyReexport(first, changed, listOf(partial)) }
         assertEquals(setOf("unit-2", "unit-3"), stillOpen.unexplained)
 
-        val otherPeriod = ReportCorrection("2026-09", setOf("unit-2", "unit-3"), "wrong period", "manager-1", at)
+        val otherPeriod = ReportCorrection("2026-09", setOf("unit-2", "unit-3"), "wrong period", "manager-1", at.plusSeconds(60))
         assertThrows(ReportNotReproduced::class.java) { verifyReexport(first, changed, listOf(partial, otherPeriod)) }
 
-        val rest = ReportCorrection("2026-10", setOf("unit-2", "unit-3"), "unit split", "manager-1", at)
+        // A correction only explains a difference if it intervened — recorded after the original export.
+        val before = ReportCorrection("2026-10", setOf("unit-2", "unit-3"), "unit split", "manager-1", at.minusSeconds(60))
+        assertThrows(ReportNotReproduced::class.java) { verifyReexport(first, changed, listOf(partial, before)) }
+
+        val rest = ReportCorrection("2026-10", setOf("unit-2", "unit-3"), "unit split", "manager-1", at.plusSeconds(60))
         assertSame(changed, verifyReexport(first, changed, listOf(partial, rest)))
         assertThrows(IllegalArgumentException::class.java) { ReportCorrection("2026-10", setOf("unit-1"), "", "manager-1", at) }
     }
