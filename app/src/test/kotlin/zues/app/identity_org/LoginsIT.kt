@@ -42,7 +42,13 @@ class LoginsIT {
 
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
 
-    private fun party(): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, full_name) VALUES (?, ?)", it, "Иван Петров") }
+    /** BOOK-02e: a party is registered in an entrance; these hold no title here, so they are registered in one aside. */
+    private val aside: UUID by lazy {
+        val condominium = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.condominium (id, address) VALUES (?, ?)", it, "ул. Другаде 1") }
+        UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'Б', 'GA')", it, condominium) }
+    }
+
+    private fun party(): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, entrance_id, full_name) VALUES (?, ?, ?)", it, aside, "Иван Петров") }
 
     @Test
     fun `a login tied to a party reads back as that party — and only under its own issuer and subject`() {

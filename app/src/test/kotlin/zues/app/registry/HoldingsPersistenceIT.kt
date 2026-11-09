@@ -67,8 +67,8 @@ class HoldingsPersistenceIT {
                      {"designation":"ап. 2","unitType":"FLAT","idealParts":"37.5000","separateEntrance":false}]}""",
     ).get("unitIds").map { UUID.fromString(it.asText()) }
 
-    private fun party(name: String) = UUID.fromString(
-        created("/api/registry/parties", """{"fullName":"$name","idType":"EGN","idValue":"7501010010"}""").get("partyId").asText(),
+    private fun party(name: String, entranceId: UUID) = UUID.fromString(
+        created("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"$name","idType":"EGN","idValue":"7501010010"}""").get("partyId").asText(),
     )
 
     private fun title(entranceId: UUID, unitId: UUID, partyId: UUID, share: String, from: String, to: String? = null, role: String = "OWN") = created(
@@ -80,7 +80,7 @@ class HoldingsPersistenceIT {
     fun `PM-ORG-005 PM-ORG-011 stored titles read back through the port as of a date, co-owners splitting the unit's parts exactly`() {
         val entranceId = entrance()
         val (first, second) = units(entranceId)
-        val (ana, boris, seller, holderOfUse) = listOf("Ана", "Борис", "Продавач", "Ползвател").map { party(it) }
+        val (ana, boris, seller, holderOfUse) = listOf("Ана", "Борис", "Продавач", "Ползвател").map { party(it, entranceId) }
         title(entranceId, first, ana, "0.5", "2026-01-01")
         title(entranceId, first, boris, "0.5", "2026-01-01")
         title(entranceId, second, seller, "1", "2026-01-01", to = "2026-05-14")
@@ -121,8 +121,8 @@ class HoldingsPersistenceIT {
     fun `residents read back by party and unit as of a date, and nothing the port answers carries a name or an identity number`() {
         val entranceId = entrance()
         val (first, _) = units(entranceId)
-        val resident = party("Мария Георгиева")
-        val child = party("Петър Георгиев")
+        val resident = party("Мария Георгиева", entranceId)
+        val child = party("Петър Георгиев", entranceId)
         val insert = "INSERT INTO registry.household_member(id, entrance_id, unit_id, party_id, is_child_under_6, valid_from, valid_to) " +
             "VALUES (gen_random_uuid(), ?, ?, ?, ?, ?::date, ?::date)"
         jdbc.update(insert, entranceId, first, resident, false, "2026-01-01", null)
@@ -142,7 +142,7 @@ class HoldingsPersistenceIT {
     fun `PM-GA-009 a member entered through the API with a party is a resident the proxy's household check finds`() {
         val entranceId = entrance()
         val (first, _) = units(entranceId)
-        val resident = party("Мария Георгиева")
+        val resident = party("Мария Георгиева", entranceId)
         created(
             "/api/registry/entrances/$entranceId/units/$first/household",
             """{"members":[{"partyId":"$resident","validFrom":"2026-01-01"},{"isChildUnder6":true,"validFrom":"2026-01-01"}]}""",

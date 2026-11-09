@@ -41,7 +41,8 @@ export function PartyForm() {
   return (
     <form action={act} key={JSON.stringify(v)} className="as-form" style={FORM}>
       <div className="wide acct-title">Регистриране на лице</div>
-      <div className="wide as-hint">Лицето се вписва с името си; идентификаторът не е задължителен и не се показва в никакъв списък. Кой може да регистрира лице, решава системата.</div>
+      <div className="wide as-hint">Лицето се вписва с името си във входа, в чиято книга ще бъде; книгата на друг вход не може да го впише. Идентификаторът не е задължителен и не се показва в никакъв списък. Кой може да регистрира лице, решава системата.</div>
+      <label className="wide">Номер на входа<input type="text" name="entranceId" defaultValue={v.entranceId} maxLength={36} required autoComplete="off" /></label>
       <label className="wide">Пълно име<input type="text" name="fullName" defaultValue={v.fullName} maxLength={200} required autoComplete="off" /></label>
       <label>Вид на идентификатора
         <select name="idType" defaultValue={v.idType ?? ""}>

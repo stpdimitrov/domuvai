@@ -75,10 +75,11 @@ class PetitionPersistenceIT {
                          {"designation":"ап. 3","unitType":"FLAT","idealParts":"30.0000","separateEntrance":false},
                          {"designation":"ап. 4","unitType":"FLAT","idealParts":"50.0000","separateEntrance":false}]}""",
         ).get("unitIds").map { UUID.fromString(it.asText()) }
-        return units.map { unit -> party().also { title(entranceId, unit, it, "OWN") } to unit }
+        return units.map { unit -> party(entranceId).also { title(entranceId, unit, it, "OWN") } to unit }
     }
 
-    private fun party() = UUID.fromString(created("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private val aside by lazy { entrance() }   // BOOK-02e: a party is registered in an entrance; one in no book here is registered aside
+    private fun party(entranceId: UUID = aside) = UUID.fromString(created("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Иван Петров"}""").get("partyId").asText())
 
     @Autowired lateinit var logins: Logins
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
@@ -214,7 +215,7 @@ class PetitionPersistenceIT {
         asked(nextDoor, "/api/assembly/entrances/$elsewhere/petitions/$id/signatures").andExpect(status().isNotFound)
         asked(nextDoor, "/api/assembly/entrances/$elsewhere/petitions/$id/assembly", meeting).andExpect(status().isNotFound)
         // a former owner: the title ended yesterday
-        val former = party().also {
+        val former = party(entranceId).also {
             jdbc.update(
                 sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) " +
                     "SELECT gen_random_uuid(), entrance_id, unit_id, ?, 'OWN', 0.000001, current_date - 400, current_date - 1 FROM registry.title WHERE party_id = ?"),
@@ -249,7 +250,7 @@ class PetitionPersistenceIT {
         fun read() = json.readTree(mvc.perform(get("$base/$id")).andExpect(status().isOk).andReturn().response.contentAsString)
         assertThat(read().get("unlocked").asBoolean()).isTrue()                      // owners only: weighed in full
 
-        title(entranceId, thirdUnit, party(), "USR")                                 // a right of use over the same unit
+        title(entranceId, thirdUnit, party(entranceId), "USR")                                 // a right of use over the same unit
         val weighed = read()
         assertThat(weighed.get("heldPct").asText()).isEqualTo("0")                    // the unit is left out of the figure
         assertThat(weighed.get("unlocked").asBoolean()).isFalse()

@@ -40,14 +40,15 @@ class HouseholdPartyTest {
 
     private val entranceId = UUID.randomUUID()
     private val unit = PropertyUnit(UUID.randomUUID(), entranceId, "ап. 1", "FLAT", null, BigDecimal("100.0000"), false)
-    private val maria = Party(UUID.randomUUID(), "Мария Георгиева", "EGN", "7501010010")
+    private val maria = Party(UUID.randomUUID(), "Мария Георгиева", "EGN", "7501010010", entranceId = entranceId)
+    private val ofAnother = Party(UUID.randomUUID(), "Иван Петров", null, null, entranceId = UUID.randomUUID())
 
     @BeforeEach
     fun stub() {
         whenever(units.findById(unit.id)).thenReturn(Optional.of(unit))
         whenever(aggregates.insert(any<Any>())).thenAnswer { it.arguments[0] }
         whenever(parties.findAllById(any<Iterable<UUID>>())).thenAnswer { call ->
-            (call.arguments[0] as Iterable<*>).filter { it == maria.id }.map { maria }
+            listOf(maria, ofAnother).filter { it.id in (call.arguments[0] as Iterable<*>) }
         }
     }
 
@@ -71,9 +72,21 @@ class HouseholdPartyTest {
             registry.registerHousehold(entranceId, unit.id, listOf(RegisterMember(partyId = maria.id), RegisterMember(partyId = stranger)))
         }
             .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("PM-BOOK-002")
+            .hasMessageContaining("PM-BOOK-011")
             .hasMessageContaining(stranger.toString())
             .hasMessageNotContaining(maria.id.toString())
+        verify(aggregates, never()).insert(any<Any>())
+    }
+
+    @Test
+    fun `PM-BOOK-011 a party of another entrance is refused as an unknown one, naming no more, and nothing is stored`() {
+        val stranger = UUID.randomUUID()
+        val answers = listOf(ofAnother.id, stranger).map { named ->
+            runCatching { registry.registerHousehold(entranceId, unit.id, listOf(RegisterMember(partyId = maria.id), RegisterMember(partyId = named))) }
+                .exceptionOrNull()
+        }
+        assertThat(answers).allSatisfy { assertThat(it).isInstanceOf(IllegalArgumentException::class.java) }
+        assertThat(answers.map { it!!.message }).containsExactly("PM-BOOK-011: no party ${ofAnother.id}", "PM-BOOK-011: no party $stranger")
         verify(aggregates, never()).insert(any<Any>())
     }
 

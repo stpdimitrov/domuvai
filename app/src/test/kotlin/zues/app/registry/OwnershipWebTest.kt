@@ -39,7 +39,7 @@ class OwnershipWebTest {
         whenever(ownership.registerParty(any())).thenReturn(partyId)
         mvc.perform(
             post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON)
-                .content("""{"fullName":"Иван Петров","idType":"EGN","idValue":"7501010010"}"""),
+                .content("""{"entranceId":"$entranceId","fullName":"Иван Петров","idType":"EGN","idValue":"7501010010"}"""),
         ).andExpect(status().isCreated).andExpect(jsonPath("$.partyId").value(partyId.toString()))
     }
 
@@ -62,12 +62,12 @@ class OwnershipWebTest {
     }
 
     @Test
-    fun `a title for an unknown party is a 404`() {
-        whenever(ownership.assignTitle(any(), any(), any())).thenThrow(NoSuchElementException("no party $partyId"))
+    fun `PM-BOOK-011 a title for a party unknown to the entrance is a 400`() {
+        whenever(ownership.assignTitle(any(), any(), any())).thenThrow(IllegalArgumentException("PM-BOOK-011: no party $partyId"))
         mvc.perform(
             post("/api/registry/entrances/$entranceId/units/$unitId/titles").contentType(MediaType.APPLICATION_JSON)
                 .content("""{"partyId":"$partyId","titleRole":"OWN","share":"1"}"""),
-        ).andExpect(status().isNotFound)
+        ).andExpect(status().isBadRequest).andExpect(jsonPath("$.error").value("PM-BOOK-011: no party $partyId"))
     }
 
     @Test
@@ -86,29 +86,27 @@ class OwnershipWebTest {
     @Test
     fun `PM-SEC-001 with sign-in switched off nobody is asking — a party is registered, and the policy is not asked`() {
         whenever(ownership.registerParty(any())).thenReturn(partyId)
-        mvc.perform(post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON).content("""{"fullName":"Иван Петров"}"""))
+        mvc.perform(post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON).content("""{"entranceId":"$entranceId","fullName":"Иван Петров"}"""))
             .andExpect(status().isCreated).andExpect(jsonPath("$.partyId").value(partyId.toString()))
-        org.mockito.kotlin.verify(ownership).registerParty(RegisterParty("Иван Петров"))
+        org.mockito.kotlin.verify(ownership).registerParty(RegisterParty(entranceId, "Иван Петров"))
         org.mockito.kotlin.verifyNoInteractions(policy, registry)
     }
 
     @Test
     fun `PM-SEC-001 a signed-in person the policy refuses registers no party — a 403 naming the rule, and nothing written`() {
-        val entrances = listOf(Entrance(UUID.randomUUID(), UUID.randomUUID(), "А", "GA"), Entrance(UUID.randomUUID(), UUID.randomUUID(), "Б", "GA"))
         whenever(logins.partyOf("https://id.example.test/realms/domuvai", "owner-1")).thenReturn(partyId)
-        whenever(registry.listEntrances()).thenReturn(entrances)
         whenever(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-29T10:00:00Z"))
         val asking = zues.app.policy.Asking(zues.app.policy.Login("https://id.example.test/realms/domuvai", "owner-1"), partyId)
-        whenever(policy.decideInAny(asking, zues.app.policy.Action.REGISTER_PARTY, entrances.map { it.id }, java.time.LocalDate.of(2026, 10, 29)))
+        whenever(policy.decideInAny(asking, zues.app.policy.Action.REGISTER_PARTY, listOf(entranceId), java.time.LocalDate.of(2026, 10, 29)))
             .thenReturn(zues.app.policy.Decision(false, "PM-SEC-001", null, zues.app.policy.Policy.MATRIX_VERSION))
         mvc.perform(
             post("/api/registry/parties")
                 .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt().jwt { it.subject("owner-1").issuer("https://id.example.test/realms/domuvai") })
-                .contentType(MediaType.APPLICATION_JSON).content("""{"fullName":"Иван Петров"}"""),
+                .contentType(MediaType.APPLICATION_JSON).content("""{"entranceId":"$entranceId","fullName":"Иван Петров"}"""),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.rule").value("PM-SEC-001"))
-            .andExpect(jsonPath("$.error").value("a party is registered by the deployment's administrator, or by the manager or the board of an entrance"))
+            .andExpect(jsonPath("$.error").value("a party is registered in an entrance by the deployment's administrator, or by the manager or the board of that entrance"))
         org.mockito.kotlin.verify(ownership, org.mockito.kotlin.never()).registerParty(any())
     }
 }

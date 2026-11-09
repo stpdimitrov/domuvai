@@ -19,6 +19,9 @@ data class Party(
     val idValue: String?,      // ЕГН / БУЛСТАТ / passport no — PM-BOOK-011: not for resident-visible lists
     /** Provenance if adopted from a fee-sheet import (STAGE1-ADDENDUM §1); null if registered directly. */
     val importId: UUID? = null,
+    /** The entrance whose book may name this party, and no other's (Rule: PM-BOOK-011, ADR-005); null only on a row
+     *  from before BOOK-02e that no book named — no book can name it. */
+    val entranceId: UUID? = null,
 )
 
 /** The identifier kinds чл. 7 keeps for a party. */

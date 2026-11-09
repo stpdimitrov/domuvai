@@ -94,7 +94,7 @@ class FundPersistenceIT {
             "/api/registry/entrances/$entranceId/units",
             """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""", "unitIds",
         )
-        val chair = postFor("/api/registry/parties", """{"fullName":"Иван Петров"}""", "partyId")
+        val chair = postFor("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Иван Петров"}""", "partyId")
         val iban = "BG80BNBG${"%014d".format(System.nanoTime() % 100_000_000_000_000)}"
         val fundAccountId = postFor(
             "/api/money/entrances/$entranceId/fund-accounts",
@@ -226,7 +226,7 @@ class FundPersistenceIT {
     @Test
     fun `a fund write repeated with its Idempotency-Key returns the first record and writes nothing, and a reused key is refused`() {   // DEVBRIEF §8 (#58)
         val (entranceId, unitId, chair) = entranceWithFund()
-        val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
+        val successor = postFor("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Мария Иванова"}""", "partyId")
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
         val works = """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}"""
         fun count(table: String) = jdbc.queryForObject("SELECT count(*) FROM $table WHERE entrance_id = ?", Long::class.java, entranceId)
@@ -287,7 +287,7 @@ class FundPersistenceIT {
     @Test
     fun `PM-FUND-010 a handover statement is stored as issued, reconciled against the bank or not, and never changed`() {
         val (entranceId, unitId, chair) = entranceWithFund()
-        val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
+        val successor = postFor("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Мария Иванова"}""", "partyId")
         pay(entranceId, unitId, 50_000, "REPAIR_RENEWAL")
         val (works, signedOn) = signedOff(entranceId, """{"amountMinor":20000,"purpose":"WORKS","decisionId":"GA-2026-7"}""")
         act(entranceId, works, "pay", """{"paidOn":"$signedOn"}""").andExpect(status().isOk)
@@ -338,7 +338,7 @@ class FundPersistenceIT {
     @Test
     fun `PM-FUND-010 the table refuses a handover statement that does not reconcile or name two sides, one check at a time`() {
         val (entranceId, _, chair, fundAccountId) = entranceWithFund()
-        val successor = postFor("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
+        val successor = postFor("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Мария Иванова"}""", "partyId")
         val valid = linkedMapOf(
             "id" to "gen_random_uuid()", "entrance_id" to "'$entranceId'", "fund_account_id" to "'$fundAccountId'", "period_from" to "NULL",
             "handover_on" to "DATE '2026-09-15'", "outgoing_party" to "'$chair'", "incoming_party" to "'$successor'",

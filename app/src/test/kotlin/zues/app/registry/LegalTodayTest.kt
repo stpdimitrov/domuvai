@@ -97,7 +97,7 @@ class LegalTodayTest {
     @Test
     fun `PM-SYS-004 a title given no start date starts on the Sofia day`() {
         val partyId = UUID.randomUUID()
-        whenever(parties.existsById(partyId)).thenReturn(true)
+        whenever(parties.findById(partyId)).thenReturn(Optional.of(Party(partyId, "Иван Петров", null, null, entranceId = entranceId)))
 
         ownership.assignTitle(entranceId, unit.id, AssignTitle(partyId, "OWN"))
 

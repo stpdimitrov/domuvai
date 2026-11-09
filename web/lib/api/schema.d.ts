@@ -1097,7 +1097,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a registered party, so the book names them and a household proxy can be checked; an unknown party is a 400 and nothing is stored */
+        /** Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a party registered in the entrance, so the book names them and a household proxy can be checked; an unknown party, or one of another entrance, is a 400 and nothing is stored */
         post: operations["post_registry_entrances_entranceId_units_unitId_household"];
         delete?: never;
         options?: never;
@@ -1131,7 +1131,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included */
+        /** Record a title to a unit — effective-dated, with its share, naming a party of the entrance (one of another entrance is answered as unknown, 400) — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included */
         post: operations["post_registry_entrances_entranceId_units_unitId_titles"];
         delete?: never;
         options?: never;
@@ -1148,7 +1148,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a party — a person or company that can hold a title — by the deployment's administrator, or by the manager or the board of any entrance, as the sign-in says who is asking; anybody else is a 403 */
+        /** Register a party — a person or company that can hold a title — in an entrance, whose book alone may name them, by the deployment's administrator, or by the manager or the board of that entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_parties"];
         delete?: never;
         options?: never;
@@ -2115,6 +2115,8 @@ export interface components {
             members: components["schemas"]["NewMemberRequest"][];
         };
         RegisterPartyRequest: {
+            /** Format: uuid */
+            entranceId: string;
             fullName: string;
             idType?: string;
             idValue?: string;

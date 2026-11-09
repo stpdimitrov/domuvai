@@ -80,7 +80,7 @@ for unit, (_, _, adults, children) in zip(unit_ids, UNITS):
 
 
 def party(name):
-    return call("POST", "/api/registry/parties", {"fullName": name})["partyId"]
+    return call("POST", "/api/registry/parties", {"entranceId": entrance, "fullName": name})["partyId"]
 
 
 OWNERS = [["Иван Петров"], ["Елена Колева", "Георги Колев"], ["Мария Иванова"], ["Стефан Димов"], ["Надя Тодорова"], ["Петър Георгиев"]]

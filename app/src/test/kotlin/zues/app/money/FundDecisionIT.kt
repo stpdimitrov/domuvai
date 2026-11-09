@@ -62,7 +62,7 @@ class FundDecisionIT {
             "/api/registry/entrances/$entrance/units",
             """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""", "unitIds",
         )
-        val chair = created("/api/registry/parties", """{"fullName":"Иван Петров"}""", "partyId")
+        val chair = created("/api/registry/parties", """{"entranceId":"$entrance","fullName":"Иван Петров"}""", "partyId")
         val iban = "BG80BNBG${"%014d".format(System.nanoTime() % 100_000_000_000_000)}"
         created(
             "/api/money/entrances/$entrance/fund-accounts",

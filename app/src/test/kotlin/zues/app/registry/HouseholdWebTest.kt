@@ -73,10 +73,10 @@ class HouseholdWebTest {
         mvc.perform(named).andExpect(status().isCreated)
         verify(registry).registerHousehold(eq(entranceId), eq(unitId), eq(listOf(RegisterMember(false, "2026-01-01", party))))
 
-        whenever(registry.registerHousehold(any(), any(), any())).thenThrow(IllegalArgumentException("PM-BOOK-002: no party $party"))
+        whenever(registry.registerHousehold(any(), any(), any())).thenThrow(IllegalArgumentException("PM-BOOK-011: no party $party"))
         mvc.perform(named)
             .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.error").value("PM-BOOK-002: no party $party"))
+            .andExpect(jsonPath("$.error").value("PM-BOOK-011: no party $party"))
     }
 
     private fun endStay(memberId: UUID, on: String) =

@@ -56,8 +56,14 @@ class MandateNamesIT {
         return UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'А', 'GA')", it, condominium) }
     }
 
+    /** BOOK-02e: a party is registered in an entrance; these hold no title here, so they are registered in one aside. */
+    private val aside: UUID by lazy {
+        val condominium = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.condominium (id, address) VALUES (?, ?)", it, "ул. Другаде 1") }
+        UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'Б', 'GA')", it, condominium) }
+    }
+
     private fun party(name: String, egn: String? = null): UUID = UUID.randomUUID().also {
-        jdbc.update("INSERT INTO registry.party (id, full_name, id_type, id_value) VALUES (?, ?, ?, ?)", it, name, egn?.let { "EGN" }, egn)
+        jdbc.update("INSERT INTO registry.party (id, full_name, entrance_id, id_type, id_value) VALUES (?, ?, ?, ?, ?)", it, name, aside, egn?.let { "EGN" }, egn)
     }
 
     private fun mandate(entrance: UUID, body: String, party: UUID) {

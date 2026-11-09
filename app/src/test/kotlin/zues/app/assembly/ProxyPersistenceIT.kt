@@ -75,7 +75,8 @@ class ProxyPersistenceIT {
         registered("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText(),
     )
 
-    private fun party() = UUID.fromString(registered("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private val aside by lazy { entrance() }   // BOOK-02e: a party is registered in an entrance; one in no book here is registered aside
+    private fun party(entranceId: UUID = aside) = UUID.fromString(registered("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Иван Петров"}""").get("partyId").asText())
 
     @Autowired lateinit var logins: Logins
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
@@ -86,7 +87,7 @@ class ProxyPersistenceIT {
     private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     /** A party with a login of its own, tied to it. */
-    private fun person(): UUID = party().also { logins.tie(realm, "login-$it", it) }
+    private fun person(entranceId: UUID = aside): UUID = party(entranceId).also { logins.tie(realm, "login-$it", it) }
 
     private fun <T> signedIn(party: UUID?, act: () -> T): T {
         val before = signedInAs
@@ -110,7 +111,7 @@ class ProxyPersistenceIT {
     private fun entered(path: String, body: String): JsonNode = signedIn(null) { created(path, body) }
 
     /** An owner of a unit of the entrance since the start of last year — the whole entrance, the first time it is asked for. */
-    private fun owner(entranceId: UUID): UUID = person().also {
+    private fun owner(entranceId: UUID): UUID = person(entranceId).also {
         val existing = jdbc.queryForList("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)
         val unit = existing.firstOrNull() ?: UUID.fromString(
             entered("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
@@ -153,7 +154,7 @@ class ProxyPersistenceIT {
     private val aHouseholdMember = """"agentKind":"HOUSEHOLD_MEMBER","scope":"WHOLE_AGENDA","form":"WRITTEN""""
 
     /** Somebody the book has living in [unit], flagged a child under six or not. */
-    private fun living(entranceId: UUID, unit: UUID, party: UUID = person(), child: Boolean = false) = party.also {
+    private fun living(entranceId: UUID, unit: UUID, party: UUID = person(entranceId), child: Boolean = false) = party.also {
         jdbc.update(
             sofiaDated("INSERT INTO registry.household_member (id, entrance_id, unit_id, party_id, is_child_under_6, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, ?, current_date - 100, NULL)"),
             entranceId, unit, it, child,
@@ -300,7 +301,7 @@ class ProxyPersistenceIT {
         mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming)).andExpect(status().isForbidden)
         signedIn(null) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming)).andExpect(status().isForbidden) }
         // a former owner is no principal
-        val former = person().also {
+        val former = person(entranceId).also {
             jdbc.update(sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date - 400, current_date - 1)"), entranceId, unit, it)
         }
         appoint(proxies, former, agent).andExpect(status().isForbidden)
@@ -312,23 +313,23 @@ class ProxyPersistenceIT {
         val member = """"agentKind":"HOUSEHOLD_MEMBER","scope":"WHOLE_AGENDA","form":"WRITTEN""""
         appoint(proxies, owner, stranger, member).andExpect(status().isBadRequest)                             // lives nowhere the book knows
         val resident = "INSERT INTO registry.household_member (id, entrance_id, unit_id, party_id, is_child_under_6, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, false, current_date - 100, NULL)"
-        val atHome = person().also { jdbc.update(sofiaDated(resident), entranceId, unit, it) }
+        val atHome = person(entranceId).also { jdbc.update(sofiaDated(resident), entranceId, unit, it) }
         appoint(proxies, owner, atHome, member).andExpect(status().isBadRequest)                               // the owner is not in the book as living there
         jdbc.update(sofiaDated(resident), entranceId, unit, owner)
-        val movedOut = person().also {
+        val movedOut = person(entranceId).also {
             jdbc.update(sofiaDated(resident.replace("current_date - 100, NULL", "current_date - 100, current_date - 1")), entranceId, unit, it)
         }
         appoint(proxies, owner, movedOut, member).andExpect(status().isBadRequest)
         // a resident of another unit of the entrance is not of this household; an owner next door is not "another owner" here
-        val acrossTheLanding = person().also { jdbc.update(sofiaDated(resident), entranceId, otherUnit, it) }
+        val acrossTheLanding = person(entranceId).also { jdbc.update(sofiaDated(resident), entranceId, otherUnit, it) }
         appoint(proxies, owner, acrossTheLanding, member).andExpect(status().isBadRequest)
         appoint(proxies, owner, owner(entrance())).andExpect(status().isBadRequest)
         // a child under six of this household is no adult: the book's flag, through the registry's port
-        val child = person().also { jdbc.update(sofiaDated(resident.replace("false,", "true,")), entranceId, unit, it) }
+        val child = person(entranceId).also { jdbc.update(sofiaDated(resident.replace("false,", "true,")), entranceId, unit, it) }
         val refused = appoint(proxies, owner, child, member).andExpect(status().isBadRequest).andReturn().response.contentAsString
         assertThat(refused).contains("child under six")
         // somebody whose title begins tomorrow is not an owner today: neither appoints nor is "another owner"
-        val buyer = person().also {
+        val buyer = person(entranceId).also {
             jdbc.update(sofiaDated("INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from) VALUES (gen_random_uuid(), ?, ?, ?, 'OWN', 0.000001, current_date + 1)"), entranceId, unit, it)
         }
         appoint(proxies, buyer, agent).andExpect(status().isForbidden)
@@ -337,7 +338,7 @@ class ProxyPersistenceIT {
         signedIn(owner) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(naming.replace("$owner", "$agent"))).andExpect(status().isForbidden) }
         appoint(proxies, owner, atHome, member).andExpect(status().isCreated)
         // a holder of a right of use appoints too, and another owner represents them
-        val holderOfUse = person().also {
+        val holderOfUse = person(entranceId).also {
             entered("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"USR","share":"1","validFrom":"2025-01-01"}""")
         }
         appoint(proxies, holderOfUse, agent).andExpect(status().isCreated)
