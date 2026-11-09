@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
@@ -471,7 +472,7 @@ function Votes({ item, votes, decision, entrance, assembly, myself }: {
       {open && (   // once closed, no vote is taken and no second close (PM-VOTE-014); who may do either is the API's (PM-SEC-001)
         <div className="co-card" style={{ marginTop: 12 }}>
           <PartyPicker id={`parties-vote-${item.id}`} entrance={entrance} role="OWN" myself={myself} />
-          <VoteForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-vote-${item.id}`} />
+          <VoteForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-vote-${item.id}`} mintedKey={randomUUID()} />
           <CloseForm entrance={entrance} assembly={assembly} item={item.id} />
         </div>
       )}

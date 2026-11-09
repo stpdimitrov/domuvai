@@ -131,7 +131,7 @@ class AssemblyNamesIT {
                 created("$base/attendance", """{"attendeePartyId":"$ana","channel":"IN_PERSON"}""")
                 created("$base/attendance", """{"attendeePartyId":"$vera","channel":"IN_PERSON"}""")
                 created("$base/sittings", "{}")
-                created("$base/agenda/$item/votes", """{"ownerPartyId":"$ana","choice":"FOR"}""")
+                mvc.perform(post("$base/agenda/$item/votes", """{"ownerPartyId":"$ana","choice":"FOR"}""").header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isCreated)
             }
         }
 

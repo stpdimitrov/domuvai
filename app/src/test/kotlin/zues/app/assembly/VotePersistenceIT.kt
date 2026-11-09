@@ -152,8 +152,12 @@ class VotePersistenceIT {
         return Meeting(entranceId, of, item, manager, owners, unit)
     }
 
-    private fun vote(m: Meeting, owner: UUID, choice: String, correction: String? = null, item: String = m.item): ResultActions =
-        mvc.perform(post("${m.base}/agenda/$item/votes", """{"ownerPartyId":"$owner","choice":"$choice"${correction?.let { ""","correction":"$it"""" }.orEmpty()}}"""))
+    /** A vote sent under [key] — a fresh one each time unless the test replays one; null sends none. */
+    private fun vote(m: Meeting, owner: UUID, choice: String, correction: String? = null, item: String = m.item, key: String? = UUID.randomUUID().toString()): ResultActions =
+        mvc.perform(
+            post("${m.base}/agenda/$item/votes", """{"ownerPartyId":"$owner","choice":"$choice"${correction?.let { ""","correction":"$it"""" }.orEmpty()}}""")
+                .also { request -> key?.let { request.header("Idempotency-Key", it) } },
+        )
 
     private fun rows(m: Meeting) = jdbc.queryForList("SELECT id, party_id, weight, choice, channel, reverses, correction FROM assembly.vote WHERE agenda_item_id = ?::uuid ORDER BY cast_at, id", m.item)
 
@@ -253,6 +257,53 @@ class VotePersistenceIT {
         }
         vote(m, m.owners[0], "FOR").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))   // nobody signed in records nothing
         assertThat(rows(m)).isEmpty()
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying a queued vote twice records one vote - the same key and request answer with the votes first made, also once the item has closed`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        val queued = UUID.randomUUID().toString()
+        fun ids(result: ResultActions) = json.readTree(result.andExpect(status().isCreated).andReturn().response.contentAsString).map { it.get("id").asText() }
+        val first = signedIn(m.manager) { ids(vote(m, ana, "FOR", key = queued)) }
+        signedIn(m.manager) {
+            repeat(2) { assertThat(ids(vote(m, ana, "FOR", key = queued))).isEqualTo(first) }                       // the queue replayed twice: one vote
+            vote(m, ana, "AGAINST", key = queued).andExpect(status().isConflict)                                    // the same key for another request
+            vote(m, boris, "FOR", key = queued).andExpect(status().isConflict)
+            vote(m, ana, "FOR", key = "  ").andExpect(status().isBadRequest)                                       // a vote carries a key
+            vote(m, ana, "FOR", key = null).andExpect(status().isBadRequest)
+            // a correction queued under its own key is replayed as one reversal
+            val fix = UUID.randomUUID().toString()
+            val reversal = ids(vote(m, ana, "AGAINST", correction = "грешка", key = fix))
+            assertThat(ids(vote(m, ana, "AGAINST", correction = " грешка ", key = fix))).isEqualTo(reversal)          // the why as stored
+        }
+        signedIn(boris) { vote(m, ana, "FOR", key = queued).andExpect(status().isForbidden) }                       // a replay is answered only to who may record it
+        assertThat(rows(m).map { it["choice"] }).containsExactly("FOR", "AGAINST")
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, m.entranceId)).isEqualTo(2)
+        // closed: no new vote is taken, but a replay of one already recorded is still answered with it
+        signedIn(m.manager) {
+            close(m).andExpect(status().isCreated)
+            assertThat(ids(vote(m, ana, "FOR", key = queued))).isEqualTo(first)
+            vote(m, boris, "FOR").andExpect(status().isConflict)
+        }
+        assertThat(rows(m)).hasSize(2)
+        // the kept key is never edited or removed
+        assertThat(jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE entrance_id = ?", m.entranceId)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_request_key WHERE entrance_id = ?", m.entranceId)).isZero()
+        // a key a racing request took first is refused by the table itself: one key per entrance
+        assertThatThrownBy {
+            jdbc.update("INSERT INTO assembly.vote_request_key (id, entrance_id, idempotency_key, operation, request_hash, kept_at) VALUES (gen_random_uuid(), ?, ?, 'RECORD_VOTE', 'x', now())", m.entranceId, queued)
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `PM-SYS-014 a key is kept per entrance - the same key in another entrance records that entrance's vote`() {
+        val (m, other) = opened() to opened()
+        val key = UUID.randomUUID().toString()
+        signedIn(m.manager) { vote(m, m.owners[0], "FOR", key = key).andExpect(status().isCreated) }
+        signedIn(other.manager) { vote(other, other.owners[0], "FOR", key = key).andExpect(status().isCreated) }
+        assertThat(rows(m)).hasSize(1)
+        assertThat(rows(other)).hasSize(1)
     }
 
     private fun close(m: Meeting): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/decision", ""))
