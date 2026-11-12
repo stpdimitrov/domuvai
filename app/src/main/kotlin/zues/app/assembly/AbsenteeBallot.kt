@@ -154,6 +154,6 @@ class AbsenteeBallotService(
                     chose.name, request.signature, request.documentRef.trim(), request.documentSha256, receivedOn, by.party, by.loginIssuer, by.loginSubject, now, made,
                 ),
             )
-        }
+        }.sortedBy { it.id.toString() }                                                                      // the order a replay answers in
     }
 }

@@ -573,6 +573,7 @@ class VotePersistenceIT {
             close(m).andExpect(status().isCreated)
             ballot(m, absent, today, key = k).andExpect(status().isConflict)                                  // the same key for another operation
             assertThat(ballotRows(m)).isEmpty()
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, m.entranceId)).isEqualTo(1)   // a refused ballot keeps no key
             val q = UUID.randomUUID().toString()
             ballot(m, absent, today, key = q).andExpect(status().isCreated)
             ballot(m, absent, today, choice = "AGAINST", key = q).andExpect(status().isConflict)             // the same key for another request
