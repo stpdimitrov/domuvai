@@ -480,7 +480,7 @@ function Votes({ item, votes, decision, entrance, assembly, myself }: {
       {item.absenteeEligible && decision?.ok && !decision.data.supersedes && (   // closed, tagged, not merged (PM-GA-017, PM-VOTE-013); the window and who may act are the API's
         <div className="co-card" style={{ marginTop: 12 }}>
           <PartyPicker id={`parties-ballot-${item.id}`} entrance={entrance} role="OWN" />
-          <BallotForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-ballot-${item.id}`} />
+          <BallotForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-ballot-${item.id}`} mintedKey={randomUUID()} />
           <MergeForm entrance={entrance} assembly={assembly} item={item.id} />
         </div>
       )}

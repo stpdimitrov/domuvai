@@ -11,7 +11,8 @@ import { enterBallot, type BallotState } from "./actions";
  */
 // Rule: PM-GA-017
 // Rule: PM-GA-018
-export default function BallotForm({ entrance, assembly, item, parties }: { entrance: string; assembly: string; item: string; parties: string }) {
+// Rule: PM-SYS-014
+export default function BallotForm({ entrance, assembly, item, parties, mintedKey }: { entrance: string; assembly: string; item: string; parties: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<BallotState, FormData>(enterBallot, {});
   const v = state.values ?? {};
   return (
@@ -19,6 +20,7 @@ export default function BallotForm({ entrance, assembly, item, parties }: { entr
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="assembly" value={assembly} />
       <input type="hidden" name="item" value={item} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <label>
         Отсъстващ собственик
         <input type="text" name="ownerPartyId" list={parties} defaultValue={v.ownerPartyId} required placeholder="идентификатор на собственика" maxLength={36} />

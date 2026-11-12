@@ -11,6 +11,8 @@ import zues.app.policy.Asking
 import zues.app.registry.Holdings
 import zues.app.registry.TitleRole
 import zues.kernel.CivilDate
+import zues.kernel.IdempotencyKey
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import java.math.BigDecimal
 import java.time.Clock
@@ -42,10 +44,13 @@ data class AbsenteeBallot(
     val loginIssuer: String,
     val loginSubject: String,
     val recordedAt: Instant,
+    /** The keyed request that entered it (Rule: PM-SYS-014); none on a ballot entered before ballots took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 interface AbsenteeBallotRepository : ListCrudRepository<AbsenteeBallot, UUID> {
     fun findByAgendaItemId(agendaItemId: UUID): List<AbsenteeBallot>
+    fun findByRequestKeyId(requestKeyId: UUID): List<AbsenteeBallot>
 }
 
 /** An absent owner's ballot, as entered from their declaration: [signature] HANDWRITTEN, [receivedOn] a day, yyyy-MM-dd. */
@@ -92,24 +97,35 @@ class AbsenteeBallotService(
     private val decisions: DecisionRepository,
     private val ballots: AbsenteeBallotRepository,
     private val holdings: Holdings,
+    private val keys: VoteRequestKeys,
     private val aggregates: JdbcAggregateTemplate,
     private val clock: Clock,
 ) {
     /**
      * Enters [request]'s ballot on [itemId], by whoever runs the assembly (RECORD_VOTE, PM-SEC-001): the item is tagged
      * eligible and closed, the owner was not represented at its sitting, and has no ballot on it yet. One row per unit
-     * they own on the sitting's day, weighed as a vote is.
+     * they own on the sitting's day, weighed as a vote is. The request carries [key] (PM-SYS-014): the same request under
+     * the same key — a queue replayed — enters nothing and is answered with the rows the first one made, even once the
+     * window has closed; the same key for another request or operation is an [IdempotencyKeyReused].
      */
     // Rule: PM-GA-017
     // Rule: PM-GA-018
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @Transactional
-    fun enter(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID, request: BallotRequest): List<AbsenteeBallot> {
-        val by = acts.runBy(who, entranceId, assemblyId, Action.RECORD_VOTE)
+    fun enter(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID, key: String, request: BallotRequest): List<AbsenteeBallot> {
+        val by = acts.runBy(who, entranceId, assemblyId, Action.RECORD_VOTE)                                  // asked before the key is looked up
+        val idempotencyKey = IdempotencyKey(key)
         val chose = VoteChoice.entries.firstOrNull { it.name == request.choice } ?: throw IllegalArgumentException("a ballot is FOR, AGAINST or ABSTAIN, not \"${request.choice}\"")
         signedDeclaration(request.signature, request.documentRef, request.documentSha256)
         val receivedOn = runCatching { LocalDate.parse(request.receivedOn) }.getOrElse { throw IllegalArgumentException("receivedOn is a day, yyyy-MM-dd") }
         assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")   // one ballot per owner, never two at once
+        val asked = VoteRequestKeys.hash(assemblyId, itemId, by.party, request.ownerPartyId, chose.name, request.signature, request.documentRef.trim(), request.documentSha256, receivedOn)
+        when (val decided = keys.decide(entranceId, idempotencyKey, VoteRequestKeys.ENTER_ABSENTEE_BALLOT, asked)) {   // decided under the assembly's lock
+            is KeyDecision.Replay -> return ballots.findByRequestKeyId(UUID.fromString(decided.resultId)).sortedBy { it.id.toString() }
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
         val item = agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
         check(item.absenteeEligible) { "this item is not tagged for absentee ballots (PM-GA-017)" }
@@ -129,14 +145,15 @@ class AbsenteeBallotService(
         check(theirs.none { it.unitId in bothRoles || it.unitId in owned.overHeldUnitIds }) {
             "a unit of this owner has both an owner and a holder of a right of use, or is owned for more than the whole of it: it is not weighed, so not voted on (TODO(legal): PM-GA-012, PM-ORG-005)"
         }
+        val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.ENTER_ABSENTEE_BALLOT, asked)
         val now = clock.instant()
         return theirs.groupBy { it.unitId }.map { (unit, held) ->
             aggregates.insert(
                 AbsenteeBallot(
                     UUID.randomUUID(), entranceId, assemblyId, itemId, owner, unit, held.fold(BigDecimal.ZERO) { sum, h -> sum + BigDecimal(h.idealParts) },
-                    chose.name, request.signature, request.documentRef.trim(), request.documentSha256, receivedOn, by.party, by.loginIssuer, by.loginSubject, now,
+                    chose.name, request.signature, request.documentRef.trim(), request.documentSha256, receivedOn, by.party, by.loginIssuer, by.loginSubject, now, made,
                 ),
             )
-        }
+        }.sortedBy { it.id.toString() }                                                                      // the order a replay answers in
     }
 }

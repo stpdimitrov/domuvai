@@ -1470,7 +1470,8 @@ def absentee_before_open(api, web, here, of):
               "documentSha256": "0" * 64, "receivedOn": datetime.datetime.now(ZoneInfo("Europe/Sofia")).date().isoformat()}
     failures = []
     for what, path, body in (("a ballot", f"{item}/absentee-ballots", ballot), ("the merge", f"{item}/absentee-merge", {})):
-        status, said = fetch(api, path, body=body, headers=as_board())
+        keyed = {**as_board(), "Idempotency-Key": str(uuid.uuid4())} if what == "a ballot" else as_board()   # PM-SYS-014: a ballot carries a key
+        status, said = fetch(api, path, body=body, headers=keyed)
         if status != 403 or "PM-SEC-001" not in said:
             failures.append(f"{path}: PM-SEC-001 — {what} by a board member who does not run the assembly answers HTTP {status} {said[:120]!r} — expected the API's 403 naming PM-SEC-001")
     return failures
