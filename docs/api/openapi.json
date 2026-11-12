@@ -4449,6 +4449,14 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -4528,14 +4536,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403",
+        "summary": "Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403. Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the rows it first made, even once day 7 has passed; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-017",
           "PM-GA-018",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },

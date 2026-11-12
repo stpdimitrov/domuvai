@@ -16,7 +16,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-/** The `Idempotency-Key` a vote was recorded with (DEVBRIEF §8): the operation, a hash of the request, when. The votes it made name it. Insert-only. Rule: PM-SYS-014 */
+/** The `Idempotency-Key` a vote or an absentee ballot was recorded with (DEVBRIEF §8): the operation, a hash of the request, when. The rows it made name it. Insert-only. Rule: PM-SYS-014 */
 @Table("vote_request_key")
 data class VoteRequestKeyRow(
     @Id val id: UUID,
@@ -31,25 +31,26 @@ interface VoteRequestKeyRepository : Repository<VoteRequestKeyRow, UUID> {
     fun findByEntranceIdAndIdempotencyKey(entranceId: UUID, idempotencyKey: String): VoteRequestKeyRow?
 }
 
-/** The same `Idempotency-Key` for another request, or taken by a racing one: a 409, never a second vote. Rule: PM-SYS-014 */
+/** The same `Idempotency-Key` for another request, or taken by a racing one: a 409, never a second write. Rule: PM-SYS-014 */
 class IdempotencyKeyReused(message: String) : IllegalStateException(message)
 
 /**
- * A keyed vote write (Rule: PM-SYS-014): the kernel's [decideKey] on what this entrance kept for the key, inside the
- * vote's own transaction, so the key is kept only if the votes are.
+ * A keyed write (Rule: PM-SYS-014): the kernel's [decideKey] on what this entrance kept for the key, inside the write's
+ * own transaction, so the key is kept only if its rows are. One key space per entrance, so a key reused for another
+ * [operation] is refused, not applied twice.
  */
 @Component
 class VoteRequestKeys(private val keys: VoteRequestKeyRepository, private val aggregates: JdbcAggregateTemplate, private val clock: Clock) {
 
     // Rule: PM-SYS-014
-    /** Apply, Replay (naming the kept key's id, which the votes it made carry) or Reused — found by entrance and key together. Rule: PM-SYS-014 */
-    fun decide(entranceId: UUID, key: IdempotencyKey, requestHash: String): KeyDecision =
-        decideKey(keys.findByEntranceIdAndIdempotencyKey(entranceId, key.value)?.let { KeptKey(it.operation, it.requestHash, it.id.toString()) }, OPERATION, requestHash)
+    /** Apply, Replay (naming the kept key's id, which the rows it made carry) or Reused — found by entrance and key together. Rule: PM-SYS-014 */
+    fun decide(entranceId: UUID, key: IdempotencyKey, operation: String, requestHash: String): KeyDecision =
+        decideKey(keys.findByEntranceIdAndIdempotencyKey(entranceId, key.value)?.let { KeptKey(it.operation, it.requestHash, it.id.toString()) }, operation, requestHash)
 
     // Rule: PM-SYS-014
-    /** Keeps the key and returns the id its votes name; a key a racing request took first is refused, and this write rolled back. Rule: PM-SYS-014 */
-    fun keep(entranceId: UUID, key: IdempotencyKey, requestHash: String): UUID {
-        val row = VoteRequestKeyRow(UUID.randomUUID(), entranceId, key.value, OPERATION, requestHash, clock.instant().truncatedTo(ChronoUnit.MICROS))
+    /** Keeps the key and returns the id its rows name; a key a racing request took first is refused, and this write rolled back. Rule: PM-SYS-014 */
+    fun keep(entranceId: UUID, key: IdempotencyKey, operation: String, requestHash: String): UUID {
+        val row = VoteRequestKeyRow(UUID.randomUUID(), entranceId, key.value, operation, requestHash, clock.instant().truncatedTo(ChronoUnit.MICROS))
         try {
             aggregates.insert(row)
         } catch (e: DuplicateKeyException) {
@@ -59,7 +60,8 @@ class VoteRequestKeys(private val keys: VoteRequestKeyRepository, private val ag
     }
 
     companion object {
-        private const val OPERATION = "RECORD_VOTE"
+        const val RECORD_VOTE = "RECORD_VOTE"
+        const val ENTER_ABSENTEE_BALLOT = "ENTER_ABSENTEE_BALLOT"
 
         // Rule: PM-SYS-014
         /** Each field length-prefixed and a missing one apart from any text, so two requests hash alike only when they are alike. */

@@ -529,8 +529,87 @@ class VotePersistenceIT {
 
     private val scan = "ab".repeat(32)
 
-    private fun ballot(m: Meeting, owner: UUID, received: String, signature: String = "HANDWRITTEN", hash: String = scan, choice: String = "FOR"): ResultActions =
-        mvc.perform(post("${m.base}/agenda/${m.item}/absentee-ballots", """{"ownerPartyId":"$owner","choice":"$choice","signature":"$signature","documentRef":"декларация 1","documentSha256":"$hash","receivedOn":"$received"}"""))
+    /** A ballot sent under [key] — a fresh one each time unless the test replays one; null sends none. */
+    private fun ballot(m: Meeting, owner: UUID, received: String, signature: String = "HANDWRITTEN", hash: String = scan, choice: String = "FOR", key: String? = UUID.randomUUID().toString()): ResultActions =
+        mvc.perform(
+            post("${m.base}/agenda/${m.item}/absentee-ballots", """{"ownerPartyId":"$owner","choice":"$choice","signature":"$signature","documentRef":"декларация 1","documentSha256":"$hash","receivedOn":"$received"}""")
+                .also { request -> key?.let { request.header("Idempotency-Key", it) } },
+        )
+
+    private fun ballotIds(result: ResultActions) = json.readTree(result.andExpect(status().isCreated).andReturn().response.contentAsString).map { it.get("id").asText() }
+
+    private fun ballotRows(m: Meeting) = jdbc.queryForList("SELECT id::text, party_id, choice, request_key_id FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid ORDER BY id", m.item)
+
+    @Test
+    fun `PM-SYS-014 replaying a queued absentee ballot twice enters it once - the same key and request answer with the rows first made, also once the window has closed`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val absent = m.owners[2]
+        val queued = UUID.randomUUID().toString()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        val first = signedIn(m.manager) { ballotIds(ballot(m, absent, today, key = queued)) }
+        signedIn(m.manager) { repeat(2) { assertThat(ballotIds(ballot(m, absent, today, key = queued))).isEqualTo(first) } }       // the queue replayed twice: one ballot
+        assertThat(ballotRows(m).map { it["id"] }).isEqualTo(first)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, m.entranceId)).isEqualTo(1)
+        signedIn(m.manager) {
+            ballot(m, absent, today).andExpect(status().isConflict)                                          // another key: this owner's ballot is entered
+            clock.by = Duration.ofDays(12)                                                                    // day 7 is over
+            assertThat(ballotIds(ballot(m, absent, today, key = queued))).isEqualTo(first)                    // the replay is still answered with what it made
+            ballot(m, absent, today).andExpect(status().isConflict)
+        }
+        assertThat(ballotRows(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-SYS-014 an absentee ballot's key is refused for another request or operation, and a ballot without a key is a 400`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val absent = m.owners[2]
+        val k = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            ballot(m, absent, today, key = null).andExpect(status().isBadRequest)
+            ballot(m, absent, today, key = "  ").andExpect(status().isBadRequest)
+            vote(m, m.owners[0], "FOR", key = k).andExpect(status().isCreated)                               // k was kept for a vote
+            close(m).andExpect(status().isCreated)
+            ballot(m, absent, today, key = k).andExpect(status().isConflict)                                  // the same key for another operation
+            assertThat(ballotRows(m)).isEmpty()
+            val q = UUID.randomUUID().toString()
+            ballot(m, absent, today, key = q).andExpect(status().isCreated)
+            ballot(m, absent, today, choice = "AGAINST", key = q).andExpect(status().isConflict)             // the same key for another request
+            ballot(m, absent, today, hash = "cd".repeat(32), key = q).andExpect(status().isConflict)
+        }
+        assertThat(ballotRows(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-VOTE-014 a replayed absentee ballot adds no row and edits none - its rows name the key, which is never changed or removed`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val queued = UUID.randomUUID().toString()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        signedIn(m.manager) { repeat(2) { ballotIds(ballot(m, m.owners[2], today, key = queued)) } }
+        val kept = jdbc.queryForObject("SELECT id FROM assembly.vote_request_key WHERE entrance_id = ? AND idempotency_key = ?", UUID::class.java, m.entranceId, queued)
+        assertThat(jdbc.queryForObject("SELECT operation FROM assembly.vote_request_key WHERE id = ?", String::class.java, kept)).isEqualTo("ENTER_ABSENTEE_BALLOT")
+        assertThat(ballotRows(m).single()["request_key_id"]).isEqualTo(kept)
+        assertThat(jdbc.update("UPDATE assembly.absentee_ballot SET request_key_id = NULL WHERE agenda_item_id = ?::uuid", m.item)).isZero()
+        assertThat(jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE id = ?", kept)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_request_key WHERE id = ?", kept)).isZero()
+        assertThat(ballotRows(m).single()["request_key_id"]).isEqualTo(kept)
+    }
+
+    @Test
+    fun `PM-SEC-001 a replayed absentee ballot is answered only to whoever may enter it - the policy is asked before the key is looked up`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val queued = UUID.randomUUID().toString()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        signedIn(m.manager) { ballot(m, m.owners[2], today, key = queued).andExpect(status().isCreated) }
+        for (who in listOf(m.owners[2], m.owners[0], person())) {
+            signedIn(who) { ballot(m, m.owners[2], today, key = queued).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        }
+        ballot(m, m.owners[2], today, key = queued).andExpect(status().isForbidden)                          // nobody signed in
+        assertThat(ballotRows(m)).hasSize(1)
+    }
 
     @Test
     fun `PM-GA-017 only an item tagged ABSENTEE_ELIGIBLE accepts an absent owner's ballot, after its sitting closes - once, weighed by their share, never edited`() {

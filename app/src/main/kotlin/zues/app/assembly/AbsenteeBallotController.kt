@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -34,7 +35,9 @@ data class AbsenteeBallotView(
  * handwritten-signed declaration (PM-GA-018), by whoever runs the assembly, signed in — anybody else, the owner
  * included, is a 403 naming the rule (PM-SEC-001). Read, as how each owner voted, by the manager, the board and the
  * controller only; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002 (the owner's answer
- * on #298, 2026-10-27), and every read is entered (PM-SEC-004).
+ * on #298, 2026-10-27), and every read is entered (PM-SEC-004). A ballot is entered under an `Idempotency-Key`
+ * (PM-SYS-014): the same request sent again — a device's queue replayed — enters nothing more and is answered with the
+ * rows it first made; the same key for another request is a 409.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots")
@@ -43,12 +46,14 @@ class AbsenteeBallotController(private val ballots: AbsenteeBallotService, priva
     // Rule: PM-GA-017
     // Rule: PM-GA-018
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun enter(
         @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, @RequestBody request: BallotRequest,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String,
         signedIn: JwtAuthenticationToken?,
-    ): List<AbsenteeBallotView> = ballots.enter(who.of(signedIn), entranceId, assemblyId, itemId, request).map { it.view() }
+    ): List<AbsenteeBallotView> = ballots.enter(who.of(signedIn), entranceId, assemblyId, itemId, idempotencyKey, request).map { it.view() }
 
     // Rule: PM-SEC-002
     // Rule: PM-SEC-001
@@ -65,7 +70,7 @@ class AbsenteeBallotController(private val ballots: AbsenteeBallotService, priva
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onRefused(e: ActRefused): Map<String, String> = mapOf("error" to (e.message ?: "not allowed"), "rule" to e.ruleId)
 
-    /** An unknown choice or signature, no declaration or hash, a day outside the window, an owner who was represented. */
+    /** An unknown choice or signature, no declaration or hash, a day outside the window, an owner who was represented, a blank key. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid request"))
@@ -74,7 +79,7 @@ class AbsenteeBallotController(private val ballots: AbsenteeBallotService, priva
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
-    /** An item not tagged or not closed, the window closed, a ballot already entered, a QES, a unit not weighed. */
+    /** An item not tagged or not closed, the window closed, a ballot already entered, a QES, a unit not weighed, a key used for another request. */
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))

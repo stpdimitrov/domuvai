@@ -66,7 +66,7 @@ export interface paths {
         /** How each absent owner voted on an item, ballot by ballot in the order entered — their choice for each unit, its weight and the declaration it came from; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002, and every read is entered */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots"];
         put?: never;
-        /** Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403 */
+        /** Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403. Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the rows it first made, even once day 7 has passed; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots"];
         delete?: never;
         options?: never;
@@ -2744,7 +2744,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;

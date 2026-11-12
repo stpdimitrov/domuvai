@@ -296,7 +296,7 @@ export async function closeItem(_: CloseState, form: FormData): Promise<CloseSta
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
 }
 
-export type BallotState = { refused?: string; entered?: boolean; values?: Record<string, string> };
+export type BallotState = { refused?: string; entered?: boolean; values?: Record<string, string>; key?: string };
 
 /**
  * Entering an absent owner's ballot on an item tagged for them, from their handwritten-signed declaration (Rule:
@@ -305,19 +305,24 @@ export type BallotState = { refused?: string; entered?: boolean; values?: Record
  * the 7-day window, whether the owner was represented at the sitting or already has a ballot, and each unit's weight
  * are all the api's. The rows it entered are not shown: who reads ballots is open (#298) — the form says only that it
  * was entered. A refusal is shown in its words, the form kept.
+ * Rule: PM-SYS-014 — the ballot carries an Idempotency-Key minted once per form, as the vote does: a refusal entered
+ * nothing, so the form comes back under a new key; an answer lost keeps the key, so the same form sent again is the same
+ * ballot, never a second. A page reloaded mints a new key.
  */
 // Rule: PM-GA-017
 // Rule: PM-GA-018
 // Rule: PM-SEC-001
+// Rule: PM-SYS-014
 export async function enterBallot(_: BallotState, form: FormData): Promise<BallotState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
   const values = Object.fromEntries(["entrance", "assembly", "item", "ownerPartyId", "choice", "documentRef", "documentSha256", "receivedOn"].map((n) => [n, text(n)]));
-  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item)) return { refused: "Точката от дневния ред не е посочена.", values };
-  if (!UUID.test(values.ownerPartyId)) return { refused: "Посочете идентификатора на собственика, чиято бюлетина вписвате.", values };
+  const key = text("key");
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item) || !UUID.test(key)) return { refused: "Точката от дневния ред не е посочена.", values, key: randomUUID() };
+  if (!UUID.test(values.ownerPartyId)) return { refused: "Посочете идентификатора на собственика, чиято бюлетина вписвате.", values, key };
 
   const answer = await reach(() =>
     api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots", {
-      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item } },
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item }, header: { "Idempotency-Key": key } },
       body: {
         ownerPartyId: values.ownerPartyId, choice: values.choice, signature: "HANDWRITTEN",   // a QES waits for its provider (PM-GA-018)
         documentRef: values.documentRef, documentSha256: values.documentSha256.toLowerCase(), receivedOn: values.receivedOn,
@@ -325,9 +330,12 @@ export async function enterBallot(_: BallotState, form: FormData): Promise<Ballo
     }),
   );
   if (!answer?.data) {
-    return { refused: answer ? undoneBy(answer, "впишете бюлетината") : unknownOutcome("вписването на бюлетината"), values };
+    // the ballot may be entered before its answer is lost, or behind a 5xx: the same form, sent again, carries the same key
+    return answer && answer.response.status < 500
+      ? { refused: undoneBy(answer, "впишете бюлетината"), values, key: randomUUID() }
+      : { refused: answer ? undoneBy(answer, "впишете бюлетината") : unknownOutcome("вписването на бюлетината"), values, key };
   }
-  return { entered: true };
+  return { entered: true, key: randomUUID() };
 }
 
 export type MergeState = { refused?: string };

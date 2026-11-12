@@ -114,7 +114,7 @@ class VoteService(
         val chose = VoteChoice.entries.firstOrNull { it.name == choice } ?: throw IllegalArgumentException("a vote is FOR, AGAINST or ABSTAIN, not \"$choice\"")
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
         val asked = VoteRequestKeys.hash(assemblyId, itemId, by.party, owner, choice, correction?.trim()?.takeIf { it.isNotEmpty() })   // the why as it is stored
-        when (val decided = keys.decide(entranceId, key, asked)) {                                           // decided under the assembly's lock
+        when (val decided = keys.decide(entranceId, key, VoteRequestKeys.RECORD_VOTE, asked)) {                                           // decided under the assembly's lock
             is KeyDecision.Replay -> return votes.findByRequestKeyId(UUID.fromString(decided.resultId)).sortedWith(compareBy({ it.castAt }, { it.id.toString() }))
             KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key ${key.value} was used for another request (PM-SYS-014)")
             KeyDecision.Apply -> Unit
@@ -137,7 +137,7 @@ class VoteService(
         val why = correction?.trim()?.takeIf { it.isNotEmpty() }
         if (inEffect.isNotEmpty()) checkNotNull(why) { "this owner's vote on the item is recorded: a correction says why, and reverses it (PM-VOTE-014)" }
         else require(why == null) { "there is no vote of this owner on the item to correct" }
-        val made = keys.keep(entranceId, key, asked)
+        val made = keys.keep(entranceId, key, VoteRequestKeys.RECORD_VOTE, asked)
         val now = clock.instant()
         fun row(unit: UUID, weight: BigDecimal, reverses: UUID?) = Vote(
             UUID.randomUUID(), entranceId, assemblyId, item.id, sitting.sessionNo, owner, unit, weight, chose.name, channel, now,
