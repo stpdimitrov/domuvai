@@ -206,7 +206,7 @@ export interface paths {
         /** List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         put?: never;
-        /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown */
+        /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown. Sent under an Idempotency-Key: the same request again registers nothing more and is answered with the proxy it first made, even once the assembly takes no more proxies or its agent is at the limit; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         delete?: never;
         options?: never;
@@ -3544,7 +3544,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_proxies: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;

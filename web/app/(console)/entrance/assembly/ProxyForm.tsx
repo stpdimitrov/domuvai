@@ -13,13 +13,15 @@ import { appointProxy, type ProxyState } from "./actions";
 // Rule: PM-GA-009
 // Rule: PM-GA-010
 // Rule: PM-GA-011
-export default function ProxyForm({ entrance, assembly, parties }: { entrance: string; assembly: string; parties: string }) {
+// Rule: PM-SYS-014
+export default function ProxyForm({ entrance, assembly, parties, mintedKey }: { entrance: string; assembly: string; parties: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<ProxyState, FormData>(appointProxy, {});
   const v = state.values ?? {};
   return (
     <form action={act} key={JSON.stringify(v)} className="as-form">
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="assembly" value={assembly} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <label>
         Пълномощник
         <select name="agentKind" defaultValue={v.agentKind || "OWNER"}>

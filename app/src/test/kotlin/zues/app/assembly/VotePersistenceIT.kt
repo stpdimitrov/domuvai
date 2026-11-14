@@ -93,6 +93,7 @@ class VotePersistenceIT {
     private var signedInAs: String? = null
 
     private fun post(path: String, body: String) = MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON).content(body)
+        .also { request -> if (path.endsWith("/proxies")) request.header("Idempotency-Key", UUID.randomUUID().toString()) }   // PM-SYS-014: a proxy is registered under a key
         .also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     private fun created(path: String, body: String): JsonNode =

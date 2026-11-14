@@ -100,8 +100,8 @@ RUNNING = {
    ("Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
     ['PM-GA-023', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
-   ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown',
-    ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001']),
+   ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown. Sent under an Idempotency-Key: the same request again registers nothing more and is answered with the proxy it first made, even once the assembly takes no more proxies or its agent is at the limit; the same key for another request is a 409',
+    ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001', 'PM-SYS-014']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
    ("List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered", ['PM-GA-009', 'PM-SEC-001', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions'):
