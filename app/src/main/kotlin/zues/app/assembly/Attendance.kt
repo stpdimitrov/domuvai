@@ -96,7 +96,7 @@ class AttendanceService(
      * runs the assembly ([by]), on the day of that sitting and on no other; nobody is present twice — an owner who
      * gave a proxy is represented, and is not entered beside their representative (Rule: PM-ORG-005).
      * Entered under [key] (PM-SYS-014): the same request under the same key — a queue replayed — enters nobody more and is
-     * answered with the line the first one made, even on a later day or once the person is represented by a proxy since;
+     * answered with the line the first one made, even on a later day, once the assembly has left NOTICED/OPEN, or once the person is represented by a proxy since;
      * the same key for another request or operation is an [IdempotencyKeyReused].
      */
     // Rule: PM-GA-012
