@@ -5199,6 +5199,14 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5275,14 +5283,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly",
+        "summary": "Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly. Sent under an Idempotency-Key: the same request again enters nobody more and is answered with the line it first made — also on a later day, and with the line as it stands now; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-012",
           "PM-GA-016",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },

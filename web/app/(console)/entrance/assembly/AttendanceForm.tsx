@@ -11,13 +11,15 @@ import { recordAttendance, type AttendanceState } from "./actions";
  */
 // Rule: PM-GA-012
 // Rule: PM-GA-016
-export default function AttendanceForm({ entrance, assembly, mode, parties }: { entrance: string; assembly: string; mode: string; parties: string }) {
+// Rule: PM-SYS-014
+export default function AttendanceForm({ entrance, assembly, mode, parties, mintedKey }: { entrance: string; assembly: string; mode: string; parties: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<AttendanceState, FormData>(recordAttendance, {});
   const v = state.values ?? {};
   return (
     <form action={act} key={JSON.stringify(v)} className="as-form">
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="assembly" value={assembly} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <label>
         Лице
         <input type="text" name="attendeePartyId" list={parties} defaultValue={v.attendeePartyId} required placeholder="идентификатор на лицето" maxLength={36} />

@@ -94,7 +94,10 @@ class AttendanceWebTest {
         held[it] = roles.toSet()
     }
 
-    private fun MockHttpServletRequestBuilder.by(subject: String) = header(
+    /** The `Idempotency-Key` every record request below is sent under (PM-SYS-014). */
+    private val KEY = "7d6216b0-0000-4000-8000-000000000004"
+
+    private fun MockHttpServletRequestBuilder.by(subject: String, key: String? = KEY) = also { request -> key?.let { request.header("Idempotency-Key", it) } }.header(
         HttpHeaders.AUTHORIZATION,
         "Bearer " + SignedJWT(
             JWSHeader(JWSAlgorithm.RS256),
@@ -124,7 +127,7 @@ class AttendanceWebTest {
         val attendee = UUID.randomUUID()
         val principal = UUID.randomUUID()
         val keeper = Actor(manager, ISSUER, "login-keeper")
-        whenever(attendance.record(entranceId, assemblyId, keeper, attendee, "IN_PERSON")).thenReturn(line(attendee, manager, "IN_PERSON", false, setOf(attendee, principal)))
+        whenever(attendance.record(entranceId, assemblyId, KEY, keeper, attendee, "IN_PERSON")).thenReturn(line(attendee, manager, "IN_PERSON", false, setOf(attendee, principal)))
         val body = """{"attendeePartyId":"$attendee","channel":"IN_PERSON","recordedBy":"${UUID.randomUUID()}"}"""
 
         for (subject in listOf("login-controller", "login-owner", "login-stranger")) {
@@ -139,7 +142,7 @@ class AttendanceWebTest {
             .andExpect(jsonPath("$.recordedBy").value(manager.toString()))             // the one signed in, whatever the body named
             .andExpect(jsonPath("$.counted").value(true))
             .andExpect(jsonPath("$.represents.length()").value(2))
-        verify(attendance).record(entranceId, assemblyId, keeper, attendee, "IN_PERSON")
+        verify(attendance).record(entranceId, assemblyId, KEY, keeper, attendee, "IN_PERSON")
     }
 
     @Test
@@ -150,7 +153,7 @@ class AttendanceWebTest {
         val attendee = UUID.randomUUID()
         val keeper = Actor(manager, ISSUER, "login-keeper-2")
         val unverified = line(attendee, manager, "VIDEO", false, setOf(attendee))
-        whenever(attendance.record(entranceId, assemblyId, keeper, attendee, "VIDEO")).thenReturn(unverified)
+        whenever(attendance.record(entranceId, assemblyId, KEY, keeper, attendee, "VIDEO")).thenReturn(unverified)
         mvc.perform(post(base).by("login-keeper-2").content("""{"attendeePartyId":"$attendee","channel":"VIDEO"}"""))
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.identityVerified").value(false))
@@ -207,10 +210,32 @@ class AttendanceWebTest {
         val manager = person("login-keeper-3", Role.BM)
         convenedBy(manager)
         val body = """{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""
-        whenever(attendance.record(any(), any(), any(), any(), any())).thenThrow(IllegalStateException("already on the register"))
+        whenever(attendance.record(any(), any(), any(), any(), any(), any())).thenThrow(IllegalStateException("already on the register"))
         mvc.perform(post(base).by("login-keeper-3").content(body)).andExpect(status().isConflict)
         whenever(attendance.register(entranceId, assemblyId)).thenReturn(emptyList())
         mvc.perform(get(base).by("login-keeper-3")).andExpect(status().isOk)
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `PM-SYS-014 an attendance without an Idempotency-Key is a 400 and nobody is entered, a blank one is a 400 once the policy has been asked`() {
+        val manager = person("login-keeper-4", Role.BM)
+        convenedBy(manager)
+        val body = """{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""
+        mvc.perform(post(base).by("login-keeper-4", key = null).content(body)).andExpect(status().isBadRequest)
+        verifyNoInteractions(attendance)
+        whenever(attendance.record(any(), any(), eq(" "), any(), any(), any())).thenThrow(IllegalArgumentException("an Idempotency-Key is not blank"))
+        mvc.perform(post(base).by("login-keeper-4", key = " ").content(body)).andExpect(status().isBadRequest)
+        person("login-stranger-4")
+        mvc.perform(post(base).by("login-stranger-4", key = " ").content(body)).andExpect(status().isForbidden)   // asked before the key is looked at
+    }
+
+    @Test
+    fun `PM-SYS-014 a key used for another request is a 409`() {
+        val manager = person("login-keeper-5", Role.BM)
+        convenedBy(manager)
+        whenever(attendance.record(any(), any(), any(), any(), any(), any())).thenThrow(IdempotencyKeyReused("Idempotency-Key $KEY was used for another request (PM-SYS-014)"))
+        mvc.perform(post(base).by("login-keeper-5").content("""{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""))
+            .andExpect(status().isConflict).andExpect(jsonPath("$.error").value("Idempotency-Key $KEY was used for another request (PM-SYS-014)"))
     }
 }

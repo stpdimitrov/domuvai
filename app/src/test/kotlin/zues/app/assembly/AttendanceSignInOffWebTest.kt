@@ -56,7 +56,7 @@ class AttendanceSignInOffWebTest {
     @Test
     fun `PM-SEC-001 with sign-in switched off nobody is entered in the register or verified - and the register is still read`() {
         val base = "/api/assembly/entrances/${UUID.randomUUID()}/assemblies/${UUID.randomUUID()}/attendance"
-        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content("""{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""))
+        mvc.perform(post(base).header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON).content("""{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""))
             .andExpect(status().isForbidden)
         mvc.perform(post("$base/${UUID.randomUUID()}/identity-verification").contentType(MediaType.APPLICATION_JSON).content("""{"how":"камера"}"""))
             .andExpect(status().isForbidden)

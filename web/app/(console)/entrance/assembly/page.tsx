@@ -332,7 +332,7 @@ function Assembly({ shown, entrance, voided, myself }: { shown: Shown; entrance:
       {(a.status === "NOTICED" || a.status === "OPEN") && (   // the register is kept for these; on which day, for which sitting and by whom are the api's (PM-GA-012, PM-SEC-001)
         <div className="co-card" style={{ marginTop: 12 }}>
           <PartyPicker id="parties-attendance" entrance={entrance} myself={myself} />
-          <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} parties="parties-attendance" />
+          <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} parties="parties-attendance" mintedKey={randomUUID()} />
         </div>
       )}
       {a.status === "OPEN" && [...a.agenda].sort((x, y) => x.ordinal - y.ordinal).map((i) => (
