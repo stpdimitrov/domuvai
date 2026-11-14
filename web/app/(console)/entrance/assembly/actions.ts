@@ -172,31 +172,40 @@ export async function openSitting(_: SittingState, form: FormData): Promise<Sitt
   redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
 }
 
-export type AttendanceState = { refused?: string; values?: Record<string, string> };
+export type AttendanceState = { refused?: string; values?: Record<string, string>; key?: string };
 
 /**
  * Entering a person in the register of the sitting (Rule: PM-GA-012, PM-GA-016) — the api's act. Whether this
  * person keeps the register (PM-SEC-001), whether it is the day, which sitting the line is for, whether the person is
  * an owner or a registered proxy's representative, whether they may be present that way and whom the line brings are
  * all the api's; a refusal is shown in its words, the form kept as filled. The person is a party id until #300.
+ * Rule: PM-SYS-014 — the line carries an Idempotency-Key minted once per form, as a proxy does: a refusal entered nobody, so
+ * the form comes back under a new key; an answer lost, or a 5xx, keeps the key, so the same form sent again is the same
+ * line, never a second. A page reloaded mints a new key.
  */
 // Rule: PM-GA-012
 // Rule: PM-GA-016
 // Rule: PM-SEC-001
+// Rule: PM-SYS-014
 export async function recordAttendance(_: AttendanceState, form: FormData): Promise<AttendanceState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
   const values = Object.fromEntries(["entrance", "assembly", "attendeePartyId", "channel"].map((n) => [n, text(n)]));
-  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values };
-  if (!UUID.test(values.attendeePartyId)) return { refused: "Посочете идентификатора на лицето, което вписвате.", values };
+  const key = text("key");
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values, key: UUID.test(key) ? key : randomUUID() };
+  if (!UUID.test(key)) return { refused: "Формата е изтекла — опитайте отново.", values, key: randomUUID() };
+  if (!UUID.test(values.attendeePartyId)) return { refused: "Посочете идентификатора на лицето, което вписвате.", values, key };
 
   const answer = await reach(() =>
     api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance", {
-      params: { path: { entranceId: values.entrance, assemblyId: values.assembly } },
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly }, header: { "Idempotency-Key": key } },
       body: { attendeePartyId: values.attendeePartyId, channel: values.channel },
     }),
   );
+  // no answer: the person may be entered — and a person is on the register once; the same form, sent again, carries the same key
   if (!answer?.data) {
-    return { refused: answer ? undoneBy(answer, "впишете лицето в присъствения списък") : unknownOutcome("вписването"), values };
+    return answer
+      ? { refused: undoneBy(answer, "впишете лицето в присъствения списък"), values, key: answer.response.status < 500 ? randomUUID() : key }
+      : { refused: unknownOutcome("вписването"), values, key };
   }
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
 }

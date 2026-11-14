@@ -80,7 +80,11 @@ class AttendanceServiceTest {
     }
     private val proxies: ProxyRepository = mock { on { findByAssemblyId(any()) } doAnswer { proxyRows.toList() } }
 
-    private fun service(at: Instant = meets) = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, Clock.fixed(at, ZoneOffset.UTC))
+    /** The key space is the persistence test's: here no key was ever kept, so every entry is a new one. */
+    private fun keys(at: Instant) = VoteRequestKeys(mock(), mock<JdbcAggregateTemplate> { on { insert(any<Any>()) } doAnswer { it.arguments[0] } }, Clock.fixed(at, ZoneOffset.UTC))
+    private fun key() = UUID.randomUUID().toString()
+
+    private fun service(at: Instant = meets) = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, keys(at), Clock.fixed(at, ZoneOffset.UTC))
 
     private fun owner(from: String = "2026-01-01"): UUID = UUID.randomUUID().also { owners[it] = LocalDate.parse(from) }
 
@@ -89,7 +93,7 @@ class AttendanceServiceTest {
         if (signedIn) keeper.loginIssuer else null, if (signedIn) "login-$principal" else null, principal, null,
     ).also { proxyRows += it }
 
-    private fun record(attendee: UUID, channel: String = "IN_PERSON", at: Instant = meets) = service(at).record(entranceId, assembly!!.id, keeper, attendee, channel)
+    private fun record(attendee: UUID, channel: String = "IN_PERSON", at: Instant = meets) = service(at).record(entranceId, assembly!!.id, key(), keeper, attendee, channel)
 
     private fun register() = service().register(entranceId, assembly!!.id)
 
@@ -131,7 +135,7 @@ class AttendanceServiceTest {
         assertThatThrownBy { record(owner()) }.isInstanceOf(IllegalStateException::class.java)
         val id = assembly!!.id
         assembly = null
-        assertThatThrownBy { service().record(entranceId, id, keeper, owner(), "IN_PERSON") }.isInstanceOf(NoSuchElementException::class.java)
+        assertThatThrownBy { service().record(entranceId, id, key(), keeper, owner(), "IN_PERSON") }.isInstanceOf(NoSuchElementException::class.java)
     }
 
     @Test
@@ -181,7 +185,7 @@ class AttendanceServiceTest {
         owners[seller] = LocalDate.parse("2030-01-01")                              // as if the book now had them owning only from 2030: not on the day
         assertThat(register().single().represented).isEmpty()
         owners[seller] = LocalDate.parse("2026-01-01")
-        val readNextYear = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, Clock.fixed(Instant.parse("2027-06-01T09:00:00Z"), ZoneOffset.UTC))
+        val readNextYear = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, keys(Instant.parse("2027-06-01T09:00:00Z")), Clock.fixed(Instant.parse("2027-06-01T09:00:00Z"), ZoneOffset.UTC))
         assertThat(readNextYear.register(entranceId, assembly!!.id).single().represented).containsExactly(seller)   // read a year on: the same answer
         assertThat(buyerLater).isNotIn(register().flatMap { it.represented })
     }
@@ -242,7 +246,7 @@ class AttendanceServiceTest {
         assertThat(service(nextDay).register(entranceId, assembly!!.id)).isEmpty()
         assertThatThrownBy { service(nextDay).verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера") }.isInstanceOf(NoSuchElementException::class.java)
         assertThat(service(nextDay).isPresent(assembly!!.id, ana)).isFalse()            // on the day before's register, not yet on this one's: Ana may still give a proxy
-        val line = service(nextDay).record(entranceId, assembly!!.id, keeper, ana, "IN_PERSON")
+        val line = service(nextDay).record(entranceId, assembly!!.id, key(), keeper, ana, "IN_PERSON")
         assertThat(service(nextDay).isPresent(assembly!!.id, ana)).isTrue()
         assertThat(line.attendance.sessionNo).isEqualTo(3)
         assertThat(line.represented).containsExactly(ana)
@@ -262,7 +266,7 @@ class AttendanceServiceTest {
         assertThatThrownBy { service().verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, herself, "аз съм") }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-016")
         // nor on another day
-        val dayAfter = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, Clock.fixed(meets.plusSeconds(86_400), ZoneOffset.UTC))
+        val dayAfter = AttendanceService(aggregates, assemblies, attendance, verifications, proxies, sittingRows, book, keys(meets.plusSeconds(86_400)), Clock.fixed(meets.plusSeconds(86_400), ZoneOffset.UTC))
         assertThatThrownBy { dayAfter.verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера") }.isInstanceOf(IllegalStateException::class.java)
         assertThat(verified).isEmpty()
         assertThat(service().verifyIdentity(entranceId, assembly!!.id, remote.attendance.id, keeper, "камера").identityVerifiedAt).isEqualTo(meets)

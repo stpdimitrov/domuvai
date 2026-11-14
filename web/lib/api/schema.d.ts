@@ -137,7 +137,7 @@ export interface paths {
         /** Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The attendee's name and the names of those the line brings go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
         put?: never;
-        /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly */
+        /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly. Sent under an Idempotency-Key: the same request again enters nobody more and is answered with the line it first made — also on a later day, and with the line as it stands now; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
         delete?: never;
         options?: never;
@@ -3198,7 +3198,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_attendance: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;

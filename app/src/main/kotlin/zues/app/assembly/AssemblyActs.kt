@@ -125,9 +125,10 @@ class AssemblyActs(
     /** The register is kept by whoever runs the assembly: who is present, and that a remote participant was identified. */
     // Rule: PM-GA-012
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @Transactional
-    fun recordAttendance(who: Asking, entranceId: UUID, assemblyId: UUID, attendeePartyId: UUID, channel: String): Present =
-        attendance.record(entranceId, assemblyId, keepingTheRegister(who, entranceId, assemblyId), attendeePartyId, channel)
+    fun recordAttendance(who: Asking, entranceId: UUID, assemblyId: UUID, key: String, attendeePartyId: UUID, channel: String): Present =
+        attendance.record(entranceId, assemblyId, key, keepingTheRegister(who, entranceId, assemblyId), attendeePartyId, channel)
 
     // Rule: PM-GA-016
     // Rule: PM-SEC-001
