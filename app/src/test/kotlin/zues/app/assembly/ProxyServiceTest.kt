@@ -71,7 +71,12 @@ class ProxyServiceTest {
     /** Whether the book lets the one registering be told; the entry and the decision are `BookHouseholdsTest`'s. */
     private var told = true
     private val access: BookAccessService = mock { on { tested(any(), any(), any(), any(), any()) } doAnswer { told } }
-    private val service = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), Clock.fixed(now, ZoneOffset.UTC))
+    /** The key space is the persistence test's: here no key was ever kept, so every registration is a new one. */
+    private val keys = VoteRequestKeys(
+        mock(), mock<JdbcAggregateTemplate> { on { insert(any<Any>()) } doAnswer { it.arguments[0] } }, Clock.fixed(now, ZoneOffset.UTC),
+    )
+    private fun key() = UUID.randomUUID().toString()
+    private val service = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), keys, Clock.fixed(now, ZoneOffset.UTC))
 
     private fun actor(party: UUID) = Actor(party, "https://id.example.test/realms/domuvai", "login-$party")
     /** An owner of a unit of their own, living in it. */
@@ -82,7 +87,7 @@ class ProxyServiceTest {
     private fun proxy(
         principal: UUID = owner(), by: UUID = agent, kind: String = "OWNER", scope: String = "WHOLE_AGENDA",
         items: List<Int> = emptyList(), form: String = "WRITTEN",
-    ) = service.register(entranceId, assembly.id, RegisterProxy(principal, by, kind, scope, items, form), actor(principal), null)
+    ) = service.register(entranceId, assembly.id, key(), RegisterProxy(principal, by, kind, scope, items, form), actor(principal), null)
 
     @Test
     fun `PM-GA-009 a proxy registration captures principal, agent, scope and form`() {
@@ -155,7 +160,7 @@ class ProxyServiceTest {
     }
 
     private fun recorded(principal: UUID, by: UUID) = service.register(
-        entranceId, assembly.id, RegisterProxy(principal, by, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(UUID.randomUUID()), "5d".repeat(32),
+        entranceId, assembly.id, key(), RegisterProxy(principal, by, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(UUID.randomUUID()), "5d".repeat(32),
     )
 
     @Test
@@ -241,7 +246,7 @@ class ProxyServiceTest {
         val other = owner()
         val member = UUID.randomUUID().also { living[it] = owners.getValue(other) }
         val recorder = UUID.randomUUID()
-        service.register(entranceId, assembly.id, RegisterProxy(other, member, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(recorder), "5d".repeat(32))
+        service.register(entranceId, assembly.id, key(), RegisterProxy(other, member, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(recorder), "5d".repeat(32))
 
         val theRecorder = Asking(Login("https://id.example.test/realms/domuvai", "login-$recorder"), recorder)
         verify(access).tested(entranceId, theRecorder, other, LocalDate.parse("2026-10-09"), BookHouseholdsAdapter.PURPOSE)
@@ -261,11 +266,11 @@ class ProxyServiceTest {
         val principal = owner()
         val elsewhere = UUID.randomUUID()
         whenever(assemblies.lock(any(), any())).thenReturn(assembly.copy(entranceId = elsewhere))
-        assertThatThrownBy { service.register(elsewhere, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
+        assertThatThrownBy { service.register(elsewhere, assembly.id, key(), RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
-        val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
+        val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), keys, Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
         whenever(assemblies.lock(any(), any())).thenReturn(assembly)
-        assertThatThrownBy { tomorrow.register(entranceId, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
+        assertThatThrownBy { tomorrow.register(entranceId, assembly.id, key(), RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         assertThat(registered).isEmpty()
     }
@@ -286,14 +291,14 @@ class ProxyServiceTest {
         val command = RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN")
         val document = "5d".repeat(32)
         for (missing in listOf(null, "", "authorisation.pdf", "5D".repeat(32))) {
-            assertThatThrownBy { service.register(entranceId, assembly.id, command, recorder, missing) }
+            assertThatThrownBy { service.register(entranceId, assembly.id, key(), command, recorder, missing) }
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         }
-        assertThatThrownBy { service.register(entranceId, assembly.id, command, actor(principal), document) }     // in person: no document
+        assertThatThrownBy { service.register(entranceId, assembly.id, key(), command, actor(principal), document) }     // in person: no document
             .isInstanceOf(IllegalArgumentException::class.java)
         assertThat(registered).isEmpty()
 
-        val recorded = service.register(entranceId, assembly.id, command, recorder, document)
+        val recorded = service.register(entranceId, assembly.id, key(), command, recorder, document)
         assertThat(recorded.principalPartyId).isEqualTo(principal)
         assertThat(recorded.recordedBy).isEqualTo(recorder.party)
         assertThat(recorded.authorisationHash).isEqualTo(document)
@@ -308,7 +313,7 @@ class ProxyServiceTest {
         val recorder = actor(UUID.randomUUID())
         val document = "5d".repeat(32)
         fun recorded(principal: UUID, by: UUID, kind: String) =
-            service.register(entranceId, assembly.id, RegisterProxy(principal, by, kind, "WHOLE_AGENDA", emptyList(), "WRITTEN"), recorder, document)
+            service.register(entranceId, assembly.id, key(), RegisterProxy(principal, by, kind, "WHOLE_AGENDA", emptyList(), "WRITTEN"), recorder, document)
         assertThatThrownBy { recorded(UUID.randomUUID(), agent, "OWNER") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         assertThatThrownBy { recorded(owner(), UUID.randomUUID(), "OWNER") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("owns nothing")
         assertThat(registered).isEmpty()
@@ -371,7 +376,7 @@ class ProxyServiceTest {
         current = assembly
         // through another entrance's path the assembly is not there: nothing is registered, nothing is listed
         val elsewhere = UUID.randomUUID()
-        assertThatThrownBy { owner().let { p -> service.register(elsewhere, assembly.id, RegisterProxy(p, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(p), null) } }
+        assertThatThrownBy { owner().let { p -> service.register(elsewhere, assembly.id, key(), RegisterProxy(p, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(p), null) } }
             .isInstanceOf(NoSuchElementException::class.java)
         proxy()
         assertThatThrownBy { service.forAssembly(elsewhere, assembly.id) }.isInstanceOf(NoSuchElementException::class.java)

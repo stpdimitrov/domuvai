@@ -56,8 +56,8 @@ class ProxySignInOffWebTest {
     fun `PM-SEC-001 with sign-in switched off no proxy is appointed - whatever the body says - and the list is still read`() {
         val base = "/api/assembly/entrances/${UUID.randomUUID()}/assemblies/${UUID.randomUUID()}/proxies"
         val body = """{"principalPartyId":"${UUID.randomUUID()}","agentPartyId":"${UUID.randomUUID()}","agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"}"""
-        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden)
-        mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(body.replace("{", """{"authorisationHash":"${"5d".repeat(32)}",""")))
+        mvc.perform(post(base).header("Idempotency-Key", "k-1").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden)
+        mvc.perform(post(base).header("Idempotency-Key", "k-1").contentType(MediaType.APPLICATION_JSON).content(body.replace("{", """{"authorisationHash":"${"5d".repeat(32)}",""")))
             .andExpect(status().isForbidden)                                          // nor recorded from a document, by nobody
         whenever(proxies.forAssembly(any(), any())).thenReturn(emptyList())
         mvc.perform(get(base)).andExpect(status().isOk)

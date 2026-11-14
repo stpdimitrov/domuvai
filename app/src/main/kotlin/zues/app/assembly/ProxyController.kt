@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -50,6 +51,8 @@ data class AppointProxyRequest(
  * Proxies for a general assembly (PM-GA-009, PM-GA-010). A proxy is appointed by the one it represents, signed in —
  * an owner or a holder of use in the entrance today — or recorded by whoever runs the assembly from a written
  * authorisation they were handed, with the document's SHA-256 (PM-SEC-001). Anybody else naming a principal is a 403.
+ * A proxy is registered under an `Idempotency-Key` (PM-SYS-014): the same request sent again — a device's queue
+ * replayed — registers nothing more and is answered with the proxy it first made; the same key for another request is a 409.
  * The proxies are read as the assembly is.
  * A body that cannot be read is a 400 for anyone.
  */
@@ -59,11 +62,13 @@ class ProxyController(private val acts: AssemblyActs, private val proxies: Proxy
 
     // Rule: PM-GA-009
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun register(
-        @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: AppointProxyRequest, signedIn: JwtAuthenticationToken?,
-    ): ProxyView = view(acts.registerProxy(who.of(signedIn), entranceId, assemblyId, request))
+        @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: AppointProxyRequest,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String, signedIn: JwtAuthenticationToken?,
+    ): ProxyView = view(acts.registerProxy(who.of(signedIn), entranceId, assemblyId, idempotencyKey, request))
 
     // Rule: PM-SEC-001
     // Rule: PM-BOOK-006
@@ -90,6 +95,7 @@ class ProxyController(private val acts: AssemblyActs, private val proxies: Proxy
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onRefused(e: ActRefused) = ProxyRefused(e.message ?: "not allowed")
 
+    /** Also a blank key. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException) = ProxyRefused(e.message ?: "invalid request")
@@ -98,7 +104,7 @@ class ProxyController(private val acts: AssemblyActs, private val proxies: Proxy
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException) = ProxyRefused(e.message ?: "not found")
 
-    /** The agent is at the limit, the principal already has a proxy, or the assembly takes none any more. */
+    /** The agent is at the limit, the principal already has a proxy, the assembly takes none any more, or the key was used for another request. */
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException) = ProxyRefused(e.message ?: "conflict", (e as? ProxyLimitReached)?.limit)

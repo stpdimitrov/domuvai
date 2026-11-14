@@ -82,7 +82,7 @@ class AttendancePersistenceIT {
     /** Whose requests these are: every request below carries this login's token, until another person is signed in. */
     private var signedInAs: String? = null
 
-    private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
+    private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> if (path.endsWith("/proxies")) request.header("Idempotency-Key", UUID.randomUUID().toString()) }.also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     /** A party with a login of its own, tied to it. */
     private fun person(entranceId: UUID = aside): UUID = party(entranceId).also { logins.tie(realm, "login-$it", it) }

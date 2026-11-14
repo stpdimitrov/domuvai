@@ -95,13 +95,16 @@ class ProxyWebTest {
         held[it] = roles.toSet()
     }
 
-    private fun MockHttpServletRequestBuilder.by(subject: String) = header(
-        HttpHeaders.AUTHORIZATION,
-        "Bearer " + SignedJWT(
-            JWSHeader(JWSAlgorithm.RS256),
-            JWTClaimsSet.Builder().subject(subject).issuer(ISSUER).audience(AUDIENCE).expirationTime(Date.from(Instant.now().plusSeconds(300))).build(),
-        ).apply { sign(RSASSASigner(issuer.private)) }.serialize(),
-    ).contentType(MediaType.APPLICATION_JSON)
+    /** The `Idempotency-Key` every request below is sent under (PM-SYS-014). */
+    private val KEY = "7d6216b0-0000-4000-8000-000000000001"
+
+    private fun bearer(subject: String) = "Bearer " + SignedJWT(
+        JWSHeader(JWSAlgorithm.RS256),
+        JWTClaimsSet.Builder().subject(subject).issuer(ISSUER).audience(AUDIENCE).expirationTime(Date.from(Instant.now().plusSeconds(300))).build(),
+    ).apply { sign(RSASSASigner(issuer.private)) }.serialize()
+
+    private fun MockHttpServletRequestBuilder.by(subject: String, key: String? = KEY) =
+        also { request -> key?.let { request.header("Idempotency-Key", it) } }.header(HttpHeaders.AUTHORIZATION, bearer(subject)).contentType(MediaType.APPLICATION_JSON)
 
     private val document = "5d".repeat(32)
 
@@ -129,7 +132,7 @@ class ProxyWebTest {
         val boris = person("login-boris", Role.USR)
         for ((principal, subject) in listOf(ana to "login-ana", boris to "login-boris")) {
             val command = RegisterProxy(principal, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED")
-            whenever(proxies.register(entranceId, assemblyId, command, Actor(principal, ISSUER, subject), null)).thenReturn(stored(principal, subject))
+            whenever(proxies.register(entranceId, assemblyId, KEY, command, Actor(principal, ISSUER, subject), null)).thenReturn(stored(principal, subject))
         }
         // naming herself, or nobody, Ana appoints her own
         mvc.perform(post(base).by("login-ana").content(appointing(principal = ana))).andExpect(status().isCreated)
@@ -143,7 +146,7 @@ class ProxyWebTest {
             .andExpect(jsonPath("$.scope").value("LISTED_ITEMS"))
             .andExpect(jsonPath("$.items[1]").value(3))
             .andExpect(jsonPath("$.form").value("NOTARISED"))
-        verify(proxies, times(2)).register(entranceId, assemblyId, RegisterProxy(ana, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED"), Actor(ana, ISSUER, "login-ana"), null)
+        verify(proxies, times(2)).register(entranceId, assemblyId, KEY, RegisterProxy(ana, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED"), Actor(ana, ISSUER, "login-ana"), null)
         // a holder of a right of use appoints too: the rule says "an owner or user"
         mvc.perform(post(base).by("login-boris").content(appointing())).andExpect(status().isCreated).andExpect(jsonPath("$.principalPartyId").value(boris.toString()))
         // in person there is no document to give
@@ -159,7 +162,7 @@ class ProxyWebTest {
         person("login-stranger-5")
         convenedBy(manager)
         val command = RegisterProxy(owner, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED")
-        whenever(proxies.register(entranceId, assemblyId, command, Actor(manager, ISSUER, "login-manager-5"), document))
+        whenever(proxies.register(entranceId, assemblyId, KEY, command, Actor(manager, ISSUER, "login-manager-5"), document))
             .thenReturn(stored(owner, "login-manager-5").copy(recordedBy = manager, authorisationHash = document))
 
         // another office, another owner, a stranger and a login tied to no party do not record a proxy for the owner — document or not
@@ -177,7 +180,7 @@ class ProxyWebTest {
             .andExpect(jsonPath("$.principalPartyId").value(owner.toString()))
             .andExpect(jsonPath("$.recordedBy").value(manager.toString()))
             .andExpect(jsonPath("$.authorisationHash").value(document))
-        verify(proxies).register(entranceId, assemblyId, command, Actor(manager, ISSUER, "login-manager-5"), document)
+        verify(proxies).register(entranceId, assemblyId, KEY, command, Actor(manager, ISSUER, "login-manager-5"), document)
         // nobody records an authorisation that names themself as the proxy
         mvc.perform(post(base).by("login-manager-5").content(appointing(principal = owner, hash = document).replace("$agent", "$manager"))).andExpect(status().isBadRequest)
         verifyNoMoreInteractions(proxies)
@@ -193,7 +196,7 @@ class ProxyWebTest {
         person("login-manager-6", Role.BM)
         convenedBy(convenor, "OWNERS")
         val command = RegisterProxy(principal, agent, "THIRD_PARTY", "LISTED_ITEMS", listOf(2, 3), "NOTARISED")
-        whenever(proxies.register(entranceId, assemblyId, command, Actor(convenor, ISSUER, "login-convening-owner"), document))
+        whenever(proxies.register(entranceId, assemblyId, KEY, command, Actor(convenor, ISSUER, "login-convening-owner"), document))
             .thenReturn(stored(principal, "login-convening-owner").copy(recordedBy = convenor, authorisationHash = document))
         for (subject in listOf("login-absent-owner", "login-manager-6")) {
             val named = if (subject == "login-absent-owner") convenor else principal
@@ -232,7 +235,7 @@ class ProxyWebTest {
     @Test
     fun `PM-GA-010 a registration past the limit is a 409 that shows the limit`() {
         val owner = person("login-owner-3", Role.OWN)
-        whenever(proxies.register(eq(entranceId), eq(assemblyId), any(), eq(Actor(owner, ISSUER, "login-owner-3")), eq(null))).thenThrow(ProxyLimitReached(3, "чл. 14 ЗУЕС"))
+        whenever(proxies.register(eq(entranceId), eq(assemblyId), eq(KEY), any(), eq(Actor(owner, ISSUER, "login-owner-3")), eq(null))).thenThrow(ProxyLimitReached(3, "чл. 14 ЗУЕС"))
         mvc.perform(post(base).by("login-owner-3").content(appointing()))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.limit").value(3))
@@ -270,12 +273,30 @@ class ProxyWebTest {
     @Test
     fun `what the service refuses keeps its status, the list is read, and no token is a 401`() {
         val owner = person("login-owner-4", Role.OWN)
-        whenever(proxies.register(any(), any(), any(), any(), eq(null))).thenThrow(IllegalArgumentException("unknown kind"))
+        whenever(proxies.register(any(), any(), any(), any(), any(), eq(null))).thenThrow(IllegalArgumentException("unknown kind"))
         mvc.perform(post(base).by("login-owner-4").content(appointing())).andExpect(status().isBadRequest).andExpect(jsonPath("$.limit").doesNotExist())
         whenever(proxies.forAssembly(entranceId, assemblyId)).thenReturn(listOf(stored(owner, "login-owner-4").copy(scope = "WHOLE_AGENDA", scopeItems = null)))
         mvc.perform(get(base).by("login-owner-4")).andExpect(status().isOk).andExpect(jsonPath("$[0].items").isEmpty)
         whenever(proxies.forAssembly(any(), any())).thenThrow(NoSuchElementException("no assembly"))
         mvc.perform(get(base).by("login-owner-4")).andExpect(status().isNotFound)
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(appointing())).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `PM-SYS-014 a proxy without an Idempotency-Key is a 400 and nothing is registered, a blank one is a 400 once the policy has been asked`() {
+        person("login-owner-9", Role.OWN)
+        mvc.perform(post(base).by("login-owner-9", key = null).content(appointing())).andExpect(status().isBadRequest)
+        verifyNoInteractions(proxies)
+        whenever(proxies.register(any(), any(), eq(" "), any(), any(), eq(null))).thenThrow(IllegalArgumentException("an Idempotency-Key is not blank"))
+        mvc.perform(post(base).by("login-owner-9", key = " ").content(appointing())).andExpect(status().isBadRequest)
+        person("login-stranger-9")
+        mvc.perform(post(base).by("login-stranger-9", key = " ").content(appointing())).andExpect(status().isForbidden)   // asked before the key is looked at
+    }
+
+    @Test
+    fun `PM-SYS-014 a key used for another request is a 409`() {
+        person("login-owner-10", Role.OWN)
+        whenever(proxies.register(any(), any(), any(), any(), any(), eq(null))).thenThrow(IdempotencyKeyReused("Idempotency-Key $KEY was used for another request (PM-SYS-014)"))
+        mvc.perform(post(base).by("login-owner-10").content(appointing())).andExpect(status().isConflict).andExpect(jsonPath("$.error").value("Idempotency-Key $KEY was used for another request (PM-SYS-014)"))
     }
 }

@@ -325,7 +325,7 @@ function Assembly({ shown, entrance, voided, myself }: { shown: Shown; entrance:
           <div style={{ margin: "20px 0 0", ...HEADING }}>Вписване на пълномощно</div>
           <div className="co-card" style={{ marginTop: 12 }}>
             <PartyPicker id="parties-proxy" entrance={entrance} />
-            <ProxyForm entrance={entrance} assembly={a.id} parties="parties-proxy" />
+            <ProxyForm entrance={entrance} assembly={a.id} parties="parties-proxy" mintedKey={randomUUID()} />
           </div>
         </>
       )}
