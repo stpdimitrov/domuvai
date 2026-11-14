@@ -14,6 +14,7 @@ import zues.kernel.toSofiaDate
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /** A person present at a sitting of an assembly — in person or by video (Rule: PM-GA-012). Whom they represent is read from the proxies. */
@@ -125,7 +126,7 @@ class AttendanceService(
         check(countedProxies(assemblyId).none { it.principalPartyId == attendeePartyId }) {
             "this owner gave a proxy for this assembly and is represented: they are not entered beside their representative (PM-ORG-005)"
         }
-        val now = clock.instant()
+        val now = clock.instant().truncatedTo(ChronoUnit.MICROS)   // as the column keeps it: the first answer and a replay's read the same instant
         val brings = brings(assembly, ladder.day(n), attendeePartyId, enteredAt = now)
         require(brings.isNotEmpty()) { "the register takes an owner in the entrance, or the representative a registered proxy names (PM-GA-012)" }
         val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.RECORD_ATTENDANCE, asked)             // kept with the row, in this transaction
