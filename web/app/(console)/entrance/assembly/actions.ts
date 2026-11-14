@@ -418,7 +418,8 @@ export async function appointProxy(_: ProxyState, form: FormData): Promise<Proxy
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
   const values = Object.fromEntries(["entrance", "assembly", "agentKind", "agentPartyId", "form", "scope", "items", "principalPartyId"].map((n) => [n, text(n)]));
   const key = text("key");
-  if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(key)) return { refused: "Събранието не е посочено.", values, key: randomUUID() };
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values, key: UUID.test(key) ? key : randomUUID() };
+  if (!UUID.test(key)) return { refused: "Формата е изтекла — опитайте отново.", values, key: randomUUID() };
   const body = proxyOf({ agentKind: values.agentKind, agent: values.agentPartyId, form: values.form, scope: values.scope, items: values.items, principal: values.principalPartyId });
   if ("refused" in body) return { refused: body.refused, values, key };
   const document = form.get("authorisation");
