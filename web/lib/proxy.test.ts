@@ -62,8 +62,12 @@ test("PM-SEC-001 who may appoint or record is the API's: its refusal in its word
   assert.match(proxyRefused(said(404, "no assembly")), /^Системата не прие това: no assembly/);
   // the web gates nothing on a role: the form is offered, whatever office the signed-in person holds
   for (const s of [actions, form].map(code)) assert.doesNotMatch(s, /\b(OWN|USR|BM|MB|CTL|CSH|isOwner)\b/);
-  assert.match(page, /<ProxyForm entrance=\{entrance\} assembly=\{a\.id\} parties="parties-proxy" \/>/);
+  assert.match(page, /<ProxyForm entrance=\{entrance\} assembly=\{a\.id\} parties="parties-proxy" mintedKey=\{randomUUID\(\)\} \/>/);
   // a write that got no answer is not said to be done or undone
   assert.match(actions, /unknownOutcome\("вписването на пълномощното"\)/);
+  // Rule: PM-SYS-014 — the proxy goes under the form's key: kept when the answer is lost or a 5xx, renewed after a refusal
+  assert.match(actions, /header: \{ "Idempotency-Key": key \}/);
+  assert.match(actions, /unknownOutcome\("вписването на пълномощното"\), values, key \}/);
+  assert.match(actions, /refused: proxyRefused\(answer\), values, key: answer\.response\.status < 500 \? randomUUID\(\) : key/);
   assert.deepEqual(actions.match(/api\.POST\(\s*"[^"]*\/proxies"/g)?.length, 1);
 });

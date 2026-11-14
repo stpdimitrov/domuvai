@@ -13,6 +13,8 @@ import zues.app.registry.BookHouseholds
 import zues.app.registry.Holdings
 import zues.app.registry.HouseholdAnswer
 import zues.app.registry.TitleRole
+import zues.kernel.IdempotencyKey
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import zues.law.constantOn
 import java.time.Clock
@@ -47,6 +49,8 @@ data class Proxy(
     val recordedBy: UUID?,
     /** The SHA-256 of that written authorisation; none when the principal appointed in person. */
     val authorisationHash: String?,
+    /** The keyed request that registered it (Rule: PM-SYS-014); none on a proxy registered before proxies took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 /** Who may be a proxy: an adult household member, another owner, or a third party. Rule: PM-GA-009 */
@@ -59,6 +63,7 @@ enum class AuthorisationForm { WRITTEN, NOTARISED, LAWYER_AUTHORISATION }
 
 interface ProxyRepository : ListCrudRepository<Proxy, UUID> {
     fun findByAssemblyId(assemblyId: UUID): List<Proxy>
+    fun findByRequestKeyId(requestKeyId: UUID): List<Proxy>
 }
 
 /**
@@ -88,12 +93,20 @@ class ProxyService(
     private val proxies: ProxyRepository,
     private val holdings: Holdings,
     private val households: BookHouseholds,
+    private val keys: VoteRequestKeys,
     private val clock: Clock,
 ) {
     // Rule: PM-GA-009
     // Rule: PM-GA-010
+    // Rule: PM-SYS-014
+    /**
+     * Registers [request] under [key] (PM-SYS-014): the same request under the same key — a queue replayed — registers
+     * nothing and is answered with the proxy the first one made, even once the assembly takes no more proxies or its
+     * agent is at the limit; the same key for another request or operation is an [IdempotencyKeyReused].
+     */
     @Transactional
-    fun register(entranceId: UUID, assemblyId: UUID, request: RegisterProxy, by: Actor, authorisationHash: String?): Proxy {
+    fun register(entranceId: UUID, assemblyId: UUID, key: String, request: RegisterProxy, by: Actor, authorisationHash: String?): Proxy {
+        val idempotencyKey = IdempotencyKey(key)
         // appointed in person, or recorded from a document: never a principal named with nothing behind the naming
         if (by.party == request.principalPartyId) {
             require(authorisationHash == null) { "a proxy appointed in person carries no document" }
@@ -108,9 +121,15 @@ class ProxyService(
         require(request.principalPartyId != request.agentPartyId) { "nobody is their own proxy" }
         // the assembly's row is locked, so two registrations for one agent are counted one after the other
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
-        check(assembly.status in PROXIES_OPEN) { "an assembly that is ${assembly.status} takes no new proxies" }
         require((request.items as List<Int?>).none { it == null }) { "an agenda item is named by its number" }
         val items = request.items.distinct().sorted()
+        val asked = VoteRequestKeys.hash(assemblyId, by.party, request.principalPartyId, request.agentPartyId, kind.name, scope.name, items.joinToString(","), form.name, authorisationHash)
+        when (val decided = keys.decide(entranceId, idempotencyKey, VoteRequestKeys.REGISTER_PROXY, asked)) {   // decided under the assembly's lock
+            is KeyDecision.Replay -> return proxies.findByRequestKeyId(UUID.fromString(decided.resultId)).single()
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
+        check(assembly.status in PROXIES_OPEN) { "an assembly that is ${assembly.status} takes no new proxies" }
         if (scope == ProxyScope.LISTED_ITEMS) {
             require(items.isNotEmpty()) { "a proxy for listed items names at least one" }
             val onAgenda = agenda.findByAssemblyIdOrderByOrdinal(assemblyId).map { it.ordinal }
@@ -134,9 +153,10 @@ class ProxyService(
         if (registered.count { it.agentPartyId == request.agentPartyId } >= limit.value.toInt()) {
             throw ProxyLimitReached(limit.value.toInt(), limit.source)
         }
+        val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.REGISTER_PROXY, asked)         // kept with the row, in this transaction
         val proxy = Proxy(
             UUID.randomUUID(), entranceId, assemblyId, request.principalPartyId, request.agentPartyId, kind.name,
-            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(), by.loginIssuer, by.loginSubject, by.party, authorisationHash,
+            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(), by.loginIssuer, by.loginSubject, by.party, authorisationHash, made,
         )
         try {
             return aggregates.insert(proxy)

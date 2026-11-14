@@ -397,7 +397,7 @@ export async function postProtocol(_: ProtocolState, form: FormData): Promise<Pr
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
 }
 
-export type ProxyState = { refused?: string; values?: Record<string, string> };
+export type ProxyState = { refused?: string; values?: Record<string, string>; key?: string };
 
 /**
  * A proxy appointed for the assembly, or recorded from a written authorisation (Rule: PM-GA-009, PM-GA-010, PM-GA-011,
@@ -405,28 +405,34 @@ export type ProxyState = { refused?: string; values?: Record<string, string> };
  * their own; naming one records the document handed over, and the SHA-256 of the file attached goes with it (the file itself
  * is not kept by this call). Who may, whether the agent is who the kind says, whether the form suffices and how many one person
  * may represent are the api's; a refusal is shown in its words, the fields kept — the file is chosen again.
+ * Rule: PM-SYS-014 — the proxy carries an Idempotency-Key minted once per form, as a vote does: a refusal registered
+ * nothing, so the form comes back under a new key; an answer lost, or a 5xx, keeps the key, so the same form sent again is
+ * the same proxy, never a second. A page reloaded mints a new key.
  */
 // Rule: PM-GA-009
 // Rule: PM-GA-010
 // Rule: PM-GA-011
 // Rule: PM-SEC-001
+// Rule: PM-SYS-014
 export async function appointProxy(_: ProxyState, form: FormData): Promise<ProxyState> {
   const text = (name: string) => (typeof form.get(name) === "string" ? (form.get(name) as string).trim() : "");
   const values = Object.fromEntries(["entrance", "assembly", "agentKind", "agentPartyId", "form", "scope", "items", "principalPartyId"].map((n) => [n, text(n)]));
-  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values };
+  const key = text("key");
+  if (!UUID.test(values.entrance) || !UUID.test(values.assembly)) return { refused: "Събранието не е посочено.", values, key: UUID.test(key) ? key : randomUUID() };
+  if (!UUID.test(key)) return { refused: "Формата е изтекла — опитайте отново.", values, key: randomUUID() };
   const body = proxyOf({ agentKind: values.agentKind, agent: values.agentPartyId, form: values.form, scope: values.scope, items: values.items, principal: values.principalPartyId });
-  if ("refused" in body) return { refused: body.refused, values };
+  if ("refused" in body) return { refused: body.refused, values, key };
   const document = form.get("authorisation");
   const authorisationHash = document instanceof File && document.size > 0 ? createHash("sha256").update(Buffer.from(await document.arrayBuffer())).digest("hex") : undefined;
 
   const answer = await reach(() =>
     api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies", {
-      params: { path: { entranceId: values.entrance, assemblyId: values.assembly } },
+      params: { path: { entranceId: values.entrance, assemblyId: values.assembly }, header: { "Idempotency-Key": key } },
       body: { ...body, ...(authorisationHash && { authorisationHash }) },
     }),
   );
-  // no answer: the proxy may be registered — and a principal has one per assembly
-  if (!answer) return { refused: unknownOutcome("вписването на пълномощното"), values };
-  if (!answer.data) return { refused: proxyRefused(answer), values };
+  // no answer: the proxy may be registered — and a principal has one per assembly; the same form, sent again, carries the same key
+  if (!answer) return { refused: unknownOutcome("вписването на пълномощното"), values, key };
+  if (!answer.data) return { refused: proxyRefused(answer), values, key: answer.response.status < 500 ? randomUUID() : key };
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
 }

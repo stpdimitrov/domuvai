@@ -93,6 +93,7 @@ class VotePersistenceIT {
     private var signedInAs: String? = null
 
     private fun post(path: String, body: String) = MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON).content(body)
+        .also { request -> if (path.endsWith("/proxies")) request.header("Idempotency-Key", UUID.randomUUID().toString()) }   // PM-SYS-014: a proxy is registered under a key
         .also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     private fun created(path: String, body: String): JsonNode =
@@ -279,7 +280,7 @@ class VotePersistenceIT {
         }
         signedIn(boris) { vote(m, ana, "FOR", key = queued).andExpect(status().isForbidden) }                       // a replay is answered only to who may record it
         assertThat(rows(m).map { it["choice"] }).containsExactly("FOR", "AGAINST")
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, m.entranceId)).isEqualTo(2)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ? AND operation <> 'REGISTER_PROXY'", Int::class.java, m.entranceId)).isEqualTo(2)
         // closed: no new vote is taken, but a replay of one already recorded is still answered with it
         signedIn(m.manager) {
             close(m).andExpect(status().isCreated)
@@ -550,7 +551,7 @@ class VotePersistenceIT {
         val first = signedIn(m.manager) { ballotIds(ballot(m, absent, today, key = queued)) }
         signedIn(m.manager) { repeat(2) { assertThat(ballotIds(ballot(m, absent, today, key = queued))).isEqualTo(first) } }       // the queue replayed twice: one ballot
         assertThat(ballotRows(m).map { it["id"] }).isEqualTo(first)
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, m.entranceId)).isEqualTo(1)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ? AND operation <> 'REGISTER_PROXY'", Int::class.java, m.entranceId)).isEqualTo(1)
         signedIn(m.manager) {
             ballot(m, absent, today).andExpect(status().isConflict)                                          // another key: this owner's ballot is entered
             clock.by = Duration.ofDays(12)                                                                    // day 7 is over
@@ -573,7 +574,7 @@ class VotePersistenceIT {
             close(m).andExpect(status().isCreated)
             ballot(m, absent, today, key = k).andExpect(status().isConflict)                                  // the same key for another operation
             assertThat(ballotRows(m)).isEmpty()
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, m.entranceId)).isEqualTo(1)   // a refused ballot keeps no key
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ? AND operation <> 'REGISTER_PROXY'", Int::class.java, m.entranceId)).isEqualTo(1)   // a refused ballot keeps no key
             val q = UUID.randomUUID().toString()
             ballot(m, absent, today, key = q).andExpect(status().isCreated)
             ballot(m, absent, today, choice = "AGAINST", key = q).andExpect(status().isConflict)             // the same key for another request

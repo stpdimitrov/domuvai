@@ -84,7 +84,9 @@ class ProxyPersistenceIT {
     /** Whose requests these are: every request below carries this login's token, until another person is signed in. */
     private var signedInAs: String? = null
 
-    private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
+    /** A request, under [key] — a fresh one for a proxy unless the test replays one; null sends none (PM-SYS-014). */
+    private fun post(path: String, key: String? = if (path.endsWith("/proxies")) UUID.randomUUID().toString() else null) =
+        MockMvcRequestBuilders.post(path).also { request -> key?.let { request.header("Idempotency-Key", it) } }.also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     /** A party with a login of its own, tied to it. */
     private fun person(entranceId: UUID = aside): UUID = party(entranceId).also { logins.tie(realm, "login-$it", it) }
@@ -140,8 +142,14 @@ class ProxyPersistenceIT {
     private fun appointing(agent: UUID, rest: String = """"agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"""") = """{"agentPartyId":"$agent",$rest}"""
 
     /** The principal, signed in, appoints. */
-    private fun appoint(proxies: String, principal: UUID, agent: UUID, rest: String = """"agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"""") =
-        signedIn(principal) { mvc.perform(post(proxies).contentType(MediaType.APPLICATION_JSON).content(appointing(agent, rest))) }
+    private fun appoint(proxies: String, principal: UUID, agent: UUID, rest: String = """"agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"""", key: String? = UUID.randomUUID().toString()) =
+        signedIn(principal) { mvc.perform(post(proxies, key).contentType(MediaType.APPLICATION_JSON).content(appointing(agent, rest))) }
+
+    private fun proxyIds(result: org.springframework.test.web.servlet.ResultActions) = json.readTree(result.andExpect(status().isCreated).andReturn().response.contentAsString).get("id").asText()
+
+    private fun proxyRows(entranceId: UUID) = jdbc.queryForList("SELECT id::text, principal_party_id, agent_party_id, request_key_id FROM assembly.proxy WHERE entrance_id = ? ORDER BY id", entranceId)
+
+    private fun keptKeys(entranceId: UUID) = jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, entranceId)
 
     private fun entranceOf(proxies: String) = UUID.fromString(Regex("entrances/([^/]+)").find(proxies)!!.groupValues[1])
 
@@ -386,5 +394,113 @@ class ProxyPersistenceIT {
         val elsewhere = proxies.replace(Regex("entrances/[^/]+"), "entrances/$other")
         mvc.perform(get(elsewhere)).andExpect(status().isNotFound)
         appoint(elsewhere, owner(other), owner(other)).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying a queued proxy twice registers it once - the same key and request answer with the proxy first made, also once the assembly takes no more proxies`() {
+        val proxies = assembly(entrance())
+        val entranceId = entranceOf(proxies)
+        val principal = owner(entranceId)
+        val agent = owner(entranceId)
+        val queued = UUID.randomUUID().toString()
+        val first = proxyIds(appoint(proxies, principal, agent, key = queued))
+        repeat(2) { assertThat(proxyIds(appoint(proxies, principal, agent, key = queued))).isEqualTo(first) }          // the queue replayed twice: one proxy
+        assertThat(proxyRows(entranceId).map { it["id"] }).containsExactly(first)
+        assertThat(keptKeys(entranceId)).isEqualTo(1)
+        appoint(proxies, principal, agent).andExpect(status().isConflict)                                              // another key: this principal has a proxy
+        val manager = jdbc.queryForObject("SELECT party_id FROM identity_org.management_mandate WHERE entrance_id = ?", UUID::class.java, entranceId)!!
+        signedIn(manager) { created(proxies.removeSuffix("/proxies") + "/notice-posting", """{"postedAt":"${Instant.now()}","coSignatoryPartyId":"$agent","photoHash":"${"3f".repeat(32)}"}""") }
+        jdbc.update("UPDATE assembly.assembly SET status = 'OPEN' WHERE id = ?::uuid", proxies.substringAfter("/assemblies/").substringBefore("/"))
+        assertThat(proxyIds(appoint(proxies, principal, agent, key = queued))).isEqualTo(first)                        // an assembly under way takes no more, yet the replay is answered
+        appoint(proxies, owner(entranceId), agent).andExpect(status().isConflict)
+        assertThat(proxyRows(entranceId)).hasSize(1)
+
+        // recorded from a written authorisation by whoever runs the assembly: the same, and the document is part of the request
+        val other = assembly(entrance())
+        val otherEntrance = entranceOf(other)
+        val onPaper = owner(otherEntrance)
+        val recorder = jdbc.queryForObject("SELECT party_id FROM identity_org.management_mandate WHERE entrance_id = ?", UUID::class.java, otherEntrance)!!
+        val written = """{"principalPartyId":"$onPaper","authorisationHash":"${"5d".repeat(32)}","agentPartyId":"${owner(otherEntrance)}","agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"}"""
+        val sent = UUID.randomUUID().toString()
+        val recordedAs = { body: String -> signedIn(recorder) { mvc.perform(post(other, sent).contentType(MediaType.APPLICATION_JSON).content(body)) } }
+        val kept = proxyIds(recordedAs(written))
+        assertThat(proxyIds(recordedAs(written))).isEqualTo(kept)
+        recordedAs(written.replace("5d".repeat(32), "6e".repeat(32))).andExpect(status().isConflict)                  // another document: another request
+        assertThat(proxyRows(otherEntrance)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-SYS-014 a proxy's key is refused for another request or operation, and a proxy without an Idempotency-Key is a 400`() {
+        val proxies = assembly(entrance())
+        val entranceId = entranceOf(proxies)
+        val principal = owner(entranceId)
+        val agent = owner(entranceId)
+        appoint(proxies, principal, agent, key = null).andExpect(status().isBadRequest)
+        appoint(proxies, principal, agent, key = "  ").andExpect(status().isBadRequest)
+        val k = UUID.randomUUID().toString()
+        jdbc.update("INSERT INTO assembly.vote_request_key (id, entrance_id, idempotency_key, operation, request_hash, kept_at) VALUES (gen_random_uuid(), ?, ?, 'RECORD_VOTE', 'x', now())", entranceId, k)
+        appoint(proxies, principal, agent, key = k).andExpect(status().isConflict)                                      // k was kept for a vote: another operation
+        assertThat(proxyRows(entranceId)).isEmpty()
+        assertThat(keptKeys(entranceId)).isEqualTo(1)                                                                   // a refused proxy keeps no key
+        appoint(proxies, principal, agent, """"agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"""", key = "bad").andExpect(status().isCreated)
+        appoint(proxies, principal, agent, """"agentKind":"THIRD_PARTY","scope":"WHOLE_AGENDA","form":"WRITTEN"""", key = "bad").andExpect(status().isConflict)    // another kind
+        appoint(proxies, principal, agent, """"agentKind":"OWNER","scope":"LISTED_ITEMS","items":[1],"form":"WRITTEN"""", key = "bad").andExpect(status().isConflict)
+        appoint(proxies, principal, owner(entranceId), key = "bad").andExpect(status().isConflict)                       // another agent
+        appoint(proxies, owner(entranceId), agent, key = "bad").andExpect(status().isConflict)                           // another principal
+        assertThat(proxyRows(entranceId)).hasSize(1)
+        // a registration the table refuses (an agent nobody registered) is rolled back with its key: nothing is kept
+        val before = keptKeys(entranceId)
+        appoint(proxies, owner(entranceId), UUID.randomUUID(), """"agentKind":"THIRD_PARTY","scope":"WHOLE_AGENDA","form":"WRITTEN"""", key = UUID.randomUUID().toString()).andExpect(status().isBadRequest)
+        assertThat(keptKeys(entranceId)).isEqualTo(before)
+    }
+
+    @Test
+    fun `PM-GA-010 a replay of the proxy that reached the limit is answered with it, not refused as past the limit, while a new key for one more is still refused showing the limit`() {
+        val proxies = assembly(entrance())
+        val entranceId = entranceOf(proxies)
+        val agent = owner(entranceId)
+        val limit = constantOn("GA_PROXY_MAX_PRINCIPALS", toSofiaDate(meets)).value.toInt()
+        val last = owner(entranceId)
+        repeat(limit - 1) { appoint(proxies, owner(entranceId), agent).andExpect(status().isCreated) }
+        val queued = UUID.randomUUID().toString()
+        val reached = proxyIds(appoint(proxies, last, agent, key = queued))
+        assertThat(proxyIds(appoint(proxies, last, agent, key = queued))).isEqualTo(reached)                            // the agent is at the limit: the replay is not one more
+        val refusal = json.readTree(appoint(proxies, owner(entranceId), agent).andExpect(status().isConflict).andReturn().response.contentAsString)
+        assertThat(refusal.get("limit").asInt()).isEqualTo(limit)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.proxy WHERE agent_party_id = ?", Int::class.java, agent)).isEqualTo(limit)
+    }
+
+    @Test
+    fun `PM-VOTE-014 a replayed proxy adds no row and edits none - its row names the key, which is never changed or removed`() {
+        val proxies = assembly(entrance())
+        val entranceId = entranceOf(proxies)
+        val principal = owner(entranceId)
+        val queued = UUID.randomUUID().toString()
+        val agent = owner(entranceId)
+        repeat(2) { proxyIds(appoint(proxies, principal, agent, key = queued)) }
+        val kept = jdbc.queryForObject("SELECT id FROM assembly.vote_request_key WHERE entrance_id = ? AND idempotency_key = ?", UUID::class.java, entranceId, queued)
+        assertThat(jdbc.queryForObject("SELECT operation FROM assembly.vote_request_key WHERE id = ?", String::class.java, kept)).isEqualTo("REGISTER_PROXY")
+        val row = proxyRows(entranceId).single()
+        assertThat(row["request_key_id"]).isEqualTo(kept)
+        assertThat(jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE id = ?", kept)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_request_key WHERE id = ?", kept)).isZero()
+        assertThat(proxyRows(entranceId).single()).isEqualTo(row)                                                       // the replay changed nothing
+    }
+
+    @Test
+    fun `PM-SEC-001 a replayed proxy is answered only to whoever may register it - the policy is asked before the key is looked up`() {
+        val proxies = assembly(entrance())
+        val entranceId = entranceOf(proxies)
+        val principal = owner(entranceId)
+        val agent = owner(entranceId)
+        val queued = UUID.randomUUID().toString()
+        proxyIds(appoint(proxies, principal, agent, key = queued))
+        val naming = """{"principalPartyId":"$principal","authorisationHash":"${"5d".repeat(32)}","agentPartyId":"$agent","agentKind":"OWNER","scope":"WHOLE_AGENDA","form":"WRITTEN"}"""
+        for (who in listOf(agent, owner(entranceId), person())) {                                                       // an owner naming another principal runs no assembly
+            signedIn(who) { mvc.perform(post(proxies, queued).contentType(MediaType.APPLICATION_JSON).content(naming)).andExpect(status().isForbidden) }
+        }
+        signedIn(person()) { mvc.perform(post(proxies, queued).contentType(MediaType.APPLICATION_JSON).content(appointing(agent))).andExpect(status().isForbidden) }   // a stranger appointing in person
+        signedIn(null) { mvc.perform(post(proxies, queued).contentType(MediaType.APPLICATION_JSON).content(appointing(agent))).andExpect(status().isForbidden) }       // nobody signed in
+        assertThat(proxyRows(entranceId)).hasSize(1)
     }
 }
