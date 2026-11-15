@@ -47,7 +47,8 @@ class FundDecisionIT {
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var disbursements: FundDisbursementRepository
 
-    private fun send(path: String, body: String) = mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body))
+    /** Each write under a fresh `Idempotency-Key`, which the keyed ones (a paper decision among them) require (PM-SYS-014); the others ignore it. */
+    private fun send(path: String, body: String) = mvc.perform(post(path).header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON).content(body))
 
     private fun created(path: String, body: String, field: String): String {
         val response = send(path, body).andExpect(status().isCreated).andReturn().response.contentAsString

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL } from "@/lib/api/client";
@@ -49,7 +50,7 @@ export default async function PaperDecisionsPage({ searchParams }: { searchParam
               {read?.data?.map((d) => <li key={d.id}><PaperRecord decision={d} /></li>)}
             </ul>
           </div>
-          <PaperDecisionForm entrance={view.entrance.id} />
+          <PaperDecisionForm entrance={view.entrance.id} mintedKey={randomUUID()} />
         </>
       ) : (
         <div style={BODY}>

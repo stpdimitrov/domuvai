@@ -16,7 +16,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-/** The `Idempotency-Key` a vote, an absentee ballot, a proxy or an attendance was recorded with (DEVBRIEF §8): the operation, a hash of the request, when. The rows it made name it. Insert-only. Rule: PM-SYS-014 */
+/** The `Idempotency-Key` a vote, an absentee ballot, a proxy, an attendance or a paper decision was recorded with (DEVBRIEF §8): the operation, a hash of the request, when. The rows it made name it. Insert-only. Rule: PM-SYS-014 */
 @Table("vote_request_key")
 data class VoteRequestKeyRow(
     @Id val id: UUID,
@@ -64,6 +64,7 @@ class VoteRequestKeys(private val keys: VoteRequestKeyRepository, private val ag
         const val ENTER_ABSENTEE_BALLOT = "ENTER_ABSENTEE_BALLOT"
         const val REGISTER_PROXY = "REGISTER_PROXY"
         const val RECORD_ATTENDANCE = "RECORD_ATTENDANCE"
+        const val RECORD_PAPER_DECISION = "RECORD_PAPER_DECISION"
 
         // Rule: PM-SYS-014
         /** Each field length-prefixed and a missing one apart from any text, so two requests hash alike only when they are alike. */

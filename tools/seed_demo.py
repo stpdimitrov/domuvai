@@ -107,7 +107,7 @@ call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
 def paper_decision(text, item):
     return call("POST", f"/api/assembly/entrances/{entrance}/paper-decisions", {
         "decisionText": text, "protocolDate": "2026-03-12", "protocolRef": f"Протокол на ОС от 12.03.2026, т. {item}",
-        "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"})["id"]
+        "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"}, {"Idempotency-Key": str(uuid.uuid4())})["id"]
 
 tariff = paper_decision("Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.", 4)
 

@@ -6188,6 +6188,19 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
         "summary": "List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403",
@@ -6210,6 +6223,14 @@
             "required": true,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
               "type": "string"
             }
           }
@@ -6273,9 +6294,22 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         },
-        "summary": "Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001",
+        "summary": "Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the record it first made; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
@@ -6284,7 +6318,8 @@
           "PM-GA-022",
           "PM-DOC-007",
           "PM-SEC-001",
-          "PM-SEC-004"
+          "PM-SEC-004",
+          "PM-SYS-014"
         ]
       }
     },
