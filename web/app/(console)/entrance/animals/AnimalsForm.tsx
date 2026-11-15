@@ -78,9 +78,10 @@ export function AnimalLeavingForm({ entrance, units, today }: { entrance: string
 }
 
 /**
- * The absences of a unit entered in the book (WEB-46): two days a row, as typed. Whether an absence exempts a charge and
- * whether it came in time is the API's — no number of days and no grace window is typed here (Rule: PM-FEE-006,
- * PM-FEE-007); the days are sent as typed (Rule: PM-BOOK-008).
+ * The absences of a unit entered in the book (WEB-46): two days a row, as typed, and optionally the day it was
+ * handed in. Whether an absence exempts a charge and whether it came in time is the API's — no number of days and no grace window is typed here (Rule: PM-FEE-006,
+ * PM-FEE-007); the days are sent as typed (Rule: PM-BOOK-008). Each row may also carry the day the paper was handed
+ * in, sent as `handedInOn` only when typed (Rule: PM-FEE-007).
  */
 // Rule: PM-BOOK-008, PM-FEE-006, PM-FEE-007
 export function AbsencesForm({ entrance, units }: { entrance: string; units: UnitChoice[] }) {
@@ -91,15 +92,16 @@ export function AbsencesForm({ entrance, units }: { entrance: string; units: Uni
       <input type="hidden" name="entrance" value={entrance} />
       <div className="wide acct-title">Вписване на отсъствия</div>
       <div className="wide as-hint">
-        Отсъствието е период: първият ден, в който го няма, и денят, в който се връща (чл. 51 ЗУЕС). Освобождава ли от такса и в срок ли е подадено — решава системата, не тази страница. Отсъствие, вписано
-        със закъснение, се отчита от деня, в който е вписано, а не от деня на подаване на декларацията — системата не приема ден на подаване
-        (известен проблем, #215). Вписаното се чете в книгата като периоди на неползване.
+        Отсъствието е период: първият ден, в който го няма, и денят, в който се връща (чл. 51 ЗУЕС). Освобождава ли от такса и в срок ли е подадено — решава системата, не тази страница.
+        „Подадена на“ е денят, в който хартиената декларация е подадена; управителят го посочва. Ако не е посочен, за ден на подаване се счита денят на вписване.
+        Денят на подаване може да е преди началото на отсъствието, но не и след деня на вписване — иначе системата отказва. Вписаното се чете в книгата като периоди на неползване.
       </div>
       <UnitSelect units={units} chosen={state.input?.unit} />
       {Array.from({ length: ABSENCE_ROWS }, (_, i) => (
         <div key={i} className="wide" style={ROW}>
           <label>Отсъства от {i + 1}<input type="date" name={`absentFrom${i}`} defaultValue={rows?.[i]?.from ?? ""} /></label>
           <label>Връща се на<input type="date" name={`absentTo${i}`} defaultValue={rows?.[i]?.to ?? ""} /></label>
+          <label>Подадена на<input type="date" name={`handedIn${i}`} defaultValue={rows?.[i]?.handedIn ?? ""} /></label>
         </div>
       ))}
       {state.refused && <div className="wide as-refused" role="alert">{state.refused}</div>}

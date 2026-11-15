@@ -1855,7 +1855,7 @@ def animals_screen(api, web, entrance, signed_in):
     failures = [f"{path}: HTTP {status}"] if status != 200 else []
     failures += [f"{path}: the unit {u['designation']} ({u['id']}) is not offered" for u in units if f'value="{u["id"]}"' not in page]
     failures += [] if 'name="species0"' in page and 'name="animal"' in page and 'name="absentFrom0"' in page else [f"{path}: the animals, leaving or absences form is missing"]
-    failures += [] if "#215" in visible_text(page) and "Животните още не се четат в книгата" in visible_text(page) else [f"{path}: the page does not state that an absence entered late is stamped with the day it is entered (#215) and that the book does not serve animals yet"]
+    failures += [] if "денят на вписване" in visible_text(page) and 'name="handedIn0"' in page and "Животните още не се четат в книгата" in visible_text(page) else [f"{path}: the page does not offer the day the paper was handed in (handedIn0), state that with none stated the day of entry counts, and that the book does not serve animals yet"]
     if signed_in:
         unit = sorted(units, key=lambda u: u["designation"])[0]["id"]
         spans = lambda: [(n["from"], n["to"]) for u in json.loads(fetch(api, f"/api/registry/entrances/{entrance}/book?purpose=e2e%3A%20animals")[1]).get("units", []) if u["unitId"] == unit for n in u["nonUse"]]

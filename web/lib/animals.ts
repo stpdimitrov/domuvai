@@ -14,14 +14,17 @@ export const ABSENCE_ROWS = 3;
 /** A row of the animals form as typed: the species ("" = no animal in this row), the veterinary passport number and from when. */
 export type AnimalRow = { species: string; passport: string; from: string };
 
-/** A row of the absences form as typed: the first day absent and the first day back, as the API takes them (the span is `[absentFrom, absentTo)`). */
-export type AbsenceRow = { from: string; to: string };
+/**
+ * A row of the absences form as typed: the first day absent and the first day back, as the API takes them (the span is
+ * `[absentFrom, absentTo)`), and optionally the day the paper was handed in ("" = none stated).
+ */
+export type AbsenceRow = { from: string; to: string; handedIn?: string };
 
 /** The request's `NewAnimalRequest`: the species and the passport number as typed, the day only when typed. */
 export type NewAnimal = { species: string; vetPassportNo?: string; validFrom?: string };
 
-/** The request's `NewAbsenceRequest`. */
-export type NewAbsence = { absentFrom: string; absentTo: string };
+/** The request's `NewAbsenceRequest`: the two days, and `handedInOn` only when typed (with none, the API takes the day of entry). */
+export type NewAbsence = { absentFrom: string; absentTo: string; handedInOn?: string };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -45,16 +48,21 @@ export function animalsOf(rows: AnimalRow[]): { animals: NewAnimal[] } | { refus
 
 /**
  * Rule: PM-BOOK-008, PM-FEE-006, PM-FEE-007 — the absences as typed, one `NewAbsenceRequest` each, both days sent as
- * typed. Whether the span exempts, and whether it was filed in time, is the API's: the two days are not compared here.
+ * typed, and the day the paper was handed in only when typed (PM-FEE-007, RULES §7 item 16). Whether the span exempts,
+ * and whether it was filed in time, is the API's: no day is compared here — not to the other days, not to today.
  */
 // Rule: PM-BOOK-008, PM-FEE-006, PM-FEE-007
 export function absencesOf(rows: AbsenceRow[]): { absences: NewAbsence[] } | { refused: string } {
   const absences: NewAbsence[] = [];
   for (const [i, row] of rows.entries()) {
-    const [absentFrom, absentTo] = [row.from.trim(), row.to.trim()];
-    if (!absentFrom && !absentTo) continue;
+    const [absentFrom, absentTo, handedInOn] = [row.from.trim(), row.to.trim(), (row.handedIn ?? "").trim()];
+    if (!absentFrom && !absentTo) {
+      if (handedInOn) return { refused: `Ред ${i + 1}: посочете и двата дни на отсъствието.` };   // a handed-in day with no span is no absence
+      continue;
+    }
     for (const day of [absentFrom, absentTo]) if (!DAY.test(day)) return { refused: `Ред ${i + 1}: ${day ? `„${day}“ не е дата` : "посочете и двата дни"}.` };
-    absences.push({ absentFrom, absentTo });
+    if (handedInOn && !DAY.test(handedInOn)) return { refused: `Ред ${i + 1}: „${handedInOn}“ не е дата.` };
+    absences.push({ absentFrom, absentTo, ...(handedInOn && { handedInOn }) });
   }
   return absences.length ? { absences } : { refused: "Посочете поне едно отсъствие." };
 }

@@ -56,12 +56,38 @@ test("PM-FEE-006 whether an absence exempts a charge is the API's: the page type
   assert.match(form, /решава системата, не тази страница/);
 });
 
-test("PM-FEE-007 whether a declaration came in time is the API's: no grace window here, and the late-entry fact (#215) is stated, not worked around", () => {
-  assert.doesNotMatch(code(library + actions + form + page), /grace|window|срок *[<>=]|handedIn|filedOn|submittedOn/i);
-  // the form takes no "handed in" day because the API has none: the request is the two days and nothing else
-  assert.deepEqual(Object.keys((absencesOf([{ from: "2026-07-01", to: "2026-07-10" }]) as { absences: object[] }).absences[0]!).sort(), ["absentFrom", "absentTo"]);
-  assert.match(form, /#215/);
-  assert.match(form, /системата не приема ден на подаване/);
+test("PM-FEE-007 a handed-in day typed on a row is sent as handedInOn on that row, as typed", () => {
+  assert.deepEqual(
+    absencesOf([{ from: "2026-07-01", to: "2026-07-10", handedIn: " 2026-06-20 " }, { from: "2026-08-01", to: "2026-08-05" }, { from: "", to: "" }]),
+    { absences: [{ absentFrom: "2026-07-01", absentTo: "2026-07-10", handedInOn: "2026-06-20" }, { absentFrom: "2026-08-01", absentTo: "2026-08-05" }] });   // a paper may be handed in before the absence begins
+  // the form offers one beside each row, and the action reads it row by row
+  assert.match(form, /name=\{`handedIn\$\{i\}`\}/);
+  assert.match(actions, /handedIn: text\(form, `handedIn\$\{i\}`\)/);
+  assert.ok("refused" in absencesOf([{ from: "2026-07-01", to: "2026-07-10", handedIn: "20.6.2026" }]));   // not a day: refused before sending
+  assert.ok("refused" in absencesOf([{ from: "", to: "", handedIn: "2026-06-20" }]));                    // a handed-in day with no span is no absence
+});
+
+test("PM-FEE-007 a handed-in day left empty sends no handedInOn, and the API takes the day of entry", () => {
+  for (const handedIn of [undefined, "", "  "]) {
+    const sent = (absencesOf([{ from: "2026-07-01", to: "2026-07-10", ...(handedIn !== undefined && { handedIn }) }]) as { absences: object[] }).absences[0]!;
+    assert.deepEqual(Object.keys(sent).sort(), ["absentFrom", "absentTo"], JSON.stringify(handedIn));
+  }
+  // the note says what an empty field means (RULES §7 item 16) — and no longer that the system takes no such day (#215)
+  assert.match(form, /Ако не е посочен, за ден на подаване се счита денят на вписване/);
+  assert.doesNotMatch(form, /системата не приема ден на подаване|#215/);
+});
+
+test("PM-FEE-007 a handed-in day after today is the API's 400, shown in its words — the web does not compare it to today", () => {
+  const words = "PM-FEE-007: handedInOn (2026-12-01) must not be after the day it is entered (2026-11-15)";
+  assert.match(absencesRefused(said(400, words)), new RegExp(`^Системата не прие това: ${words.replace(/[()]/g, "\\$&")}`));
+  assert.match(form, /state\.refused/);
+  // a day in the future goes through absencesOf untouched
+  assert.deepEqual(absencesOf([{ from: "2026-07-01", to: "2026-07-10", handedIn: "2099-01-01" }]), { absences: [{ absentFrom: "2026-07-01", absentTo: "2026-07-10", handedInOn: "2099-01-01" }] });
+});
+
+test("PM-FEE-007 whether a declaration came in time is the API's: the web computes no grace window and no \"in time\" arithmetic", () => {
+  assert.doesNotMatch(code(library + actions + form + page), /grace|window|срок *[<>=]|filedOn|submittedOn|new Date|Date\.|getTime/i);
+  assert.doesNotMatch(code(library + actions + form), /handedIn\w* *[<>]=?|[<>]=? *handedIn/);                     // the handed-in day is compared with nothing
   assert.match(absencesRefused(said(409, "PM-FEE-007: too late")), /^Системата не прие това: PM-FEE-007: too late/);   // a refusal for lateness is shown in the API's words
 });
 
