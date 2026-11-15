@@ -11,6 +11,26 @@ import java.util.UUID
 enum class DocumentKind { PROTOCOL, NOTICE, POSTING_ACT, CONSTATIVE_PROTOCOL, FILING, CERTIFICATE }
 
 /**
+ * A breach recorded in a constative protocol (Rule: PM-DOC-003, PM-DOC-004): who, what, when, where. Required when
+ * kind = CONSTATIVE_PROTOCOL.
+ */
+data class BreachRecord(
+    val partyId: UUID,
+    val description: String,
+    val occurredAt: Instant,
+    val location: String,
+)
+
+/**
+ * Photographic evidence metadata (Rule: PM-DOC-009): when it was captured, and the hash of the display copy. The
+ * original bytes are unmodified; the display copy is resized for the screen.
+ */
+data class PhotoMetadata(
+    val capturedAt: Instant,
+    val displayCopyHash: String?,
+)
+
+/**
  * Where the paper original is and who keeps it (Rule: PM-DOC-007): the stored file is then a copy of that paper, and
  * says so. Both are words as the entrance keeps them — "the archive in the board's room", "the chair of the board".
  */
@@ -19,6 +39,8 @@ data class PaperOriginal(val location: String, val custodian: String)
 /**
  * A document to store, as another module hands it over. [entityRef] is what it belongs to, `<type>:<uuid>` — the
  * assembly `assembly:…` a protocol records, say. [supersedes] names the version a re-upload replaces; none for a first.
+ * [retentionUntil] is PM-DOC-005's date, if set. [signatureValidationReport] is PM-DOC-008's evidence. [photoMetadata]
+ * is PM-DOC-009's capture time and display copy. [breach] is PM-DOC-003/004's required fields for a constative protocol.
  */
 class StoreDocument(
     val entranceId: UUID,
@@ -29,6 +51,10 @@ class StoreDocument(
     val authorPartyId: UUID,
     val paperOriginal: PaperOriginal? = null,
     val supersedes: UUID? = null,
+    val retentionUntil: LocalDate? = null,
+    val signatureValidationReport: String? = null,
+    val photoMetadata: PhotoMetadata? = null,
+    val breach: BreachRecord? = null,
 )
 
 /** A stored version of a document: never changed. Its bytes are read by [contentHash] through [Documents.content]. */
@@ -46,11 +72,15 @@ data class StoredDocument(
     val versionNo: Int,
     val supersedes: UUID?,
     val paperOriginal: PaperOriginal?,
+    val retentionUntil: LocalDate?,
+    val signatureValidationReport: String?,
+    val photoMetadata: PhotoMetadata?,
+    val breach: BreachRecord?,
 )
 
 /**
  * Published when a document is stored (docs/events/DocumentStored.schema.json). In-process it carries [entranceId], as
- * the other events do; the envelope carries it once externalized. Retention is PM-DOC-005's, not yet set.
+ * the other events do; the envelope carries it once externalized.
  */
 data class DocumentStored(
     val entranceId: UUID,
@@ -62,11 +92,30 @@ data class DocumentStored(
 )
 
 /**
+ * A deletion log entry (Rule: PM-DOC-005): immutable record of a document's deletion. Written by the background
+ * deletion job; the document row and bytes are already gone.
+ */
+data class DeletionLog(
+    val id: UUID,
+    val documentId: UUID,
+    val entranceId: UUID,
+    val entityRef: String,
+    val kind: String,
+    val contentHash: String,
+    val deletedAt: Instant,
+    val deletedBy: UUID,
+    val reason: String,
+)
+
+/**
  * What a document must carry to be stored, before anything is looked up: its kind is one of the statutory kinds, and
  * the fields that kind wants are there. Pure. Returns the kind.
  */
 // Rule: PM-DOC-002
+// Rule: PM-DOC-003
+// Rule: PM-DOC-004
 // Rule: PM-DOC-007
+// Rule: PM-DOC-009
 fun admit(request: StoreDocument): DocumentKind {
     val kind = DocumentKind.entries.firstOrNull { it.name == request.kind }
         ?: throw IllegalArgumentException(
@@ -80,6 +129,18 @@ fun admit(request: StoreDocument): DocumentKind {
     }
     if (kind == DocumentKind.PROTOCOL) {
         require(request.paperOriginal != null) { "a protocol is kept on paper: say where the original is and who keeps it (PM-DOC-007)" }
+    }
+    // Rule: PM-DOC-003, PM-DOC-004
+    if (kind == DocumentKind.CONSTATIVE_PROTOCOL) {
+        require(request.breach != null) { "a constative protocol records the breach: who, what, when, where (PM-DOC-003, PM-DOC-004)" }
+        require(request.breach.description.isNotBlank()) { "a constative protocol records what the breach was (PM-DOC-004)" }
+        require(request.breach.location.isNotBlank()) { "a constative protocol records where the breach occurred (PM-DOC-004)" }
+    }
+    // Rule: PM-DOC-009
+    request.photoMetadata?.let {
+        require(it.displayCopyHash == null || it.displayCopyHash.matches(Regex("^[0-9a-f]{64}$"))) {
+            "a photo's display copy hash is a SHA-256 hash"
+        }
     }
     return kind
 }
