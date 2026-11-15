@@ -195,6 +195,19 @@ class SittingService(
     }
 
     /**
+     * The register of [sitting] weighed again, now, exactly as its quorum was (the owner's answer to #283, 2026-10-24):
+     * what an item closed at it counts as "represented" — owners who arrived after the opening included. Whether the
+     * sitting opened is not weighed again; one that cannot be weighed is refused, as at the opening.
+     */
+    // Rule: PM-GA-012
+    // Rule: PM-VOTE-011
+    internal fun reweigh(assembly: Assembly, sitting: Sitting): Quorum {
+        val quorum = weigh(assembly, Ladder(assembly, sittings.findByAssemblyIdOrderBySessionNo(assembly.id)), sitting.sessionNo)
+        if (quorum.cannotWeigh.isNotEmpty()) throw QuorumNotWeighable("the represented share cannot be weighed: " + quorum.cannotWeigh.joinToString("; "))
+        return quorum
+    }
+
+    /**
      * The ideal parts of the owners the register makes present, on the day of the sitting (PM-ORG-011), by title
      * share and never by a count of units (PM-ORG-004, PM-ORG-005), against the law's threshold that day (PM-SYS-002).
      *

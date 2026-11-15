@@ -16,8 +16,67 @@
         ],
         "type": "object"
       },
+      "AbsenteeBallotView": {
+        "properties": {
+          "choice": {
+            "type": "string"
+          },
+          "documentRef": {
+            "type": "string"
+          },
+          "documentSha256": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ownerPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "receivedOn": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "recordedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "weight": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice",
+          "documentRef",
+          "documentSha256",
+          "id",
+          "ownerPartyId",
+          "receivedOn",
+          "recordedAt",
+          "recordedBy",
+          "signature",
+          "unitId",
+          "weight"
+        ],
+        "type": "object"
+      },
       "AddAgendaItemRequest": {
         "properties": {
+          "absenteeEligible": {
+            "type": "boolean"
+          },
           "itemType": {
             "type": "string"
           },
@@ -49,6 +108,9 @@
       },
       "AgendaItemAdded": {
         "properties": {
+          "absenteeEligible": {
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -71,6 +133,7 @@
           }
         },
         "required": [
+          "absenteeEligible",
           "id",
           "itemType",
           "majority",
@@ -82,6 +145,9 @@
       },
       "AgendaItemView": {
         "properties": {
+          "absenteeEligible": {
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -101,6 +167,7 @@
           }
         },
         "required": [
+          "absenteeEligible",
           "id",
           "itemType",
           "majorityRuleId",
@@ -314,6 +381,12 @@
             "format": "date-time",
             "type": "string"
           },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
           "recordedAt": {
             "format": "date-time",
             "type": "string"
@@ -344,6 +417,38 @@
           "recordedBy",
           "represents",
           "sessionNo"
+        ],
+        "type": "object"
+      },
+      "BallotRequest": {
+        "properties": {
+          "choice": {
+            "type": "string"
+          },
+          "documentRef": {
+            "type": "string"
+          },
+          "documentSha256": {
+            "type": "string"
+          },
+          "ownerPartyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "receivedOn": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice",
+          "documentRef",
+          "documentSha256",
+          "ownerPartyId",
+          "receivedOn",
+          "signature"
         ],
         "type": "object"
       },
@@ -396,6 +501,38 @@
         ],
         "type": "object"
       },
+      "BookMember": {
+        "properties": {
+          "childUnder6": {
+            "type": "boolean"
+          },
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "memberId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "childUnder6",
+          "from",
+          "memberId"
+        ],
+        "type": "object"
+      },
       "BookNonUse": {
         "properties": {
           "from": {
@@ -418,6 +555,10 @@
           "name": {
             "type": "string"
           },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "role": {
             "type": "string"
           },
@@ -427,6 +568,7 @@
         },
         "required": [
           "name",
+          "partyId",
           "role",
           "share"
         ],
@@ -442,6 +584,12 @@
           },
           "designation": {
             "type": "string"
+          },
+          "household": {
+            "items": {
+              "$ref": "#/components/schemas/BookMember"
+            },
+            "type": "array"
           },
           "householdCount": {
             "format": "int32",
@@ -470,6 +618,7 @@
         "required": [
           "complete",
           "designation",
+          "household",
           "householdCount",
           "idealParts",
           "nonUse",
@@ -480,16 +629,11 @@
       },
       "CancelDisbursementRequest": {
         "properties": {
-          "cancelledBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "reason": {
             "type": "string"
           }
         },
         "required": [
-          "cancelledBy",
           "reason"
         ],
         "type": "object"
@@ -657,10 +801,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "authorisedBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "decisionId": {
             "type": "string"
           },
@@ -676,7 +816,6 @@
         },
         "required": [
           "amountMinor",
-          "authorisedBy",
           "purpose"
         ],
         "type": "object"
@@ -839,6 +978,111 @@
         ],
         "type": "object"
       },
+      "DecisionView": {
+        "properties": {
+          "absenteeCloses": {
+            "type": "string"
+          },
+          "agendaItemId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "annulmentCloses": {
+            "type": "string"
+          },
+          "basisHash": {
+            "type": "string"
+          },
+          "closedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "comparison": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "denominator": {
+            "type": "string"
+          },
+          "finalOn": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "majorityRuleId": {
+            "type": "string"
+          },
+          "mergedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "mergedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "protocolPostedOn": {
+            "type": "string"
+          },
+          "represented": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "sessionNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "supersedes": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "tallyAbstain": {
+            "type": "string"
+          },
+          "tallyAgainst": {
+            "type": "string"
+          },
+          "tallyFor": {
+            "type": "string"
+          },
+          "thresholdPct": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "absenteeCloses",
+          "agendaItemId",
+          "basisHash",
+          "closedBy",
+          "comparison",
+          "decidedAt",
+          "denominator",
+          "id",
+          "majorityRuleId",
+          "outcome",
+          "represented",
+          "result",
+          "sessionNo",
+          "status",
+          "tallyAbstain",
+          "tallyAgainst",
+          "tallyFor",
+          "thresholdPct"
+        ],
+        "type": "object"
+      },
       "DeclarationFiled": {
         "properties": {
           "filedOn": {
@@ -915,7 +1159,6 @@
         },
         "required": [
           "amountMinor",
-          "authorisedBy",
           "committedOn",
           "id",
           "purpose",
@@ -1178,6 +1421,10 @@
             "format": "uuid",
             "type": "string"
           },
+          "mandateId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "purpose": {
             "type": "string"
           }
@@ -1326,12 +1573,10 @@
           "handoverOn",
           "holderName",
           "iban",
-          "incomingPartyId",
           "inherited",
           "issuedAt",
           "issuedOn",
           "openingMinor",
-          "outgoingPartyId",
           "paidOutMinor",
           "receivedMinor",
           "reconciled"
@@ -1356,12 +1601,15 @@
           "lawVersion": {
             "type": "string"
           },
+          "recordedBy": {
+            "format": "uuid",
+            "type": "string"
+          },
           "statement": {
             "$ref": "#/components/schemas/HandoverStatement"
           }
         },
         "required": [
-          "basis",
           "basisHash",
           "engineVersion",
           "id",
@@ -1619,6 +1867,27 @@
           "handoverOn",
           "incomingPartyId",
           "outgoingPartyId"
+        ],
+        "type": "object"
+      },
+      "IssuedPeriod": {
+        "properties": {
+          "chargeRunId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legalDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chargeRunId",
+          "legalDate",
+          "period"
         ],
         "type": "object"
       },
@@ -1885,6 +2154,9 @@
           },
           "absentTo": {
             "type": "string"
+          },
+          "handedInOn": {
+            "type": "string"
           }
         },
         "required": [
@@ -1914,6 +2186,10 @@
         "properties": {
           "isChildUnder6": {
             "type": "boolean"
+          },
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
           },
           "validFrom": {
             "type": "string"
@@ -1950,6 +2226,25 @@
           "designation",
           "separateEntrance",
           "unitType"
+        ],
+        "type": "object"
+      },
+      "NoChargeRunAnswer": {
+        "properties": {
+          "code": {
+            "enum": [
+              "NO_RUN",
+              "NO_ENTRANCE"
+            ],
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "error"
         ],
         "type": "object"
       },
@@ -2011,6 +2306,28 @@
         "required": [
           "dueOn",
           "overdueDays"
+        ],
+        "type": "object"
+      },
+      "OpenDebt": {
+        "properties": {
+          "debtDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "dueOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "outstandingMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "debtDate",
+          "dueOn",
+          "outstandingMinor"
         ],
         "type": "object"
       },
@@ -2090,6 +2407,10 @@
       },
       "OwnerResponse": {
         "properties": {
+          "partyId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "partyName": {
             "type": "string"
           },
@@ -2105,10 +2426,60 @@
           }
         },
         "required": [
+          "partyId",
           "partyName",
           "share",
           "titleRole",
           "unitId"
+        ],
+        "type": "object"
+      },
+      "PaperDecisionView": {
+        "properties": {
+          "archiveLocation": {
+            "type": "string"
+          },
+          "basisHash": {
+            "type": "string"
+          },
+          "custodian": {
+            "type": "string"
+          },
+          "decisionText": {
+            "type": "string"
+          },
+          "engineVersion": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lawVersion": {
+            "type": "string"
+          },
+          "protocolDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "protocolRef": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archiveLocation",
+          "basisHash",
+          "decisionText",
+          "engineVersion",
+          "id",
+          "lawVersion",
+          "protocolDate",
+          "protocolRef",
+          "recordedAt"
         ],
         "type": "object"
       },
@@ -2126,16 +2497,11 @@
       },
       "PayDisbursementRequest": {
         "properties": {
-          "paidBy": {
-            "format": "uuid",
-            "type": "string"
-          },
           "paidOn": {
             "type": "string"
           }
         },
         "required": [
-          "paidBy",
           "paidOn"
         ],
         "type": "object"
@@ -2296,6 +2662,18 @@
         ],
         "type": "object"
       },
+      "PostProtocol": {
+        "properties": {
+          "postedOn": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "postedOn"
+        ],
+        "type": "object"
+      },
       "ProfileRequest": {
         "properties": {
           "csv": {
@@ -2399,6 +2777,12 @@
               "type": "integer"
             },
             "type": "array"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
           },
           "principalPartyId": {
             "format": "uuid",
@@ -2548,6 +2932,27 @@
           },
           "validTo": {
             "format": "date",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RecordPaperDecision": {
+        "properties": {
+          "archiveLocation": {
+            "type": "string"
+          },
+          "custodian": {
+            "type": "string"
+          },
+          "decisionText": {
+            "type": "string"
+          },
+          "protocolDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "protocolRef": {
             "type": "string"
           }
         },
@@ -2713,6 +3118,10 @@
       },
       "RegisterPartyRequest": {
         "properties": {
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
           "fullName": {
             "type": "string"
           },
@@ -2724,6 +3133,7 @@
           }
         },
         "required": [
+          "entranceId",
           "fullName"
         ],
         "type": "object"
@@ -2899,6 +3309,9 @@
           },
           "partyId": {
             "format": "uuid",
+            "type": "string"
+          },
+          "partyName": {
             "type": "string"
           },
           "role": {
@@ -3377,6 +3790,15 @@
             "format": "uuid",
             "type": "string"
           },
+          "inEffect": {
+            "type": "boolean"
+          },
+          "names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
           "ownerPartyId": {
             "format": "uuid",
             "type": "string"
@@ -3406,6 +3828,7 @@
           "channel",
           "choice",
           "id",
+          "inEffect",
           "ownerPartyId",
           "recordedBy",
           "sessionNo",
@@ -3875,18 +4298,712 @@
             "description": "Unprocessable Entity"
           }
         },
-        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice",
+        "summary": "Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice; tagged, or not, as accepting the ballots of absent owners",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-VOTE-004",
           "PM-GA-006",
+          "PM-GA-017",
           "PM-SEC-001"
         ]
       }
     },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AbsenteeBallotView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "How each absent owner voted on an item, ballot by ballot in the order entered — their choice for each unit, its weight and the declaration it came from; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002, and every read is entered",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-SEC-001",
+          "PM-SEC-002",
+          "PM-SEC-004",
+          "PM-GOV-008"
+        ]
+      },
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BallotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AbsenteeBallotView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403. Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the rows it first made, even once day 7 has passed; the same key for another request is a 409",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-017",
+          "PM-GA-018",
+          "PM-SEC-001",
+          "PM-SYS-014"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_merge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the merge it first made, even though the item is merged; the same key for another request is a 409",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-013",
+          "PM-GA-017",
+          "PM-SEC-001",
+          "PM-SYS-014"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — an item tagged for absentee ballots only once they are merged, then shown as the merged decision naming the one it supersedes — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-011",
+          "PM-VOTE-013",
+          "PM-VOTE-016",
+          "PM-GA-023",
+          "PM-SEC-001",
+          "PM-SEC-002"
+        ]
+      },
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the decision it first made, even though the item is closed; the same key for another request is a 409",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-002",
+          "PM-VOTE-011",
+          "PM-VOTE-012",
+          "PM-VOTE-014",
+          "PM-VOTE-016",
+          "PM-SEC-001",
+          "PM-SYS-014"
+        ]
+      }
+    },
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VoteView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002. Each row carries the owner's name beside the id, given by the book and entered in its access log once a read",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-VOTE-014",
+          "PM-SEC-001",
+          "PM-SEC-002",
+          "PM-GOV-008",
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011"
+        ]
+      },
       "post": {
         "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes",
         "parameters": [
@@ -3914,6 +5031,14 @@
             "required": true,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
               "type": "string"
             }
           }
@@ -3995,7 +5120,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the votes it first made, even once the item has closed; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
@@ -4003,7 +5128,8 @@
           "PM-VOTE-001",
           "PM-VOTE-014",
           "PM-ORG-005",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },
@@ -4097,14 +5223,17 @@
             "description": "Conflict"
           }
         },
-        "summary": "Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
+        "summary": "Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The attendee's name and the names of those the line brings go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-012",
           "PM-GA-016",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011"
         ]
       },
       "post": {
@@ -4125,6 +5254,14 @@
             "required": true,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
               "type": "string"
             }
           }
@@ -4203,14 +5340,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly",
+        "summary": "Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly. Sent under an Idempotency-Key: the same request again enters nobody more and is answered with the line it first made — also on a later day, and with the line as it stands now; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-012",
           "PM-GA-016",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },
@@ -4454,6 +5592,123 @@
         ]
       }
     },
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting": {
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assemblyId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProtocol"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the posting it first made, even though it is entered; the same key for another request is a 409",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-023",
+          "PM-SEC-001",
+          "PM-SYS-014"
+        ]
+      }
+    },
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies": {
       "get": {
         "operationId": "get_assembly_entrances_entranceId_assemblies_assemblyId_proxies",
@@ -4532,13 +5787,16 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403",
+        "summary": "List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-009",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011"
         ]
       },
       "post": {
@@ -4559,6 +5817,14 @@
             "required": true,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
               "type": "string"
             }
           }
@@ -4625,14 +5891,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown",
+        "summary": "Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown. Sent under an Idempotency-Key: the same request again registers nothing more and is answered with the proxy it first made, even once the assembly takes no more proxies or its agent is at the limit; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-009",
           "PM-GA-010",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },
@@ -4931,6 +6198,207 @@
           "PM-GA-014",
           "PM-GA-015",
           "PM-SEC-001"
+        ]
+      }
+    },
+    "/api/assembly/entrances/{entranceId}/paper-decisions": {
+      "get": {
+        "operationId": "get_assembly_entrances_entranceId_paper_decisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaperDecisionView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-GA-022",
+          "PM-DOC-007",
+          "PM-SEC-001",
+          "PM-SEC-002"
+        ]
+      },
+      "post": {
+        "operationId": "post_assembly_entrances_entranceId_paper_decisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPaperDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperDecisionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the record it first made; the same key for another request is a 409",
+        "tags": [
+          "assembly"
+        ],
+        "x-rules": [
+          "PM-FEE-012",
+          "PM-GA-022",
+          "PM-DOC-007",
+          "PM-SEC-001",
+          "PM-SEC-004",
+          "PM-SYS-014"
         ]
       }
     },
@@ -5508,11 +6976,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when; party ids, not names. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). No task is stored or sent",
+        "summary": "Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent",
         "tags": [
           "identity"
         ],
         "x-rules": [
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-BOOK-011",
           "PM-GOV-004",
           "PM-GOV-005",
           "PM-GOV-008",
@@ -6602,6 +8073,67 @@
       }
     },
     "/api/money/entrances/{entranceId}/charge-runs": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_charge_runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IssuedPeriod"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoChargeRunAnswer"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "The periods the entrance has a charge run issued for, the newest first: each run's header, no amount and no person; for the manager, the board and the controller",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-BOOK-012",
+          "PM-FEE-014",
+          "PM-SEC-002"
+        ]
+      },
       "post": {
         "operationId": "post_money_entrances_entranceId_charge_runs",
         "parameters": [
@@ -6840,10 +8372,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/NoChargeRunAnswer"
                 }
               }
             },
@@ -6856,7 +8385,9 @@
         ],
         "x-rules": [
           "PM-BOOK-012",
-          "PM-BOOK-006"
+          "PM-BOOK-006",
+          "PM-BOOK-007",
+          "PM-SEC-004"
         ]
       }
     },
@@ -6938,7 +8469,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance",
+        "summary": "The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance; an owner reads it without the party ids",
         "tags": [
           "money"
         ],
@@ -7018,7 +8549,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners",
+        "summary": "List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id or mandate",
         "tags": [
           "money"
         ],
@@ -7104,7 +8635,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register the entrance's repair-fund account",
+        "summary": "Register the entrance's repair-fund account; opened in the manager's name, its holder must stand on a manager's or board member's mandate of the entrance that day, and the account stores it",
         "tags": [
           "money"
         ],
@@ -7212,7 +8743,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two",
+        "summary": "Sign off a disbursement from the repair fund, by the holder of its account, who is the sign-in — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two",
         "tags": [
           "money"
         ],
@@ -7329,7 +8860,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason",
+        "summary": "Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, who is the sign-in, with the reason",
         "tags": [
           "money"
         ],
@@ -7445,7 +8976,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account",
+        "summary": "Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account, who is the sign-in",
         "tags": [
           "money"
         ],
@@ -7537,7 +9068,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is",
+        "summary": "The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is, an owner without the two parties, the recorder or the basis",
         "tags": [
           "money"
         ],
@@ -7642,7 +9173,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash",
+        "summary": "Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash, and the sign-in's party as who recorded it",
         "tags": [
           "money"
         ],
@@ -7739,7 +9270,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is",
+        "summary": "A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is, an owner without the two parties, the recorder or the basis",
         "tags": [
           "money"
         ],
@@ -8201,6 +9732,80 @@
         ]
       }
     },
+    "/api/money/units/{unitId}/open-debts": {
+      "get": {
+        "operationId": "get_money_units_unitId_open_debts",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unitId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OpenDebt"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "summary": "The debts a payment valued on the date can settle, the oldest first, each with its date, the day it fell due and what is outstanding — the dates a payer can designate. Not the arrears of that date: a credit recorded after it has already closed its debt here, so for a past date this can show less than the arrears read",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-DEBT-008",
+          "PM-DEBT-002",
+          "PM-SEC-002"
+        ]
+      }
+    },
     "/api/money/units/{unitId}/statement": {
       "get": {
         "operationId": "get_money_units_unitId_statement",
@@ -8321,12 +9926,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "List the registered entrances",
+        "summary": "List the registered entrances — each person sees those where they hold a role today, the administrator every one, as the sign-in says who is asking; holding none, the list is empty",
         "tags": [
           "registry"
         ],
         "x-rules": [
-          "PM-ORG-001"
+          "PM-ORG-001",
+          "PM-SEC-001"
         ]
       },
       "post": {
@@ -8405,12 +10011,13 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register an entrance — founding its building at an address, or joining an existing building",
+        "summary": "Register an entrance — founding its building at an address, or joining an existing building — by the deployment's administrator only, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
-          "PM-ORG-001"
+          "PM-ORG-001",
+          "PM-SEC-001"
         ]
       }
     },
@@ -8495,7 +10102,7 @@
             "description": "Not Found"
           }
         },
-        "summary": "Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)",
+        "summary": "Read the Book of the Condominium as of a date — the id of each party beside the name, never an identity number; only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)",
         "tags": [
           "registry"
         ],
@@ -8503,7 +10110,8 @@
           "PM-BOOK-001",
           "PM-BOOK-002",
           "PM-BOOK-006",
-          "PM-BOOK-007"
+          "PM-BOOK-007",
+          "PM-BOOK-011"
         ]
       }
     },
@@ -8933,7 +10541,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)",
+        "summary": "The owners and users of an entrance's units as of a date — each party's id beside the name, never an identity number; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)",
         "tags": [
           "registry"
         ],
@@ -9233,7 +10841,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, with the day the paper was handed in when it came in earlier (never after today, a 400); as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
@@ -9564,14 +11172,17 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a party registered in the entrance, so the book names them and a household proxy can be checked; an unknown party, or one of another entrance, is a 400 and nothing is stored",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-FEE-005",
           "PM-FEE-008",
-          "PM-BOOK-005"
+          "PM-BOOK-005",
+          "PM-BOOK-002",
+          "PM-BOOK-011",
+          "PM-GA-009"
         ]
       }
     },
@@ -9788,14 +11399,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included",
+        "summary": "Record a title to a unit — effective-dated, with its share, naming a party of the entrance (one of another entrance is answered as unknown, 400) — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included",
         "tags": [
           "registry"
         ],
         "x-rules": [
           "PM-ORG-005",
           "PM-ORG-011",
-          "PM-BOOK-005"
+          "PM-BOOK-005",
+          "PM-BOOK-011"
         ]
       }
     },
@@ -9876,12 +11488,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Register a party — a person or company that can hold a title",
+        "summary": "Register a party — a person or company that can hold a title — in an entrance, whose book alone may name them, by the deployment's administrator, or by the manager or the board of that entrance, as the sign-in says who is asking; anybody else is a 403",
         "tags": [
           "registry"
         ],
         "x-rules": [
-          "PM-BOOK-002"
+          "PM-BOOK-002",
+          "PM-BOOK-005",
+          "PM-BOOK-011",
+          "PM-SEC-001"
         ]
       }
     }

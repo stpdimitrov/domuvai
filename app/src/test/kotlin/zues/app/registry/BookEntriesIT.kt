@@ -62,7 +62,8 @@ class BookEntriesIT {
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
     private val today: LocalDate get() = LocalDate.parse(toSofiaDate(Instant.now()))
 
-    private fun person(name: String, subject: String): UUID = ownership.registerParty(RegisterParty(name)).also { logins.tie(realm, subject, it) }
+    private val aside by lazy { registry.registerEntrance(RegisterEntrance("ул. Другаде 1", "Б", "GA")).entranceId }   // BOOK-02e: a party is registered in an entrance
+    private fun person(name: String, subject: String, entrance: UUID = aside): UUID = ownership.registerParty(RegisterParty(entrance, name)).also { logins.tie(realm, subject, it) }
 
     private fun mandate(entrance: UUID, body: String, party: UUID) {
         jdbc.update(
@@ -137,8 +138,8 @@ class BookEntriesIT {
         val (elsewhere) = entrance("ул. Витоша 10")
         person("Елена Колева", "x-controller").also { mandate(entrance, "CTL", it) }
         person("Стефан Илиев", "x-cashier").also { mandate(entrance, "CSH", it) }
-        person("Иван Петров", "x-owner").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
-        person("Анна Петрова", "x-user").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
+        person("Иван Петров", "x-owner", entrance).also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
+        person("Анна Петрова", "x-user", entrance).also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
         person("Мария Иванова", "x-other-manager").also { mandate(elsewhere, "BM", it) }
 
         for (by in listOf("x-controller", "x-cashier", "x-owner", "x-user", "x-other-manager", "x-a-login-tied-to-nobody")) {
@@ -168,19 +169,20 @@ class BookEntriesIT {
         val forBoard = registry.registerEntrance(RegisterEntrance("ул. Витоша 16", "А", "GA")).entranceId
         person("Мария Иванова", "t-manager").also { mandate(forManager, "BM", it) }
         person("Радка Тонева", "t-board").also { mandate(forBoard, "MB", it) }
-        val owner = person("Иван Петров", "t-owner")
-        val user = person("Анна Петрова", "t-user")
+        // one party per entrance: each entrance registers its own (BOOK-02e)
+        val owners = listOf(forManager, forBoard).associateWith { person("Иван Петров", "t-owner-$it", it) }
+        val users = listOf(forManager, forBoard).associateWith { person("Анна Петрова", "t-user-$it", it) }
 
         for ((entrance, by) in listOf(forManager to "t-manager", forBoard to "t-board")) {
             unitsBy(entrance, by).andExpect(status().isCreated).andExpect(jsonPath("$.unitIds.length()").value(2))
             val flat = registry.listUnits(entrance).first { it.designation == "ап. 1" }.id
-            title(entrance, flat, by, owner).andExpect(status().isCreated)
-            title(entrance, flat, by, user, role = "USR").andExpect(status().isCreated)
+            title(entrance, flat, by, owners.getValue(entrance)).andExpect(status().isCreated)
+            title(entrance, flat, by, users.getValue(entrance), role = "USR").andExpect(status().isCreated)
             assertThat(units(entrance) to titles(flat)).describedAs(by).isEqualTo(2 to 2)
         }
         // a unit of another entrance, asked through this one: the manager here records no title there
         val (_, elsewhere) = entrance("ул. Витоша 18")
-        title(forManager, elsewhere, "t-manager", owner).andExpect(status().isNotFound)
+        title(forManager, elsewhere, "t-manager", owners.getValue(forManager)).andExpect(status().isNotFound)
         assertThat(titles(elsewhere)).isZero()
     }
 
@@ -191,8 +193,8 @@ class BookEntriesIT {
         val empty = registry.registerEntrance(RegisterEntrance("ул. Витоша 24", "А", "GA")).entranceId
         person("Елена Колева", "n-controller").also { mandate(entrance, "CTL", it); mandate(empty, "CTL", it) }
         person("Стефан Илиев", "n-cashier").also { mandate(entrance, "CSH", it); mandate(empty, "CSH", it) }
-        val owner = person("Иван Петров", "n-owner").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
-        person("Анна Петрова", "n-user").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
+        val owner = person("Иван Петров", "n-owner", entrance).also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
+        person("Анна Петрова", "n-user", entrance).also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
         person("Мария Иванова", "n-other-manager").also { mandate(elsewhere, "BM", it) }
         val stranger = person("Петя Колева", "n-stranger")
 
@@ -210,7 +212,7 @@ class BookEntriesIT {
     fun `PM-ORG-001 what is entered for a unit belongs to the entrance the unit lies in — the database refuses a row naming another`() {
         val (entrance, flat) = entrance("ул. Витоша 26")
         val (elsewhere) = entrance("ул. Витоша 28")
-        val party = person("Иван Петров", "o-owner")
+        val party = person("Иван Петров", "o-owner", elsewhere)   // of the title's entrance: only the unit is out of place
         assertThatThrownBy {
             jdbc.update(
                 "INSERT INTO registry.title (id, entrance_id, unit_id, party_id, title_role, share, valid_from) VALUES (?, ?, ?, ?, 'OWN', 1, ?)",
@@ -240,12 +242,12 @@ class BookEntriesIT {
     fun `PM-SEC-001 an entrance's units are read by anyone holding a role in it — and by nobody else`() {
         val (entrance, flat) = entrance("ул. Витоша 18")
         val (elsewhere, flatElsewhere) = entrance("ул. Витоша 20")
-        person("Иван Петров", "u-owner").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
-        person("Анна Петрова", "u-user").also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
+        person("Иван Петров", "u-owner", entrance).also { ownership.assignTitle(entrance, flat, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
+        person("Анна Петрова", "u-user", entrance).also { ownership.assignTitle(entrance, flat, AssignTitle(it, "USR", validFrom = "2020-01-01")) }
         for ((body, subject) in listOf("BM" to "u-manager", "MB" to "u-board", "CTL" to "u-controller", "CSH" to "u-cashier")) {
             person(subject, subject).also { mandate(entrance, body, it) }
         }
-        person("Георги Стоянов", "u-owner-elsewhere").also { ownership.assignTitle(elsewhere, flatElsewhere, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
+        person("Георги Стоянов", "u-owner-elsewhere", elsewhere).also { ownership.assignTitle(elsewhere, flatElsewhere, AssignTitle(it, "OWN", validFrom = "2020-01-01")) }
         person("Мария Иванова", "u-manager-elsewhere").also { mandate(elsewhere, "BM", it) }
 
         val list = { by: String -> mvc.perform(get("/api/registry/entrances/$entrance/units").with(jwt().jwt { it.subject(by).issuer(realm) })) }

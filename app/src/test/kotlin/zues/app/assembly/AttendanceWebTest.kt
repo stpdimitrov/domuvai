@@ -30,8 +30,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import zues.app.IssuerKeys
 import zues.app.identity_org.Logins
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.Succession
 import zues.app.identity_org.WhoAsks
+import zues.app.policy.Asking
+import zues.app.policy.Login
 import zues.app.policy.Held
 import zues.app.policy.Policy
 import zues.app.policy.Role
@@ -79,6 +82,7 @@ class AttendanceWebTest {
     @MockitoBean lateinit var notices: NoticeService
     @MockitoBean lateinit var repository: AssemblyRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames
     @MockitoBean lateinit var succession: Succession
 
     private val assemblyId = UUID.randomUUID()
@@ -90,7 +94,10 @@ class AttendanceWebTest {
         held[it] = roles.toSet()
     }
 
-    private fun MockHttpServletRequestBuilder.by(subject: String) = header(
+    /** The `Idempotency-Key` every record request below is sent under (PM-SYS-014). */
+    private val KEY = "7d6216b0-0000-4000-8000-000000000004"
+
+    private fun MockHttpServletRequestBuilder.by(subject: String, key: String? = KEY) = also { request -> key?.let { request.header("Idempotency-Key", it) } }.header(
         HttpHeaders.AUTHORIZATION,
         "Bearer " + SignedJWT(
             JWSHeader(JWSAlgorithm.RS256),
@@ -120,7 +127,7 @@ class AttendanceWebTest {
         val attendee = UUID.randomUUID()
         val principal = UUID.randomUUID()
         val keeper = Actor(manager, ISSUER, "login-keeper")
-        whenever(attendance.record(entranceId, assemblyId, keeper, attendee, "IN_PERSON")).thenReturn(line(attendee, manager, "IN_PERSON", false, setOf(attendee, principal)))
+        whenever(attendance.record(entranceId, assemblyId, KEY, keeper, attendee, "IN_PERSON")).thenReturn(line(attendee, manager, "IN_PERSON", false, setOf(attendee, principal)))
         val body = """{"attendeePartyId":"$attendee","channel":"IN_PERSON","recordedBy":"${UUID.randomUUID()}"}"""
 
         for (subject in listOf("login-controller", "login-owner", "login-stranger")) {
@@ -135,7 +142,7 @@ class AttendanceWebTest {
             .andExpect(jsonPath("$.recordedBy").value(manager.toString()))             // the one signed in, whatever the body named
             .andExpect(jsonPath("$.counted").value(true))
             .andExpect(jsonPath("$.represents.length()").value(2))
-        verify(attendance).record(entranceId, assemblyId, keeper, attendee, "IN_PERSON")
+        verify(attendance).record(entranceId, assemblyId, KEY, keeper, attendee, "IN_PERSON")
     }
 
     @Test
@@ -146,7 +153,7 @@ class AttendanceWebTest {
         val attendee = UUID.randomUUID()
         val keeper = Actor(manager, ISSUER, "login-keeper-2")
         val unverified = line(attendee, manager, "VIDEO", false, setOf(attendee))
-        whenever(attendance.record(entranceId, assemblyId, keeper, attendee, "VIDEO")).thenReturn(unverified)
+        whenever(attendance.record(entranceId, assemblyId, KEY, keeper, attendee, "VIDEO")).thenReturn(unverified)
         mvc.perform(post(base).by("login-keeper-2").content("""{"attendeePartyId":"$attendee","channel":"VIDEO"}"""))
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.identityVerified").value(false))
@@ -175,6 +182,27 @@ class AttendanceWebTest {
         person("login-owner-5", Role.OWN)
         whenever(attendance.register(entranceId, assemblyId)).thenReturn(emptyList())
         mvc.perform(get(base).by("login-owner-5")).andExpect(status().isOk)
+        verifyNoInteractions(names)                                      // a register of nobody asks the book for nobody
+    }
+
+    @Test
+    fun `PM-BOOK-006 PM-BOOK-007 PM-BOOK-011 the register asks the book once for the names of the attendees and of whom they bring - and serves what is given, each line its own, or the ids alone`() {
+        val keeper = person("login-reader-8", Role.CTL)
+        val (ana, boris, vera) = listOf(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())
+        whenever(attendance.register(entranceId, assemblyId)).thenReturn(listOf(line(ana, keeper, "IN_PERSON", false, setOf(ana, boris)), line(vera, keeper, "IN_PERSON", false, setOf(vera))))
+        whenever(names.named(eq(entranceId), any(), any(), eq(NamedRead.REGISTER))).thenReturn(mapOf(ana to "Ана Колева", boris to "Борис Недев", vera to "Вера Стоянова"))
+        mvc.perform(get(base).by("login-reader-8")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].names.length()").value(2)).andExpect(jsonPath("$[0].names.['$ana']").value("Ана Колева")).andExpect(jsonPath("$[0].names.['$boris']").value("Борис Недев"))
+            .andExpect(jsonPath("$[1].names.length()").value(1)).andExpect(jsonPath("$[1].names.['$vera']").value("Вера Стоянова"))
+        verify(names, times(1)).named(entranceId, Asking(Login(ISSUER, "login-reader-8"), keeper), setOf(ana, boris, vera), NamedRead.REGISTER)   // once a read, not once a line
+        // names withheld: the ids alone, and the field is not there
+        whenever(names.named(any(), any(), any(), any())).thenReturn(null)
+        mvc.perform(get(base).by("login-reader-8")).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].attendeePartyId").value(ana.toString())).andExpect(jsonPath("$[0].names").doesNotExist())
+        // a refused read asks for no name
+        person("login-stranger-8")
+        mvc.perform(get(base).by("login-stranger-8")).andExpect(status().isForbidden)
+        verify(names, times(2)).named(any(), any(), any(), any())
     }
 
     @Test
@@ -182,10 +210,32 @@ class AttendanceWebTest {
         val manager = person("login-keeper-3", Role.BM)
         convenedBy(manager)
         val body = """{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""
-        whenever(attendance.record(any(), any(), any(), any(), any())).thenThrow(IllegalStateException("already on the register"))
+        whenever(attendance.record(any(), any(), any(), any(), any(), any())).thenThrow(IllegalStateException("already on the register"))
         mvc.perform(post(base).by("login-keeper-3").content(body)).andExpect(status().isConflict)
         whenever(attendance.register(entranceId, assemblyId)).thenReturn(emptyList())
         mvc.perform(get(base).by("login-keeper-3")).andExpect(status().isOk)
         mvc.perform(post(base).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `PM-SYS-014 an attendance without an Idempotency-Key is a 400 and nobody is entered, a blank one is a 400 once the policy has been asked`() {
+        val manager = person("login-keeper-4", Role.BM)
+        convenedBy(manager)
+        val body = """{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""
+        mvc.perform(post(base).by("login-keeper-4", key = null).content(body)).andExpect(status().isBadRequest)
+        verifyNoInteractions(attendance)
+        whenever(attendance.record(any(), any(), eq(" "), any(), any(), any())).thenThrow(IllegalArgumentException("an Idempotency-Key is not blank"))
+        mvc.perform(post(base).by("login-keeper-4", key = " ").content(body)).andExpect(status().isBadRequest)
+        person("login-stranger-4")
+        mvc.perform(post(base).by("login-stranger-4", key = " ").content(body)).andExpect(status().isForbidden)   // asked before the key is looked at
+    }
+
+    @Test
+    fun `PM-SYS-014 a key used for another request is a 409`() {
+        val manager = person("login-keeper-5", Role.BM)
+        convenedBy(manager)
+        whenever(attendance.record(any(), any(), any(), any(), any(), any())).thenThrow(IdempotencyKeyReused("Idempotency-Key $KEY was used for another request (PM-SYS-014)"))
+        mvc.perform(post(base).by("login-keeper-5").content("""{"attendeePartyId":"${UUID.randomUUID()}","channel":"IN_PERSON"}"""))
+            .andExpect(status().isConflict).andExpect(jsonPath("$.error").value("Idempotency-Key $KEY was used for another request (PM-SYS-014)"))
     }
 }

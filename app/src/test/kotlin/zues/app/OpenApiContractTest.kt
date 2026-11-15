@@ -26,6 +26,7 @@ import zues.app.assembly.ProxyService
 import zues.app.assembly.SittingService
 import zues.app.identity_org.LoginAdministration
 import zues.app.identity_org.Logins
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.MandateAdministration
 import zues.app.identity_org.MandateReading
 import zues.app.identity_org.WhoAsks
@@ -38,6 +39,7 @@ import zues.app.money.MoneyAccess
 import zues.app.money.FundHandoverService
 import zues.app.money.FundService
 import zues.app.money.HeadcountCheckService
+import zues.app.money.IssuedPeriodsService
 import zues.app.money.LedgerReads
 import zues.app.money.PaymentService
 import zues.app.money.StatementService
@@ -78,6 +80,11 @@ class OpenApiContractTest {
     @MockitoBean lateinit var assemblyActs: AssemblyActs
     @MockitoBean lateinit var assemblyReads: zues.app.assembly.AssemblyReads
     @MockitoBean lateinit var voteActs: zues.app.assembly.VoteActs
+    @MockitoBean lateinit var decisionActs: zues.app.assembly.DecisionActs
+    @MockitoBean lateinit var protocolPostings: zues.app.assembly.ProtocolPostingService
+    @MockitoBean lateinit var absenteeBallots: zues.app.assembly.AbsenteeBallotService
+    @MockitoBean lateinit var paperDecisions: zues.app.assembly.PaperDecisions
+    @MockitoBean lateinit var absenteeMerges: zues.app.assembly.AbsenteeMergeService
     @MockitoBean lateinit var assemblies: AssemblyService
     @MockitoBean lateinit var attendance: AttendanceService
     @MockitoBean lateinit var notices: NoticeService
@@ -88,12 +95,14 @@ class OpenApiContractTest {
     @MockitoBean lateinit var imports: ImportService
     @MockitoBean lateinit var importGuard: zues.app.intake.ImportGuard
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames
     @MockitoBean lateinit var loginAdministration: LoginAdministration
     @MockitoBean lateinit var mandateAdministration: MandateAdministration
     @MockitoBean lateinit var mandateReading: MandateReading
     @MockitoBean lateinit var whoAsks: WhoAsks
     @MockitoBean lateinit var moneyAccess: MoneyAccess
     @MockitoBean lateinit var headcount: HeadcountCheckService
+    @MockitoBean lateinit var issuedPeriods: IssuedPeriodsService
     @MockitoBean lateinit var bookAccess: BookAccessService
     @MockitoBean lateinit var arrears: ArrearsService
     @MockitoBean lateinit var chargeRuns: ChargeRunService
@@ -110,6 +119,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var declarations: DeclarationService
     @MockitoBean lateinit var declarationFiling: zues.app.registry.DeclarationFiling
     @MockitoBean lateinit var bookEntries: zues.app.registry.BookEntries
+    @MockitoBean lateinit var registrations: zues.app.registry.Registrations
     @MockitoBean lateinit var ownership: OwnershipService
     @MockitoBean lateinit var registry: RegistryService
 

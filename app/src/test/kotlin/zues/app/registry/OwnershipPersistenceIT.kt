@@ -65,10 +65,10 @@ class OwnershipPersistenceIT {
         return UUID.fromString(json.readTree(response).get("unitIds").get(0).asText())
     }
 
-    private fun registerParty(fullName: String, idType: String, idValue: String): UUID {
+    private fun registerParty(entranceId: UUID, fullName: String, idType: String, idValue: String): UUID {
         val response = mvc.perform(
             post("/api/registry/parties").contentType(MediaType.APPLICATION_JSON)
-                .content("""{"fullName":"$fullName","idType":"$idType","idValue":"$idValue"}"""),
+                .content("""{"entranceId":"$entranceId","fullName":"$fullName","idType":"$idType","idValue":"$idValue"}"""),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
         return UUID.fromString(json.readTree(response).get("partyId").asText())
     }
@@ -87,8 +87,8 @@ class OwnershipPersistenceIT {
     fun `PM-ORG-011 the owner resolves as of the date, across a sale`() {
         val entranceId = createEntrance()
         val unitId = registerSingleUnit(entranceId)
-        val oldOwner = registerParty("Old Owner", "EGN", "7501010010")
-        val newOwner = registerParty("New Owner", "EGN", "8002020020")
+        val oldOwner = registerParty(entranceId, "Old Owner", "EGN", "7501010010")
+        val newOwner = registerParty(entranceId, "New Owner", "EGN", "8002020020")
         assignTitle(entranceId, unitId, oldOwner, "2026-01-01", "2026-06-01").andExpect(status().isCreated)
         assignTitle(entranceId, unitId, newOwner, "2026-06-01", null).andExpect(status().isCreated)
 
@@ -107,7 +107,7 @@ class OwnershipPersistenceIT {
     fun `PM-BOOK-011 the owners list carries the name but not the identity number`() {
         val entranceId = createEntrance()
         val unitId = registerSingleUnit(entranceId)
-        val party = registerParty("Иван Петров", "EGN", "7501010010")
+        val party = registerParty(entranceId, "Иван Петров", "EGN", "7501010010")
         assignTitle(entranceId, unitId, party, "2026-01-01", null).andExpect(status().isCreated)
 
         val body = mvc.perform(get("/api/registry/entrances/$entranceId/owners").param("on", "2026-05-01"))

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { sofiaInstant, sofiaTime } from "./sofia.ts";
+import { sofiaInstant, sofiaLocal, sofiaTime } from "./sofia.ts";
 
 test("a time typed in Sofia is the instant Sofia's clock shows it at, summer and winter", () => {
   assert.equal(sofiaInstant("2026-11-05T18:30"), "2026-11-05T16:30:00Z");     // EET, UTC+2
@@ -23,8 +23,23 @@ test("a time the clocks skip in spring is no time; one they repeat in autumn is 
   assert.equal(sofiaInstant("2026-10-25T04:00"), "2026-10-25T02:00:00Z");
 });
 
+test("seconds, when the field sends them, are kept — the same rules for the clocks' changes", () => {
+  assert.equal(sofiaInstant("2026-11-05T18:30:00"), "2026-11-05T16:30:00Z");
+  assert.equal(sofiaInstant("2026-11-05T18:30:42"), "2026-11-05T16:30:42Z");
+  assert.equal(sofiaInstant("2026-07-01T09:00:07"), "2026-07-01T06:00:07Z");
+  assert.equal(sofiaInstant("2026-03-29T03:30:15"), null);                    // skipped in spring, seconds or not
+  assert.equal(sofiaInstant("2026-10-25T03:30:15"), "2026-10-25T00:30:15Z");  // repeated in autumn: the earlier
+});
+
+test("an instant, filled into a datetime-local field, is Sofia's wall clock — and reads back as the same instant", () => {
+  assert.equal(sofiaLocal("2026-11-05T16:30:00Z"), "2026-11-05T18:30");
+  assert.equal(sofiaLocal("2026-07-01T06:00:00Z"), "2026-07-01T09:00");
+  assert.equal(sofiaInstant(sofiaLocal("2026-11-05T16:30:00Z")), "2026-11-05T16:30:00Z");
+  assert.equal(sofiaLocal("not a time"), "");
+});
+
 test("anything but a datetime-local value is no time", () => {
-  for (const bad of ["", "2026-11-05", "2026-11-05 18:30", "2026-11-05T18:30:00", "2026-02-30T10:00", "2026-11-05T24:00", "2026-13-01T10:00",
+  for (const bad of ["", "2026-11-05", "2026-11-05 18:30", "2026-11-05T18:30:60", "2026-11-05T18:30:0", "2026-02-30T10:00", "2026-11-05T24:00", "2026-13-01T10:00",
     "2026-11-05T18:60", "05.11.2026 18:30", "2026-11-05T18:30Z", "x"]) {
     assert.equal(sofiaInstant(bad), null, bad);
   }

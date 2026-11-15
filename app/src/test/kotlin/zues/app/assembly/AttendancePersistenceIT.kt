@@ -62,11 +62,19 @@ class AttendancePersistenceIT {
             .andExpect(status().isCreated).andReturn().response.contentAsString,
     )
 
+    /** An entrance or a party, registered as nobody — sign-in switched off — whoever the test has signed in: registering them is the administrator's (AUTH-05e). */
+    private fun registered(path: String, body: String): JsonNode {
+        val before = signedInAs
+        signedInAs = null
+        try { return created(path, body) } finally { signedInAs = before }
+    }
+
     private fun entrance() = UUID.fromString(
-        created("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText(),
+        registered("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText(),
     )
 
-    private fun party() = UUID.fromString(created("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private val aside by lazy { entrance() }   // BOOK-02e: a party is registered in an entrance; one in no book here is registered aside
+    private fun party(entranceId: UUID = aside) = UUID.fromString(registered("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Иван Петров"}""").get("partyId").asText())
 
     @Autowired lateinit var logins: Logins
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
@@ -74,10 +82,12 @@ class AttendancePersistenceIT {
     /** Whose requests these are: every request below carries this login's token, until another person is signed in. */
     private var signedInAs: String? = null
 
-    private fun post(path: String) = MockMvcRequestBuilders.post(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
+    /** A request, under [key] — a fresh one for a proxy or an attendance unless the test replays one; null sends none (PM-SYS-014). */
+    private fun post(path: String, key: String? = if (path.endsWith("/proxies") || path.endsWith("/attendance")) UUID.randomUUID().toString() else null) =
+        MockMvcRequestBuilders.post(path).also { request -> key?.let { request.header("Idempotency-Key", it) } }.also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     /** A party with a login of its own, tied to it. */
-    private fun person(): UUID = party().also { logins.tie(realm, "login-$it", it) }
+    private fun person(entranceId: UUID = aside): UUID = party(entranceId).also { logins.tie(realm, "login-$it", it) }
 
     private fun <T> signedIn(party: UUID?, act: () -> T): T {
         val before = signedInAs
@@ -95,7 +105,7 @@ class AttendancePersistenceIT {
     }
 
     /** An owner of a unit of the entrance since the start of last year — the whole entrance, the first time it is asked for. */
-    private fun owner(entranceId: UUID): UUID = person().also {
+    private fun owner(entranceId: UUID): UUID = person(entranceId).also {
         val existing = jdbc.queryForList("SELECT id FROM registry.unit WHERE entrance_id = ?", UUID::class.java, entranceId)
         val unit = existing.firstOrNull() ?: UUID.fromString(
             created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
@@ -130,8 +140,8 @@ class AttendancePersistenceIT {
         return base
     }
 
-    private fun present(base: String, attendee: UUID, channel: String = "IN_PERSON") =
-        mvc.perform(post("$base/attendance").contentType(MediaType.APPLICATION_JSON).content("""{"attendeePartyId":"$attendee","channel":"$channel"}"""))
+    private fun present(base: String, attendee: UUID, channel: String = "IN_PERSON", key: String? = UUID.randomUUID().toString()) =
+        mvc.perform(post("$base/attendance", key).contentType(MediaType.APPLICATION_JSON).content("""{"attendeePartyId":"$attendee","channel":"$channel"}"""))
 
     private fun register(base: String): JsonNode = json.readTree(mvc.perform(get("$base/attendance")).andExpect(status().isOk).andReturn().response.contentAsString)
 
@@ -212,5 +222,117 @@ class AttendancePersistenceIT {
         // through another entrance's path the assembly is not there
         val other = entrance()
         signedIn(manager(other)) { present(draft.replace("$entranceId", "$other"), ana).andExpect(status().isNotFound) }
+    }
+
+    private fun lineOf(result: org.springframework.test.web.servlet.ResultActions) = json.readTree(result.andExpect(status().isCreated).andReturn().response.contentAsString)
+
+    private fun lineRows(entranceId: UUID) = jdbc.queryForList("SELECT id::text, attendee_party_id, channel, recorded_at, request_key_id FROM assembly.attendance WHERE entrance_id = ? ORDER BY recorded_at", entranceId)
+
+    private fun keptKeys(entranceId: UUID) = jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ?", Int::class.java, entranceId)
+
+    @Test
+    fun `PM-SYS-014 replaying a queued attendance twice enters the person once - the same key and request answer with the line first made, also on a later day`() {
+        val entranceId = entrance()
+        val (ana, boris) = listOf(owner(entranceId), owner(entranceId))
+        val base = meetingToday(entranceId, ana)
+        val queued = UUID.randomUUID().toString()
+        val first = lineOf(present(base, ana, key = queued))
+        repeat(2) { assertThat(lineOf(present(base, ana, key = queued))).isEqualTo(first) }                         // the queue replayed twice: one line
+        assertThat(lineRows(entranceId).map { it["id"] }).containsExactly(first.get("id").asText())
+        assertThat(keptKeys(entranceId)).isEqualTo(1)
+        present(base, ana).andExpect(status().isConflict)                                                          // another key: Ana is on the register
+        // the day passes: a new key is refused, the replay is still answered with the line
+        jdbc.update("UPDATE assembly.assembly SET scheduled_at = now() - interval '2 days' WHERE id = ?::uuid", base.substringAfterLast("/"))
+        present(base, boris).andExpect(status().isConflict)
+        assertThat(lineOf(present(base, ana, key = queued))).isEqualTo(first)
+        assertThat(lineRows(entranceId)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-SYS-014 an attendance's key is refused for another request or operation, and an attendance without an Idempotency-Key is a 400`() {
+        val entranceId = entrance()
+        val (ana, boris) = listOf(owner(entranceId), owner(entranceId))
+        val base = meetingToday(entranceId, ana)
+        present(base, ana, key = null).andExpect(status().isBadRequest)
+        present(base, ana, key = "  ").andExpect(status().isBadRequest)
+        val k = UUID.randomUUID().toString()
+        jdbc.update("INSERT INTO assembly.vote_request_key (id, entrance_id, idempotency_key, operation, request_hash, kept_at) VALUES (gen_random_uuid(), ?, ?, 'RECORD_VOTE', 'x', now())", entranceId, k)
+        present(base, ana, key = k).andExpect(status().isConflict)                                                 // k was kept for a vote: another operation
+        assertThat(lineRows(entranceId)).isEmpty()
+        assertThat(keptKeys(entranceId)).isEqualTo(1)                                                              // a refused entry keeps no key
+        present(base, person(), key = UUID.randomUUID().toString()).andExpect(status().isBadRequest)               // neither an owner nor anybody's proxy
+        assertThat(keptKeys(entranceId)).isEqualTo(1)
+        val bad = "bad-${UUID.randomUUID()}"
+        present(base, ana, key = bad).andExpect(status().isCreated)
+        present(base, boris, key = bad).andExpect(status().isConflict)                                             // another attendee
+        present(base, ana, "VIDEO", key = bad).andExpect(status().isConflict)                                      // another channel
+        signedIn(manager(entranceId, "CTL")) { present(base, ana, key = bad).andExpect(status().isForbidden) }
+        assertThat(lineRows(entranceId)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-ORG-005 a replay of an attendance is answered with the line, not refused as already on the register or as represented, while a new key for the same person is still refused`() {
+        val entranceId = entrance()
+        val (ana, boris) = listOf(owner(entranceId), owner(entranceId))
+        val base = meetingToday(entranceId, ana)
+        val queued = UUID.randomUUID().toString()
+        val line = lineOf(present(base, boris, key = queued))
+        present(base, boris).andExpect(status().isConflict)                                                        // a new key: Boris is on the register
+        // a proxy naming Boris as principal exists since: the replay is answered, not refused as represented
+        jdbc.update(
+            "INSERT INTO assembly.proxy (id, entrance_id, assembly_id, principal_party_id, agent_party_id, agent_kind, scope, form, registered_at, login_issuer, login_subject, recorded_by) " +
+                "VALUES (gen_random_uuid(), ?, ?::uuid, ?, ?, 'OWNER', 'WHOLE_AGENDA', 'WRITTEN', now(), ?, ?, ?)",
+            entranceId, base.substringAfterLast("/"), boris, ana, realm, "login-$boris", boris,
+        )
+        assertThat(lineOf(present(base, boris, key = queued)).get("id")).isEqualTo(line.get("id"))                 // the replay is not one more
+        assertThat(lineRows(entranceId)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-VOTE-014 a replayed attendance adds no row and edits none - its row names the key, which is never changed or removed`() {
+        val entranceId = entrance()
+        val ana = owner(entranceId)
+        val base = meetingToday(entranceId, ana)
+        val queued = UUID.randomUUID().toString()
+        repeat(2) { lineOf(present(base, ana, key = queued)) }
+        val kept = jdbc.queryForObject("SELECT id FROM assembly.vote_request_key WHERE entrance_id = ? AND idempotency_key = ?", UUID::class.java, entranceId, queued)
+        assertThat(jdbc.queryForObject("SELECT operation FROM assembly.vote_request_key WHERE id = ?", String::class.java, kept)).isEqualTo("RECORD_ATTENDANCE")
+        val row = lineRows(entranceId).single()
+        assertThat(row["request_key_id"]).isEqualTo(kept)
+        assertThat(jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE id = ?", kept)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_request_key WHERE id = ?", kept)).isZero()
+        assertThat(jdbc.update("UPDATE assembly.attendance SET request_key_id = NULL WHERE entrance_id = ?", entranceId)).isZero()
+        assertThat(lineRows(entranceId).single()).isEqualTo(row)                                                   // the replay changed nothing
+    }
+
+    @Test
+    fun `PM-SEC-001 a replayed attendance is answered only to whoever keeps the register - the policy is asked before the key is looked up`() {
+        val entranceId = entrance()
+        val ana = owner(entranceId)
+        val base = meetingToday(entranceId, ana)
+        val queued = UUID.randomUUID().toString()
+        lineOf(present(base, ana, key = queued))
+        for (who in listOf(ana, person(), null)) {                                                                  // an owner, a stranger, nobody signed in
+            signedIn(who) { present(base, ana, key = queued).andExpect(status().isForbidden) }
+        }
+        assertThat(lineRows(entranceId)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-GA-016 a replayed remote attendance is answered with the line as it stands - unverified is not counted, verified is`() {
+        val entranceId = entrance()
+        val (ana, vera) = listOf(owner(entranceId), owner(entranceId))
+        val base = meetingToday(entranceId, ana)
+        val queued = UUID.randomUUID().toString()
+        val first = lineOf(present(base, vera, "VIDEO", key = queued))
+        assertThat(first.get("counted").asBoolean()).isFalse()
+        assertThat(lineOf(present(base, vera, "VIDEO", key = queued)).get("counted").asBoolean()).isFalse()        // not identified yet: not counted
+        created("$base/attendance/${first.get("id").asText()}/identity-verification", """{"how":"лична карта пред камерата"}""")
+        val replayed = lineOf(present(base, vera, "VIDEO", key = queued))
+        assertThat(replayed.get("id")).isEqualTo(first.get("id"))
+        assertThat(replayed.get("identityVerified").asBoolean()).isTrue()                                           // the line as it stands now
+        assertThat(replayed.get("counted").asBoolean()).isTrue()
+        assertThat(replayed.get("represents").map { it.asText() }).containsExactly("$vera")
+        assertThat(lineRows(entranceId)).hasSize(1)
     }
 }

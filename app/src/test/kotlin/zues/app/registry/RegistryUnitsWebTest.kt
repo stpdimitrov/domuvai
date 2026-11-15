@@ -23,7 +23,7 @@ import java.math.BigDecimal
  * failure modes surface (invalid parts → 400, unknown entrance → 404) without a database.
  */
 @WebMvcTest(RegistryController::class)
-@org.springframework.context.annotation.Import(zues.app.identity_org.WhoAsks::class, BookEntries::class)
+@org.springframework.context.annotation.Import(zues.app.identity_org.WhoAsks::class, BookEntries::class, Registrations::class)
 class RegistryUnitsWebTest {
 
     @Autowired lateinit var mvc: MockMvc

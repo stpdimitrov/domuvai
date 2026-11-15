@@ -852,7 +852,7 @@
   min-width: 720px;
 }
 /* /entrance/assembly (WEB-25) */
-.as-mandates, .as-agenda, .as-register, .as-list {
+.as-mandates, .as-agenda, .as-register, .as-list, .as-votes {
   display: grid;
   column-gap: 14px;
   align-items: center;
@@ -862,6 +862,7 @@
 .as-mandates { grid-template-columns: 220px 120px 96px 96px minmax(0, 1fr); }
 .as-agenda { grid-template-columns: 40px minmax(0, 1fr) 160px 160px; }
 .as-register { grid-template-columns: 120px 90px minmax(0, 1fr) 90px minmax(0, 1fr); }
+.as-votes { grid-template-columns: 100px 100px 90px 90px 110px minmax(0, 1fr); }
 .as-list { grid-template-columns: 150px minmax(0, 1fr) 220px 90px; }
 .as-list.picked { background: #f4f3ef; }
 .as-facts {
@@ -912,6 +913,23 @@
 .as-hint {
   margin-left: 12px;
   color: #6b6f6c;
+}
+.as-verify {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font: 400 12.5px/1.4 "IBM Plex Sans";
+}
+.as-verify input[type="text"] {
+  flex: 1 1 240px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #deddd9;
+  border-radius: 4px;
+  font: inherit;
+  background: #fff;
 }
 
 /* two tables on one screen: each as tall as its rows, and the screen scrolls — not each table inside itself */

@@ -63,6 +63,7 @@ class MandateReadWebTest {
     @MockitoBean lateinit var store: MandateStore
     @MockitoBean lateinit var acts: MandateActLog
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var names: PartyNames         // the registry's; unanswered here, so the ids alone
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean lateinit var standing: MandateStanding     // the real one, watched
 
     private val entrance = UUID.randomUUID()

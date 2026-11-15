@@ -26,26 +26,26 @@ KNOWN = {r['id'] for r in RULES['rules']}
 RUNNING = {
  # ---- registry
  ('post', '/api/registry/entrances'):
-   ('Register an entrance — founding its building at an address, or joining an existing building', ['PM-ORG-001']),
+   ("Register an entrance — founding its building at an address, or joining an existing building — by the deployment's administrator only, as the sign-in says who is asking; anybody else is a 403", ['PM-ORG-001', 'PM-SEC-001']),
  ('get', '/api/registry/entrances'):
-   ('List the registered entrances', ['PM-ORG-001']),
+   ('List the registered entrances — each person sees those where they hold a role today, the administrator every one, as the sign-in says who is asking; holding none, the list is empty', ['PM-ORG-001', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units'):
    ('Add units with their ideal parts — declared, or derived from area and marked DERIVED — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403',
     ['PM-ORG-002', 'PM-ORG-003', 'PM-ORG-009', 'PM-BOOK-005']),
  ('get', '/api/registry/entrances/{entranceId}/units'):
    ('List the units of an entrance — for anyone holding a role in it: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-ORG-001', 'PM-ORG-002', 'PM-ORG-003', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household'):
-   ("Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403", ['PM-FEE-005', 'PM-FEE-008', 'PM-BOOK-005']),
+   ("Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a party registered in the entrance, so the book names them and a household proxy can be checked; an unknown party, or one of another entrance, is a 400 and nothing is stored", ['PM-FEE-005', 'PM-FEE-008', 'PM-BOOK-005', 'PM-BOOK-002', 'PM-BOOK-011', 'PM-GA-009']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals'):
    ('Record the animals kept in a unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-005', 'PM-FEE-009']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/absences'):
-   ('File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-FEE-006', 'PM-FEE-007', 'PM-BOOK-005']),
+   ('File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, with the day the paper was handed in when it came in earlier (never after today, a 400); as the sign-in says who is asking; anybody else is a 403', ['PM-FEE-006', 'PM-FEE-007', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/household/{memberId}/end'):
    ('Record or correct the day a resident left — their occupancy range closes — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-008', 'PM-BOOK-005']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/animals/{animalId}/end'):
    ('Record or correct the day an animal left the unit — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403', ['PM-BOOK-005', 'PM-BOOK-008']),
  ('get', '/api/registry/entrances/{entranceId}/book'):
-   ('Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)', ['PM-BOOK-001', 'PM-BOOK-002', 'PM-BOOK-006', 'PM-BOOK-007']),
+   ('Read the Book of the Condominium as of a date — the id of each party beside the name, never an identity number; only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403)', ['PM-BOOK-001', 'PM-BOOK-002', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('get', '/api/registry/entrances/{entranceId}/book/access-log'):
    ("Export who read the entrance's book or was refused it, why and when — oldest first; read by whoever may read the book, and logged too", ['PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/entrances/{entranceId}/book/retention'):
@@ -57,32 +57,53 @@ RUNNING = {
  ('get', '/api/registry/entrances/{entranceId}/book/declarations/overdue'):
    ("Owners and users past their declaration deadline on a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-BOOK-003', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  ('post', '/api/registry/parties'):
-   ('Register a party — a person or company that can hold a title', ['PM-BOOK-002']),
+   ("Register a party — a person or company that can hold a title — in an entrance, whose book alone may name them, by the deployment's administrator, or by the manager or the board of that entrance, as the sign-in says who is asking; anybody else is a 403", ['PM-BOOK-002', 'PM-BOOK-005', 'PM-BOOK-011', 'PM-SEC-001']),
  ('post', '/api/registry/entrances/{entranceId}/units/{unitId}/titles'):
-   ('Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included', ['PM-ORG-005', 'PM-ORG-011', 'PM-BOOK-005']),
+   ('Record a title to a unit — effective-dated, with its share, naming a party of the entrance (one of another entrance is answered as unknown, 400) — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included', ['PM-ORG-005', 'PM-ORG-011', 'PM-BOOK-005', 'PM-BOOK-011']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
-   ("The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
+   ("The owners and users of an entrance's units as of a date — each party's id beside the name, never an identity number; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
  # ---- assembly
  ('post', '/api/assembly/entrances/{entranceId}/assemblies'):
    ('Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked',
     ['PM-GA-002', 'PM-GA-004', 'PM-GA-005', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda'):
-   ('Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice',
-    ['PM-VOTE-004', 'PM-GA-006', 'PM-SEC-001']),
+   ('Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice; tagged, or not, as accepting the ballots of absent owners',
+    ['PM-VOTE-004', 'PM-GA-006', 'PM-GA-017', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes'):
-   ("Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
-    ['PM-VOTE-001', 'PM-VOTE-014', 'PM-ORG-005', 'PM-SEC-001']),
+   ("Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the votes it first made, even once the item has closed; the same key for another request is a 409",
+    ['PM-VOTE-001', 'PM-VOTE-014', 'PM-ORG-005', 'PM-SEC-001', 'PM-SYS-014']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots'):
+   ("Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403. Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the rows it first made, even once day 7 has passed; the same key for another request is a 409",
+    ['PM-GA-017', 'PM-GA-018', 'PM-SEC-001', 'PM-SYS-014']),
+ ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots'):
+   ("How each absent owner voted on an item, ballot by ballot in the order entered — their choice for each unit, its weight and the declaration it came from; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002, and every read is entered",
+    ['PM-SEC-001', 'PM-SEC-002', 'PM-SEC-004', 'PM-GOV-008']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge'):
+   ("Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the merge it first made, even though the item is merged; the same key for another request is a 409",
+    ['PM-VOTE-013', 'PM-GA-017', 'PM-SEC-001', 'PM-SYS-014']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision'):
+   ("Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the decision it first made, even though the item is closed; the same key for another request is a 409",
+    ['PM-VOTE-002', 'PM-VOTE-011', 'PM-VOTE-012', 'PM-VOTE-014', 'PM-VOTE-016', 'PM-SEC-001', 'PM-SYS-014']),
+ ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision'):
+   ("An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — an item tagged for absentee ballots only once they are merged, then shown as the merged decision naming the one it supersedes — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404",
+    ['PM-VOTE-011', 'PM-VOTE-013', 'PM-VOTE-016', 'PM-GA-023', 'PM-SEC-001', 'PM-SEC-002']),
+ ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes'):
+   ("How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002. Each row carries the owner's name beside the id, given by the book and entered in its access log once a read",
+    ['PM-VOTE-014', 'PM-SEC-001', 'PM-SEC-002', 'PM-GOV-008', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/schedule'):
    ('Move the meeting — by whoever runs the assembly; blocked when no notice could be in time; a posted notice is void and the assembly a draft again',
     ['PM-GA-004', 'PM-GA-006', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/notice-posting'):
    ('Record the posting act with its photograph — signed by whoever runs the assembly (the convenor, or their successor in the office), co-signed by an owner that day; the only way an assembly becomes NOTICED; refused when posted too close to the meeting',
     ['PM-GA-004', 'PM-GA-005', 'PM-GA-006', 'PM-GA-007', 'PM-SYS-013', 'PM-SEC-001']),
+ ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting'):
+   ("Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the posting it first made, even though it is entered; the same key for another request is a 409",
+    ['PM-GA-023', 'PM-SEC-001', 'PM-SYS-014']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
-   ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown',
-    ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001']),
+   ('Appoint one\'s own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown. Sent under an Idempotency-Key: the same request again registers nothing more and is answered with the proxy it first made, even once the assembly takes no more proxies or its agent is at the limit; the same key for another request is a 409',
+    ['PM-GA-009', 'PM-GA-010', 'PM-SEC-001', 'PM-SYS-014']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies'):
-   ('List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-009', 'PM-SEC-001']),
+   ("List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered", ['PM-GA-009', 'PM-SEC-001', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions'):
    ('Open a petition to convene an assembly — by the signed-in owner, who signs it; anybody else is a 403', ['PM-GA-003', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/signatures'):
@@ -93,12 +114,12 @@ RUNNING = {
  ('post', '/api/assembly/entrances/{entranceId}/petitions/{petitionId}/assembly'):
    ('The owners convene on their petition — once, by the signed-in signatory, when it is unlocked and the demand was not met', ['PM-GA-003', 'PM-SEC-001']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
-   ('Enter a person in the register of the sitting — an owner, or a registered proxy\'s representative; in person or by video; kept by whoever runs the assembly',
-    ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001']),
+   ('Enter a person in the register of the sitting — an owner, or a registered proxy\'s representative; in person or by video; kept by whoever runs the assembly. Sent under an Idempotency-Key: the same request again enters nobody more and is answered with the line it first made — also on a later day, and with the line as it stands now; the same key for another request is a 409',
+    ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001', 'PM-SYS-014']),
  ('post', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance/{attendanceId}/identity-verification'):
    ('Record that a remote participant was reliably identified, and how — from then on their presence counts', ['PM-GA-016', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance'):
-   ('Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001']),
+   ("Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The attendee's name and the names of those the line brings go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered", ['PM-GA-012', 'PM-GA-016', 'PM-SEC-001', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/quorum'):
    ('The quorum meter of the sitting the assembly is at — the share of all ideal parts its register makes present against that sitting\'s threshold in force, from when it may open, or why it cannot be weighed; and the sittings weighed so far — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. Who owns the share behind a higher quorum is named to the manager, the board and the controller only',
     ['PM-GA-012', 'PM-GA-013', 'PM-GA-014', 'PM-GA-015', 'PM-ORG-005', 'PM-ORG-011', 'PM-SEC-001', 'PM-SEC-002']),
@@ -111,6 +132,12 @@ RUNNING = {
    ('Whether the entrance held its general assemblies in a calendar year — a sitting opened on its quorum on a Sofia day of that year — how many against how many the law asks, and the first — read as an assembly is', ['PM-GA-001', 'PM-SEC-001']),
  ('get', '/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}'):
    ('Read an assembly with its agenda — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403', ['PM-GA-002', 'PM-GA-005', 'PM-SEC-001']),
+ ('post', '/api/assembly/entrances/{entranceId}/paper-decisions'):
+   ("Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the record it first made; the same key for another request is a 409",
+    ['PM-FEE-012', 'PM-GA-022', 'PM-DOC-007', 'PM-SEC-001', 'PM-SEC-004', 'PM-SYS-014']),
+ ('get', '/api/assembly/entrances/{entranceId}/paper-decisions'):
+   ("List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403",
+    ['PM-GA-022', 'PM-DOC-007', 'PM-SEC-001', 'PM-SEC-002']),
  # ---- identity
  ('get', '/api/identity/me'):
    ("Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do", ['PM-SEC-001']),
@@ -119,7 +146,7 @@ RUNNING = {
  ('post', '/api/identity/logins/untie'):
    ("Untie a login — only the deployment's administrator; an issuer may be named to clear what a changed issuer URL left. On the record, refusals too", ['PM-SEC-001', 'PM-SEC-004']),
  ('get', '/api/identity/entrances/{entranceId}/mandates'):
-   ("Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when; party ids, not names. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). No task is stored or sent", ['PM-GOV-004', 'PM-GOV-005', 'PM-GOV-008', 'PM-SEC-001']),
+   ("Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent", ['PM-BOOK-006', 'PM-BOOK-007', 'PM-BOOK-011', 'PM-GOV-004', 'PM-GOV-005', 'PM-GOV-008', 'PM-SEC-001']),
  ('post', '/api/identity/entrances/{entranceId}/mandates'):
    ("Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too", ['PM-GOV-004', 'PM-SEC-001', 'PM-SEC-004', 'PM-SEC-011']),
  ('post', '/api/identity/entrances/{entranceId}/mandates/{mandateId}/end'):
@@ -136,19 +163,25 @@ RUNNING = {
  ('post', '/api/money/entrances/{entranceId}/charge-runs'):
    ('Issue a charge run — stored with its basis, meter readings included, never altered afterwards',
     ['PM-FEE-012', 'PM-FEE-014', 'PM-FEE-015', 'PM-FEE-016', 'PM-FEE-017', 'PM-SEC-001']),
+ ('get', '/api/money/entrances/{entranceId}/charge-runs'):
+   ("The periods the entrance has a charge run issued for, the newest first: each run's header, no amount and no person; for the manager, the board and the controller", ['PM-BOOK-012', 'PM-FEE-014', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/charge-runs/{period}/headcount'):
-   ("The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed; for the book's readers", ['PM-BOOK-012', 'PM-BOOK-006']),
+   ("The units whose billed persons, in an issued period, are not the persons the book declares for it — nothing is changed; for the book's readers", ['PM-BOOK-012', 'PM-BOOK-006', 'PM-BOOK-007', 'PM-SEC-004']),
  ('get', '/api/money/units/{unitId}/statement'):
    ("The unit's itemised statement, showing how each number was derived — a metered line with its reading and item", ['PM-FEE-017', 'PM-FEE-018', 'PM-SEC-002']),
  ('get', '/api/money/units/{unitId}/arrears'):
    ("The unit's arrears, aged as of a date, with the day its oldest open debt fell due", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),
+ ('get', '/api/money/units/{unitId}/open-debts'):
+   ("The debts a payment valued on the date can settle, the oldest first, each with its date, the day it fell due and "
+    "what is outstanding — the dates a payer can designate. Not the arrears of that date: a credit recorded after it has "
+    "already closed its debt here, so for a past date this can show less than the arrears read", ['PM-DEBT-008', 'PM-DEBT-002', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/arrears'):
    ("The entrance's arrears as of a date in one read — every unit that owes, aged, largest first, each with the day "
     "its oldest open debt fell due — and their total", ['PM-DEBT-001', 'PM-DEBT-002', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/fund-accounts'):
-   ("Register the entrance's repair-fund account", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005', 'PM-SEC-001']),
+   ("Register the entrance's repair-fund account; opened in the manager's name, its holder must stand on a manager's or board member's mandate of the entrance that day, and the account stores it", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
-   ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
+   ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id or mandate", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/journal'):
    ("The entrance's double-entry journal from one date to another, both included — each journal whole, its legs "
     "summing to zero, with what wrote it where money knows; optionally only the journals that touch one account",
@@ -157,22 +190,22 @@ RUNNING = {
    ("The operating account — its IBAN and holder, and what the ledger holds as paid into it, apart from the fund's "
     "account and the cash box; outflows are not recorded yet, and the response says so — read as the fund is", ['PM-FUND-004', 'PM-FEE-019', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/fund'):
-   ('The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance', ['PM-FUND-004', 'PM-FUND-009', 'PM-GOV-008', 'PM-SEC-002']),
+   ('The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance; an owner reads it without the party ids', ['PM-FUND-004', 'PM-FUND-009', 'PM-GOV-008', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements'):
-   ('Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two',
+   ('Sign off a disbursement from the repair fund, by the holder of its account, who is the sign-in — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two',
     ['PM-FUND-006', 'PM-FUND-007', 'PM-FUND-008', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay'):
-   ("Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account",
+   ("Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account, who is the sign-in",
     ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel'):
-   ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason", ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
+   ("Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, who is the sign-in, with the reason", ['PM-FUND-007', 'PM-FUND-009', 'PM-SEC-001']),
  ('post', '/api/money/entrances/{entranceId}/fund/handover-statements'):
-   ("Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash",
+   ("Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash, and the sign-in's party as who recorded it",
     ['PM-FUND-010', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund/handover-statements'):
-   ("The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is", ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
+   ("The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is, an owner without the two parties, the recorder or the basis", ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
  ('get', '/api/money/entrances/{entranceId}/fund/handover-statements/{statementId}'):
-   ('A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is', ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
+   ('A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is, an owner without the two parties, the recorder or the basis', ['PM-FUND-010', 'PM-GOV-008', 'PM-SEC-002']),
  ('post', '/api/money/entrances/{entranceId}/payments'):
    ('Record a payment — oldest debt first unless the payer designates one; the rule applied is stored',
     ['PM-DEBT-008', 'PM-SEC-001']),
@@ -207,9 +240,6 @@ PLANNED = [
   'Generate the notice document and send the electronic notification beside the posting', ['PM-GA-008', 'PM-SYS-013']),
  ('post', '/agenda-items/{agenda_item_id}/votes', 'assembly',
   'Cast or record a vote', ['PM-GA-009', 'PM-GA-018', 'PM-VOTE-014', 'PM-ORG-005']),
- ('post', '/agenda-items/{agenda_item_id}/close', 'assembly',
-  'Close the item and compute the tally on its stated denominator',
-  ['PM-VOTE-011', 'PM-VOTE-012', 'PM-VOTE-013', 'PM-VOTE-016']),
  ('post', '/assemblies/{assembly_id}/protocol', 'assembly',
   'Draw up the protocol and announce it, starting the appeal clock',
   ['PM-GA-019', 'PM-GA-020', 'PM-GA-021', 'PM-GA-023']),

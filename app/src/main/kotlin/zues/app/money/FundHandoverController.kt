@@ -17,7 +17,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
-/** A handover to state the fund for (PM-FUND-010): ISO dates, the two sides, and the balance on the bank's own statement. */
+/** A handover to state the fund for (PM-FUND-010): ISO dates, the two sides, and the balance on the bank's own statement. Who records it is the sign-in's party. */
 data class IssueHandoverRequest(
     val handoverOn: String,
     val from: String? = null,                     // the period's first day; without it, from the fund's first record
@@ -42,27 +42,31 @@ class FundHandoverController(private val handovers: FundHandoverService, private
         @RequestBody request: IssueHandoverRequest,
         signedIn: JwtAuthenticationToken?,
     ): HandoverStatementView {
-        access.keep(entranceId, who.of(signedIn))
+        val recordedBy = access.keeper(entranceId, who.of(signedIn))
         return handovers.issue(
             entranceId, idempotencyKey,
             IssueHandover(
                 LocalDate.parse(request.handoverOn), request.from?.let(LocalDate::parse),
                 request.outgoingPartyId, request.incomingPartyId,
                 requireNotNull(request.bankBalanceMinor) { "bankBalanceMinor is the balance on the bank's own statement for the handover date — required" },
+                recordedBy,
             ),
         )
     }
 
     @GetMapping
     fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<HandoverStatementView> {
-        access.fund(entranceId, who.of(signedIn))
-        return handovers.list(entranceId)
+        val asking = who.of(signedIn)
+        access.fund(entranceId, asking)
+        val parties = access.seesFundParties(entranceId, asking)                       // Rule: PM-SEC-002
+        return handovers.list(entranceId).map { if (parties) it else it.withoutParties() }
     }
 
     @GetMapping("/{statementId}")
     fun find(@PathVariable entranceId: UUID, @PathVariable statementId: UUID, signedIn: JwtAuthenticationToken?): HandoverStatementView {
-        access.fund(entranceId, who.of(signedIn))
-        return handovers.find(entranceId, statementId)
+        val asking = who.of(signedIn)
+        access.fund(entranceId, asking)
+        return handovers.find(entranceId, statementId).let { if (access.seesFundParties(entranceId, asking)) it else it.withoutParties() }
     }
 
     /** A missing bank balance, a handover date after today, a period starting after it, or one party on both sides → 400. */

@@ -6,26 +6,23 @@
 |---|---|
 | Rules in catalogue | **233** |
 | Every rule carries an acceptance criterion | yes — all 233 are testable as written |
-| Proved by a test named after the rule | **92** (39%) |
-| Remaining | **141** |
-| Proposed slices at ~10 rules each | **18** |
+| Proved by a test named after the rule | **104** (45%) |
+| Remaining | **129** |
+| Proposed slices at ~10 rules each | **17** |
 
 Ordered by the gate each rule serves. A gate is the only thing that can tell us the rules are wrong; everything else is scheduling. Within a gate: MUST before SHOULD, and a rule whose number is unconfirmed comes first — its *mechanism* is testable today, with the number read from configuration while counsel answers.
 
 ## Gate 1 — the fee engine reproduces the firm's spreadsheet to the cent
 
-18 rule(s) remaining across 3 slice(s).
+15 rule(s) remaining across 3 slice(s).
 
-### S-G1-01 · `kernel` · SYS · 9 rule(s) · ⚠ 1 unconfirmed
+### S-G1-01 · `kernel` · SYS · 6 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
 | `PM-SYS-009` | MUST ⚠ | Fine ranges are configuration; the UI states they must be verified. |
-| `PM-SYS-006` | MUST | Overrides are evidence, not silence. |
 | `PM-SYS-007` | MUST | Physical posting remains a first-class, recorded action. |
-| `PM-SYS-012` | MUST | Snapshot-based reporting. |
 | `PM-SYS-013` | MUST | Marking a notice "sent by push" does not advance the assembly out of `DRAFT`; only a recorded posting act does. |
-| `PM-SYS-014` | MUST | A queued vote renders as "изпраща се", never as cast; replaying the queue twice produces one vote. |
 | `PM-SYS-015` | MUST | Budget is a dated config value; a bundle regression breaks the build, not the pilot. |
 | `PM-SYS-008` | SHOULD | One number a manager can act on. |
 | `PM-SYS-011` | SHOULD | Tasks appear without anyone remembering to create them. |
@@ -51,49 +48,35 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 
 ## Gate 2 — one lawful general assembly, end to end
 
-48 rule(s) remaining across 6 slice(s).
+39 rule(s) remaining across 5 slice(s).
 
 ### S-G2-01 · `assembly` · GA · VOTE · 10 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-GA-017` | MUST | Only agenda items tagged `ABSENTEE_ELIGIBLE` accept post-meeting ballots; the tally reopens until day 7. |
-| `PM-GA-018` | MUST | A plain portal click is rejected unless a QES is attached. |
 | `PM-GA-019` | MUST | Day 8 without minutes raises an overdue compliance task. |
 | `PM-GA-020` | MUST | `announced_at` sets `appeal_deadline = announced_at + 30 days`. |
 | `PM-GA-021` | MUST | Generated PDF fails validation if attendance percentages are missing. |
-| `PM-GA-022` | MUST | Each protocol records the physical archive location. |
-| `PM-GA-023` | MUST | Decision shows a countdown; after 30 days status becomes `FINAL`. |
 | `PM-GA-024` | MUST | Litigation flag does not pause the execution clock; a court stay does. |
 | `PM-GA-025` | MUST | Every decision creates an execution task with a computed due date. |
-| `PM-VOTE-002` | MUST | An item with no explicit threshold resolves to >50% of represented ideal parts and states the denominator used. |
-
-### S-G2-02 · `assembly` · VOTE · 10 rule(s)
-
-| Rule | | Test must prove |
-|---|---|---|
 | `PM-VOTE-003` | MUST | Item type `EXTENSION` cannot pass at 99.9%. |
 | `PM-VOTE-005` | MUST | An item typed USEFUL_EXPENSE or CREDIT fails at 74.9% and passes at 75%. |
 | `PM-VOTE-006` | MUST | The respondent's ideal parts are removed from both numerator and denominator. |
 | `PM-VOTE-007` | MUST | An item typed MAJOR_REPAIR, MAJOR_RENEWAL or ENERGY_EFFICIENCY fails at 50.9% and passes at 51%. |
 | `PM-VOTE-008` | MUST | A vote rejecting a `NECESSARY` work order is flagged unlawful and blocked from becoming a decision. |
-| `PM-VOTE-009` | MUST | A standing authorisation with a monetary cap unlocks the manager's emergency-spend path. |
-| `PM-VOTE-010` | MUST | Each is a distinct agenda item type. |
-| `PM-VOTE-011` | MUST | Result line reads e.g. "62.41% of 78.10% represented; threshold 51% of total — NOT PASSED". |
-| `PM-VOTE-012` | MUST | Explicit `denominator` field per majority rule: `TOTAL` or `REPRESENTED`. |
-| `PM-VOTE-013` | MUST | Provisional result is labelled `PROVISIONAL` until day 7 closes. |
 
-### S-G2-03 · `assembly` · GA · VOTE · 5 rule(s) · ⚠ 1 unconfirmed
+### S-G2-02 · `assembly` · GA · VOTE · 6 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
-| `PM-VOTE-016` | MUST | Reproducible from the audit trail years later. |
+| `PM-VOTE-009` | MUST | A standing authorisation with a monetary cap unlocks the manager's emergency-spend path. |
+| `PM-VOTE-010` | MUST | Each is a distinct agenda item type. |
 | `PM-GA-011` | SHOULD ⚠ | Proxy form type drives the validation path. |
 | `PM-GA-008` | SHOULD | Sending email alone leaves the assembly in `DRAFT`. |
 | `PM-GA-026` | SHOULD | Zero re-keying between notice and protocol. |
 | `PM-VOTE-015` | SHOULD | Debt does not disable the ballot; it may be displayed as context. |
 
-### S-G2-04 · `identity-org` · GOV · 10 rule(s) · ⚠ 1 unconfirmed
+### S-G2-03 · `identity-org` · GOV · 10 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|
@@ -108,7 +91,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-013` | MUST | Document generator produces the agreement from stored data. |
 | `PM-GOV-014` | MUST | Protocol picker forces selection of the deciding body. |
 
-### S-G2-05 · `identity-org` · GOV · 5 rule(s)
+### S-G2-04 · `identity-org` · GOV · 5 rule(s)
 
 | Rule | | Test must prove |
 |---|---|---|
@@ -118,7 +101,7 @@ Ordered by the gate each rule serves. A gate is the only thing that can tell us 
 | `PM-GOV-009` | SHOULD | Declining a nomination requires a reason code. |
 | `PM-GOV-017` | SHOULD | Violation records cite the rule version in force on the incident date. |
 
-### S-G2-06 · `policy` · SEC · 8 rule(s) · ⚠ 1 unconfirmed
+### S-G2-05 · `policy` · SEC · 8 rule(s) · ⚠ 1 unconfirmed
 
 | Rule | | Test must prove |
 |---|---|---|

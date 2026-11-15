@@ -57,7 +57,7 @@ class DocumentsPersistenceIT {
     )
 
     private fun entrance() = created("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""", "entranceId")
-    private fun party() = created("/api/registry/parties", """{"fullName":"Мария Иванова"}""", "partyId")
+    private fun party(entranceId: UUID) = created("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Мария Иванова"}""", "partyId")
 
     private val paper = PaperOriginal("архивът в стаята на УС", "председателят на УС")
 
@@ -67,7 +67,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-001 a document is stored with its content hash, author, time and entity, and reads back byte for byte`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         val entity = "assembly:${UUID.randomUUID()}"
         val bytes = "протокол от общото събрание".toByteArray()
 
@@ -88,7 +88,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-001 re-upload creates a new version - nothing is overwritten`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         val entity = "assembly:${UUID.randomUUID()}"
         val first = protocol(entranceId, author, entity, "първи".toByteArray())
 
@@ -124,7 +124,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-001 the tables refuse to change, remove or empty a document, or to keep bytes under a hash not theirs`() {
         val entranceId = entrance()
-        val stored = protocol(entranceId, party(), "assembly:${UUID.randomUUID()}", "оригинал".toByteArray())
+        val stored = protocol(entranceId, party(entranceId), "assembly:${UUID.randomUUID()}", "оригинал".toByteArray())
 
         // a document row: an update and a delete do nothing
         jdbc.update("UPDATE evidence.document SET entity_ref = 'assembly:00000000-0000-0000-0000-000000000000' WHERE id = ?", stored.id)
@@ -166,7 +166,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-001 the table keeps versions in a line of one document - written past the service, it still refuses a fork, a stray or a nameless row`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         val entity = "assembly:${UUID.randomUUID()}"
         val first = insert(entranceId, author, "NOTICE", null, null, entity)
         val second = insert(entranceId, author, "NOTICE", null, null, entity, key = first, versionNo = 2, supersedes = first)
@@ -184,7 +184,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-002 the table refuses a document of no statutory kind`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         insert(entranceId, author, "NOTICE", null, null)
         for (kind in listOf("OTHER", "", "notice")) {
             refused("document_kind_is_statutory") { insert(entranceId, author, kind, null, null) }
@@ -194,7 +194,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-007 the table refuses a protocol with no archive location or custodian`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         insert(entranceId, author, "PROTOCOL", "архивът", "председателят на УС")
         refused("document_protocol_paper") { insert(entranceId, author, "PROTOCOL", null, null) }
         refused("document_paper_whole") { insert(entranceId, author, "PROTOCOL", "архивът", null) }

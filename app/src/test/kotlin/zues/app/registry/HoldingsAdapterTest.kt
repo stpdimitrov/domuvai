@@ -140,8 +140,17 @@ class HoldingsAdapterTest {
         fun member(party: UUID?, from: String = "2026-01-01", to: String? = null) =
             HouseholdMember(UUID.randomUUID(), entranceId, unitId, party, false, LocalDate.parse(from), to?.let { LocalDate.parse(it) })
         whenever(household.findByEntranceId(entranceId)).thenReturn(listOf(member(staying), member(gone, to = "2026-04-01"), member(null)))
-        assertThat(holdings.residents(entranceId, may)).containsExactly(Resident(staying, unitId))
+        assertThat(holdings.residents(entranceId, may)).containsExactly(Resident(staying, unitId, childUnder6 = false))
         assertThat(holdings.residents(entranceId, LocalDate.of(2026, 3, 31)).map { it.partyId }).containsExactlyInAnyOrder(staying, gone)
+    }
+
+    @Test
+    fun `PM-GA-009 a resident carries the book's flag for a child under six, the one age fact the book holds`() {
+        val unitId = UUID.randomUUID()
+        val (child, grown) = List(2) { UUID.randomUUID() }
+        fun member(party: UUID, childUnder6: Boolean) = HouseholdMember(UUID.randomUUID(), entranceId, unitId, party, childUnder6, LocalDate.of(2026, 1, 1), null)
+        whenever(household.findByEntranceId(entranceId)).thenReturn(listOf(member(child, true), member(grown, false)))
+        assertThat(holdings.residents(entranceId, may)).containsExactlyInAnyOrder(Resident(child, unitId, true), Resident(grown, unitId, false))
     }
 
     @Test

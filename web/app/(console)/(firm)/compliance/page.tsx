@@ -3,6 +3,7 @@ import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entrances, inTurn, isPeriod, monthName, reach, shiftPeriod, thisPeriod } from "@/lib/console";
 import { unanswered } from "@/lib/refusal";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Съответствие — Етаж" };
 
@@ -129,7 +130,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-            {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
+            {view.kind === "none" && <NoEntrance />}
           </div>
         </div>
       ) : (

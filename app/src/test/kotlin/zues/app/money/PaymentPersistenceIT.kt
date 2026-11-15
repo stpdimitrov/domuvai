@@ -2,7 +2,10 @@ package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
@@ -10,6 +13,7 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActions
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -20,6 +24,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import zues.app.assembly.GaDecisions
 import zues.law.CATALOGUE_VERSION
 import zues.law.ENGINE_VERSION
 import java.util.UUID
@@ -52,6 +57,10 @@ class PaymentPersistenceIT {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var jdbc: JdbcTemplate
+    @MockitoBean lateinit var decisions: GaDecisions
+
+    @BeforeEach
+    fun everyCitedDecisionPassed() { whenever(decisions.passed(any(), any())).thenReturn(true) }
 
     /** An entrance with ап. 1 (60%) and ап. 2 (40%), each billed for April and May; returns (entrance, ап. 1). */
     private fun billedUnit(): Pair<UUID, UUID> {

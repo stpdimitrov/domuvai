@@ -48,8 +48,61 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice */
+        /** Put an item on the agenda, bound to the majority the law has in force for its type — by the office that convened it (the convenor, or their successor in it); after posting it voids the notice; tagged, or not, as accepting the ballots of absent owners */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-ballots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How each absent owner voted on an item, ballot by ballot in the order entered — their choice for each unit, its weight and the declaration it came from; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else, the owner whose ballot it is included, is a 403 naming PM-SEC-002, and every read is entered */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots"];
+        put?: never;
+        /** Enter an absent owner's ballot on an item tagged for them, after its sitting and by day 7 — from a handwritten-signed declaration, with its reference and the SHA-256 of its scan (a QES is a 409 until its provider is chosen); one row per unit they own, weighed by their title share; once per owner; an owner represented at the sitting is a 400; by whoever runs the assembly, as the sign-in says who is asking; anybody else, the owner included, is a 403. Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the rows it first made, even once day 7 has passed; the same key for another request is a 409 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/absentee-merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the merge it first made, even though the item is merged; the same key for another request is a 409 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — an item tagged for absentee ballots only once they are merged, then shown as the merged decision naming the one it supersedes — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404 */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
+        put?: never;
+        /** Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the decision it first made, even though the item is closed; the same key for another request is a 409 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
         delete?: never;
         options?: never;
         head?: never;
@@ -63,9 +116,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** How each owner voted on an item, row by row in the order recorded — corrections, what they reverse and whether a row is in effect; for the manager, the board and the controller only, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-002. Each row carries the owner's name beside the id, given by the book and entered in its access log once a read */
+        get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
         put?: never;
-        /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        /** Record how an owner present at the sitting voted on an item — one row per unit they own, weighed by their title share of its ideal parts — or correct it by a reversal that says why; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the votes it first made, even once the item has closed; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes"];
         delete?: never;
         options?: never;
@@ -80,10 +134,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
+        /** Read the register of the sitting — each line, whether it counts, and whom it makes present — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The attendee's name and the names of those the line brings go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
         put?: never;
-        /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly */
+        /** Enter a person in the register of the sitting — an owner, or a registered proxy's representative; in person or by video; kept by whoever runs the assembly. Sent under an Idempotency-Key: the same request again enters nobody more and is answered with the line it first made — also on a later day, and with the line as it stands now; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_attendance"];
         delete?: never;
         options?: never;
@@ -125,6 +179,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/protocol-posting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the posting it first made, even though it is entered; the same key for another request is a 409 */
+        post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies": {
         parameters: {
             query?: never;
@@ -132,10 +203,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403 */
+        /** List the proxies registered for an assembly — for anyone holding a role in the entrance: an owner, a holder of use, the manager, the board, the controller, the cashier; anybody else is a 403. The principal's and the agent's names go beside their ids to the manager, the board and the controller only — one ask of the book, entered in its access log once a read; withheld, the field is absent and nothing is entered */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         put?: never;
-        /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown */
+        /** Appoint one's own proxy for an assembly, signed in as its principal — or, running the assembly, record a written authorisation handed over, with its SHA-256; agent, scope and form; refused past the limit one person may represent, with the limit shown. Sent under an Idempotency-Key: the same request again registers nothing more and is answered with the proxy it first made, even once the assembly takes no more proxies or its agent is at the limit; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_proxies"];
         delete?: never;
         options?: never;
@@ -188,6 +259,24 @@ export interface paths {
         put?: never;
         /** Weigh the quorum of the sitting the assembly is at, once, and open the assembly if it is met — by whoever runs it: the first not before the hour the notice stated, the postponed one an hour after the first fell short at the reduced share, the last on the following day at any share */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_sittings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assembly/entrances/{entranceId}/paper-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403 */
+        get: operations["get_assembly_entrances_entranceId_paper_decisions"];
+        put?: never;
+        /** Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the record it first made; the same key for another request is a 409 */
+        post: operations["post_assembly_entrances_entranceId_paper_decisions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -286,7 +375,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when; party ids, not names. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). No task is stored or sent */
+        /** Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent */
         get: operations["get_identity_entrances_entranceId_mandates"];
         put?: never;
         /** Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too */
@@ -525,7 +614,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The periods the entrance has a charge run issued for, the newest first: each run's header, no amount and no person; for the manager, the board and the controller */
+        get: operations["get_money_entrances_entranceId_charge_runs"];
         put?: never;
         /** Issue a charge run — stored with its basis, meter readings included, never altered afterwards */
         post: operations["post_money_entrances_entranceId_charge_runs"];
@@ -576,7 +666,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance */
+        /** The repair and renewal fund — its balance, what is committed, and what is available net of committed but unpaid disbursements — for the manager, the board, the controller and the owners of the entrance; an owner reads it without the party ids */
         get: operations["get_money_entrances_entranceId_fund"];
         put?: never;
         post?: never;
@@ -593,10 +683,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners */
+        /** List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id or mandate */
         get: operations["get_money_entrances_entranceId_fund_accounts"];
         put?: never;
-        /** Register the entrance's repair-fund account */
+        /** Register the entrance's repair-fund account; opened in the manager's name, its holder must stand on a manager's or board member's mandate of the entrance that day, and the account stores it */
         post: operations["post_money_entrances_entranceId_fund_accounts"];
         delete?: never;
         options?: never;
@@ -613,7 +703,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign off a disbursement from the repair fund — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two */
+        /** Sign off a disbursement from the repair fund, by the holder of its account, who is the sign-in — purpose WORKS, PASSPORT_MEASURE (naming the measure) or GA_PURPOSE; on a GA decision, or for WORKS as an emergency with its justification — one of the two */
         post: operations["post_money_entrances_entranceId_fund_disbursements"];
         delete?: never;
         options?: never;
@@ -630,7 +720,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, with the reason */
+        /** Withdraw a signed-off, unpaid disbursement — by the party holding the fund's account, who is the sign-in, with the reason */
         post: operations["post_money_entrances_entranceId_fund_disbursements_disbursementId_cancel"];
         delete?: never;
         options?: never;
@@ -647,7 +737,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account */
+        /** Record that the fund's bank paid a signed-off disbursement — exactly its amount, once, on the bank's value date; by the party holding the fund's account, who is the sign-in */
         post: operations["post_money_entrances_entranceId_fund_disbursements_disbursementId_pay"];
         delete?: never;
         options?: never;
@@ -662,10 +752,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is */
+        /** The entrance's fund handover statements as issued, newest first — a correction never hides the one it corrects; read as the fund is, an owner without the two parties, the recorder or the basis */
         get: operations["get_money_entrances_entranceId_fund_handover_statements"];
         put?: never;
-        /** Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash */
+        /** Issue the repair fund's handover statement at a change of manager or management company — opening, received and paid out in the period, and closing, from the ledger, beside the bank's own balance and the difference; with the unpaid disbursements the incoming side inherits; stored as issued, with its canonical basis and that basis's hash, and the sign-in's party as who recorded it */
         post: operations["post_money_entrances_entranceId_fund_handover_statements"];
         delete?: never;
         options?: never;
@@ -680,7 +770,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is */
+        /** A fund handover statement as it was issued — its canonical basis checked against the hash it was issued with; read as the fund is, an owner without the two parties, the recorder or the basis */
         get: operations["get_money_entrances_entranceId_fund_handover_statements_statementId"];
         put?: never;
         post?: never;
@@ -775,6 +865,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/units/{unitId}/open-debts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The debts a payment valued on the date can settle, the oldest first, each with its date, the day it fell due and what is outstanding — the dates a payer can designate. Not the arrears of that date: a credit recorded after it has already closed its debt here, so for a past date this can show less than the arrears read */
+        get: operations["get_money_units_unitId_open_debts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/units/{unitId}/statement": {
         parameters: {
             query?: never;
@@ -799,10 +906,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the registered entrances */
+        /** List the registered entrances — each person sees those where they hold a role today, the administrator every one, as the sign-in says who is asking; holding none, the list is empty */
         get: operations["get_registry_entrances"];
         put?: never;
-        /** Register an entrance — founding its building at an address, or joining an existing building */
+        /** Register an entrance — founding its building at an address, or joining an existing building — by the deployment's administrator only, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances"];
         delete?: never;
         options?: never;
@@ -817,7 +924,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the Book of the Condominium as of a date — only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403) */
+        /** Read the Book of the Condominium as of a date — the id of each party beside the name, never an identity number; only the manager, the board and the controller of the entrance, as the sign-in says who is asking; the read says why, and is logged whether served or refused (403) */
         get: operations["get_registry_entrances_entranceId_book"];
         put?: never;
         post?: never;
@@ -902,7 +1009,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The owners and users of an entrance's units as of a date — names only; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403) */
+        /** The owners and users of an entrance's units as of a date — each party's id beside the name, never an identity number; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403) */
         get: operations["get_registry_entrances_entranceId_owners"];
         put?: never;
         post?: never;
@@ -939,7 +1046,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
+        /** File an absence declaration — the long-absence exemption — entered in the book by the manager or the board of the entrance, with the day the paper was handed in when it came in earlier (never after today, a 400); as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_entrances_entranceId_units_unitId_absences"];
         delete?: never;
         options?: never;
@@ -990,7 +1097,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403 */
+        /** Register a unit's household — who counts for per-person charges — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403. A member may be named by a party registered in the entrance, so the book names them and a household proxy can be checked; an unknown party, or one of another entrance, is a 400 and nothing is stored */
         post: operations["post_registry_entrances_entranceId_units_unitId_household"];
         delete?: never;
         options?: never;
@@ -1024,7 +1131,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a title to a unit — effective-dated, with its share — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included */
+        /** Record a title to a unit — effective-dated, with its share, naming a party of the entrance (one of another entrance is answered as unknown, 400) — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included */
         post: operations["post_registry_entrances_entranceId_units_unitId_titles"];
         delete?: never;
         options?: never;
@@ -1041,7 +1148,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a party — a person or company that can hold a title */
+        /** Register a party — a person or company that can hold a title — in an entrance, whose book alone may name them, by the deployment's administrator, or by the manager or the board of that entrance, as the sign-in says who is asking; anybody else is a 403 */
         post: operations["post_registry_parties"];
         delete?: never;
         options?: never;
@@ -1056,7 +1163,26 @@ export interface components {
         AbsencesRegisteredResponse: {
             absenceIds: string[];
         };
+        AbsenteeBallotView: {
+            choice: string;
+            documentRef: string;
+            documentSha256: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+            receivedOn: string;
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: uuid */
+            recordedBy: string;
+            signature: string;
+            /** Format: uuid */
+            unitId: string;
+            weight: string;
+        };
         AddAgendaItemRequest: {
+            absenteeEligible?: boolean;
             itemType: string;
             text: string;
         };
@@ -1066,6 +1192,7 @@ export interface components {
             band: string;
         };
         AgendaItemAdded: {
+            absenteeEligible: boolean;
             /** Format: uuid */
             id: string;
             itemType: string;
@@ -1076,6 +1203,7 @@ export interface components {
             text: string;
         };
         AgendaItemView: {
+            absenteeEligible: boolean;
             /** Format: uuid */
             id: string;
             itemType: string;
@@ -1148,6 +1276,9 @@ export interface components {
             identityVerified: boolean;
             /** Format: date-time */
             identityVerifiedAt?: string;
+            names?: {
+                [key: string]: string;
+            };
             /** Format: date-time */
             recordedAt: string;
             /** Format: uuid */
@@ -1155,6 +1286,15 @@ export interface components {
             represents: string[];
             /** Format: int32 */
             sessionNo: number;
+        };
+        BallotRequest: {
+            choice: string;
+            documentRef: string;
+            documentSha256: string;
+            /** Format: uuid */
+            ownerPartyId: string;
+            receivedOn: string;
+            signature: string;
         };
         BookAccessView: {
             /** Format: uuid */
@@ -1173,6 +1313,18 @@ export interface components {
             purpose: string;
             ruleId?: string;
         };
+        BookMember: {
+            childUnder6: boolean;
+            /** Format: date */
+            from: string;
+            /** Format: uuid */
+            memberId: string;
+            name?: string;
+            /** Format: uuid */
+            partyId?: string;
+            /** Format: date */
+            to?: string;
+        };
         BookNonUse: {
             /** Format: date */
             from: string;
@@ -1181,6 +1333,8 @@ export interface components {
         };
         BookParty: {
             name: string;
+            /** Format: uuid */
+            partyId: string;
             role: string;
             share: string;
         };
@@ -1188,6 +1342,7 @@ export interface components {
             builtAreaM2?: string;
             complete: boolean;
             designation: string;
+            household: components["schemas"]["BookMember"][];
             /** Format: int32 */
             householdCount: number;
             idealParts: string;
@@ -1197,8 +1352,6 @@ export interface components {
             unitId: string;
         };
         CancelDisbursementRequest: {
-            /** Format: uuid */
-            cancelledBy: string;
             reason: string;
         };
         ChargeLineResponse: {
@@ -1246,8 +1399,6 @@ export interface components {
         CommitDisbursementRequest: {
             /** Format: int64 */
             amountMinor: number;
-            /** Format: uuid */
-            authorisedBy: string;
             decisionId?: string;
             emergencyJustification?: string;
             passportMeasure?: string;
@@ -1300,6 +1451,40 @@ export interface components {
             urgencyReason?: string;
             urgent: boolean;
         };
+        DecisionView: {
+            absenteeCloses: string;
+            /** Format: uuid */
+            agendaItemId: string;
+            annulmentCloses?: string;
+            basisHash: string;
+            /** Format: uuid */
+            closedBy: string;
+            comparison: string;
+            /** Format: date-time */
+            decidedAt: string;
+            denominator: string;
+            finalOn?: string;
+            /** Format: uuid */
+            id: string;
+            majorityRuleId: string;
+            /** Format: date-time */
+            mergedAt?: string;
+            /** Format: uuid */
+            mergedBy?: string;
+            outcome: string;
+            protocolPostedOn?: string;
+            represented: string;
+            result: string;
+            /** Format: int32 */
+            sessionNo: number;
+            status: string;
+            /** Format: uuid */
+            supersedes?: string;
+            tallyAbstain: string;
+            tallyAgainst: string;
+            tallyFor: string;
+            thresholdPct: string;
+        };
         DeclarationFiled: {
             /** Format: date */
             filedOn: string;
@@ -1311,7 +1496,7 @@ export interface components {
             /** Format: int64 */
             amountMinor: number;
             /** Format: uuid */
-            authorisedBy: string;
+            authorisedBy?: string;
             cancelReason?: string;
             /** Format: uuid */
             cancelledBy?: string;
@@ -1410,6 +1595,8 @@ export interface components {
             iban: string;
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            mandateId?: string;
             purpose: string;
         };
         FundView: {
@@ -1447,7 +1634,7 @@ export interface components {
             holderName: string;
             iban: string;
             /** Format: uuid */
-            incomingPartyId: string;
+            incomingPartyId?: string;
             inherited: components["schemas"]["InheritedDisbursement"][];
             /** Format: date-time */
             issuedAt: string;
@@ -1456,7 +1643,7 @@ export interface components {
             /** Format: int64 */
             openingMinor: number;
             /** Format: uuid */
-            outgoingPartyId: string;
+            outgoingPartyId?: string;
             /** Format: int64 */
             paidOutMinor: number;
             /** Format: int64 */
@@ -1464,12 +1651,14 @@ export interface components {
             reconciled: boolean;
         };
         HandoverStatementView: {
-            basis: string;
+            basis?: string;
             basisHash: string;
             engineVersion: string;
             /** Format: uuid */
             id: string;
             lawVersion: string;
+            /** Format: uuid */
+            recordedBy?: string;
             statement: components["schemas"]["HandoverStatement"];
         };
         HeadcountCheck: {
@@ -1557,6 +1746,13 @@ export interface components {
             /** Format: uuid */
             outgoingPartyId: string;
         };
+        IssuedPeriod: {
+            /** Format: uuid */
+            chargeRunId: string;
+            /** Format: date */
+            legalDate: string;
+            period: string;
+        };
         JournalEntry: {
             /** Format: uuid */
             journalId: string;
@@ -1632,6 +1828,7 @@ export interface components {
         NewAbsenceRequest: {
             absentFrom: string;
             absentTo: string;
+            handedInOn?: string;
         };
         NewAnimalRequest: {
             species: string;
@@ -1640,6 +1837,8 @@ export interface components {
         };
         NewMemberRequest: {
             isChildUnder6: boolean;
+            /** Format: uuid */
+            partyId?: string;
             validFrom?: string;
         };
         NewUnitRequest: {
@@ -1649,6 +1848,11 @@ export interface components {
             idealParts?: string;
             separateEntrance: boolean;
             unitType: string;
+        };
+        NoChargeRunAnswer: {
+            /** @enum {string} */
+            code: "NO_RUN" | "NO_ENTRANCE";
+            error: string;
         };
         NoticePostingView: {
             /** Format: uuid */
@@ -1670,6 +1874,14 @@ export interface components {
             dueOn: string;
             /** Format: int64 */
             overdueDays: number;
+        };
+        OpenDebt: {
+            /** Format: date */
+            debtDate: string;
+            /** Format: date */
+            dueOn: string;
+            /** Format: int64 */
+            outstandingMinor: number;
         };
         OpenPetitionRequest: {
             subject: string;
@@ -1695,19 +1907,34 @@ export interface components {
             unitId: string;
         };
         OwnerResponse: {
+            /** Format: uuid */
+            partyId: string;
             partyName: string;
             share: number;
             titleRole: string;
             /** Format: uuid */
             unitId: string;
         };
+        PaperDecisionView: {
+            archiveLocation: string;
+            basisHash: string;
+            custodian?: string;
+            decisionText: string;
+            engineVersion: string;
+            /** Format: uuid */
+            id: string;
+            lawVersion: string;
+            /** Format: date */
+            protocolDate: string;
+            protocolRef: string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
         PartyRegisteredResponse: {
             /** Format: uuid */
             partyId: string;
         };
         PayDisbursementRequest: {
-            /** Format: uuid */
-            paidBy: string;
             paidOn: string;
         };
         PaymentView: {
@@ -1756,6 +1983,10 @@ export interface components {
             /** Format: date */
             weighedOn: string;
         };
+        PostProtocol: {
+            /** Format: date */
+            postedOn: string;
+        };
         ProfileRequest: {
             csv: string;
         };
@@ -1780,6 +2011,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             items: number[];
+            names?: {
+                [key: string]: string;
+            };
             /** Format: uuid */
             principalPartyId: string;
             /** Format: uuid */
@@ -1827,6 +2061,14 @@ export interface components {
             /** Format: date */
             validTo?: string;
         };
+        RecordPaperDecision: {
+            archiveLocation?: string;
+            custodian?: string;
+            decisionText?: string;
+            /** Format: date */
+            protocolDate?: string;
+            protocolRef?: string;
+        };
         RecordPaymentRequest: {
             /** Format: int64 */
             amountMinor: number;
@@ -1873,6 +2115,8 @@ export interface components {
             members: components["schemas"]["NewMemberRequest"][];
         };
         RegisterPartyRequest: {
+            /** Format: uuid */
+            entranceId: string;
             fullName: string;
             idType?: string;
             idValue?: string;
@@ -1935,6 +2179,7 @@ export interface components {
             mandateId: string;
             /** Format: uuid */
             partyId?: string;
+            partyName?: string;
             /** @enum {string} */
             role: "OWN" | "USR" | "OCC" | "BM" | "MB" | "CTL" | "CSH" | "PMC_STAFF" | "MUN" | "SYS_ADMIN";
             standing: components["schemas"]["Standing"];
@@ -2080,6 +2325,10 @@ export interface components {
             correction?: string;
             /** Format: uuid */
             id: string;
+            inEffect: boolean;
+            names?: {
+                [key: string]: string;
+            };
             /** Format: uuid */
             ownerPartyId: string;
             /** Format: uuid */
@@ -2424,10 +2673,430 @@ export interface operations {
             };
         };
     };
-    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes: {
+    get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots: {
         parameters: {
             query?: never;
             header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbsenteeBallotView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_ballots: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BallotRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbsenteeBallotView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_merge: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+                assemblyId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoteView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_votes: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;
@@ -2566,7 +3235,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_attendance: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;
@@ -2788,6 +3459,81 @@ export interface operations {
             };
         };
     };
+    post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                entranceId: string;
+                assemblyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostProtocol"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     get_assembly_entrances_entranceId_assemblies_assemblyId_proxies: {
         parameters: {
             query?: never;
@@ -2850,7 +3596,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_proxies: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;
@@ -3067,6 +3815,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SittingView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_paper_decisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperDecisionView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_assembly_entrances_entranceId_paper_decisions: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordPaperDecision"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperDecisionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Forbidden */
@@ -4262,6 +5148,48 @@ export interface operations {
             };
         };
     };
+    get_money_entrances_entranceId_charge_runs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedPeriod"][];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoChargeRunAnswer"];
+                };
+            };
+        };
+    };
     post_money_entrances_entranceId_charge_runs: {
         parameters: {
             query?: never;
@@ -4429,9 +5357,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["NoChargeRunAnswer"];
                 };
             };
         };
@@ -5312,6 +6238,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnitArrears"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_units_unitId_open_debts: {
+        parameters: {
+            query: {
+                asOf: string;
+            };
+            header?: never;
+            path: {
+                unitId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenDebt"][];
                 };
             };
             /** @description Bad Request */

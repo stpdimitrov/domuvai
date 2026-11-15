@@ -7,11 +7,16 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
+import zues.app.assembly.GaDecisions
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -35,7 +40,8 @@ class FundServiceTest {
     private val jdbc: JdbcTemplate = mock()
     private val keyRows: FundRequestKeyRepository = mock()
     private val lateNight = Clock.fixed(Instant.parse("2026-09-28T21:30:00Z"), ZoneOffset.UTC)   // 00:30 on 29 September in Sofia
-    private val service = FundService(aggregates, accounts, disbursements, postings, FundRequestKeys(keyRows, aggregates), jdbc, lateNight)
+    private val decisions: GaDecisions = mock()
+    private val service = FundService(aggregates, accounts, disbursements, postings, FundRequestKeys(keyRows, aggregates), decisions, jdbc, lateNight)
 
     private val entranceId = UUID.randomUUID()
     private val chair = UUID.randomUUID()
@@ -64,14 +70,14 @@ class FundServiceTest {
 
     private fun newKey() = UUID.randomUUID().toString()
 
-    private fun pay(row: FundDisbursementRow, on: String = "2026-09-29", by: UUID = chair, key: String = newKey()) =
+    private fun pay(row: FundDisbursementRow, on: String = "2026-09-29", by: UUID? = chair, key: String = newKey()) =
         service.pay(entranceId, row.id, key, PayDisbursement(LocalDate.parse(on), by))
 
-    private fun cancel(row: FundDisbursementRow, reason: String = "the GA revoked decision GA-2026-7", by: UUID = chair, key: String = newKey()) =
+    private fun cancel(row: FundDisbursementRow, reason: String = "the GA revoked decision GA-2026-7", by: UUID? = chair, key: String = newKey()) =
         service.cancel(entranceId, row.id, key, CancelDisbursement(by, reason))
 
     private fun commit(
-        amount: Long = 20_000, purpose: String = "WORKS", by: UUID = chair,
+        amount: Long = 20_000, purpose: String = "WORKS", by: UUID? = chair,
         decision: String? = "GA-2026-7", emergency: String? = null, measure: String? = null, key: String = newKey(),
     ) = service.commit(entranceId, key, CommitDisbursement(amount, purpose, by, decision, emergency, measure))
 
@@ -79,6 +85,7 @@ class FundServiceTest {
     fun fundWithMoney() {
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(operating, fund))     // the operating account comes first
         holding(inAccount = 50_000)
+        whenever(decisions.passed(any(), any())).thenReturn(true)
         whenever(aggregates.insert(any<FundDisbursementRow>())).thenAnswer { (it.arguments[0] as FundDisbursementRow).also { row -> inserted += row } }
         whenever(aggregates.update(any<FundDisbursementRow>())).thenAnswer { (it.arguments[0] as FundDisbursementRow).also { row -> updated += row } }
         whenever(aggregates.insert(any<PostingRow>())).thenAnswer { (it.arguments[0] as PostingRow).also { row -> journal += row } }
@@ -102,10 +109,55 @@ class FundServiceTest {
         assertThat(signed.authorisedBy).isEqualTo(chair)
         assertThat(signed.status).isEqualTo("COMMITTED")
         assertThat(signed.committedOn).isEqualTo(LocalDate.parse("2026-09-29"))             // the Sofia day, not the UTC one
-        assertThatThrownBy { commit(by = UUID.randomUUID()) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { commit(by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)
         assertThatThrownBy { commit(decision = null) }.isInstanceOf(IllegalArgumentException::class.java)   // no decision, no emergency
         whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(fund.copy(holderParty = null)))
         assertThatThrownBy { commit() }.isInstanceOf(FundUnsignable::class.java)                          // nobody registered can sign
+    }
+
+    @Test
+    fun `PM-FUND-007 a decision that is no passed one of this entrance is refused by name, and nothing is stored or kept`() {
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)
+        assertThatThrownBy { commit() }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("GA-2026-7").hasMessageContaining("PM-FUND-007")
+        assertThat(inserted).isEmpty()
+        verify(aggregates, never()).insert(any<FundRequestKeyRow>())
+    }
+
+    @Test
+    fun `PM-FUND-007 the decision is asked after for this entrance and the id as cited`() {
+        commit(decision = "6b1f0c1e-a1d2-4a57-9d6e-0c7a1f6e2b11")
+        verify(decisions).passed(entranceId, "6b1f0c1e-a1d2-4a57-9d6e-0c7a1f6e2b11")
+    }
+
+    @Test
+    fun `PM-FUND-007 a decision is checked after the signatory, so a stranger is refused as a stranger`() {
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)
+        assertThatThrownBy { commit(by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)
+        verifyNoInteractions(decisions)
+    }
+
+    @Test
+    fun `PM-FUND-007 a repeat with its key returns the first disbursement without asking again`() {
+        remembering()
+        val first = commit(key = "k-1")
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)                   // it has since fallen
+        assertThat(commit(key = "k-1")).isEqualTo(first)
+        verify(decisions, times(1)).passed(entranceId, "GA-2026-7")
+    }
+
+    @Test
+    fun `PM-FUND-006 a passport measure still rests on a decision that passed`() {
+        whenever(decisions.passed(entranceId, "GA-2026-7")).thenReturn(false)
+        assertThatThrownBy { commit(purpose = "PASSPORT_MEASURE", measure = "ТП-2024 т. 3.2") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-FUND-007")
+        assertThat(inserted).isEmpty()
+    }
+
+    @Test
+    fun `PM-FUND-008 an emergency is signed off without asking after a decision`() {
+        commit(decision = null, emergency = "a burst riser floods the stairwell")
+        verifyNoInteractions(decisions)
     }
 
     @Test
@@ -150,7 +202,7 @@ class FundServiceTest {
     @Test
     fun `PM-FUND-007 only a signed-off disbursement is paid out, once, by the fund account's holder, on the bank's date`() {
         val works = signedOff(20_000)
-        assertThatThrownBy { pay(works, by = UUID.randomUUID()) }.isInstanceOf(IllegalArgumentException::class.java)   // not the holder
+        assertThatThrownBy { pay(works, by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)   // not the holder
         assertThatThrownBy { pay(works, on = "2026-09-30") }.isInstanceOf(IllegalArgumentException::class.java)         // after today
         assertThatThrownBy { pay(works, on = "2026-08-31") }.isInstanceOf(IllegalArgumentException::class.java)         // before the sign-off
         assertThat(journal).isEmpty()                                                                                // a refused payout posts nothing
@@ -180,9 +232,18 @@ class FundServiceTest {
     }
 
     @Test
+    fun `PM-FUND-007 with sign-in off nobody acts by name, so the record names the holder — the only party who could have`() {
+        assertThat(commit(by = null).authorisedBy).isEqualTo(chair)
+        assertThat(pay(signedOff(20_000), by = null).paidBy).isEqualTo(chair)
+        assertThat(cancel(signedOff(20_000), by = null).cancelledBy).isEqualTo(chair)
+        whenever(accounts.findByEntranceId(entranceId)).thenReturn(listOf(fund.copy(holderParty = null)))
+        assertThatThrownBy { commit(by = null) }.isInstanceOf(FundUnsignable::class.java)                  // no holder, nobody to name
+    }
+
+    @Test
     fun `PM-FUND-007 only the fund account's holder cancels, with a reason, and never a closed disbursement`() {
         val works = signedOff(20_000)
-        assertThatThrownBy { cancel(works, by = UUID.randomUUID()) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { cancel(works, by = UUID.randomUUID()) }.isInstanceOf(NotTheHolder::class.java)
         assertThatThrownBy { cancel(works, reason = "  ") }.isInstanceOf(IllegalArgumentException::class.java)
         for (closed in listOf(signedOff(status = "PAID"), signedOff(status = "CANCELLED"))) {
             assertThatThrownBy { cancel(closed) }.isInstanceOf(DisbursementClosed::class.java)

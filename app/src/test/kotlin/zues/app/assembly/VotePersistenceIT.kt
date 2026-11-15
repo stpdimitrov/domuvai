@@ -4,10 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -18,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActions
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
@@ -25,7 +30,14 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import zues.app.identity_org.Logins
+import zues.kernel.toSofiaDate
+import java.security.MessageDigest
+import java.time.Clock
+import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
@@ -40,6 +52,9 @@ import java.util.UUID
 class VotePersistenceIT {
 
     companion object {
+        /** The writes made under an Idempotency-Key (PM-SYS-014): a proxy, an attendance, an item's close, an absentee merge, a protocol posting. */
+        private val KEYED = listOf("/proxies", "/attendance", "/decision", "/absentee-merge", "/protocol-posting")
+
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer(DockerImageName.parse("postgres:16"))
@@ -58,15 +73,41 @@ class VotePersistenceIT {
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var jdbc: JdbcTemplate
     @Autowired lateinit var logins: Logins
+    @Autowired lateinit var clock: ShiftedClock
+
+    /** The app's clock, moved forward by a test that needs a later day — and back, after it. */
+    class ShiftedClock(var by: Duration = Duration.ZERO) : Clock() {
+        override fun getZone(): ZoneId = ZoneOffset.UTC
+        override fun withZone(zone: ZoneId?): Clock = this
+        override fun instant(): Instant = Instant.now().plus(by)
+    }
+
+    @TestConfiguration
+    class Clocks {
+        @Bean
+        @Primary
+        fun shiftedClock(): ShiftedClock = ShiftedClock()
+    }
+
+    @AfterEach
+    fun clockBack() { clock.by = Duration.ZERO }
 
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
     private var signedInAs: String? = null
 
-    private fun post(path: String, body: String) = MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON).content(body)
+    private fun post(path: String, body: String, key: String? = UUID.randomUUID().toString()) = MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON).content(body)
+        .also { request -> if (key != null && KEYED.any { path.endsWith(it) }) request.header("Idempotency-Key", key) }   // PM-SYS-014: a proxy, an attendance, a close, a merge and a posting are made under a key
         .also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     private fun created(path: String, body: String): JsonNode =
         json.readTree(mvc.perform(post(path, body)).andExpect(status().isCreated).andReturn().response.contentAsString)
+
+    /** An entrance or a party, registered as nobody — sign-in switched off — whoever the test has signed in: registering them is the administrator's (AUTH-05e). */
+    private fun registered(path: String, body: String): JsonNode {
+        val before = signedInAs
+        signedInAs = null
+        try { return created(path, body) } finally { signedInAs = before }
+    }
 
     private fun <T> signedIn(party: UUID, act: () -> T): T {
         val before = signedInAs
@@ -74,21 +115,22 @@ class VotePersistenceIT {
         try { return act() } finally { signedInAs = before }
     }
 
-    private fun person(): UUID = UUID.fromString(created("/api/registry/parties", """{"fullName":"Иван Петров"}""").get("partyId").asText())
+    private val aside by lazy { UUID.fromString(registered("/api/registry/entrances", """{"address":"ул. Раковски 3","label":"Б","managementForm":"GA"}""").get("entranceId").asText()) }   // BOOK-02e
+    private fun person(entranceId: UUID = aside): UUID = UUID.fromString(registered("/api/registry/parties", """{"entranceId":"$entranceId","fullName":"Иван Петров"}""").get("partyId").asText())
         .also { logins.tie(realm, "login-$it", it) }
 
     /** An entrance of one unit of 100% — owned a half by the first owner, a quarter by each of the next two. */
     private class Meeting(val entranceId: UUID, val base: String, val item: String, val manager: UUID, val owners: List<UUID>, val unit: UUID)
 
     /** Convened by the manager, noticed a month ahead, then made to meet today; the second owner's proxy names the first, who is present; the sitting opened. */
-    private fun opened(): Meeting {
-        val entranceId = UUID.fromString(created("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText())
+    private fun opened(absenteeEligible: Boolean = false): Meeting {
+        val entranceId = UUID.fromString(registered("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""").get("entranceId").asText())
         val unit = UUID.fromString(
             created("/api/registry/entrances/$entranceId/units", """{"units":[{"designation":"ап. 1","unitType":"FLAT","idealParts":"100.0000","separateEntrance":false}]}""")
                 .get("unitIds")[0].asText(),
         )
         val owners = listOf("0.5", "0.25", "0.25").map { share ->
-            person().also { created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"$share","validFrom":"2025-01-01"}""") }
+            person(entranceId).also { created("/api/registry/entrances/$entranceId/units/$unit/titles", """{"partyId":"$it","titleRole":"OWN","share":"$share","validFrom":"2025-01-01"}""") }
         }
         val manager = person()
         jdbc.update(
@@ -102,7 +144,7 @@ class VotePersistenceIT {
         }
         val of = "$base/$id"
         val item = signedIn(manager) {
-            created("$of/agenda", """{"text":"Ремонт на покрива","itemType":"GENERAL"}""").get("id").asText()
+            created("$of/agenda", """{"text":"Ремонт на покрива","itemType":"GENERAL","absenteeEligible":$absenteeEligible}""").get("id").asText()
                 .also { created("$of/notice-posting", """{"postedAt":"${Instant.now()}","coSignatoryPartyId":"${owners[0]}","photoHash":"${"3f".repeat(32)}"}""") }
         }
         jdbc.update("UPDATE assembly.assembly SET scheduled_at = now() WHERE id = ?::uuid", id)
@@ -114,8 +156,12 @@ class VotePersistenceIT {
         return Meeting(entranceId, of, item, manager, owners, unit)
     }
 
-    private fun vote(m: Meeting, owner: UUID, choice: String, correction: String? = null, item: String = m.item): ResultActions =
-        mvc.perform(post("${m.base}/agenda/$item/votes", """{"ownerPartyId":"$owner","choice":"$choice"${correction?.let { ""","correction":"$it"""" }.orEmpty()}}"""))
+    /** A vote sent under [key] — a fresh one each time unless the test replays one; null sends none. */
+    private fun vote(m: Meeting, owner: UUID, choice: String, correction: String? = null, item: String = m.item, key: String? = UUID.randomUUID().toString()): ResultActions =
+        mvc.perform(
+            post("${m.base}/agenda/$item/votes", """{"ownerPartyId":"$owner","choice":"$choice"${correction?.let { ""","correction":"$it"""" }.orEmpty()}}""")
+                .also { request -> key?.let { request.header("Idempotency-Key", it) } },
+        )
 
     private fun rows(m: Meeting) = jdbc.queryForList("SELECT id, party_id, weight, choice, channel, reverses, correction FROM assembly.vote WHERE agenda_item_id = ?::uuid ORDER BY cast_at, id", m.item)
 
@@ -215,5 +261,632 @@ class VotePersistenceIT {
         }
         vote(m, m.owners[0], "FOR").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))   // nobody signed in records nothing
         assertThat(rows(m)).isEmpty()
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying a queued vote twice records one vote - the same key and request answer with the votes first made, also once the item has closed`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        val queued = UUID.randomUUID().toString()
+        fun ids(result: ResultActions) = json.readTree(result.andExpect(status().isCreated).andReturn().response.contentAsString).map { it.get("id").asText() }
+        val first = signedIn(m.manager) { ids(vote(m, ana, "FOR", key = queued)) }
+        signedIn(m.manager) {
+            repeat(2) { assertThat(ids(vote(m, ana, "FOR", key = queued))).isEqualTo(first) }                       // the queue replayed twice: one vote
+            vote(m, ana, "AGAINST", key = queued).andExpect(status().isConflict)                                    // the same key for another request
+            vote(m, boris, "FOR", key = queued).andExpect(status().isConflict)
+            vote(m, ana, "FOR", key = "  ").andExpect(status().isBadRequest)                                       // a vote carries a key
+            vote(m, ana, "FOR", key = null).andExpect(status().isBadRequest)
+            // a correction queued under its own key is replayed as one reversal
+            val fix = UUID.randomUUID().toString()
+            val reversal = ids(vote(m, ana, "AGAINST", correction = "грешка", key = fix))
+            assertThat(ids(vote(m, ana, "AGAINST", correction = " грешка ", key = fix))).isEqualTo(reversal)          // the why as stored
+        }
+        signedIn(boris) { vote(m, ana, "FOR", key = queued).andExpect(status().isForbidden) }                       // a replay is answered only to who may record it
+        assertThat(rows(m).map { it["choice"] }).containsExactly("FOR", "AGAINST")
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ? AND operation IN ('RECORD_VOTE', 'ENTER_ABSENTEE_BALLOT')", Int::class.java, m.entranceId)).isEqualTo(2)
+        // closed: no new vote is taken, but a replay of one already recorded is still answered with it
+        signedIn(m.manager) {
+            close(m).andExpect(status().isCreated)
+            assertThat(ids(vote(m, ana, "FOR", key = queued))).isEqualTo(first)
+            vote(m, boris, "FOR").andExpect(status().isConflict)
+        }
+        assertThat(rows(m)).hasSize(2)
+        // the kept key is never edited or removed
+        assertThat(jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE entrance_id = ?", m.entranceId)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_request_key WHERE entrance_id = ?", m.entranceId)).isZero()
+        // a key a racing request took first is refused by the table itself: one key per entrance
+        assertThatThrownBy {
+            jdbc.update("INSERT INTO assembly.vote_request_key (id, entrance_id, idempotency_key, operation, request_hash, kept_at) VALUES (gen_random_uuid(), ?, ?, 'RECORD_VOTE', 'x', now())", m.entranceId, queued)
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `PM-SYS-014 a key is kept per entrance - the same key in another entrance records that entrance's vote`() {
+        val (m, other) = opened() to opened()
+        val key = UUID.randomUUID().toString()
+        signedIn(m.manager) { vote(m, m.owners[0], "FOR", key = key).andExpect(status().isCreated) }
+        signedIn(other.manager) { vote(other, other.owners[0], "FOR", key = key).andExpect(status().isCreated) }
+        assertThat(rows(m)).hasSize(1)
+        assertThat(rows(other)).hasSize(1)
+    }
+
+    private fun close(m: Meeting, key: String? = UUID.randomUUID().toString()): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/decision", "", key))
+
+    private fun decisions(m: Meeting) = jdbc.queryForList("SELECT * FROM assembly.decision WHERE agenda_item_id = ?::uuid", m.item)
+
+    @Test
+    fun `PM-VOTE-016 closing an item stores the majority applied, the tally of the votes in effect, the sitting and the status - reproducible from its basis`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        signedIn(m.manager) {
+            vote(m, ana, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "AGAINST", correction = "пълномощникът гласува против").andExpect(status().isCreated)    // the reversed FOR is not counted
+            close(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.majorityRuleId").value("GENERAL@2009-01-01")).andExpect(jsonPath("$.denominator").value("REPRESENTED"))
+                .andExpect(jsonPath("$.comparison").value("MORE_THAN")).andExpect(jsonPath("$.thresholdPct").value("50"))
+                .andExpect(jsonPath("$.represented").value("75")).andExpect(jsonPath("$.sessionNo").value(1))
+                .andExpect(jsonPath("$.tallyFor").value("50")).andExpect(jsonPath("$.tallyAgainst").value("25")).andExpect(jsonPath("$.tallyAbstain").value("0"))
+                .andExpect(jsonPath("$.result").value("FOR 66.67% of represented (50.00% of total, 75.00% represented); threshold more than 50% of represented (GENERAL@2009-01-01) — PASSED"))
+                .andExpect(jsonPath("$.outcome").value("PASSED")).andExpect(jsonPath("$.status").value("PROVISIONAL"))
+                .andExpect(jsonPath("$.closedBy").value(m.manager.toString()))
+        }
+        val stored = decisions(m).single()
+        val basis = stored["basis"] as String
+        assertThat(stored["basis_hash"]).isEqualTo(java.security.MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) })
+        assertThat(listOf(stored["law_version"], stored["engine_version"], (stored["session_no"] as Number).toInt())).containsExactly(zues.law.CATALOGUE_VERSION, zues.law.ENGINE_VERSION, 1)
+        // every vote in effect, and only those, is in the basis by its id
+        val inEffect = jdbc.queryForList("SELECT id FROM assembly.vote v WHERE agenda_item_id = ?::uuid AND NOT EXISTS (SELECT 1 FROM assembly.vote r WHERE r.reverses = v.id)", UUID::class.java, m.item)
+        val counted = basis.lines().drop(1).filterNot { it.startsWith("present ") }
+        assertThat(counted.map { it.substringAfterLast(" by ") }).containsExactlyInAnyOrderElementsOf(inEffect.map { it.toString() })
+        assertThat(counted).hasSize(2).anyMatch { it.startsWith("$boris ${m.unit} 25 AGAINST") }
+        assertThat(jdbc.update("UPDATE assembly.decision SET outcome = 'NOT_PASSED' WHERE agenda_item_id = ?::uuid", m.item)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.decision WHERE agenda_item_id = ?::uuid", m.item)).isZero()
+        assertThat(decisions(m).single()["basis_hash"]).isEqualTo(stored["basis_hash"])
+    }
+
+    @Test
+    fun `PM-VOTE-014 once an item is closed no vote on it is taken or corrected, and it is closed once`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        signedIn(m.manager) {
+            vote(m, ana, "AGAINST").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated).andExpect(jsonPath("$.outcome").value("NOT_PASSED"))
+            vote(m, boris, "FOR").andExpect(status().isConflict)
+            vote(m, ana, "FOR", correction = "късно").andExpect(status().isConflict)
+            close(m).andExpect(status().isConflict)
+        }
+        assertThat(rows(m)).hasSize(1)
+        assertThat(decisions(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-VOTE-011 a late arrival's vote counts against the represented share re-weighed at the close - the opened sitting keeps the share it was weighed on`() {
+        val m = opened()
+        val vera = m.owners[2]
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            created("${m.base}/attendance", """{"attendeePartyId":"$vera","channel":"IN_PERSON"}""")        // Vera arrives after the opening
+            vote(m, vera, "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.represented").value("100")).andExpect(jsonPath("$.tallyFor").value("75"))
+                .andExpect(jsonPath("$.result").value("FOR 75.00% of represented (75.00% of total, 100.00% represented); threshold more than 50% of represented (GENERAL@2009-01-01) — PASSED"))
+        }
+        val basis = decisions(m).single()["basis"] as String
+        assertThat(basis.lines().first()).contains(", 100 represented at the close: ")
+        assertThat(basis.lines().filter { it.startsWith("present ") }.map { it.split(" ")[1] }).containsExactlyInAnyOrderElementsOf(m.owners.map { it.toString() })
+        assertThat(jdbc.queryForObject("SELECT represented FROM assembly.session WHERE assembly_id = ?::uuid", java.math.BigDecimal::class.java, m.base.substringAfterLast("/")))
+            .isEqualByComparingTo("75")
+    }
+
+    @Test
+    fun `PM-VOTE-011 a close whose represented share cannot be weighed is refused, as the opening would be - nothing is stored`() {
+        val m = opened()
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            created("/api/registry/entrances/${m.entranceId}/units/${m.unit}/titles", """{"partyId":"${person(m.entranceId)}","titleRole":"USR","share":"1","validFrom":"2025-01-01"}""")
+            close(m).andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("right of use")))
+        }
+        assertThat(decisions(m)).isEmpty()
+    }
+
+    @Test
+    fun `PM-SEC-001 an item is closed by whoever runs the assembly - an owner, another office and a stranger are a 403 naming the rule`() {
+        val m = opened()
+        val controller = person()
+        jdbc.update(
+            sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)"),
+            m.entranceId, controller,
+        )
+        for (who in listOf(m.owners[0], controller, person())) {
+            signedIn(who) { close(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        }
+        close(m).andExpect(status().isForbidden)
+        assertThat(decisions(m)).isEmpty()
+    }
+
+    private fun read(path: String): ResultActions =
+        mvc.perform(get(path).also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } })
+
+    private fun mandated(m: Meeting, body: String): UUID = person().also {
+        jdbc.update(
+            sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, ?, ?, current_date - 30, current_date + 300)"),
+            m.entranceId, body, it,
+        )
+    }
+
+    @Test
+    fun `PM-VOTE-016 a closed item's decision is read back - the majority, the tally, the result line and the status, by an owner too - before the close a 404`() {
+        val m = opened()
+        signedIn(m.owners[2]) { read("${m.base}/agenda/${m.item}/decision").andExpect(status().isNotFound) }
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+        }
+        val stored = decisions(m).single()
+        signedIn(m.owners[2]) {
+            read("${m.base}/agenda/${m.item}/decision").andExpect(status().isOk)
+                .andExpect(jsonPath("$.id").value(stored["id"].toString())).andExpect(jsonPath("$.majorityRuleId").value("GENERAL@2009-01-01"))
+                .andExpect(jsonPath("$.denominator").value("REPRESENTED")).andExpect(jsonPath("$.sessionNo").value(1))
+                .andExpect(jsonPath("$.tallyFor").value("50")).andExpect(jsonPath("$.represented").value("75"))
+                .andExpect(jsonPath("$.result").value("FOR 66.67% of represented (50.00% of total, 75.00% represented); threshold more than 50% of represented (GENERAL@2009-01-01) — PASSED"))
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.basisHash").value(stored["basis_hash"] as String))
+                .andExpect(jsonPath("$.basis").doesNotExist())                                               // the basis names how each owner voted
+            read("${m.base}/agenda/${UUID.randomUUID()}/decision").andExpect(status().isNotFound)
+        }
+        val elsewhere = opened()                                                                             // another entrance's closed item, asked through this one
+        signedIn(elsewhere.manager) { close(elsewhere).andExpect(status().isCreated) }
+        signedIn(m.owners[2]) { read("${m.base}/agenda/${elsewhere.item}/decision").andExpect(status().isNotFound) }
+        signedIn(person()) { read("${m.base}/agenda/${m.item}/decision").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+    }
+
+    private fun postProtocol(m: Meeting, on: String, key: String? = UUID.randomUUID().toString()): ResultActions =
+        mvc.perform(post("${m.base}/protocol-posting", """{"postedOn":"$on"}""", key))
+
+    @Test
+    fun `PM-GA-023 the protocol's posting starts the countdown - entered once by whoever runs the assembly, never edited - and the decision reads PROVISIONAL with its final day`() {
+        val m = opened()
+        val today = toSofiaDate(Instant.now())
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.absenteeCloses").value(standing(today, null, today).absenteeCloses))
+                .andExpect(jsonPath("$.protocolPostedOn").doesNotExist()).andExpect(jsonPath("$.finalOn").doesNotExist())
+        }
+        signedIn(m.owners[0]) { postProtocol(m, today).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        signedIn(m.manager) {
+            postProtocol(m, LocalDate.parse(today).plusDays(1).toString()).andExpect(status().isConflict)        // not a day to come
+            postProtocol(m, today).andExpect(status().isCreated)
+            postProtocol(m, today).andExpect(status().isConflict)                                                // entered once
+        }
+        val expected = standing(today, today, today)
+        signedIn(m.owners[2]) {
+            read("${m.base}/agenda/${m.item}/decision").andExpect(status().isOk)
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.protocolPostedOn").value(today))
+                .andExpect(jsonPath("$.annulmentCloses").value(expected.annulmentCloses!!)).andExpect(jsonPath("$.finalOn").value(expected.finalOn!!))
+        }
+        jdbc.update("UPDATE assembly.protocol_posting SET posted_on = posted_on - 60 WHERE assembly_id = ?::uuid", m.base.substringAfterLast('/'))
+        jdbc.update("DELETE FROM assembly.protocol_posting WHERE assembly_id = ?::uuid", m.base.substringAfterLast('/'))
+        assertThat(jdbc.queryForObject("SELECT posted_on::text FROM assembly.protocol_posting WHERE assembly_id = ?::uuid", String::class.java, m.base.substringAfterLast('/'))).isEqualTo(today)
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.protocol_posting") }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `PM-SEC-002 how each owner voted is read by the manager, the board and the controller only - an owner and a stranger are a 403 naming the rule`() {
+        val m = opened()
+        val (ana, boris) = m.owners
+        signedIn(m.manager) {
+            vote(m, ana, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "FOR").andExpect(status().isCreated)
+            vote(m, boris, "AGAINST", correction = "пълномощникът гласува против").andExpect(status().isCreated)
+        }
+        val stored = rows(m)
+        for (reader in listOf(m.manager, mandated(m, "MB"), mandated(m, "CTL"))) {
+            signedIn(reader) {
+                read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk)
+                    .andExpect(jsonPath("$.length()").value(3))
+                    .andExpect(jsonPath("$[*].id").value(org.hamcrest.Matchers.contains(*stored.map { it["id"].toString() }.toTypedArray())))
+                    .andExpect(jsonPath("$[2].ownerPartyId").value(boris.toString())).andExpect(jsonPath("$[2].choice").value("AGAINST"))
+                    .andExpect(jsonPath("$[2].reverses").value(stored[1]["id"].toString())).andExpect(jsonPath("$[2].correction").value("пълномощникът гласува против"))
+                    .andExpect(jsonPath("$[*].inEffect").value(org.hamcrest.Matchers.contains(true, false, true)))
+            }
+        }
+        for (who in listOf(ana, boris, m.owners[2], person())) {
+            signedIn(who) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002")) }
+        }
+        val elsewhere = opened()                                                                             // another entrance's votes, asked through this one
+        signedIn(elsewhere.manager) { vote(elsewhere, elsewhere.owners[0], "FOR").andExpect(status().isCreated) }
+        signedIn(m.manager) {
+            read("${m.base}/agenda/${UUID.randomUUID()}/votes").andExpect(status().isNotFound)
+            read("${m.base}/agenda/${elsewhere.item}/votes").andExpect(status().isNotFound)
+        }
+    }
+
+    @Test
+    fun `PM-SEC-004 every read of how each owner voted is entered - served or refused, who and when - and no role deletes an entry`() {
+        val m = opened()
+        signedIn(m.manager) { vote(m, m.owners[0], "FOR").andExpect(status().isCreated) }
+        val entries = { jdbc.queryForList("SELECT actor, login_subject, agenda_item_id, outcome, rule_id, at FROM assembly.vote_read WHERE entrance_id = ?::uuid ORDER BY at, id", m.entranceId) }
+        assertThat(entries()).isEmpty()                                                                      // recording a vote reads nothing
+        val stranger = person()
+        signedIn(m.manager) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk) }
+        signedIn(m.owners[1]) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isForbidden) }
+        signedIn(stranger) { read("${m.base}/agenda/${m.item}/votes").andExpect(status().isForbidden) }
+        signedIn(m.manager) { read("${m.base}/agenda/${UUID.randomUUID()}/votes").andExpect(status().isNotFound) }   // nothing there, nothing served, nothing entered
+        val unknown = UUID.randomUUID()
+        signedIn(stranger) { read("${m.base}/agenda/$unknown/votes").andExpect(status().isForbidden) }       // refused before anything is looked up: entered as asked
+        read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk)                                   // sign-in switched off: given to nobody, and entered so
+        val log = entries()
+        assertThat(log.map { listOf(it["actor"], it["login_subject"], it["agenda_item_id"], it["outcome"], it["rule_id"]) }).containsExactly(
+            listOf(m.manager, "login-${m.manager}", UUID.fromString(m.item), "SERVED", "PM-SEC-001"),
+            listOf(m.owners[1], "login-${m.owners[1]}", UUID.fromString(m.item), "REFUSED", "PM-SEC-002"),
+            listOf(stranger, "login-$stranger", UUID.fromString(m.item), "REFUSED", "PM-SEC-002"),
+            listOf(stranger, "login-$stranger", unknown, "REFUSED", "PM-SEC-002"),
+            listOf(null, null, UUID.fromString(m.item), "OPEN", null),
+        )
+        assertThat(log.map { it["at"] as java.sql.Timestamp }).allSatisfy { assertThat(it.toInstant()).isBetween(Instant.now().minusSeconds(60), Instant.now()) }
+        assertThat(jdbc.update("UPDATE assembly.vote_read SET outcome = 'REFUSED', rule_id = 'PM-SEC-002' WHERE entrance_id = ?::uuid", m.entranceId)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_read WHERE entrance_id = ?::uuid", m.entranceId)).isZero()
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.vote_read") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThat(entries()).isEqualTo(log)
+    }
+
+    private val scan = "ab".repeat(32)
+
+    /** A ballot sent under [key] — a fresh one each time unless the test replays one; null sends none. */
+    private fun ballot(m: Meeting, owner: UUID, received: String, signature: String = "HANDWRITTEN", hash: String = scan, choice: String = "FOR", key: String? = UUID.randomUUID().toString()): ResultActions =
+        mvc.perform(
+            post("${m.base}/agenda/${m.item}/absentee-ballots", """{"ownerPartyId":"$owner","choice":"$choice","signature":"$signature","documentRef":"декларация 1","documentSha256":"$hash","receivedOn":"$received"}""")
+                .also { request -> key?.let { request.header("Idempotency-Key", it) } },
+        )
+
+    private fun ballotIds(result: ResultActions) = json.readTree(result.andExpect(status().isCreated).andReturn().response.contentAsString).map { it.get("id").asText() }
+
+    private fun ballotRows(m: Meeting) = jdbc.queryForList("SELECT id::text, party_id, choice, request_key_id FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid ORDER BY id", m.item)
+
+    @Test
+    fun `PM-SYS-014 replaying a queued absentee ballot twice enters it once - the same key and request answer with the rows first made, also once the window has closed`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val absent = m.owners[2]
+        val queued = UUID.randomUUID().toString()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        val first = signedIn(m.manager) { ballotIds(ballot(m, absent, today, key = queued)) }
+        signedIn(m.manager) { repeat(2) { assertThat(ballotIds(ballot(m, absent, today, key = queued))).isEqualTo(first) } }       // the queue replayed twice: one ballot
+        assertThat(ballotRows(m).map { it["id"] }).isEqualTo(first)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ? AND operation IN ('RECORD_VOTE', 'ENTER_ABSENTEE_BALLOT')", Int::class.java, m.entranceId)).isEqualTo(1)
+        signedIn(m.manager) {
+            ballot(m, absent, today).andExpect(status().isConflict)                                          // another key: this owner's ballot is entered
+            clock.by = Duration.ofDays(12)                                                                    // day 7 is over
+            assertThat(ballotIds(ballot(m, absent, today, key = queued))).isEqualTo(first)                    // the replay is still answered with what it made
+            ballot(m, absent, today).andExpect(status().isConflict)
+        }
+        assertThat(ballotRows(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-SYS-014 an absentee ballot's key is refused for another request or operation, and a ballot without a key is a 400`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val absent = m.owners[2]
+        val k = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            ballot(m, absent, today, key = null).andExpect(status().isBadRequest)
+            ballot(m, absent, today, key = "  ").andExpect(status().isBadRequest)
+            vote(m, m.owners[0], "FOR", key = k).andExpect(status().isCreated)                               // k was kept for a vote
+            close(m).andExpect(status().isCreated)
+            ballot(m, absent, today, key = k).andExpect(status().isConflict)                                  // the same key for another operation
+            assertThat(ballotRows(m)).isEmpty()
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.vote_request_key WHERE entrance_id = ? AND operation IN ('RECORD_VOTE', 'ENTER_ABSENTEE_BALLOT')", Int::class.java, m.entranceId)).isEqualTo(1)   // a refused ballot keeps no key
+            val q = UUID.randomUUID().toString()
+            ballot(m, absent, today, key = q).andExpect(status().isCreated)
+            ballot(m, absent, today, choice = "AGAINST", key = q).andExpect(status().isConflict)             // the same key for another request
+            ballot(m, absent, today, hash = "cd".repeat(32), key = q).andExpect(status().isConflict)
+        }
+        assertThat(ballotRows(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-VOTE-014 a replayed absentee ballot adds no row and edits none - its rows name the key, which is never changed or removed`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val queued = UUID.randomUUID().toString()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        signedIn(m.manager) { repeat(2) { ballotIds(ballot(m, m.owners[2], today, key = queued)) } }
+        val kept = jdbc.queryForObject("SELECT id FROM assembly.vote_request_key WHERE entrance_id = ? AND idempotency_key = ?", UUID::class.java, m.entranceId, queued)
+        assertThat(jdbc.queryForObject("SELECT operation FROM assembly.vote_request_key WHERE id = ?", String::class.java, kept)).isEqualTo("ENTER_ABSENTEE_BALLOT")
+        assertThat(ballotRows(m).single()["request_key_id"]).isEqualTo(kept)
+        assertThat(jdbc.update("UPDATE assembly.absentee_ballot SET request_key_id = NULL WHERE agenda_item_id = ?::uuid", m.item)).isZero()
+        assertThat(jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE id = ?", kept)).isZero()
+        assertThat(jdbc.update("DELETE FROM assembly.vote_request_key WHERE id = ?", kept)).isZero()
+        assertThat(ballotRows(m).single()["request_key_id"]).isEqualTo(kept)
+    }
+
+    @Test
+    fun `PM-SEC-001 a replayed absentee ballot is answered only to whoever may enter it - the policy is asked before the key is looked up`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val queued = UUID.randomUUID().toString()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        signedIn(m.manager) { ballot(m, m.owners[2], today, key = queued).andExpect(status().isCreated) }
+        for (who in listOf(m.owners[2], m.owners[0], person())) {
+            signedIn(who) { ballot(m, m.owners[2], today, key = queued).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        }
+        ballot(m, m.owners[2], today, key = queued).andExpect(status().isForbidden)                          // nobody signed in
+        assertThat(ballotRows(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-GA-017 only an item tagged ABSENTEE_ELIGIBLE accepts an absent owner's ballot, after its sitting closes - once, weighed by their share, never edited`() {
+        val today = toSofiaDate(Instant.now())
+        val untagged = opened()
+        signedIn(untagged.manager) {
+            close(untagged).andExpect(status().isCreated)
+            ballot(untagged, untagged.owners[2], today).andExpect(status().isConflict)                       // not tagged
+        }
+        val m = opened(absenteeEligible = true)
+        val absent = m.owners[2]
+        signedIn(m.manager) {
+            ballot(m, absent, today).andExpect(status().isConflict)                                          // the item is not closed yet
+            close(m).andExpect(status().isCreated)
+            ballot(m, m.owners[1], today).andExpect(status().isBadRequest)                                   // represented by proxy at the sitting
+            ballot(m, absent, LocalDate.parse(today).plusDays(1).toString()).andExpect(status().isBadRequest) // not received yet
+            ballot(m, absent, today).andExpect(status().isCreated)
+                .andExpect(jsonPath("$[0].weight").value("25")).andExpect(jsonPath("$[0].choice").value("FOR")).andExpect(jsonPath("$[0].signature").value("HANDWRITTEN"))
+            ballot(m, absent, today).andExpect(status().isConflict)                                          // entered once
+        }
+        val item = m.item
+        jdbc.update("UPDATE assembly.absentee_ballot SET choice = 'AGAINST' WHERE agenda_item_id = ?::uuid", item)
+        jdbc.update("DELETE FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", item)
+        assertThat(jdbc.queryForList("SELECT choice, weight FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", item).single()["choice"]).isEqualTo("FOR")
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.absentee_ballot") }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `PM-GA-018 an absentee ballot is a signed declaration entered by whoever runs the assembly - the owner's own click is a 403, a QES a 409, no hash a 400`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        signedIn(m.manager) { close(m).andExpect(status().isCreated) }
+        signedIn(m.owners[2]) { ballot(m, m.owners[2], today).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        signedIn(m.manager) {
+            ballot(m, m.owners[2], today, signature = "QES").andExpect(status().isConflict)
+            ballot(m, m.owners[2], today, signature = "CLICK").andExpect(status().isBadRequest)
+            ballot(m, m.owners[2], today, hash = "").andExpect(status().isBadRequest)
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", Long::class.java, m.item)).isZero()
+    }
+
+    private fun ballots(m: Meeting, item: String = m.item): ResultActions = read("${m.base}/agenda/$item/absentee-ballots")
+
+    /** An item tagged for absent owners and closed, with the third owner's ballot entered by the manager. */
+    private fun ballotted(): Meeting = opened(absenteeEligible = true).also { m ->
+        signedIn(m.manager) {
+            close(m).andExpect(status().isCreated)
+            ballot(m, m.owners[2], toSofiaDate(Instant.now()), choice = "AGAINST").andExpect(status().isCreated)
+        }
+    }
+
+    @Test
+    fun `PM-SEC-002 how an absent owner voted is read by the manager and the board - an owner, the ballot's own included, and a stranger are a 403 naming the rule`() {
+        val m = ballotted()
+        val (ana, boris, absent) = m.owners
+        val stored = jdbc.queryForObject("SELECT id::text FROM assembly.absentee_ballot WHERE agenda_item_id = ?::uuid", String::class.java, m.item)
+        for (reader in listOf(m.manager, mandated(m, "MB"))) {
+            signedIn(reader) {
+                ballots(m).andExpect(status().isOk).andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].id").value(stored)).andExpect(jsonPath("$[0].ownerPartyId").value(absent.toString()))
+                    .andExpect(jsonPath("$[0].choice").value("AGAINST")).andExpect(jsonPath("$[0].weight").value("25"))
+            }
+        }
+        for (who in listOf(absent, ana, boris, person())) {
+            signedIn(who) {
+                ballots(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("AGAINST"))))
+            }
+        }
+    }
+
+    @Test
+    fun `PM-SEC-001 the ballots are read entrance by entrance - another entrance's manager is a 403, its item asked through this one a 404`() {
+        val m = ballotted()
+        val elsewhere = ballotted()
+        signedIn(elsewhere.manager) { ballots(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002")) }
+        signedIn(m.manager) {
+            ballots(m, elsewhere.item).andExpect(status().isNotFound)
+            ballots(m, UUID.randomUUID().toString()).andExpect(status().isNotFound)
+        }
+    }
+
+    @Test
+    fun `PM-GOV-008 the controller reads the absentee ballots and enters none`() {
+        val m = ballotted()
+        signedIn(mandated(m, "CTL")) {
+            ballots(m).andExpect(status().isOk).andExpect(jsonPath("$[0].ownerPartyId").value(m.owners[2].toString()))
+            ballot(m, m.owners[2], toSofiaDate(Instant.now())).andExpect(status().isForbidden)
+        }
+    }
+
+    @Test
+    fun `PM-SEC-004 every read of the absentee ballots is entered, apart from the votes' - served or refused, who and when - and an item not there enters nothing`() {
+        val m = ballotted()
+        val stranger = person()
+        val entries = { jdbc.queryForList("SELECT actor, login_subject, agenda_item_id, read_of, outcome, rule_id, at FROM assembly.vote_read WHERE entrance_id = ?::uuid ORDER BY at, id", m.entranceId) }
+        assertThat(entries()).isEmpty()                                                                      // entering a ballot reads nothing
+        signedIn(m.manager) {
+            ballots(m).andExpect(status().isOk)
+            read("${m.base}/agenda/${m.item}/votes").andExpect(status().isOk)                                // the votes' read names the votes
+        }
+        signedIn(m.owners[2]) { ballots(m).andExpect(status().isForbidden) }                                 // their own ballot: refused, and entered so
+        signedIn(m.manager) { ballots(m, UUID.randomUUID().toString()).andExpect(status().isNotFound) }      // nothing there, nothing served, nothing entered
+        val unknown = UUID.randomUUID()
+        signedIn(stranger) { ballots(m, unknown.toString()).andExpect(status().isForbidden) }                // refused before anything is looked up: entered as asked
+        ballots(m).andExpect(status().isOk)                                                                  // sign-in switched off: given to nobody, and entered so
+        val log = entries()
+        assertThat(log.map { listOf(it["actor"], it["login_subject"], it["agenda_item_id"], it["read_of"], it["outcome"], it["rule_id"]) }).containsExactly(
+            listOf(m.manager, "login-${m.manager}", UUID.fromString(m.item), "ABSENTEE_BALLOTS", "SERVED", "PM-SEC-001"),
+            listOf(m.manager, "login-${m.manager}", UUID.fromString(m.item), "VOTES", "SERVED", "PM-SEC-001"),
+            listOf(m.owners[2], "login-${m.owners[2]}", UUID.fromString(m.item), "ABSENTEE_BALLOTS", "REFUSED", "PM-SEC-002"),
+            listOf(stranger, "login-$stranger", unknown, "ABSENTEE_BALLOTS", "REFUSED", "PM-SEC-002"),
+            listOf(null, null, UUID.fromString(m.item), "ABSENTEE_BALLOTS", "OPEN", null),
+        )
+        assertThat(log.map { it["at"] as java.sql.Timestamp }).allSatisfy { assertThat(it.toInstant()).isBetween(Instant.now().minusSeconds(60), Instant.now()) }
+    }
+
+    private fun merge(m: Meeting, key: String? = UUID.randomUUID().toString()): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/absentee-merge", "", key))
+
+    @Test
+    fun `PM-VOTE-013 the absentee ballots are merged after day 7 into a decision superseding the provisional one - once, never edited, and only then FINAL`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)           // 50% for, the proxy's 25% votes AGAINST
+            vote(m, m.owners[1], "AGAINST").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated).andExpect(jsonPath("$.outcome").value("PASSED"))        // 50 of 75 represented
+            postProtocol(m, today).andExpect(status().isCreated)
+            ballot(m, m.owners[2], today, choice = "AGAINST").andExpect(status().isCreated)
+            merge(m).andExpect(status().isConflict)                                    // day 7 is not over
+        }
+        clock.by = Duration.ofDays(12)
+        signedIn(m.owners[0]) { merge(m).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        val provisional = decisions(m).single()["id"].toString()
+        signedIn(m.manager) {
+            merge(m).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.supersedes").value(provisional)).andExpect(jsonPath("$.represented").value("100"))
+                .andExpect(jsonPath("$.tallyFor").value("50")).andExpect(jsonPath("$.tallyAgainst").value("50"))
+                .andExpect(jsonPath("$.outcome").value("NOT_PASSED")).andExpect(jsonPath("$.result").value(org.hamcrest.Matchers.endsWith("NOT PASSED")))   // 50 of 100: the ballot turns it
+                .andExpect(jsonPath("$.mergedBy").value(m.manager.toString()))
+                .andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.finalOn").isNotEmpty)
+            merge(m).andExpect(status().isConflict)                                    // once
+        }
+        val row = jdbc.queryForMap("SELECT * FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item)
+        val basis = row["basis"].toString()
+        assertThat(basis).contains("supersedes $provisional ${decisions(m).single()["basis_hash"]}").contains("absentee ${m.owners[2]}")
+        assertThat(row["basis_hash"]).isEqualTo(MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) })
+        assertThat(decisions(m).single()["outcome"]).isEqualTo("PASSED")                       // the provisional one stays as it was
+        jdbc.update("UPDATE assembly.merged_decision SET outcome = 'PASSED' WHERE agenda_item_id = ?::uuid", m.item)
+        jdbc.update("DELETE FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item)
+        assertThat(jdbc.queryForList("SELECT outcome FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item).single()["outcome"]).isEqualTo("NOT_PASSED")
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.merged_decision") }.isInstanceOf(DataIntegrityViolationException::class.java)
+        clock.by = Duration.ofDays(45)
+        signedIn(m.manager) { read("${m.base}/agenda/${m.item}/decision").andExpect(jsonPath("$.status").value("FINAL")).andExpect(jsonPath("$.supersedes").value(provisional)) }
+    }
+
+    @Test
+    fun `PM-GA-017 an eligible item not merged stays PROVISIONAL past the 30 days - an untagged item has nothing to merge`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val untagged = opened()
+        signedIn(m.manager) { close(m).andExpect(status().isCreated); postProtocol(m, today).andExpect(status().isCreated) }
+        signedIn(untagged.manager) { close(untagged).andExpect(status().isCreated) }
+        clock.by = Duration.ofDays(45)
+        signedIn(m.manager) {
+            read("${m.base}/agenda/${m.item}/decision").andExpect(jsonPath("$.status").value("PROVISIONAL")).andExpect(jsonPath("$.finalOn").doesNotExist())
+            merge(m).andExpect(status().isCreated).andExpect(jsonPath("$.represented").value("75")).andExpect(jsonPath("$.status").value("FINAL"))   // no ballot: merged all the same
+        }
+        signedIn(untagged.manager) { merge(untagged).andExpect(status().isConflict) }
+    }
+
+    /** A 409 saying the Idempotency-Key was used for another request — not the act's own refusal. */
+    private fun reused(result: ResultActions) =
+        result.andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("Idempotency-Key")))
+
+    private fun answer(result: ResultActions): JsonNode = json.readTree(result.andReturn().response.contentAsString)
+
+    private fun keyRow(m: Meeting, key: String) =
+        jdbc.queryForList("SELECT id::text, operation FROM assembly.vote_request_key WHERE entrance_id = ? AND idempotency_key = ?", m.entranceId, key)
+
+    @Test
+    fun `PM-SYS-014 replaying an item's close with its key answers the decision the first made - one decision, and a new key for a closed item is still the 409`() {
+        val m = opened()
+        val key = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            val first = answer(close(m, key).andExpect(status().isCreated))
+            val again = answer(close(m, key).andExpect(status().isCreated))        // the answer was lost, the form sent again
+            assertThat(again).isEqualTo(first)
+            val refused = UUID.randomUUID().toString()
+            close(m, refused).andExpect(status().isConflict)                       // another key: the item is closed (PM-VOTE-014), and no key is kept
+            assertThat(keyRow(m, refused)).isEmpty()
+        }
+        val row = decisions(m).single()
+        assertThat(keyRow(m, key).single()["operation"]).isEqualTo("CLOSE_ITEM")
+        assertThat(row["request_key_id"].toString()).isEqualTo(keyRow(m, key).single()["id"])
+    }
+
+    @Test
+    fun `PM-SYS-014 an item's close key is refused for another request or operation, answered only to whoever runs the assembly, and one without an Idempotency-Key is a 400`() {
+        val m = opened()
+        val key = UUID.randomUUID().toString()
+        val today = toSofiaDate(Instant.now())
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m, " ").andExpect(status().isBadRequest)                         // a blank key, said once the policy has been asked
+            close(m, null).andExpect(status().isBadRequest)
+            postProtocol(m, today, key).andExpect(status().isCreated)
+            reused(close(m, key))                                                  // the key of a posting, not of a close
+            assertThat(decisions(m)).isEmpty()
+            close(m, key.reversed()).andExpect(status().isCreated)
+            reused(vote(m, m.owners[1], "FOR", key = key.reversed()))              // the key of a close, not of a vote
+        }
+        signedIn(m.owners[0]) {
+            close(m, key.reversed()).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))   // a replay is answered to who runs the assembly only
+            close(m, " ").andExpect(status().isForbidden)                          // the policy is asked before the key
+        }
+        assertThat(decisions(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying the absentee merge with its key answers the merge the first made - one merge, a refused merge keeps no key, and a new key is still the 409`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val key = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+            postProtocol(m, today).andExpect(status().isCreated)
+            merge(m, key).andExpect(status().isConflict)                           // day 7 is not over: nothing merged, nothing kept
+        }
+        assertThat(keyRow(m, key)).isEmpty()
+        clock.by = Duration.ofDays(12)
+        signedIn(m.manager) {
+            merge(m, null).andExpect(status().isBadRequest)
+            val first = answer(merge(m, key).andExpect(status().isCreated))
+            val again = answer(merge(m, key).andExpect(status().isCreated))        // the answer was lost, the form sent again
+            assertThat(again).isEqualTo(first)
+            assertThat(first.get("supersedes").asText()).isEqualTo(decisions(m).single()["id"].toString())
+            merge(m).andExpect(status().isConflict)                                // another key: merged once (PM-VOTE-013)
+            reused(close(m, key))                                                  // the key of a merge, not of a close
+        }
+        signedIn(m.owners[0]) { merge(m, key).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        val row = jdbc.queryForMap("SELECT id::text, request_key_id::text FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item)
+        assertThat(keyRow(m, key).single()["operation"]).isEqualTo("MERGE_ABSENTEE")
+        assertThat(row["request_key_id"]).isEqualTo(keyRow(m, key).single()["id"])
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying the protocol's posting with its key answers the posting the first made - one posting, and the same key for another day or a new key is a 409`() {
+        val m = opened()
+        val today = toSofiaDate(Instant.now())
+        val key = UUID.randomUUID().toString()
+        lateinit var first: JsonNode
+        val refusing = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            postProtocol(m, LocalDate.parse(today).plusDays(1).toString(), refusing).andExpect(status().isConflict)   // a day to come: refused, no key kept
+            postProtocol(m, today, " ").andExpect(status().isBadRequest)
+            postProtocol(m, today, null).andExpect(status().isBadRequest)
+            first = answer(postProtocol(m, today, key).andExpect(status().isCreated))
+            val again = answer(postProtocol(m, today, key).andExpect(status().isCreated))   // the answer was lost, the form sent again
+            assertThat(again).isEqualTo(first)
+            reused(postProtocol(m, LocalDate.parse(today).minusDays(1).toString(), key))   // the key of another day
+            postProtocol(m, today, UUID.randomUUID().toString()).andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Idempotency-Key"))))
+            postProtocol(m, today).andExpect(status().isConflict)                  // another key: entered once (PM-GA-023)
+            reused(close(m, key))                                                  // the key of a posting, not of a close
+        }
+        signedIn(m.owners[0]) { postProtocol(m, today, key).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        val row = jdbc.queryForMap("SELECT id::text, request_key_id::text FROM assembly.protocol_posting WHERE assembly_id = ?::uuid", m.base.substringAfterLast('/'))
+        assertThat(keyRow(m, refusing)).isEmpty()
+        assertThat(row["id"]).isEqualTo(first.get("id").asText())
+        assertThat(keyRow(m, key).single()["operation"]).isEqualTo("POST_PROTOCOL")
+        assertThat(row["request_key_id"]).isEqualTo(keyRow(m, key).single()["id"])
     }
 }

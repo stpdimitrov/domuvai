@@ -73,5 +73,5 @@ class BookController(
     fun onBadDate(e: DateTimeParseException): Map<String, String> = mapOf("error" to "on must be an ISO date (YYYY-MM-DD)")
 }
 
-/** The policy refused this reader; the entry of the refusal is already written. */
-class BookReadForbidden(val ruleId: String) : RuntimeException("refused by $ruleId")
+/** The policy refused this caller; for a reader, the entry of the refusal is already written. [why] says what the rule's own words would not. */
+class BookReadForbidden(val ruleId: String, val why: String? = null) : RuntimeException("refused by $ruleId")

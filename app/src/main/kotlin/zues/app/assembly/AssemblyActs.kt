@@ -58,11 +58,12 @@ class AssemblyActs(
 
     // Rule: PM-GA-002
     // Rule: PM-GA-006
+    // Rule: PM-GA-017
     @Transactional
-    fun addAgendaItem(who: Asking, entranceId: UUID, assemblyId: UUID, text: String, itemType: String): AgendaItemBound {
+    fun addAgendaItem(who: Asking, entranceId: UUID, assemblyId: UUID, text: String, itemType: String, absenteeEligible: Boolean = false): AgendaItemBound {
         running(who, entranceId, assemblyId)
         notOnceTheRegisterIsOpen(assemblyId)
-        return convening.addAgendaItem(entranceId, assemblyId, text, itemType)
+        return convening.addAgendaItem(entranceId, assemblyId, text, itemType, absenteeEligible)
     }
 
     // Rule: PM-GA-002
@@ -95,14 +96,15 @@ class AssemblyActs(
      */
     // Rule: PM-GA-009
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @Transactional
-    fun registerProxy(who: Asking, entranceId: UUID, assemblyId: UUID, request: AppointProxyRequest): Proxy {
+    fun registerProxy(who: Asking, entranceId: UUID, assemblyId: UUID, key: String, request: AppointProxyRequest): Proxy {
         val named = request.principalPartyId
         if (named == null || named == who.party) {
             val principal = acting.actor(who, Action.APPOINT_PROXY, entranceId)
             notAlreadyPresent(assemblyId, principal.party)
             require(request.authorisationHash == null) { "a proxy appointed in person carries no document: the sign-in is the appointment" }
-            return proxies.register(entranceId, assemblyId, command(principal.party, request), principal, authorisationHash = null)
+            return proxies.register(entranceId, assemblyId, key, command(principal.party, request), principal, authorisationHash = null)
         }
         // the policy's own line first (PM-SEC-001: the grant is in the matrix), then: is this assembly theirs to run
         acting.actor(who, Action.RECORD_PROXY, entranceId)
@@ -117,15 +119,16 @@ class AssemblyActs(
         // TODO(legal): PM-GA-009 — the strictest reading, pending the owner's answer.
         require(request.agentPartyId != recorder.party) { "whoever records a written proxy is not the proxy it names (PM-GA-009)" }
         notAlreadyPresent(assemblyId, named)
-        return proxies.register(entranceId, assemblyId, command(named, request), recorder, document)
+        return proxies.register(entranceId, assemblyId, key, command(named, request), recorder, document)
     }
 
     /** The register is kept by whoever runs the assembly: who is present, and that a remote participant was identified. */
     // Rule: PM-GA-012
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @Transactional
-    fun recordAttendance(who: Asking, entranceId: UUID, assemblyId: UUID, attendeePartyId: UUID, channel: String): Present =
-        attendance.record(entranceId, assemblyId, keepingTheRegister(who, entranceId, assemblyId), attendeePartyId, channel)
+    fun recordAttendance(who: Asking, entranceId: UUID, assemblyId: UUID, key: String, attendeePartyId: UUID, channel: String): Present =
+        attendance.record(entranceId, assemblyId, key, keepingTheRegister(who, entranceId, assemblyId), attendeePartyId, channel)
 
     // Rule: PM-GA-016
     // Rule: PM-SEC-001

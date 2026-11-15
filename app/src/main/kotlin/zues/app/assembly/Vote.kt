@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.registry.Holdings
 import zues.app.registry.TitleRole
+import zues.kernel.IdempotencyKey
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import java.math.BigDecimal
 import java.time.Clock
@@ -38,12 +40,46 @@ data class Vote(
     val recordedBy: UUID,
     val loginIssuer: String,
     val loginSubject: String,
+    /** The keyed request that made it (Rule: PM-SYS-014); none on a vote recorded before votes took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 enum class VoteChoice { FOR, AGAINST, ABSTAIN }
 
+/**
+ * One read of how each owner voted on an item (Rule: PM-SEC-004): who asked — the sign-in's party and login, either
+ * may be missing on a refusal — which item, [readOf] its votes or its absentee ballots, when, and how it was decided.
+ * Insert-only: the table refuses to change.
+ */
+@Table("vote_read")
+data class VoteRead(
+    @Id val id: UUID,
+    val entranceId: UUID,
+    val agendaItemId: UUID,
+    val readOf: String,             // VoteReadOf
+    val actor: UUID?,
+    val loginIssuer: String?,
+    val loginSubject: String?,
+    val at: Instant,
+    val outcome: String,            // VoteReadOutcome
+    val ruleId: String?,
+)
+
+enum class VoteReadOf {
+    VOTES,
+    ABSENTEE_BALLOTS,
+}
+
+enum class VoteReadOutcome {
+    SERVED,
+    REFUSED,
+    /** sign-in switched off: given to nobody, and entered so */
+    OPEN,
+}
+
 interface VoteRepository : ListCrudRepository<Vote, UUID> {
     fun findByAgendaItemId(agendaItemId: UUID): List<Vote>
+    fun findByRequestKeyId(requestKeyId: UUID): List<Vote>
 }
 
 @Service
@@ -54,7 +90,9 @@ class VoteService(
     private val sittings: SittingRepository,
     private val attendance: AttendanceService,
     private val votes: VoteRepository,
+    private val decisions: DecisionRepository,
     private val holdings: Holdings,
+    private val keys: VoteRequestKeys,
     private val clock: Clock,
 ) {
     /**
@@ -62,19 +100,30 @@ class VoteService(
      * The owner is present — on the register in person, by video once identified, or brought by the representative a
      * counted proxy names — and their vote weighs, for each unit they own that day, their share of its ideal parts. A
      * second vote for the same owner is a correction, and says why: it reverses the vote in effect for each unit.
+     * The request carries [key] (PM-SYS-014): the same request under the same key — a replayed queue — writes nothing and
+     * is answered with the votes the first one made, even once the item has closed or the day has passed; the same key
+     * for another request is an [IdempotencyKeyReused].
      */
     // Rule: PM-VOTE-001
     // Rule: PM-VOTE-014
     // Rule: PM-ORG-005
+    // Rule: PM-SYS-014
     // TODO(legal): PM-GA-012 — a unit with both an owner and a holder of a right of use is not voted on, as it is not weighed for quorum
     @Transactional
-    fun record(entranceId: UUID, assemblyId: UUID, itemId: UUID, by: Actor, owner: UUID, choice: String, correction: String?): List<Vote> {
+    fun record(entranceId: UUID, assemblyId: UUID, itemId: UUID, by: Actor, owner: UUID, choice: String, correction: String?, key: IdempotencyKey): List<Vote> {
         val chose = VoteChoice.entries.firstOrNull { it.name == choice } ?: throw IllegalArgumentException("a vote is FOR, AGAINST or ABSTAIN, not \"$choice\"")
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
+        val asked = VoteRequestKeys.hash(assemblyId, itemId, by.party, owner, choice, correction?.trim()?.takeIf { it.isNotEmpty() })   // the why as it is stored
+        when (val decided = keys.decide(entranceId, key, VoteRequestKeys.RECORD_VOTE, asked)) {                                           // decided under the assembly's lock
+            is KeyDecision.Replay -> return votes.findByRequestKeyId(UUID.fromString(decided.resultId)).sortedWith(compareBy({ it.castAt }, { it.id.toString() }))
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key ${key.value} was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
         // every item is bound to its majority when it is put on the agenda (agenda_item.majority_rule_id NOT NULL): one of this agenda, or none
         val item = agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
         check(assembly.status == AssemblyStatus.OPEN.name) { "votes are taken at a sitting that opened on its quorum; this assembly is ${assembly.status}" }
+        check(!decisions.existsByAgendaItemId(itemId)) { "this item is closed: no vote on it is taken or corrected (PM-VOTE-014)" }
         val sitting = sittings.findByAssemblyIdOrderBySessionNo(assemblyId).single { it.quorumMet }
         val today = LocalDate.parse(toSofiaDate(clock.instant()))                                         // a Sofia calendar day (PM-SYS-004)
         check(today == sitting.weighedOn) { "the votes of sitting ${sitting.sessionNo} are taken on ${sitting.weighedOn}" }
@@ -86,16 +135,15 @@ class VoteService(
         val reversed = before.mapNotNull { it.reverses }.toSet()
         val inEffect = before.filter { it.id !in reversed }
         val why = correction?.trim()?.takeIf { it.isNotEmpty() }
+        if (inEffect.isNotEmpty()) checkNotNull(why) { "this owner's vote on the item is recorded: a correction says why, and reverses it (PM-VOTE-014)" }
+        else require(why == null) { "there is no vote of this owner on the item to correct" }
+        val made = keys.keep(entranceId, key, VoteRequestKeys.RECORD_VOTE, asked)
         val now = clock.instant()
         fun row(unit: UUID, weight: BigDecimal, reverses: UUID?) = Vote(
             UUID.randomUUID(), entranceId, assemblyId, item.id, sitting.sessionNo, owner, unit, weight, chose.name, channel, now,
-            reverses, why.takeIf { reverses != null }, by.party, by.loginIssuer, by.loginSubject,
+            reverses, why.takeIf { reverses != null }, by.party, by.loginIssuer, by.loginSubject, made,
         )
-        if (inEffect.isNotEmpty()) {
-            checkNotNull(why) { "this owner's vote on the item is recorded: a correction says why, and reverses it (PM-VOTE-014)" }
-            return inEffect.map { aggregates.insert(row(it.unitId, it.weight, reverses = it.id)) }
-        }
-        require(why == null) { "there is no vote of this owner on the item to correct" }
+        if (inEffect.isNotEmpty()) return inEffect.map { aggregates.insert(row(it.unitId, it.weight, reverses = it.id)) }
         val owned = holdings.inForce(entranceId, sitting.weighedOn, TitleRole.OWN)
         val bothRoles = holdings.inForce(entranceId, sitting.weighedOn, TitleRole.USR).holdings.map { it.unitId }.toSet()
         val theirs = owned.holdings.filter { it.partyId == owner }

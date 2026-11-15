@@ -1,11 +1,28 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, reach, type EntranceAt } from "@/lib/console";
+import { nameFor } from "@/lib/partyName";
+import { FORM, SCOPE } from "@/lib/proxy";
 import { refused, unanswered, type Refused } from "@/lib/refusal";
-import { sofiaTime } from "@/lib/sofia";
+import { sofiaLocal, sofiaTime } from "@/lib/sofia";
 import AgendaForm from "./AgendaForm";
+import BallotForm from "./BallotForm";
+import MergeForm from "./MergeForm";
+import ProtocolForm from "./ProtocolForm";
+import AttendanceForm from "./AttendanceForm";
+import CloseForm from "./CloseForm";
 import ConveneForm from "./ConveneForm";
+import NoticeForm from "./NoticeForm";
+import ProxyForm from "./ProxyForm";
+import ScheduleForm from "./ScheduleForm";
+import SittingForm from "./SittingForm";
+import VerifyForm from "./VerifyForm";
+import VoteForm from "./VoteForm";
+import NoEntrance from "@/app/(console)/NoEntrance";
+import PartyName from "@/app/(console)/PartyName";
+import PartyPicker from "../PartyPicker";
 
 export const metadata: Metadata = { title: "Общи събрания — Етаж" };
 
@@ -21,11 +38,15 @@ type Shown = {
   quorum: Part<Schemas["QuorumView"]>;
   attendance: Part<Schemas["AttendanceView"][]>;
   proxies: Part<Schemas["ProxyView"][]>;
+  /** Each agenda item's vote record, by item id — read on an OPEN assembly only: before it opens there is none. */
+  votes: Record<string, Part<Schemas["VoteView"][]>>;
+  /** Each agenda item's decision, by item id — read on an OPEN assembly only; the API's 404 is an item not closed yet. */
+  decisions: Record<string, Part<Schemas["DecisionView"]>>;
 };
 type Loaded =
   | {
       kind: "ok"; entrance: Entrance; mandates: Part<Schemas["StandingMandate"][]>; shown: Shown | null; asked: string | null;
-      listed: Part<Schemas["AssemblySummaryView"][]>; year: Part<Schemas["HeldInYearView"]>;
+      listed: Part<Schemas["AssemblySummaryView"][]>; year: Part<Schemas["HeldInYearView"]>; myself?: string;
     }
   | Exclude<EntranceAt, { kind: "ok" }>;
 
@@ -53,16 +74,27 @@ async function load(entranceId: string | undefined, assemblyId: string | undefin
       reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance", of)),
       reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies", of)),
     ]);
-    return { assembly: part(assembly), quorum: part(quorum), attendance: part(attendance), proxies: part(proxies) };
+    const items = assembly?.data?.status === "OPEN" ? assembly.data.agenda : [];
+    const ofItem = (itemId: string) => ({ params: { path: { ...of.params.path, itemId } } });
+    const [votes, decisions] = await Promise.all([
+      Promise.all(items.map((i) => reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", ofItem(i.id))))),
+      Promise.all(items.map((i) => reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision", ofItem(i.id))))),
+    ]);
+    return {
+      assembly: part(assembly), quorum: part(quorum), attendance: part(attendance), proxies: part(proxies),
+      votes: Object.fromEntries(items.map((i, n) => [i.id, part(votes[n])])),
+      decisions: Object.fromEntries(items.map((i, n) => [i.id, part(decisions[n])])),
+    };
   };
   const year = Number(sofiaTime(new Date().toISOString()).slice(6, 10));   // the calendar year in Sofia (PM-SYS-004), not this server's
-  const [mandates, shown, listed, held] = await Promise.all([
+  const [mandates, shown, listed, held, me] = await Promise.all([
     reach(() => api.GET("/api/identity/entrances/{entranceId}/mandates", { params: { path } })),   // "today" is the api's own: Sofia's, not this server's clock
     asked && UUID.test(asked) ? shownFor(asked) : Promise.resolve(null),
     reach(() => api.GET("/api/assembly/entrances/{entranceId}/assemblies", { params: { path } })),
     reach(() => api.GET("/api/assembly/entrances/{entranceId}/years/{year}", { params: { path: { ...path, year } } })),
+    reach(() => api.GET("/api/identity/me")),                       // for "myself" in a picker: no read of the book (WEB-52b)
   ]);
-  return { kind: "ok", entrance, mandates: part(mandates), shown, asked, listed: part(listed), year: part(held) };
+  return { kind: "ok", entrance, mandates: part(mandates), shown, asked, listed: part(listed), year: part(held), myself: me?.data?.partyId };
 }
 
 // The words for the API's codes. Any code not here is shown as it came, never guessed.
@@ -75,13 +107,16 @@ const STATUS: Record<string, { text: string; kind: "calm" | "warn" | "crit" }> =
   OPEN: { text: "открито", kind: "calm" },
 };
 const MODE: Record<string, string> = { IN_PERSON: "присъствено", VIDEO: "видеоконферентно", HYBRID: "смесено" };
-const CHANNEL: Record<string, string> = { IN_PERSON: "лично", VIDEO: "видео" };
-const SCOPE: Record<string, string> = { WHOLE_AGENDA: "целия дневен ред", LISTED_ITEMS: "точки" };
-const FORM: Record<string, string> = { WRITTEN: "писмено", NOTARISED: "с нотариална заверка", LAWYER_AUTHORISATION: "адвокатско пълномощно" };
+const CHANNEL: Record<string, string> = { IN_PERSON: "лично", VIDEO: "видео", PROXY: "чрез пълномощник" };
+const OUTCOME: Record<string, { text: string; kind: "calm" | "warn" | "crit" }> = { PASSED: { text: "прието", kind: "calm" }, NOT_PASSED: { text: "неприето", kind: "crit" } };
+const STANDING: Record<string, string> = { PROVISIONAL: "предварително", FINAL: "окончателно" };
+const DENOMINATOR: Record<string, string> = { REPRESENTED: "от представените идеални части", TOTAL: "от всички идеални части" };
+const COMPARISON: Record<string, string> = { MORE_THAN: "повече от", AT_LEAST: "поне" };
+const CHOICE: Record<string, string> = { FOR: "за", AGAINST: "против", ABSTAIN: "въздържал се" };
 const word = (table: Record<string, string>, code: string) => table[code] ?? code;
 
 const date = (iso: string) => iso.split("-").reverse().join(".");
-/** A party as the API gives it: its id, which no read here pairs with a name. The whole id is on hover. */
+/** A party as the API gives it where no read names it (a unit, an actor — Q4): its id. The whole id is on hover. */
 const Party = ({ id }: { id: string | undefined }) => (id ? <span className="mono" title={id}>{id.slice(0, 8)}</span> : <>—</>);
 const DIM = { color: "#6B6F6C" };
 const FAILED = { color: "#8E2318" };
@@ -94,7 +129,7 @@ function Standing({ s }: { s: Schemas["Standing"] }) {
   return <>{s.kind}</>;
 }
 
-export default async function AssemblyPage({ searchParams }: { searchParams: Promise<{ entrance?: string | string[]; assembly?: string | string[]; voided?: string | string[] }> }) {
+export default async function AssemblyPage({ searchParams }: { searchParams: Promise<{ entrance?: string | string[]; assembly?: string | string[]; voided?: string | string[]; moved?: string | string[] }> }) {
   const query = await searchParams;
   const view = await load(
     typeof query.entrance === "string" ? query.entrance : undefined,
@@ -117,19 +152,22 @@ export default async function AssemblyPage({ searchParams }: { searchParams: Pro
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-            {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
+            {view.kind === "none" && <NoEntrance />}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
           </div>
         </div>
       ) : (
-        <Body view={view} voided={query.voided === "1"} />
+        <Body view={view} voided={query.voided === "1" ? "agenda" : query.moved === "1" ? "moved" : null} />
       )}
     </>
   );
 }
 
-function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided: boolean }) {
-  const { entrance, mandates, shown, asked, listed, year } = view;
+/** Why the api voided a posted notice, as the act that did it answered (PM-GA-006): an item added, or the meeting moved. */
+type Voided = "agenda" | "moved" | null;
+
+function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided: Voided }) {
+  const { entrance, mandates, shown, asked, listed, year, myself } = view;
   return (
     <div style={{ padding: "0 24px 24px" }}>
       <div style={{ margin: "20px 0 0", ...HEADING }}>Управа на входа днес</div>
@@ -144,7 +182,7 @@ function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided:
         {mandates.ok && mandates.data.map((m) => (
           <div key={m.mandateId} className="as-mandates pf-row">
             <div>{word(OFFICE, m.role)}</div>
-            <div><Party id={m.partyId} /></div>
+            <div><PartyName id={m.partyId} name={m.partyName} /></div>
             <div className="num">{date(m.validFrom)}</div>
             <div className="num">{date(m.validTo)}</div>
             <div><Standing s={m.standing} /></div>
@@ -156,7 +194,7 @@ function Body({ view, voided }: { view: Extract<Loaded, { kind: "ok" }>; voided:
       {asked && !shown && (
         <div className="as-note" style={FAILED}>„{asked}“ не е събрание — връзката към събранието съдържа неговия идентификатор.</div>
       )}
-      {shown && <Assembly shown={shown} entrance={entrance.id} voided={voided} />}
+      {shown && <Assembly shown={shown} entrance={entrance.id} voided={voided} myself={myself} />}
 
       <div style={{ margin: "24px 0 0", ...HEADING }}>Свикване на общо събрание</div>
       <div className="co-card" style={{ marginTop: 12 }}>
@@ -210,8 +248,10 @@ function Listed({ entrance, listed, year, asked }: {
   );
 }
 
-function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string; voided: boolean }) {
-  const { assembly, quorum, attendance, proxies } = shown;
+// Rule: PM-GA-023
+// Rule: PM-SEC-001
+function Assembly({ shown, entrance, voided, myself }: { shown: Shown; entrance: string; voided: Voided; myself?: string }) {
+  const { assembly, quorum, attendance, proxies, votes, decisions } = shown;
   if (!assembly.ok) return <div className="as-note" style={FAILED}>{unanswered(assembly.by, "събранието")}</div>;
   const a = assembly.data;
   const status = STATUS[a.status] ?? { text: a.status, kind: "warn" as const };
@@ -238,14 +278,15 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
           <div key={i.id} className="as-agenda pf-row">
             <div className="num">{i.ordinal}</div>
             <div className="ellipsis" title={i.text}>{i.text}</div>
-            <div className="mono">{i.itemType}</div>
+            <div><span className="mono">{i.itemType}</span>{i.absenteeEligible && " · и неприсъствено"}</div>
             <div className="mono">{i.majorityRuleId}</div>
           </div>
         ))}
       </div>
-      {voided && a.status === "DRAFT" && (   // the api answered noticeVoided: the assembly is a draft again; a typed ?voided=1 on a noticed one says nothing
+      {voided && a.status === "DRAFT" && (   // the api answered with the notice void: the assembly is a draft again; a typed ?voided=1 on a noticed one says nothing
         <div className="as-note" style={{ color: "#7A5210" }}>
-          Точката е добавена след обявяването на поканата — поканата отпада и събранието трябва да се обяви отново.
+          {voided === "agenda" ? "Точката е добавена след обявяването на поканата" : "Събранието е преместено след обявяването на поканата"} — поканата
+          отпада и събранието трябва да се обяви отново.
         </div>
       )}
       {(a.status === "DRAFT" || a.status === "NOTICED") && (   // the agenda the api keeps open; adding after notice voids it (PM-GA-006)
@@ -254,8 +295,54 @@ function Assembly({ shown, entrance, voided }: { shown: Shown; entrance: string;
         </div>
       )}
 
+      {(a.status === "DRAFT" || a.status === "NOTICED") && (   // the acts the api allows before the meeting opens; who may do them is the api's (PM-SEC-001)
+        <>
+          {a.status === "DRAFT" && (   // only a recorded posting act makes it NOTICED (PM-GA-007, PM-SYS-013)
+            <>
+              <div style={{ margin: "20px 0 0", ...HEADING }}>Обявяване на поканата</div>
+              <div className="co-card" style={{ marginTop: 12 }}>
+                <PartyPicker id="parties-notice" entrance={entrance} role="OWN" dayField="postedAt" />
+                <NoticeForm entrance={entrance} assembly={a.id} parties="parties-notice" />
+              </div>
+            </>
+          )}
+          <div style={{ margin: "20px 0 0", ...HEADING }}>Преместване</div>
+          <div className="co-card" style={{ marginTop: 12 }}>
+            <ScheduleForm entrance={entrance} assembly={a.id} noticed={a.status === "NOTICED"} scheduledAt={sofiaLocal(a.scheduledAt)} place={a.place} />
+          </div>
+        </>
+      )}
+
       <Quorum quorum={quorum} />
-      <Register attendance={attendance} proxies={proxies} />
+      {a.status === "NOTICED" && (   // a sitting is weighed only on a noticed assembly; which one, when and who may weigh it are the api's (PM-GA-013, PM-GA-014, PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <SittingForm entrance={entrance} assembly={a.id} at={quorum.ok ? quorum.data : undefined} />
+        </div>
+      )}
+      <Register attendance={attendance} proxies={proxies} entrance={entrance} assembly={a.id} />
+      {(a.status === "DRAFT" || a.status === "NOTICED") && (   // the proxies the api takes; who may, how many and in what form are the api's (PM-GA-009, PM-GA-010, PM-GA-011)
+        <>
+          <div style={{ margin: "20px 0 0", ...HEADING }}>Вписване на пълномощно</div>
+          <div className="co-card" style={{ marginTop: 12 }}>
+            <PartyPicker id="parties-proxy" entrance={entrance} />
+            <ProxyForm entrance={entrance} assembly={a.id} parties="parties-proxy" mintedKey={randomUUID()} />
+          </div>
+        </>
+      )}
+      {(a.status === "NOTICED" || a.status === "OPEN") && (   // the register is kept for these; on which day, for which sitting and by whom are the api's (PM-GA-012, PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <PartyPicker id="parties-attendance" entrance={entrance} myself={myself} />
+          <AttendanceForm entrance={entrance} assembly={a.id} mode={a.mode} parties="parties-attendance" mintedKey={randomUUID()} />
+        </div>
+      )}
+      {a.status === "OPEN" && [...a.agenda].sort((x, y) => x.ordinal - y.ordinal).map((i) => (
+        <Votes key={i.id} item={i} votes={votes[i.id]} decision={decisions[i.id]} entrance={entrance} assembly={a.id} myself={myself} />
+      ))}
+      {a.status === "OPEN" && !Object.values(decisions).some((d) => d.ok && d.data.protocolPostedOn) && (   // the posting is entered once; on which day and by whom are the api's (PM-GA-023, PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <ProtocolForm entrance={entrance} assembly={a.id} mintedKey={randomUUID()} />
+        </div>
+      )}
     </>
   );
 }
@@ -295,7 +382,7 @@ function Quorum({ quorum }: { quorum: Shown["quorum"] }) {
             {quorum.data.sittings.map((s) => (
               <div key={s.id}>
                 <span className="k">Заседание № {s.sessionNo}</span>
-                {s.quorumMet ? "открито" : "без кворум"} · {s.representedPct}% при праг {s.thresholdPct}% · претеглено {sofiaTime(s.weighedAt)}
+                {s.quorumMet ? <>открито{s.openedAt && <> в {sofiaTime(s.openedAt)}</>}</> : "без кворум"} · {s.representedPct}% при праг {s.thresholdPct}% · претеглено {sofiaTime(s.weighedAt)}
               </div>
             ))}
           </>
@@ -305,12 +392,13 @@ function Quorum({ quorum }: { quorum: Shown["quorum"] }) {
   );
 }
 
-function Register({ attendance, proxies }: { attendance: Shown["attendance"]; proxies: Shown["proxies"] }) {
+/** Rule: PM-GA-012, PM-GA-016 — the register as the API serves it: whether a line counts is its `counted`; an unverified video line offers the verification. */
+function Register({ attendance, proxies, entrance, assembly }: { attendance: Shown["attendance"]; proxies: Shown["proxies"]; entrance: string; assembly: string }) {
   return (
     <>
       <div style={{ margin: "20px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={HEADING}>Присъствен списък и пълномощни</span>
-        <span style={{ font: "400 11.5px/1 'IBM Plex Mono', monospace", ...DIM }}>лицата са с идентификатор — имената още не се подават тук</span>
+        <span style={{ font: "400 11.5px/1 'IBM Plex Mono', monospace", ...DIM }}>лицата са с идентификатор; името стои до него, когато системата го дава</span>
       </div>
       <div className="pf-card cp-card" style={{ margin: "12px 0 0" }}>
         <div className="as-register pf-head"><div>Лице</div><div>Заседание</div><div>Начин</div><div>Брои се</div><div>Представлява</div></div>
@@ -318,11 +406,14 @@ function Register({ attendance, proxies }: { attendance: Shown["attendance"]; pr
         {attendance.ok && attendance.data.length === 0 && <div className="as-register pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Никой не е вписан.</div></div>}
         {attendance.ok && attendance.data.map((l) => (
           <div key={l.id} className="as-register pf-row">
-            <div><Party id={l.attendeePartyId} /></div>
+            <div><PartyName id={l.attendeePartyId} name={nameFor(l.attendeePartyId, l.names)} /></div>
             <div className="num">{l.sessionNo}</div>
             <div>{word(CHANNEL, l.channel)}{l.channel === "VIDEO" && (l.identityVerified ? " · самоличността е проверена" : " · самоличността не е проверена")}</div>
             <div>{l.counted ? "да" : <span style={DIM}>не</span>}</div>
-            <div>{l.represents.length ? l.represents.map((p, i) => <span key={p}>{i > 0 && ", "}<Party id={p} /></span>) : "—"}</div>
+            <div>{l.represents.length ? l.represents.map((p, i) => <span key={p}>{i > 0 && ", "}<PartyName id={p} name={nameFor(p, l.names)} /></span>) : "—"}</div>
+            {l.channel === "VIDEO" && !l.identityVerified && (   // Rule: PM-GA-016 — counted only once the api records the verification
+              <VerifyForm entrance={entrance} assembly={assembly} attendance={l.id} />
+            )}
           </div>
         ))}
       </div>
@@ -332,13 +423,105 @@ function Register({ attendance, proxies }: { attendance: Shown["attendance"]; pr
         {proxies.ok && proxies.data.length === 0 && <div className="as-register pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма вписано пълномощно.</div></div>}
         {proxies.ok && proxies.data.map((p) => (
           <div key={p.id} className="as-register pf-row">
-            <div><Party id={p.principalPartyId} /></div>
-            <div><Party id={p.agentPartyId} /></div>
+            <div><PartyName id={p.principalPartyId} name={nameFor(p.principalPartyId, p.names)} /></div>
+            <div><PartyName id={p.agentPartyId} name={nameFor(p.agentPartyId, p.names)} /></div>
             <div>{word(FORM, p.form)}</div>
             <div>{word(SCOPE, p.scope)}{p.scope === "LISTED_ITEMS" && ` ${p.items.join(", ")}`}</div>
             <div className="num">{sofiaTime(p.registeredAt)}</div>
           </div>
         ))}
+      </div>
+    </>
+  );
+}
+
+/**
+ * One item's vote record as the API serves it, row by row in its order:
+ * each row's weight is the API's, a correction shows what it reverses and why, a reversed row is marked not in
+ * effect. Who may read it is the API's; a refusal stands in place of the rows. Below it, while the API has no decision
+ * on the item (its 404), the forms to record a vote and to close the item; once closed, the decision instead.
+ */
+// Rule: PM-VOTE-014
+// Rule: PM-VOTE-016
+// Rule: PM-ORG-005
+// Rule: PM-SEC-001
+// Rule: PM-SEC-002
+// Rule: PM-GA-017
+function Votes({ item, votes, decision, entrance, assembly, myself }: {
+  item: Schemas["AgendaItemView"]; votes: Part<Schemas["VoteView"][]> | undefined; decision: Part<Schemas["DecisionView"]> | undefined; entrance: string; assembly: string; myself?: string;
+}) {
+  const open = decision !== undefined && !decision.ok && decision.by?.status === 404;   // the API's word for an item not closed yet
+  return (
+    <>
+      <div style={{ margin: "20px 0 0", ...HEADING }}>Гласуване — точка {item.ordinal}</div>
+      <div className="pf-card cp-card" style={{ margin: "12px 0 0" }}>
+        <div className="as-votes pf-head"><div>Собственик</div><div>Обект</div><div>Тежест</div><div>Глас</div><div>Начин · засед.</div><div>Записан</div></div>
+        {votes && !votes.ok && <div className="as-votes pf-row"><div style={{ ...FAILED, gridColumn: "1 / -1" }}>{unanswered(votes.by, "гласовете по точката")}</div></div>}
+        {votes?.ok && votes.data.length === 0 && <div className="as-votes pf-row"><div style={{ ...DIM, gridColumn: "1 / -1" }}>Няма записани гласове.</div></div>}
+        {votes?.ok && votes.data.map((r) => (
+          <div key={r.id} className="as-votes pf-row" style={r.inEffect ? undefined : DIM}>
+            <div><PartyName id={r.ownerPartyId} name={nameFor(r.ownerPartyId, r.names)} /></div>
+            <div><Party id={r.unitId} /></div>
+            <div className="num">{r.weight}</div>
+            <div>{word(CHOICE, r.choice)}{!r.inEffect && " · поправен"}</div>
+            <div>{word(CHANNEL, r.channel)} · {r.sessionNo}</div>
+            <div>{sofiaTime(r.castAt)} · <Party id={r.recordedBy} />{r.reverses && <> · поправя <Party id={r.reverses} />: {r.correction}</>}</div>
+          </div>
+        ))}
+      </div>
+      {open && (   // once closed, no vote is taken and no second close (PM-VOTE-014); who may do either is the API's (PM-SEC-001)
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <PartyPicker id={`parties-vote-${item.id}`} entrance={entrance} role="OWN" myself={myself} />
+          <VoteForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-vote-${item.id}`} mintedKey={randomUUID()} />
+          <CloseForm entrance={entrance} assembly={assembly} item={item.id} mintedKey={randomUUID()} />
+        </div>
+      )}
+      {decision && !open && <Decided decision={decision} />}
+      {item.absenteeEligible && decision?.ok && !decision.data.supersedes && (   // closed, tagged, not merged (PM-GA-017, PM-VOTE-013); the window and who may act are the API's
+        <div className="co-card" style={{ marginTop: 12 }}>
+          <PartyPicker id={`parties-ballot-${item.id}`} entrance={entrance} role="OWN" />
+          <BallotForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-ballot-${item.id}`} mintedKey={randomUUID()} />
+          <MergeForm entrance={entrance} assembly={assembly} item={item.id} mintedKey={randomUUID()} />
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * An item's decision as the API stored and derives it: the majority rule applied, its denominator and threshold, the
+ * represented share, the tally on ideal parts and the result line to 2 decimals, as written by the API — the page
+ * computes none of them — and the status on the API's legal today, PROVISIONAL or FINAL, with the last day of each
+ * window. A decision merged with absentee ballots names the one it supersedes. A refusal stands in its place.
+ */
+// Rule: PM-VOTE-011
+// Rule: PM-VOTE-012
+// Rule: PM-VOTE-013
+// Rule: PM-VOTE-016
+// Rule: PM-GA-023
+function Decided({ decision }: { decision: Part<Schemas["DecisionView"]> }) {
+  if (!decision.ok) return <div className="as-note" style={FAILED}>{unanswered(decision.by, "решението по точката")}</div>;
+  const d = decision.data;
+  const outcome = OUTCOME[d.outcome] ?? { text: d.outcome, kind: "warn" as const };
+  return (
+    <>
+      <div style={{ margin: "16px 0 0", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={HEADING}>Решение</span>
+        <span className={`badge ${outcome.kind}`}>{outcome.text}</span>
+        <span className={`badge ${d.status === "FINAL" ? "calm" : "warn"}`}>{word(STANDING, d.status)}</span>
+      </div>
+      <div className="co-card as-facts" style={{ marginTop: 12 }}>
+        <div className="mono" style={{ gridColumn: "1 / -1" }}>{d.result}</div>
+        <div><span className="k">Мнозинство</span>{word(COMPARISON, d.comparison)} {d.thresholdPct}% {word(DENOMINATOR, d.denominator)} · <span className="mono">{d.majorityRuleId}</span></div>
+        <div><span className="k">Представени</span><span className="num">{d.represented}%</span> · заседание {d.sessionNo}</div>
+        <div><span className="k">За · против · възд.</span><span className="num">{d.tallyFor}% · {d.tallyAgainst}% · {d.tallyAbstain}%</span></div>
+        <div><span className="k">Приключено</span>{sofiaTime(d.decidedAt)} · <Party id={d.closedBy} /></div>
+        <div><span className="k">Гласуване неприсъствено до</span>{date(d.absenteeCloses)}</div>
+        <div><span className="k">Протокол обявен</span>{d.protocolPostedOn ? date(d.protocolPostedOn) : <span style={DIM}>не е обявен — срокът за обжалване не тече</span>}</div>
+        {d.annulmentCloses && <div><span className="k">Обжалване до</span>{date(d.annulmentCloses)}</div>}
+        {d.finalOn && <div><span className="k">Окончателно от</span>{date(d.finalOn)}</div>}
+        {d.supersedes && <div><span className="k">Слято с неприсъствените</span>{d.mergedAt && sofiaTime(d.mergedAt)} · <Party id={d.mergedBy} /> · заменя <Party id={d.supersedes} /></div>}
+        <div><span className="k">Основание</span><span className="mono" title={d.basisHash}>{d.basisHash.slice(0, 12)}</span></div>
       </div>
     </>
   );

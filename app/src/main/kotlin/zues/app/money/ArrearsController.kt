@@ -28,6 +28,13 @@ class ArrearsController(private val arrears: ArrearsService, private val access:
         return arrears.forUnit(unitId, date(asOf))
     }
 
+    /** The debts a payment valued on the date can settle, the oldest first, for the payer to designate one (Rule: PM-DEBT-008) — read as the unit's arrears are (Rule: PM-SEC-002). */
+    @GetMapping("/units/{unitId}/open-debts")
+    fun openDebts(@PathVariable unitId: UUID, @RequestParam asOf: String, signedIn: JwtAuthenticationToken?): List<OpenDebt> {
+        access.unitCharges(unitId, who.of(signedIn))
+        return arrears.openDebts(unitId, date(asOf))
+    }
+
     /**
      * Every unit of the entrance that owes on the date, aged, largest first (Rule: PM-DEBT-001) — one read, not one per
      * unit. Money does not know which entrances exist (registry does), so one with no receivable reads as owing nothing.

@@ -53,6 +53,8 @@ data class AgendaItem(
     val text: String,
     val itemType: String,
     val majorityRuleId: String,
+    /** Accepts absent owners' ballots after its sitting (Rule: PM-GA-017): set as it is drafted, never by the platform. */
+    val absenteeEligible: Boolean = false,
 )
 
 interface AssemblyRepository : ListCrudRepository<Assembly, UUID> {

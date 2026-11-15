@@ -25,6 +25,8 @@ data class FundAccountRow(
     val holderKind: String,     // HolderKind
     // The book party that holds the account, when it is a modelled party (Rule: PM-FUND-004).
     val holderParty: UUID? = null,
+    // The mandate the holder held when the fund's account was opened; none for any other account (Rule: PM-FUND-004).
+    val mandateId: UUID? = null,
 )
 
 /** The account's purpose. The fund is REPAIR_RENEWAL; it must not equal the OPERATING account. */

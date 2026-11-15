@@ -41,6 +41,9 @@ interface Units {
      * both wrong and irreproducible (PM-FEE-014).
      */
     fun forEntrance(entranceId: UUID, on: LocalDate): List<UnitForCharging>
+
+    /** Whether the entrance is registered: one with no units yet is, one nobody registered is not. */
+    fun entranceExists(entranceId: UUID): Boolean
 }
 
 @Component
@@ -49,7 +52,11 @@ class UnitsAdapter(
     private val household: HouseholdMemberRepository,
     private val animals: AnimalRepository,
     private val absences: AbsenceDeclarationRepository,
+    private val entrances: EntranceRepository,
 ) : Units {
+    // Rule: PM-BOOK-012
+    override fun entranceExists(entranceId: UUID): Boolean = entrances.existsById(entranceId)
+
     override fun forEntrance(entranceId: UUID, on: LocalDate): List<UnitForCharging> {
         // PM-FEE-006 counts absence "in a calendar year"; the run's legal date fixes the year.
         val yearStart = LocalDate.of(on.year, 1, 1)
@@ -80,11 +87,12 @@ class UnitsAdapter(
 
     /**
      * PM-FEE-007 — the exemption "MUST NOT [be applied] retroactively beyond the configured
-     * window." A declaration filed more than [graceDays] after the absence ends is late and is
-     * not applied. Timeliness turns on `filedOn`, which the system stamps, not the caller.
+     * window." A declaration handed in more than [graceDays] after the absence ends is late and
+     * is not applied. Timeliness turns on `handedInOn`, not on the day it was entered.
      */
+    // Rule: PM-FEE-007
     private fun timely(d: AbsenceDeclaration, graceDays: Long) =
-        !d.filedOn.isAfter(d.absentTo.plusDays(graceDays))
+        !d.handedInOn.isAfter(d.absentTo.plusDays(graceDays))
 
     /** The declared days that fall in the run's calendar year, clipped to it (PM-FEE-006). */
     private fun daysInYear(d: AbsenceDeclaration, yearStart: LocalDate, yearEnd: LocalDate): Long {

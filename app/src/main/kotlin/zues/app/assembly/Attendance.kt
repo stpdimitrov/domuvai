@@ -8,10 +8,13 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.registry.Holdings
 import zues.app.registry.TitleRole
+import zues.kernel.IdempotencyKey
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /** A person present at a sitting of an assembly — in person or by video (Rule: PM-GA-012). Whom they represent is read from the proxies. */
@@ -27,6 +30,8 @@ data class Attendance(
     val loginIssuer: String,
     val loginSubject: String,
     val recordedAt: Instant,
+    /** The keyed request that entered it (Rule: PM-SYS-014); none on a line entered before the register took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 enum class AttendanceChannel { IN_PERSON, VIDEO }
@@ -47,6 +52,7 @@ data class IdentityVerification(
 interface AttendanceRepository : ListCrudRepository<Attendance, UUID> {
     fun findByAssemblyIdAndSessionNoOrderByRecordedAt(assemblyId: UUID, sessionNo: Int): List<Attendance>
     fun findByAssemblyIdOrderByRecordedAt(assemblyId: UUID): List<Attendance>
+    fun findByRequestKeyId(requestKeyId: UUID): List<Attendance>
 }
 
 interface IdentityVerificationRepository : ListCrudRepository<IdentityVerification, UUID> {
@@ -82,6 +88,7 @@ class AttendanceService(
     private val proxies: ProxyRepository,
     private val sittings: SittingRepository,
     private val holdings: Holdings,
+    private val keys: VoteRequestKeys,
     private val clock: Clock,
 ) {
     /**
@@ -89,15 +96,27 @@ class AttendanceService(
      * proxy registered for this assembly names — nobody else's presence is anybody's for quorum. Recorded by whoever
      * runs the assembly ([by]), on the day of that sitting and on no other; nobody is present twice — an owner who
      * gave a proxy is represented, and is not entered beside their representative (Rule: PM-ORG-005).
+     * Entered under [key] (PM-SYS-014): the same request under the same key — a queue replayed — enters nobody more and is
+     * answered with the line the first one made, even on a later day, once the assembly has left NOTICED/OPEN, or once the person is represented by a proxy since;
+     * the same key for another request or operation is an [IdempotencyKeyReused].
      */
     // Rule: PM-GA-012
     // Rule: PM-GA-016
     // Rule: PM-ORG-005
+    // Rule: PM-SYS-014
     @Transactional
-    fun record(entranceId: UUID, assemblyId: UUID, by: Actor, attendeePartyId: UUID, channel: String): Present {
+    fun record(entranceId: UUID, assemblyId: UUID, key: String, by: Actor, attendeePartyId: UUID, channel: String): Present {
+        val idempotencyKey = IdempotencyKey(key)
         val through = AttendanceChannel.entries.firstOrNull { it.name == channel }
             ?: throw IllegalArgumentException("a person is present IN_PERSON or by VIDEO, not \"$channel\"")
-        val (assembly, ladder, n) = sittingToday(entranceId, assemblyId)
+        val assembly = lock(entranceId, assemblyId)
+        val asked = VoteRequestKeys.hash(assemblyId, by.party, attendeePartyId, through.name)
+        when (val decided = keys.decide(entranceId, idempotencyKey, VoteRequestKeys.RECORD_ATTENDANCE, asked)) {   // decided under the assembly's lock
+            is KeyDecision.Replay -> return asNow(assembly, attendance.findByRequestKeyId(UUID.fromString(decided.resultId)).single())
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
+        val (ladder, n) = onTheDay(assembly)
         require(assembly.mode == MeetingMode.HYBRID.name || assembly.mode == through.name) {
             "this assembly meets ${assembly.mode}: nobody is present at it ${through.name} (PM-GA-016)"
         }
@@ -107,11 +126,12 @@ class AttendanceService(
         check(countedProxies(assemblyId).none { it.principalPartyId == attendeePartyId }) {
             "this owner gave a proxy for this assembly and is represented: they are not entered beside their representative (PM-ORG-005)"
         }
-        val now = clock.instant()
+        val now = clock.instant().truncatedTo(ChronoUnit.MICROS)   // as the column keeps it: the first answer and a replay's read the same instant
         val brings = brings(assembly, ladder.day(n), attendeePartyId, enteredAt = now)
         require(brings.isNotEmpty()) { "the register takes an owner in the entrance, or the representative a registered proxy names (PM-GA-012)" }
+        val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.RECORD_ATTENDANCE, asked)             // kept with the row, in this transaction
         val row = aggregates.insert(
-            Attendance(UUID.randomUUID(), entranceId, assemblyId, n, attendeePartyId, through.name, by.party, by.loginIssuer, by.loginSubject, now),
+            Attendance(UUID.randomUUID(), entranceId, assemblyId, n, attendeePartyId, through.name, by.party, by.loginIssuer, by.loginSubject, now, made),
         )
         return Present(row, identityVerifiedAt = null, brings = brings)
     }
@@ -170,14 +190,30 @@ class AttendanceService(
         return lines(assemblyId, ladder.gathering(ladder.atHand ?: weighed.last().sessionNo)).any { it.attendeePartyId == partyId }
     }
 
+    /** A line as it stands now — verified or not — with whom it brought as of the moment it was entered (a replay's answer). */
+    private fun asNow(assembly: Assembly, row: Attendance): Present {
+        val ladder = Ladder(assembly, sittings.findByAssemblyIdOrderBySessionNo(assembly.id))
+        val verifiedAt = verifications.findByAssemblyId(assembly.id).firstOrNull { it.attendanceId == row.id }?.verifiedAt
+        return Present(row, verifiedAt, brings(assembly, ladder.day(row.sessionNo), row.attendeePartyId, enteredAt = row.recordedAt))
+    }
+
+    private fun lock(entranceId: UUID, assemblyId: UUID): Assembly =
+        assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
+
     /** The assembly, locked, when its notice is posted and today in Sofia is the day of the sitting it is at — that register's one day. */
     private fun sittingToday(entranceId: UUID, assemblyId: UUID): Triple<Assembly, Ladder, Int> {
-        val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
+        val assembly = lock(entranceId, assemblyId)
+        val (ladder, n) = onTheDay(assembly)
+        return Triple(assembly, ladder, n)
+    }
+
+    /** Its notice posted, and today in Sofia the day of the sitting it is at — [assembly] already locked. */
+    private fun onTheDay(assembly: Assembly): Pair<Ladder, Int> {
         check(assembly.status in REGISTER_KEPT) { "the register is kept for an assembly whose notice is posted; this one is ${assembly.status}" }
-        val ladder = Ladder(assembly, sittings.findByAssemblyIdOrderBySessionNo(assemblyId))
+        val ladder = Ladder(assembly, sittings.findByAssemblyIdOrderBySessionNo(assembly.id))
         val n = ladder.atHand ?: throw IllegalStateException("every sitting the law allows this assembly is weighed")
         check(LocalDate.parse(toSofiaDate(clock.instant())) == ladder.day(n)) { "the register of sitting $n is kept on ${ladder.day(n)}" }
-        return Triple(assembly, ladder, n)
+        return ladder to n
     }
 
     /** The proxies that make somebody present: registered by somebody signed in, and for the whole agenda. */

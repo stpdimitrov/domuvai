@@ -7,8 +7,14 @@ import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import zues.app.policy.Asking
+import zues.app.policy.Login
+import zues.app.registry.BookHouseholds
 import zues.app.registry.Holdings
+import zues.app.registry.HouseholdAnswer
 import zues.app.registry.TitleRole
+import zues.kernel.IdempotencyKey
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import zues.law.constantOn
 import java.time.Clock
@@ -43,6 +49,8 @@ data class Proxy(
     val recordedBy: UUID?,
     /** The SHA-256 of that written authorisation; none when the principal appointed in person. */
     val authorisationHash: String?,
+    /** The keyed request that registered it (Rule: PM-SYS-014); none on a proxy registered before proxies took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 /** Who may be a proxy: an adult household member, another owner, or a third party. Rule: PM-GA-009 */
@@ -55,6 +63,7 @@ enum class AuthorisationForm { WRITTEN, NOTARISED, LAWYER_AUTHORISATION }
 
 interface ProxyRepository : ListCrudRepository<Proxy, UUID> {
     fun findByAssemblyId(assemblyId: UUID): List<Proxy>
+    fun findByRequestKeyId(requestKeyId: UUID): List<Proxy>
 }
 
 /**
@@ -83,12 +92,21 @@ class ProxyService(
     private val agenda: AgendaItemRepository,
     private val proxies: ProxyRepository,
     private val holdings: Holdings,
+    private val households: BookHouseholds,
+    private val keys: VoteRequestKeys,
     private val clock: Clock,
 ) {
     // Rule: PM-GA-009
     // Rule: PM-GA-010
+    // Rule: PM-SYS-014
+    /**
+     * Registers [request] under [key] (PM-SYS-014): the same request under the same key — a queue replayed — registers
+     * nothing and is answered with the proxy the first one made, even once the assembly takes no more proxies or its
+     * agent is at the limit; the same key for another request or operation is an [IdempotencyKeyReused].
+     */
     @Transactional
-    fun register(entranceId: UUID, assemblyId: UUID, request: RegisterProxy, by: Actor, authorisationHash: String?): Proxy {
+    fun register(entranceId: UUID, assemblyId: UUID, key: String, request: RegisterProxy, by: Actor, authorisationHash: String?): Proxy {
+        val idempotencyKey = IdempotencyKey(key)
         // appointed in person, or recorded from a document: never a principal named with nothing behind the naming
         if (by.party == request.principalPartyId) {
             require(authorisationHash == null) { "a proxy appointed in person carries no document" }
@@ -103,9 +121,15 @@ class ProxyService(
         require(request.principalPartyId != request.agentPartyId) { "nobody is their own proxy" }
         // the assembly's row is locked, so two registrations for one agent are counted one after the other
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
-        check(assembly.status in PROXIES_OPEN) { "an assembly that is ${assembly.status} takes no new proxies" }
         require((request.items as List<Int?>).none { it == null }) { "an agenda item is named by its number" }
         val items = request.items.distinct().sorted()
+        val asked = VoteRequestKeys.hash(assemblyId, by.party, request.principalPartyId, request.agentPartyId, kind.name, scope.name, items.joinToString(","), form.name, authorisationHash)
+        when (val decided = keys.decide(entranceId, idempotencyKey, VoteRequestKeys.REGISTER_PROXY, asked)) {   // decided under the assembly's lock
+            is KeyDecision.Replay -> return proxies.findByRequestKeyId(UUID.fromString(decided.resultId)).single()
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
+        check(assembly.status in PROXIES_OPEN) { "an assembly that is ${assembly.status} takes no new proxies" }
         if (scope == ProxyScope.LISTED_ITEMS) {
             require(items.isNotEmpty()) { "a proxy for listed items names at least one" }
             val onAgenda = agenda.findByAssemblyIdOrderByOrdinal(assemblyId).map { it.ordinal }
@@ -121,7 +145,7 @@ class ProxyService(
         check(registered.none { it.agentPartyId == request.principalPartyId }) { "the principal represents others at this assembly, and cannot be represented (PM-GA-010)" }
         // The book is asked only after what this assembly already holds: somebody who has their one proxy learns
         // nothing more about who owns or lives where by trying again.
-        requireWhoTheRuleNames(entranceId, request, kind)
+        requireWhoTheRuleNames(entranceId, request, kind, by)
         // TODO(legal): PM-GA-010 — the number is unconfirmed, and so is what it counts: here, the principals (owners or
         // users alike) one party represents at one assembly, whatever kind of representative it is for each. "One
         // person" is one party of the book: a person registered twice is not recognised as one.
@@ -129,9 +153,10 @@ class ProxyService(
         if (registered.count { it.agentPartyId == request.agentPartyId } >= limit.value.toInt()) {
             throw ProxyLimitReached(limit.value.toInt(), limit.source)
         }
+        val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.REGISTER_PROXY, asked)         // kept with the row, in this transaction
         val proxy = Proxy(
             UUID.randomUUID(), entranceId, assemblyId, request.principalPartyId, request.agentPartyId, kind.name,
-            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(), by.loginIssuer, by.loginSubject, by.party, authorisationHash,
+            scope.name, items.joinToString(",").ifEmpty { null }, form.name, clock.instant(), by.loginIssuer, by.loginSubject, by.party, authorisationHash, made,
         )
         try {
             return aggregates.insert(proxy)
@@ -145,13 +170,17 @@ class ProxyService(
      * "An owner or user … MAY appoint a proxy: an adult household member, another owner, or a third party" — as the
      * book stands today in Sofia, through the registry's port: the principal holds a title in the entrance, an agent
      * called an owner owns in it, and an agent called a household member lives in the principal's own household — a
-     * unit the principal holds and lives in too. Anybody else is a third party, and is appointed as one.
+     * unit the principal holds and lives in too — and is no child under six there. Anybody else is a third party, and
+     * is appointed as one. Who lives where is the book's to answer, on its record: only somebody it lets read, or the
+     * principal, is told more than that it does not bear the appointment out (Rule: PM-BOOK-006, PM-BOOK-007).
      */
     // Rule: PM-GA-009
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
     // TODO(legal): PM-GA-009 — whose household: the narrow reading is taken (the principal's own, where they live); whether
     // a landlord may name a member of the household living in their unit is not in the catalogue. Nor is which day
     // governs — the day of appointing, taken here, or the day of the meeting.
-    private fun requireWhoTheRuleNames(entranceId: UUID, request: RegisterProxy, kind: AgentKind) {
+    private fun requireWhoTheRuleNames(entranceId: UUID, request: RegisterProxy, kind: AgentKind, by: Actor) {
         val today = LocalDate.parse(toSofiaDate(clock.instant()))                  // a Sofia calendar day (PM-SYS-004)
         val owned = holdings.inForce(entranceId, today, TitleRole.OWN).holdings
         val principals = (owned + holdings.inForce(entranceId, today, TitleRole.USR).holdings).filter { it.partyId == request.principalPartyId }
@@ -159,12 +188,18 @@ class ProxyService(
         when (kind) {
             AgentKind.OWNER -> require(owned.any { it.partyId == request.agentPartyId }) { "the representative is called another owner, and owns nothing in the entrance today (PM-GA-009)" }
             AgentKind.HOUSEHOLD_MEMBER -> {
-                // TODO(legal): PM-GA-009 — "adult": the book records no date of birth, and the registry's port does not
-                // publish its one age fact (child under six), so no age is checked
-                val residents = holdings.residents(entranceId, today)
-                val home = residents.filter { it.partyId == request.principalPartyId }.map { it.unitId }.toSet().intersect(principals.map { it.unitId }.toSet())
-                require(residents.any { it.partyId == request.agentPartyId && it.unitId in home }) {
-                    "the representative is called a member of the principal's household, and the book does not have the two living in one of the principal's units today (PM-GA-009)"
+                val asking = Asking(Login(by.loginIssuer, by.loginSubject), by.party)
+                when (households.member(entranceId, asking, request.principalPartyId, request.agentPartyId, principals.map { it.unitId }.toSet(), today)) {
+                    HouseholdAnswer.MEMBER -> Unit
+                    HouseholdAnswer.NOT_LIVING_THERE -> throw IllegalArgumentException(
+                        "the representative is called a member of the principal's household, and the book does not have the two living in one of the principal's units today (PM-GA-009)",
+                    )
+                    HouseholdAnswer.CHILD_UNDER_6 -> throw IllegalArgumentException(
+                        "the representative is a member of the principal's household, and the book has them as a child under six: not an adult (PM-GA-009)",
+                    )
+                    HouseholdAnswer.NOT_BORNE_OUT -> throw IllegalArgumentException(
+                        "the representative is called a member of the principal's household, and the book does not bear that out (PM-GA-009)",
+                    )
                 }
             }
             AgentKind.THIRD_PARTY -> Unit                                          // anybody, under a written authorisation: its form is PM-GA-011's

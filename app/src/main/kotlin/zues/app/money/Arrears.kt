@@ -48,6 +48,12 @@ data class UnitArrears(
 data class OldestDebt(val dueOn: LocalDate, val overdueDays: Long)
 
 /**
+ * A debt the payer can name (Rule: PM-DEBT-008): the date a payment designates it by, the day it fell due and what is
+ * still outstanding on it.
+ */
+data class OpenDebt(val debtDate: LocalDate, val dueOn: LocalDate, val outstandingMinor: Long)
+
+/**
  * An entrance's arrears in one read (Rule: PM-DEBT-001): every unit that owes something on the read
  * date, aged as its own read ages it, largest first, and what they owe together — gross, the credit
  * their advances cover, and net, so `totalMinor − advanceMinor = netMinor`. A unit's advance covers only
@@ -86,6 +92,19 @@ class ArrearsService(private val postings: PostingRepository, private val termOn
     @Transactional(readOnly = true)
     fun forUnit(unitId: UUID, asOf: LocalDate): UnitArrears =
         aged(unitId, postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE), postings.findByUnitIdAndAccount(unitId, Ledger.ADVANCE), asOf)
+
+    /**
+     * Rule: PM-DEBT-008 — what a payment valued on [asOf] can settle, the oldest first: the list the allocation itself
+     * works from, so a date offered here is never one a designation is refused for. It is not the arrears of that date:
+     * a credit recorded after [asOf] has already closed its debt here, as it has for that payment, where [forUnit] does
+     * not count it yet. Rule: PM-SYS-002, PM-DEBT-002 — each debt falls due the term in force on its own date, and only
+     * an open debt is looked up; the debt's date stands in for the decision's announcement, as in [forUnit].
+     */
+    @Transactional(readOnly = true)
+    fun openDebts(unitId: UUID, asOf: LocalDate): List<OpenDebt> =
+        Ledger.openDebts(postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE), asOf)
+            .sortedBy { it.valueDate }
+            .map { OpenDebt(it.valueDate, it.valueDate.plusDays(termOn(it.valueDate)), it.outstandingMinor) }
 
     /** Rule: PM-DEBT-001 — the entrance's receivable and advance postings, unit by unit, each aged exactly as [forUnit] ages it. */
     @Transactional(readOnly = true)

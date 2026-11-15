@@ -1,12 +1,14 @@
 package zues.app.registry
 
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.core.NestedExceptionUtils
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.kernel.IdealParts
 import zues.kernel.toSofiaDate
 import java.math.BigDecimal
+import java.sql.SQLException
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
@@ -55,10 +57,15 @@ data class ImportedUnit(
     val ownerName: String? = null,
 )
 
-/** One resident to register in a unit's household. `validFrom` defaults to today in Sofia (PM-SYS-004). */
+/**
+ * One resident to register in a unit's household. `validFrom` defaults to today in Sofia (PM-SYS-004).
+ * [partyId] names the resident by a party already registered — the name stays in `party` alone
+ * (PM-BOOK-011); null enters a resident the headcount counts and nobody can name.
+ */
 data class RegisterMember(
     val isChildUnder6: Boolean = false,
     val validFrom: String? = null,
+    val partyId: UUID? = null,
 )
 
 /** One animal to register in a unit. `validFrom` defaults to today in Sofia (PM-SYS-004). */
@@ -70,11 +77,13 @@ data class RegisterAnimal(
 
 /**
  * One filed absence to record for a unit — a closed span `[absentFrom, absentTo)` of non-use
- * (Rule: PM-FEE-006/007). Both bounds are required; the filing date is stamped by the system.
+ * (Rule: PM-FEE-006/007). Both bounds are required. [handedInOn] is the day the paper declaration
+ * was handed in, when that was before today; the day of entry is stamped by the system.
  */
 data class RegisterAbsence(
     val absentFrom: String,
     val absentTo: String,
+    val handedInOn: String? = null,
 )
 
 /**
@@ -217,7 +226,7 @@ class RegistryService(
                 )
             }
             row.ownerName?.let { name ->
-                val partyId = aggregates.insert(Party(UUID.randomUUID(), name, idType = null, idValue = null, importId = importId)).id
+                val partyId = aggregates.insert(Party(UUID.randomUUID(), name, idType = null, idValue = null, importId = importId, entranceId = entranceId)).id
                 aggregates.insert(
                     Title(
                         id = UUID.randomUUID(), entranceId = entranceId, unitId = unitId, partyId = partyId,
@@ -249,27 +258,48 @@ class RegistryService(
     /**
      * Register residents in a unit's household — the headcount a per-person charge builds on
      * (Rule: PM-FEE-008). Children under six are flagged for separate treatment (Rule:
-     * PM-FEE-005). The unit must exist and belong to the entrance.
+     * PM-FEE-005). The unit must exist and belong to the entrance. A member may be named by a registered
+     * party, so the book names who lives there (Rule: PM-BOOK-002) and a household proxy can be checked
+     * (Rule: PM-GA-009); an unknown party, a party named twice, or one already a member of the unit for an
+     * overlapping stay refuses the whole list, nothing stored (#442).
      */
+    // Rule: PM-BOOK-002, PM-BOOK-011
     @Transactional
     fun registerHousehold(entranceId: UUID, unitId: UUID, members: List<RegisterMember>): List<UUID> {
         // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
         units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
             ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
+        // Rule: PM-BOOK-002 — every named party is checked before any member is stored; one of another entrance is
+        // answered as one unknown, so an id from elsewhere tells nothing (Rule: PM-BOOK-011)
+        val named = members.mapNotNull { it.partyId }.distinct()
+        val known = parties.findAllById(named).filter { it.entranceId == entranceId }.map { it.id }.toSet()
+        require(known.containsAll(named)) { "PM-BOOK-011: no party ${(named - known).joinToString()}" }
         val today = LocalDate.parse(toSofiaDate(clock.instant()))               // a Sofia calendar day (PM-SYS-004)
-        return members.map { member ->
-            aggregates.insert(
-                HouseholdMember(
-                    id = UUID.randomUUID(),
-                    entranceId = entranceId,
-                    unitId = unitId,
-                    partyId = null,
-                    isChildUnder6 = member.isChildUnder6,
-                    validFrom = member.validFrom?.let { LocalDate.parse(it) } ?: today,
-                    validTo = null,
-                ),
-            ).id
+        val entered = members.map { member ->
+            HouseholdMember(
+                id = UUID.randomUUID(),
+                entranceId = entranceId,
+                unitId = unitId,
+                partyId = member.partyId,
+                isChildUnder6 = member.isChildUnder6,
+                validFrom = member.validFrom?.let { LocalDate.parse(it) } ?: today,
+                validTo = null,
+            )
         }
+        // Rule: PM-BOOK-002, PM-FEE-008 — a member is a person and the headcount counts persons: a party
+        // named twice in the list, or already a member of the unit for a stay the new open-ended one
+        // overlaps, would count one person twice. Stays are half-open [validFrom, validTo), as `current`
+        // reads them, so one whose stay ended on or before the new validFrom may be entered again. An
+        // unnamed member is never checked — a headcount needs no name.
+        val repeated = entered.mapNotNull { it.partyId }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        require(repeated.isEmpty()) { "PM-BOOK-002: party ${repeated.joinToString()} named more than once" }
+        // Two concurrent entries can both pass this read; the table's exclusion constraint refuses the second (BOOK-02d).
+        val stays = household.findByUnitId(unitId).filter { it.partyId != null }.groupBy { it.partyId }
+        val already = entered.filter { it.partyId != null }.filter { new ->
+            stays[new.partyId].orEmpty().any { it.validTo == null || it.validTo > new.validFrom }
+        }.map { it.partyId }
+        require(already.isEmpty()) { "PM-BOOK-002: party ${already.joinToString()} is already a member of unit $unitId" }
+        return entered.map { member -> oneStayAtATime(unitId, member.partyId) { aggregates.insert(member).id } }
     }
 
     /**
@@ -300,10 +330,11 @@ class RegistryService(
 
     /**
      * File absence declarations for a unit — the record a per-person exemption requires (Rule:
-     * PM-FEE-007; the exemption itself is PM-FEE-006). Each is a closed span; `filedOn` is
-     * stamped from the clock as the Sofia calendar day (PM-SYS-004), so timeliness turns on when
-     * the system received the filing, not on a date the caller claims. The unit must exist and
-     * belong to the entrance.
+     * PM-FEE-007; the exemption itself is PM-FEE-006). Each is a closed span; `filedOn`, the day
+     * of entry, is stamped from the clock as the Sofia calendar day (PM-SYS-004). The manager states
+     * the day the paper was handed in, on which timeliness turns; it may not be after the day of
+     * entry, and with none stated it is that day. One refused refuses them all, and nothing is
+     * stored. The unit must exist and belong to the entrance.
      */
     @Transactional
     fun registerAbsence(entranceId: UUID, unitId: UUID, declarations: List<RegisterAbsence>): List<UUID> {
@@ -311,21 +342,23 @@ class RegistryService(
         units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
             ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
         val filedOn = LocalDate.parse(toSofiaDate(clock.instant()))             // a Sofia calendar day (PM-SYS-004)
-        return declarations.map { declaration ->
+        val rows = declarations.map { declaration ->
             val from = LocalDate.parse(declaration.absentFrom)
             val to = LocalDate.parse(declaration.absentTo)
             require(to.isAfter(from)) { "absentTo ($to) must be after absentFrom ($from)" }
-            aggregates.insert(
-                AbsenceDeclaration(
-                    id = UUID.randomUUID(),
-                    entranceId = entranceId,
-                    unitId = unitId,
-                    absentFrom = from,
-                    absentTo = to,
-                    filedOn = filedOn,
-                ),
-            ).id
+            val handedInOn = declaration.handedInOn?.let(LocalDate::parse) ?: filedOn
+            require(!handedInOn.isAfter(filedOn)) { "PM-FEE-007: handedInOn ($handedInOn) must not be after the day it is entered ($filedOn)" }
+            AbsenceDeclaration(
+                id = UUID.randomUUID(),
+                entranceId = entranceId,
+                unitId = unitId,
+                absentFrom = from,
+                absentTo = to,
+                filedOn = filedOn,
+                handedInOn = handedInOn,
+            )
         }
+        return rows.map { aggregates.insert(it).id }
     }
 
     /**
@@ -341,7 +374,28 @@ class RegistryService(
             ?.takeIf { it.entranceId == entranceId && it.unitId == unitId }
             ?: throw NoSuchElementException("no resident $memberId in unit $unitId")
         require(on > member.validFrom) { "the move-out ($on) must be after the move-in (${member.validFrom})" }
-        return aggregates.update(member.copy(validTo = on, endRecordedOn = LocalDate.parse(toSofiaDate(clock.instant()))))
+        // Rule: PM-BOOK-002 — a corrected move-out that runs into a later stay of the same party is refused by the table
+        return oneStayAtATime(unitId, member.partyId) {
+            aggregates.update(member.copy(validTo = on, endRecordedOn = LocalDate.parse(toSofiaDate(clock.instant()))))
+        }
+    }
+
+    /**
+     * Rule: PM-BOOK-002, PM-FEE-008 — the table's refusal of two overlapping stays of one party in one unit
+     * (`household_member_party_stays_no_overlap`), said as a 400 naming the rule and the party; nothing is stored, the
+     * transaction rolls back. Any other refusal is passed on.
+     */
+    private fun <T> oneStayAtATime(unitId: UUID, partyId: UUID?, write: () -> T): T = try {
+        write()
+    } catch (e: RuntimeException) {      // Spring Data JDBC wraps the violation in a DbActionExecutionException, no DataAccessException
+        val cause = NestedExceptionUtils.getRootCause(e) as? SQLException
+        if (cause?.sqlState != EXCLUSION_VIOLATION || STAYS_NO_OVERLAP !in cause.message.orEmpty()) throw e
+        throw IllegalArgumentException("PM-BOOK-002: party $partyId already has a stay in unit $unitId that this one overlaps")
+    }
+
+    private companion object {
+        const val EXCLUSION_VIOLATION = "23P01"
+        const val STAYS_NO_OVERLAP = "household_member_party_stays_no_overlap"
     }
 
     /** Record, or correct, the day an animal left the unit — as for a resident (Rule: PM-BOOK-005, PM-BOOK-008). */

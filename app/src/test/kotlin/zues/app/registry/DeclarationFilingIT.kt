@@ -60,7 +60,8 @@ class DeclarationFilingIT {
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
     private val today: LocalDate get() = LocalDate.parse(toSofiaDate(Instant.now()))
 
-    private fun person(name: String, subject: String): UUID = ownership.registerParty(RegisterParty(name)).also { logins.tie(realm, subject, it) }
+    private val aside by lazy { registry.registerEntrance(RegisterEntrance("ул. Другаде 1", "Б", "GA")).entranceId }   // BOOK-02e: a party is registered in an entrance
+    private fun person(name: String, subject: String, entrance: UUID = aside): UUID = ownership.registerParty(RegisterParty(entrance, name)).also { logins.tie(realm, subject, it) }
 
     private fun mandate(entrance: UUID, body: String, party: UUID) {
         jdbc.update(
@@ -84,9 +85,9 @@ class DeclarationFilingIT {
     fun `PM-BOOK-003 an owner or a user files their own declaration for a unit they hold, and nobody else's`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Витоша 2", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        val owner = person("Иван Петров", "owner")
-        val other = person("Георги Стоянов", "other-owner")
-        val user = person("Анна Петрова", "user")
+        val owner = person("Иван Петров", "owner", entrance)
+        val other = person("Георги Стоянов", "other-owner", entrance)
+        val user = person("Анна Петрова", "user", entrance)
         ownership.assignTitle(entrance, flat1, AssignTitle(owner, "OWN", validFrom = "2020-01-01"))
         ownership.assignTitle(entrance, flat2, AssignTitle(other, "OWN", validFrom = "2020-01-01"))
         ownership.assignTitle(entrance, flat1, AssignTitle(user, "USR", validFrom = "2020-01-01"))
@@ -103,7 +104,7 @@ class DeclarationFilingIT {
     fun `PM-BOOK-005 the manager or the board record a declaration handed in, in the name of an owner or user of the unit — the controller and the cashier do not`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Витоша 4", "А", "GA")).entranceId
         val (flat1) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000")))
-        val owner = person("Иван Петров", "r-owner")
+        val owner = person("Иван Петров", "r-owner", entrance)
         ownership.assignTitle(entrance, flat1, AssignTitle(owner, "OWN", validFrom = "2020-01-01"))
         val manager = person("Мария Иванова", "r-manager").also { mandate(entrance, "BM", it) }
         val board = person("Радка Тонева", "r-board").also { mandate(entrance, "MB", it) }

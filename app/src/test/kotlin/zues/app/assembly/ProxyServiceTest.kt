@@ -6,9 +6,15 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import zues.law.constantOn
+import zues.app.policy.Asking
+import zues.app.policy.Login
+import zues.app.registry.BookAccessService
+import zues.app.registry.BookHouseholdsAdapter
 import zues.app.registry.HeldOn
 import zues.app.registry.Holding
 import zues.app.registry.Holdings
@@ -48,18 +54,29 @@ class ProxyServiceTest {
     private val owners = mutableMapOf<UUID, UUID>()                              // party → unit
     private val holdersOfUse = mutableMapOf<UUID, UUID>()
     private val living = mutableMapOf<UUID, UUID>()
+    private val childrenUnder6 = mutableSetOf<UUID>()
+    private val otherRows = mutableListOf<Resident>()                            // a second row of the book for a party already living somewhere
     private val book = object : Holdings {
         override fun inForce(entranceId: UUID, on: LocalDate, role: TitleRole) = HeldOn(
             (if (role == TitleRole.OWN) owners else holdersOfUse).takeIf { asked(entranceId, on) }.orEmpty()
                 .map { (party, unit) -> Holding(party, unit, role.name, "1", "10", "10", "DECLARED") },
             emptyList(),
         )
-        override fun residents(entranceId: UUID, on: LocalDate) = living.takeIf { asked(entranceId, on) }.orEmpty().map { (party, unit) -> Resident(party, unit) }
+        override fun residents(entranceId: UUID, on: LocalDate) =
+            living.takeIf { asked(entranceId, on) }.orEmpty().map { (party, unit) -> Resident(party, unit, party in childrenUnder6) } + otherRows
 
         /** The book answers for this entrance today in Sofia, and for nothing else: the wrong entrance or day finds it empty. */
         private fun asked(entrance: UUID, on: LocalDate) = entrance == entranceId && on == LocalDate.parse("2026-10-09")
     }
-    private val service = ProxyService(aggregates, assemblies, agenda, proxies, book, Clock.fixed(now, ZoneOffset.UTC))
+    /** Whether the book lets the one registering be told; the entry and the decision are `BookHouseholdsTest`'s. */
+    private var told = true
+    private val access: BookAccessService = mock { on { tested(any(), any(), any(), any(), any()) } doAnswer { told } }
+    /** The key space is the persistence test's: here no key was ever kept, so every registration is a new one. */
+    private val keys = VoteRequestKeys(
+        mock(), mock<JdbcAggregateTemplate> { on { insert(any<Any>()) } doAnswer { it.arguments[0] } }, Clock.fixed(now, ZoneOffset.UTC),
+    )
+    private fun key() = UUID.randomUUID().toString()
+    private val service = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), keys, Clock.fixed(now, ZoneOffset.UTC))
 
     private fun actor(party: UUID) = Actor(party, "https://id.example.test/realms/domuvai", "login-$party")
     /** An owner of a unit of their own, living in it. */
@@ -70,7 +87,7 @@ class ProxyServiceTest {
     private fun proxy(
         principal: UUID = owner(), by: UUID = agent, kind: String = "OWNER", scope: String = "WHOLE_AGENDA",
         items: List<Int> = emptyList(), form: String = "WRITTEN",
-    ) = service.register(entranceId, assembly.id, RegisterProxy(principal, by, kind, scope, items, form), actor(principal), null)
+    ) = service.register(entranceId, assembly.id, key(), RegisterProxy(principal, by, kind, scope, items, form), actor(principal), null)
 
     @Test
     fun `PM-GA-009 a proxy registration captures principal, agent, scope and form`() {
@@ -142,16 +159,118 @@ class ProxyServiceTest {
         assertThat(registered).hasSize(before + 4)
     }
 
+    private fun recorded(principal: UUID, by: UUID) = service.register(
+        entranceId, assembly.id, key(), RegisterProxy(principal, by, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(UUID.randomUUID()), "5d".repeat(32),
+    )
+
+    @Test
+    fun `PM-GA-009 a child under six of the principal's home is no adult household member, in person or recorded - the same person unflagged is`() {
+        val principal = owner()
+        val child = UUID.randomUUID().also { living[it] = owners.getValue(principal); childrenUnder6 += it }
+        assertThatThrownBy { proxy(principal, by = child, kind = "HOUSEHOLD_MEMBER") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("child under six").hasMessageContaining("PM-GA-009")
+        assertThatThrownBy { recorded(principal, child) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("child under six").hasMessageContaining("PM-GA-009")
+        assertThat(registered).isEmpty()
+
+        childrenUnder6 -= child
+        assertThat(proxy(principal, by = child, kind = "HOUSEHOLD_MEMBER").agentPartyId).isEqualTo(child)
+        val otherPrincipal = owner()
+        val grown = UUID.randomUUID().also { living[it] = owners.getValue(otherPrincipal) }
+        assertThat(recorded(otherPrincipal, grown).agentPartyId).isEqualTo(grown)
+    }
+
+    @Test
+    fun `PM-GA-009 a child of another home is refused as not of this household - the flag is told only of the principal's own home`() {
+        val principal = owner()
+        val nextDoor = UUID.randomUUID().also { living[it] = UUID.randomUUID(); childrenUnder6 += it }
+        assertThatThrownBy { proxy(principal, by = nextDoor, kind = "HOUSEHOLD_MEMBER") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("household").hasMessageNotContaining("child")
+        // flagged elsewhere and not at home: the home's row is what is asked, and an adult there is appointed
+        val atHome = UUID.randomUUID().also { living[it] = owners.getValue(principal) }
+        otherRows += Resident(atHome, UUID.randomUUID(), childUnder6 = true)
+        assertThat(proxy(principal, by = atHome, kind = "HOUSEHOLD_MEMBER").agentPartyId).isEqualTo(atHome)
+    }
+
+    @Test
+    fun `PM-GA-009 two rows of one home that disagree refuse the agent - the book's flag is not outvoted`() {
+        val principal = owner()
+        val home = owners.getValue(principal)
+        val member = UUID.randomUUID().also { living[it] = home }
+        otherRows += Resident(member, home, childUnder6 = true)
+        assertThatThrownBy { proxy(principal, by = member, kind = "HOUSEHOLD_MEMBER") }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("child under six")
+        assertThat(registered).isEmpty()
+    }
+
+    @Test
+    fun `PM-BOOK-006 a recorder the book does not let read gets one plain refusal, with no word of the flag or of who lives where`() {
+        told = false
+        val principal = owner()
+        val child = UUID.randomUUID().also { living[it] = owners.getValue(principal); childrenUnder6 += it }
+        val nextDoor = UUID.randomUUID().also { living[it] = UUID.randomUUID() }
+
+        val refusals = listOf(child, nextDoor).map { agent ->
+            assertThatThrownBy { recorded(principal, agent) }.isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("does not bear that out").hasMessageContaining("PM-GA-009").hasMessageNotContaining("child").hasMessageNotContaining("living")
+            runCatching { recorded(principal, agent) }.exceptionOrNull()!!.message
+        }
+        assertThat(refusals.toSet()).hasSize(1)
+        assertThat(registered).isEmpty()
+
+        val grown = UUID.randomUUID().also { living[it] = owners.getValue(principal) }
+        assertThat(recorded(principal, grown).agentPartyId).isEqualTo(grown)
+    }
+
+    @Test
+    fun `PM-BOOK-006 a recorder the book lets read keeps today's two refusals`() {
+        val principal = owner()
+        val child = UUID.randomUUID().also { living[it] = owners.getValue(principal); childrenUnder6 += it }
+        val nextDoor = UUID.randomUUID().also { living[it] = UUID.randomUUID() }
+
+        assertThatThrownBy { recorded(principal, child) }.hasMessageContaining("child under six")
+        assertThatThrownBy { recorded(principal, nextDoor) }.hasMessageContaining("does not have the two living in one of the principal's units")
+    }
+
+    @Test
+    fun `PM-BOOK-007 a household member is tested once, as the sign-in, of the principal, today in Sofia`() {
+        val principal = owner()
+        val atHome = UUID.randomUUID().also { living[it] = owners.getValue(principal) }
+
+        proxy(principal, by = atHome, kind = "HOUSEHOLD_MEMBER")
+
+        val asking = Asking(Login("https://id.example.test/realms/domuvai", "login-$principal"), principal)
+        verify(access).tested(entranceId, asking, principal, LocalDate.parse("2026-10-09"), BookHouseholdsAdapter.PURPOSE)
+
+        // recorded from a document: the recorder is who asked, and the household is still the principal's
+        val other = owner()
+        val member = UUID.randomUUID().also { living[it] = owners.getValue(other) }
+        val recorder = UUID.randomUUID()
+        service.register(entranceId, assembly.id, key(), RegisterProxy(other, member, "HOUSEHOLD_MEMBER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(recorder), "5d".repeat(32))
+
+        val theRecorder = Asking(Login("https://id.example.test/realms/domuvai", "login-$recorder"), recorder)
+        verify(access).tested(entranceId, theRecorder, other, LocalDate.parse("2026-10-09"), BookHouseholdsAdapter.PURPOSE)
+    }
+
+    @Test
+    fun `PM-BOOK-007 a proxy of another kind asks nothing about residents and enters nothing`() {
+        proxy(kind = "OWNER")
+        proxy(by = UUID.randomUUID(), kind = "THIRD_PARTY")
+
+        assertThat(registered).hasSize(2)
+        verify(access, never()).tested(any(), any(), any(), any(), any())
+    }
+
     @Test
     fun `PM-GA-009 the book is asked about this entrance, today in Sofia - an owner elsewhere or on another day is not one here`() {
         val principal = owner()
         val elsewhere = UUID.randomUUID()
         whenever(assemblies.lock(any(), any())).thenReturn(assembly.copy(entranceId = elsewhere))
-        assertThatThrownBy { service.register(elsewhere, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
+        assertThatThrownBy { service.register(elsewhere, assembly.id, key(), RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
-        val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
+        val tomorrow = ProxyService(aggregates, assemblies, agenda, proxies, book, BookHouseholdsAdapter(book, access), keys, Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC))
         whenever(assemblies.lock(any(), any())).thenReturn(assembly)
-        assertThatThrownBy { tomorrow.register(entranceId, assembly.id, RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
+        assertThatThrownBy { tomorrow.register(entranceId, assembly.id, key(), RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(principal), null) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         assertThat(registered).isEmpty()
     }
@@ -172,14 +291,14 @@ class ProxyServiceTest {
         val command = RegisterProxy(principal, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN")
         val document = "5d".repeat(32)
         for (missing in listOf(null, "", "authorisation.pdf", "5D".repeat(32))) {
-            assertThatThrownBy { service.register(entranceId, assembly.id, command, recorder, missing) }
+            assertThatThrownBy { service.register(entranceId, assembly.id, key(), command, recorder, missing) }
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         }
-        assertThatThrownBy { service.register(entranceId, assembly.id, command, actor(principal), document) }     // in person: no document
+        assertThatThrownBy { service.register(entranceId, assembly.id, key(), command, actor(principal), document) }     // in person: no document
             .isInstanceOf(IllegalArgumentException::class.java)
         assertThat(registered).isEmpty()
 
-        val recorded = service.register(entranceId, assembly.id, command, recorder, document)
+        val recorded = service.register(entranceId, assembly.id, key(), command, recorder, document)
         assertThat(recorded.principalPartyId).isEqualTo(principal)
         assertThat(recorded.recordedBy).isEqualTo(recorder.party)
         assertThat(recorded.authorisationHash).isEqualTo(document)
@@ -194,7 +313,7 @@ class ProxyServiceTest {
         val recorder = actor(UUID.randomUUID())
         val document = "5d".repeat(32)
         fun recorded(principal: UUID, by: UUID, kind: String) =
-            service.register(entranceId, assembly.id, RegisterProxy(principal, by, kind, "WHOLE_AGENDA", emptyList(), "WRITTEN"), recorder, document)
+            service.register(entranceId, assembly.id, key(), RegisterProxy(principal, by, kind, "WHOLE_AGENDA", emptyList(), "WRITTEN"), recorder, document)
         assertThatThrownBy { recorded(UUID.randomUUID(), agent, "OWNER") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GA-009")
         assertThatThrownBy { recorded(owner(), UUID.randomUUID(), "OWNER") }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("owns nothing")
         assertThat(registered).isEmpty()
@@ -257,7 +376,7 @@ class ProxyServiceTest {
         current = assembly
         // through another entrance's path the assembly is not there: nothing is registered, nothing is listed
         val elsewhere = UUID.randomUUID()
-        assertThatThrownBy { owner().let { p -> service.register(elsewhere, assembly.id, RegisterProxy(p, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(p), null) } }
+        assertThatThrownBy { owner().let { p -> service.register(elsewhere, assembly.id, key(), RegisterProxy(p, agent, "OWNER", "WHOLE_AGENDA", emptyList(), "WRITTEN"), actor(p), null) } }
             .isInstanceOf(NoSuchElementException::class.java)
         proxy()
         assertThatThrownBy { service.forAssembly(elsewhere, assembly.id) }.isInstanceOf(NoSuchElementException::class.java)

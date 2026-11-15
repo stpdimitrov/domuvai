@@ -2,12 +2,16 @@ package zues.app.registry
 
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
@@ -18,6 +22,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.MvcResult
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -33,6 +38,8 @@ import zues.law.constantOn
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * The Book of the Condominium against real PostgreSQL: assemble it from a unit with an owner,
@@ -66,12 +73,15 @@ class BookPersistenceIT {
     @MockitoSpyBean lateinit var book: BookService          // the real one; one test makes it fail after the entry is written
     @Autowired lateinit var declarations: DeclarationService
     @Autowired lateinit var jdbc: JdbcTemplate
+    @Autowired lateinit var headcounts: Units
     @Autowired lateinit var logins: Logins
+    @Autowired lateinit var transactions: PlatformTransactionManager
 
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
 
     /** A registered party with a login of its own, tied to it. */
-    private fun person(name: String, subject: String): UUID = ownership.registerParty(RegisterParty(name)).also { logins.tie(realm, subject, it) }
+    private val aside by lazy { registry.registerEntrance(RegisterEntrance("ул. Другаде 1", "Б", "GA")).entranceId }   // BOOK-02e: a party is registered in an entrance
+    private fun person(name: String, subject: String, entrance: UUID = aside): UUID = ownership.registerParty(RegisterParty(entrance, name)).also { logins.tie(realm, subject, it) }
 
     /** A mandate as the assembly's protocol would give it; nothing writes one through the api yet. */
     private fun mandate(entrance: UUID, body: String, party: UUID, from: LocalDate, to: LocalDate, succeededAt: LocalDate? = null) {
@@ -91,7 +101,7 @@ class BookPersistenceIT {
     fun `PM-BOOK-003 PM-BOOK-004 a filed declaration persists with its template version and clears what was owed`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 3", "А", "GA")).entranceId
         val unit = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
-        val party = ownership.registerParty(RegisterParty("Мария Георгиева"))
+        val party = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
         ownership.assignTitle(entrance, unit, AssignTitle(party, "OWN", validFrom = "2020-01-01"))
         val dayAfterDeadline = LocalDate.parse("2020-01-17")         // acquired 1 Jan 2020; the window closed on the 16th
         assertThat(declarations.overdue(entrance, dayAfterDeadline).single().partyName).isEqualTo("Мария Георгиева")
@@ -113,7 +123,7 @@ class BookPersistenceIT {
             ),
         )
         val unit1 = unitIds[0]
-        val party = ownership.registerParty(RegisterParty("Иван Петров"))
+        val party = ownership.registerParty(RegisterParty(entrance, "Иван Петров"))
         ownership.assignTitle(entrance, unit1, AssignTitle(party, "OWN", validFrom = "2026-01-01"))
         registry.registerHousehold(
             entrance, unit1, listOf(RegisterMember(validFrom = "2026-01-01"), RegisterMember(validFrom = "2026-01-01")),
@@ -127,6 +137,7 @@ class BookPersistenceIT {
         assertThat(e1.idealParts).isEqualTo("60.0000")
         assertThat(e1.parties.first { it.name == "Иван Петров" }.role).isEqualTo("OWN")
         assertThat(e1.householdCount).isEqualTo(2)
+        assertThat(e1.household).allSatisfy { assertThat(it.name).isNull(); assertThat(it.from).isEqualTo("2026-01-01") }
         assertThat(e1.nonUse).hasSize(1)
         assertThat(e1.complete).isTrue()                       // PM-BOOK-002: ideal parts + an owner named
 
@@ -142,12 +153,132 @@ class BookPersistenceIT {
     }
 
     @Test
+    fun `PM-BOOK-002 a member entered with a registered party is served by name, and an unknown party stores nothing`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 11", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева", "EGN", "7501010010"))
+        val rows = "SELECT count(*) FROM registry.household_member WHERE unit_id = ?"
+
+        assertThatThrownBy { registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = UUID.randomUUID()))) }
+            .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-BOOK-011")
+        assertThat(jdbc.queryForObject(rows, Int::class.java, flat)).isZero()
+
+        registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria), RegisterMember(validFrom = "2026-01-01")))
+
+        val line = book.forEntrance(entrance, LocalDate.parse("2026-06-01")).units.single()
+        assertThat(line.household.map { it.partyId to it.name }).containsExactlyInAnyOrder(maria to "Мария Георгиева", null to null)
+        assertThat(line.household.toString()).doesNotContain("7501010010")   // PM-BOOK-011
+    }
+
+    @Test
+    fun `PM-FEE-008 a refused repeat of a member leaves the unit's headcount unchanged, and one who moved out is entered again`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 13", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
+        fun occupants(on: String) = headcounts.forEntrance(entrance, LocalDate.parse(on)).single().occupants
+        val member = registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria))).single()
+
+        for (repeat in listOf(
+            listOf(RegisterMember(validFrom = "2026-02-01"), RegisterMember(validFrom = "2026-02-01", partyId = maria)),  // already living there
+            listOf(RegisterMember(validFrom = "2025-06-01", partyId = maria)),                                            // an earlier start overlaps too
+        )) {
+            assertThatThrownBy { registry.registerHousehold(entrance, flat, repeat) }
+                .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-BOOK-002").hasMessageContaining(maria.toString())
+        }
+        assertThat(occupants("2026-06-01")).isEqualTo(1)
+
+        registry.endHouseholdStay(entrance, flat, member, LocalDate.parse("2026-04-01"))
+        registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-04-01", partyId = maria)))
+        assertThat(occupants("2026-03-31")).isEqualTo(1)
+        assertThat(occupants("2026-06-01")).isEqualTo(1)
+    }
+
+    @Test
+    fun `PM-BOOK-002 PM-FEE-008 two concurrent entries of one party into one unit store exactly one row, the other a 400, and count her once`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 15", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
+        mandate(entrance, "BM", person("Мария Иванова", "login-manager"), today.minusMonths(1), today.plusMonths(11))
+        val second = Executors.newSingleThreadExecutor()
+        var blocked = false
+        try {
+            // The first entry is made and held uncommitted; the second, over HTTP, reads no stay of Maria's, passes the
+            // service's check and inserts — and the table makes it wait for the first. Then the first commits.
+            val pending = TransactionTemplate(transactions).execute {
+                registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria)))
+                second.submit<MvcResult> {
+                    mvc.perform(
+                        post("/api/registry/entrances/$entrance/units/$flat/household").by("login-manager")
+                            .contentType(MediaType.APPLICATION_JSON).content("""{"members":[{"partyId":"$maria","validFrom":"2026-02-01"}]}"""),
+                    ).andReturn()
+                }.also { other ->
+                    // the second waits on the first's transaction id; pg_locks is read afresh, not a snapshot
+                    val waiting = "SELECT count(*) FROM pg_locks WHERE locktype = 'transactionid' AND NOT granted"
+                    val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+                    while (!other.isDone && !blocked && System.nanoTime() < until) {
+                        blocked = jdbc.queryForObject(waiting, Int::class.java)!! > 0
+                        if (!blocked) Thread.sleep(20)
+                    }
+                }
+            }!!
+            val refused = pending.get(30, TimeUnit.SECONDS).response
+            assertThat(blocked).describedAs("the second entry got past the read and waited on the table").isTrue()
+            assertThat(refused.status).isEqualTo(400)
+            assertThat(refused.contentAsString).contains("PM-BOOK-002").contains(maria.toString())
+        } finally {
+            second.shutdownNow()
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM registry.household_member WHERE unit_id = ? AND party_id = ?", Int::class.java, flat, maria)).isEqualTo(1)
+        assertThat(headcounts.forEntrance(entrance, LocalDate.parse("2026-06-01")).single().occupants).isEqualTo(1)
+    }
+
+    @Test
+    fun `PM-BOOK-002 a corrected move-out that runs into a later stay of the same party is a 400 and changes nothing`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 17", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
+        mandate(entrance, "BM", person("Мария Иванова", "login-manager"), today.minusMonths(1), today.plusMonths(11))
+        val first = registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria))).single()
+        registry.endHouseholdStay(entrance, flat, first, LocalDate.parse("2026-04-01"))
+        registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-04-01", partyId = maria)))
+        fun end(on: String) = mvc.perform(
+            post("/api/registry/entrances/$entrance/units/$flat/household/$first/end").by("login-manager")
+                .contentType(MediaType.APPLICATION_JSON).content("""{"on":"$on"}"""),
+        )
+        val stored = "SELECT valid_to FROM registry.household_member WHERE id = ?"
+
+        end("2026-05-01").andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value(containsString("PM-BOOK-002")))
+        assertThat(jdbc.queryForObject(stored, LocalDate::class.java, first)).isEqualTo(LocalDate.parse("2026-04-01"))
+
+        end("2026-03-01").andExpect(status().isOk)                       // a correction clear of the later stay is recorded
+        assertThat(jdbc.queryForObject(stored, LocalDate::class.java, first)).isEqualTo(LocalDate.parse("2026-03-01"))
+    }
+
+    @Test
+    fun `PM-BOOK-002 against the table a party whose stay ended before the new validFrom is entered, and unnamed members are never refused`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 19", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        val maria = ownership.registerParty(RegisterParty(entrance, "Мария Георгиева"))
+        val first = registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01", partyId = maria))).single()
+        registry.endHouseholdStay(entrance, flat, first, LocalDate.parse("2026-03-01"))
+
+        registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-04-01", partyId = maria)))
+        repeat(2) { registry.registerHousehold(entrance, flat, listOf(RegisterMember(validFrom = "2026-01-01"), RegisterMember(validFrom = "2026-01-01"))) }
+        // the table itself, past the service: overlapping unnamed stays are still not one person's
+        jdbc.update("INSERT INTO registry.household_member (id, entrance_id, unit_id, valid_from) VALUES (?, ?, ?, ?)", UUID.randomUUID(), entrance, flat, LocalDate.parse("2026-01-01"))
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM registry.household_member WHERE unit_id = ? AND party_id = ?", Int::class.java, flat, maria)).isEqualTo(2)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM registry.household_member WHERE unit_id = ? AND party_id IS NULL", Int::class.java, flat)).isEqualTo(5)
+    }
+
+    @Test
     fun `PM-BOOK-006 owner A asking for the book is a 403 and an entry, the manager in office reads it, and one no longer in office does not`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 9", "А", "GA")).entranceId
         val other = registry.registerEntrance(RegisterEntrance("ул. Раковски 9", "Б", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        val ownerA = person("Иван Петров", "login-owner-a")
-        val ownerB = person("Георги Стоянов", "login-owner-b")
+        val ownerA = person("Иван Петров", "login-owner-a", entrance)
+        val ownerB = person("Георги Стоянов", "login-owner-b", entrance)
         ownership.assignTitle(entrance, flat1, AssignTitle(ownerA, "OWN", validFrom = "2020-01-01"))
         ownership.assignTitle(entrance, flat2, AssignTitle(ownerB, "OWN", validFrom = "2020-01-01"))
         registry.registerHousehold(entrance, flat2, listOf(RegisterMember(validFrom = "2020-01-01")))
@@ -219,9 +350,9 @@ class BookPersistenceIT {
     fun `PM-BOOK-006 the owners list, the overdue list and the retention pass are the manager's and the board's — the controller reads and does not anonymise, an owner gets none`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Раковски 11", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
-        val ownerA = person("Иван Петров", "login-11-owner-a")
+        val ownerA = person("Иван Петров", "login-11-owner-a", entrance)
         ownership.assignTitle(entrance, flat1, AssignTitle(ownerA, "OWN", validFrom = "2020-01-01"))
-        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "login-11-owner-b"), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, flat2, AssignTitle(person("Георги Стоянов", "login-11-owner-b", entrance), "OWN", validFrom = "2020-01-01"))
         val manager = person("Мария Иванова", "login-11-manager")
         val controller = person("Елена Колева", "login-11-controller")
         mandate(entrance, "BM", manager, today.minusMonths(1), today.plusMonths(11))
@@ -246,7 +377,7 @@ class BookPersistenceIT {
         mvc.perform(get(owners).param("on", today.toString()).by("login-11-controller")).andExpect(status().isOk)
         mvc.perform(get(overdue).by("login-11-controller")).andExpect(status().isOk)
         mvc.perform(post(retention).by("login-11-controller")).andExpect(status().isForbidden)                                    // reads all, writes none
-            .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("anonymised by the manager and the board")))
+            .andExpect(jsonPath("$.error").value(containsString("anonymised by the manager and the board")))
 
         assertThat(listOf(entries("OWNERS_LIST", "SERVED"), entries("OWNERS_LIST", "REFUSED"), entries("OVERDUE_LIST", "SERVED"), entries("OVERDUE_LIST", "REFUSED"),
             entries("RETENTION", "SERVED"), entries("RETENTION", "REFUSED"))).containsExactly(2L, 2L, 2L, 1L, 2L, 2L)

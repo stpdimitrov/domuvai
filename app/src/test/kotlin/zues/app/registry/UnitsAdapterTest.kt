@@ -23,7 +23,8 @@ class UnitsAdapterTest {
     private val household: HouseholdMemberRepository = mock()
     private val animals: AnimalRepository = mock()
     private val absences: AbsenceDeclarationRepository = mock()
-    private val adapter = UnitsAdapter(units, household, animals, absences)
+    private val entrances: EntranceRepository = mock()
+    private val adapter = UnitsAdapter(units, household, animals, absences, entrances)
 
     private val entranceId = UUID.randomUUID()
     private val unitId = UUID.randomUUID()
@@ -42,8 +43,8 @@ class UnitsAdapterTest {
     private fun animal(from: LocalDate = LocalDate.of(2026, 1, 1), to: LocalDate? = null) =
         Animal(UUID.randomUUID(), entranceId, unitId, "cat", "VP-1", from, to)
 
-    private fun absence(from: LocalDate, to: LocalDate, filedOn: LocalDate) =
-        AbsenceDeclaration(UUID.randomUUID(), entranceId, unitId, from, to, filedOn)
+    private fun absence(from: LocalDate, to: LocalDate, filedOn: LocalDate, handedInOn: LocalDate = filedOn) =
+        AbsenceDeclaration(UUID.randomUUID(), entranceId, unitId, from, to, filedOn, handedInOn)
 
     private val exemptionDays = numberOn("ABSENCE_EXEMPTION_DAYS", period.toString()).toInt()
     private val graceDays = numberOn("ABSENCE_DECLARATION_GRACE_DAYS", period.toString()).toLong()
@@ -142,6 +143,29 @@ class UnitsAdapterTest {
     }
 
     @Test
+    fun `PM-FEE-007 a declaration handed in on time and entered after the window earns the exemption`() {
+        val from = LocalDate.of(2026, 1, 1)
+        val to = LocalDate.of(2026, 3, 1)
+        val cutoff = to.plusDays(graceDays)
+        val enteredLate = cutoff.plusDays(10)
+
+        whenever(absences.findByUnitId(unitId)).thenReturn(listOf(absence(from, to, filedOn = enteredLate, handedInOn = cutoff)))
+        assertThat(adapter.forEntrance(entranceId, period).single().absentDays)
+            .isEqualTo(ChronoUnit.DAYS.between(from, to).toInt())
+            .isGreaterThan(exemptionDays)
+    }
+
+    @Test
+    fun `PM-FEE-007 a declaration handed in after the window is not applied, however soon it was entered`() {
+        val from = LocalDate.of(2026, 1, 1)
+        val to = LocalDate.of(2026, 3, 1)
+        val oneDayLate = to.plusDays(graceDays + 1)
+
+        whenever(absences.findByUnitId(unitId)).thenReturn(listOf(absence(from, to, filedOn = oneDayLate, handedInOn = oneDayLate)))
+        assertThat(adapter.forEntrance(entranceId, period).single().absentDays).isEqualTo(0)
+    }
+
+    @Test
     fun `PM-ORG-009 the view for charging reports business use and a separate entrance as two facts`() {
         whenever(units.findByEntranceId(entranceId)).thenReturn(
             listOf(
@@ -155,5 +179,13 @@ class UnitsAdapterTest {
         assertThat(view.map { Triple(it.designation, it.businessUse, it.separateEntrance) }).containsExactly(
             Triple("магазин 1", true, false), Triple("магазин 2", true, true), Triple("ап. 1", false, true), Triple("ап. 2", false, false),
         )
+    }
+
+    @Test
+    fun `PM-BOOK-012 an entrance is registered or it is not, whatever units it has`() {
+        val registered = UUID.randomUUID()
+        whenever(entrances.existsById(registered)).thenReturn(true)
+        assertThat(adapter.entranceExists(registered)).isTrue()
+        assertThat(adapter.entranceExists(UUID.randomUUID())).isFalse()
     }
 }

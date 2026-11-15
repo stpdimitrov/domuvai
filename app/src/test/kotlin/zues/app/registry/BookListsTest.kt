@@ -62,7 +62,7 @@ class BookListsTest {
         Asking(Login(AN_ISSUER, subject), UUID.randomUUID()).also { if (role != null) holdings += Dated(it.party!!, Held(role, entranceId, setOf(UUID.randomUUID())), from, until) }
 
     private val on = LocalDate.parse("2025-01-15")
-    private val theOwners = listOf(OwnerView(UUID.randomUUID(), "Иван Петров", "OWN", BigDecimal.ONE))
+    private val theOwners = listOf(OwnerView(UUID.randomUUID(), UUID.randomUUID(), "Иван Петров", "OWN", BigDecimal.ONE))
     private val theOverdue = listOf(OverdueDeclaration(UUID.randomUUID(), "ап. 1", "Мария Георгиева", "OWN", on.minusMonths(1), on.minusDays(10)))
     private val applied = RetentionApplied(today, householdUnlinked = 1, animalPassportsCleared = 2)
     private val written = mutableListOf<BookAccessRow>()

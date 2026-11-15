@@ -3,15 +3,18 @@ import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthName, reach, shiftPeriod as shift, thisPeriod, type EntranceAt } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
+import { passedDecisions, type Passed } from "./decisions";
+import IssueForm from "./IssueForm";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Начисления — Етаж" };
 
 type UnitCharge = Schemas["UnitChargeResponse"];
 
 /**
- * The basis a run is computed from — a general-assembly decision (PM-FEE-012). The assembly module
- * does not serve decisions yet, and the API takes the tariff with the request, so this page posts
- * the design's decision as a DEMO basis and says so on screen. Never bill from it (ADR-012 §7).
+ * The basis the table below is previewed on (PM-FEE-012). The API takes the tariff with the request and checks
+ * its decisions on issue only, so this page posts the design's decision as a DEMO basis and says so on screen. A run is
+ * issued from the form, on a decision the assembly took (`passedDecisions`); never bill from this one (ADR-012 §7).
  */
 const DEMO_BASIS = {
   decision: "Решение на ОС от 12.03.2026, т. 4",
@@ -29,7 +32,7 @@ const describe = (l: Schemas["TariffLineRequest"]) =>
 const pct = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 4, maximumFractionDigits: 6 }) + "%";
 
 type Loaded =
-  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string>; namesFailed?: string }
+  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string>; namesFailed?: string; passed: Passed[]; decisionsFailed?: string }
   | Exclude<EntranceAt, { kind: "ok" }>
   | { kind: "refused"; entrance: Schemas["EntranceView"]; message: string; aboutMultiple: boolean };
 
@@ -62,9 +65,10 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     }),
     api.GET("/api/registry/entrances/{entranceId}/units", { params: { path } }),
     api.GET("/api/registry/entrances/{entranceId}/owners", { params: { path, query: { on: legalDate } } }),
+    passedDecisions(entrance.id),   // the decisions a run may be issued on (WEB-38, PM-FEE-012)
   ]));
   if (!fetched) return { kind: "down" };
-  const [run, units, owners] = fetched;
+  const [run, units, owners, decisions] = fetched;
   if (!run.data) {
     const message = run.error?.error ?? `HTTP ${run.response.status}`;
     return { kind: "refused", entrance, message: unansweredBy(run, "изчислението"), aboutMultiple: message.includes("PM-FEE-010") };   // the API names the rule it refuses on
@@ -79,6 +83,8 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     entrance,
     run: run.data,
     ideal: new Map((units.data ?? []).map((u) => [u.id, u.idealPartsPct])),
+    passed: "passed" in decisions ? decisions.passed : [],
+    decisionsFailed: "refused" in decisions ? decisions.refused : undefined,
     owners: new Map([...names].map(([unit, list]) => [unit, list.sort((a, b) => a.localeCompare(b, "bg")).join(", ")])),   // the API lists them in no fixed order
     // The amounts are money's and stay; what the registry did not give is said to be refused, never left as a dash.
     namesFailed: [
@@ -153,7 +159,7 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-            {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
+            {view.kind === "none" && <NoEntrance />}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
             {view.kind === "refused" && (
               <>
@@ -195,7 +201,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
               {[DEMO_BASIS.decision, ...DEMO_BASIS.lines.map(describe)].join(" · ")}
             </div>
             <div style={{ font: "400 11.5px/1.5 'IBM Plex Mono', monospace", color: "#6B6F6C", marginTop: 4 }}>
-              Демо базис: модулът „Общи събрания“ ще подава решенията. Не се начислява от него.
+              Демо базис за прегледа на тази страница, не решение на общото събрание. Не се начислява от него.
             </div>
             <div style={{ font: "400 12.5px/1.6 'IBM Plex Sans'", color: "#3D413E", marginTop: 8 }}>
               {multiple.value != null
@@ -261,7 +267,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
             <span style={{ color: "#14584A", fontWeight: 500 }}>{idealSum}</span> · посочете сума, за да видите как е изведена
           </div>
           <div style={{ font: "400 11.5px/1.4 'IBM Plex Mono', monospace", color: "#6B6F6C" }}>
-            Преглед — нищо не е записано. Издаването изисква решение на ОС, не демо базис.
+            Преглед на демо базиса — нищо не е записано. Издаването е по-долу, по прието решение на ОС.
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
@@ -269,9 +275,10 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
             <div style={{ font: "400 11px/1 'IBM Plex Sans'", letterSpacing: ".1em", textTransform: "uppercase", color: "#6B6F6C" }}>Общо за начисляване</div>
             <div style={{ font: "500 24px/1.2 'IBM Plex Sans'", fontVariantNumeric: "tabular-nums" }}>{eur(run.totalMinor)}</div>
           </div>
-          <button type="button" className="btn-confirm" disabled title="Издаването изисква решение на ОС" style={{ opacity: 0.5, cursor: "not-allowed" }}>Потвърди начисленията</button>
         </div>
       </div>
+
+      <IssueForm entrance={view.entrance.id} period={period} multiple={multiple.given} passed={view.passed} unread={view.decisionsFailed} />
     </>
   );
 }

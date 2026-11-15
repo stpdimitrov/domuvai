@@ -7,9 +7,11 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import zues.app.identity_org.PartyNames
 import zues.app.identity_org.WhoAsks
 import java.time.Instant
 import java.util.UUID
@@ -18,7 +20,10 @@ data class RecordAttendanceRequest(val attendeePartyId: UUID, val channel: Strin
 
 data class VerifyIdentityRequest(val how: String)
 
-/** A line of the register. [counted] is false for a remote participant not yet identified; [represents] is whom the line makes present. */
+/**
+ * A line of the register. [counted] is false for a remote participant not yet identified; [represents] is whom the line makes present.
+ * [names] gives the name of each party the line carries, to the manager, the board and the controller only — absent otherwise.
+ */
 data class AttendanceView(
     val id: UUID,
     val sessionNo: Int,
@@ -30,24 +35,28 @@ data class AttendanceView(
     val represents: List<UUID>,
     val recordedBy: UUID,
     val recordedAt: Instant,
+    val names: Map<UUID, String>? = null,
 )
 
 /**
  * The register of who is present at an assembly (PM-GA-012, PM-GA-016). It is kept by whoever runs the assembly, signed
  * in — never by a field of the request — and anybody else is a 403 naming the rule (PM-SEC-001). It is read as the
- * assembly is.
+ * assembly is. A person is entered under an `Idempotency-Key` (PM-SYS-014): the same request sent again — a device's queue
+ * replayed — enters nobody more and is answered with the line it first made; the same key for another request is a 409.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/attendance")
-class AttendanceController(private val acts: AssemblyActs, private val attendance: AttendanceService, private val reads: AssemblyReads, private val who: WhoAsks) {
+class AttendanceController(private val acts: AssemblyActs, private val attendance: AttendanceService, private val reads: AssemblyReads, private val who: WhoAsks, private val names: PartyNames) {
 
     // Rule: PM-GA-012
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun record(
-        @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: RecordAttendanceRequest, signedIn: JwtAuthenticationToken?,
-    ): AttendanceView = view(acts.recordAttendance(who.of(signedIn), entranceId, assemblyId, request.attendeePartyId, request.channel))
+        @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: RecordAttendanceRequest,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String, signedIn: JwtAuthenticationToken?,
+    ): AttendanceView = view(acts.recordAttendance(who.of(signedIn), entranceId, assemblyId, idempotencyKey, request.attendeePartyId, request.channel))
 
     // Rule: PM-GA-016
     // Rule: PM-SEC-001
@@ -59,20 +68,31 @@ class AttendanceController(private val acts: AssemblyActs, private val attendanc
     ): AttendanceView = view(acts.verifyIdentity(who.of(signedIn), entranceId, assemblyId, attendanceId, request.how))
 
     // Rule: PM-SEC-001
+    // Rule: PM-BOOK-006
+    // Rule: PM-BOOK-007
+    // Rule: PM-BOOK-011
+    // Rule: PM-SEC-002
     @GetMapping
     fun register(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, signedIn: JwtAuthenticationToken?): List<AttendanceView> {
-        reads.require(entranceId, who.of(signedIn))
-        return attendance.register(entranceId, assemblyId).map(::view)
+        val asking = who.of(signedIn)
+        reads.require(entranceId, asking)
+        val lines = attendance.register(entranceId, assemblyId)
+        val served = names.beside(entranceId, asking, lines.flatMap { it.represented + it.attendance.attendeePartyId }, NamedRead.REGISTER)
+        return lines.map { view(it, served) }
     }
 
-    private fun view(p: Present) = p.attendance.let {
-        AttendanceView(it.id, it.sessionNo, it.attendeePartyId, it.channel, p.identityVerified, p.identityVerifiedAt, p.counted, p.represented.sortedBy { id -> id.toString() }, it.recordedBy, it.recordedAt)
+    private fun view(p: Present, served: Map<UUID, String>? = null) = p.attendance.let {
+        AttendanceView(
+            it.id, it.sessionNo, it.attendeePartyId, it.channel, p.identityVerified, p.identityVerifiedAt, p.counted, p.represented.sortedBy { id -> id.toString() },
+            it.recordedBy, it.recordedAt, served.of(it.attendeePartyId, *p.represented.toTypedArray()),
+        )
     }
 
     @ExceptionHandler(ActRefused::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onRefused(e: ActRefused): Map<String, String> = mapOf("error" to (e.message ?: "not allowed"), "rule" to e.ruleId)
 
+    /** Also a blank key. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid request"))
@@ -81,7 +101,7 @@ class AttendanceController(private val acts: AssemblyActs, private val attendanc
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
-    /** Not yet noticed, not yet the day, already on the register, or already verified. */
+    /** Not yet noticed, not yet the day, already on the register, already verified, or the key was used for another request. */
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))

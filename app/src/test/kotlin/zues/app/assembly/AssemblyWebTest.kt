@@ -328,7 +328,7 @@ class AssemblyWebTest {
         for (subject in listOf("login-other-owner", "login-owner-and-manager", "login-manager", "login-controller")) {
             mvc.perform(post("$base/${assembly.id}/agenda").by(subject).content(agenda)).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-GA-003"))
         }
-        verify(assemblies, never()).addAgendaItem(any(), any(), any(), any())
+        verify(assemblies, never()).addAgendaItem(any(), any(), any(), any(), any())
         val majority = MajorityRule("GENERAL", "50", Comparison.MORE_THAN, Denominator.REPRESENTED, "2009-01-01", "чл. 17 ЗУЕС", true, "PM-VOTE-002")
         whenever(assemblies.addAgendaItem(entranceId, assembly.id, "Ремонт на покрива", "GENERAL"))
             .thenReturn(AgendaItemBound(AgendaItem(UUID.randomUUID(), entranceId, assembly.id, 1, "Ремонт на покрива", "GENERAL", majority.id), majority, false))
@@ -409,7 +409,7 @@ class AssemblyWebTest {
             post("$base/${assembly.id}/notice-posting").by("login-manager")
                 .content("""{"postedAt":"$at","coSignatoryPartyId":"${UUID.randomUUID()}","photoHash":"${"ab".repeat(32)}"}"""),
         ).andExpect(status().isConflict).andExpect(jsonPath("$.error").value("PM-GA-004"))
-        whenever(assemblies.addAgendaItem(any(), any(), any(), eq("COMMON_PART_USE_RIGHT"))).thenThrow(MajorityPending("TODO(legal): PM-VOTE-004"))
+        whenever(assemblies.addAgendaItem(any(), any(), any(), eq("COMMON_PART_USE_RIGHT"), any())).thenThrow(MajorityPending("TODO(legal): PM-VOTE-004"))
         mvc.perform(post("$base/${assembly.id}/agenda").by("login-manager").content("""{"text":"Покривът под наем","itemType":"COMMON_PART_USE_RIGHT"}"""))
             .andExpect(status().isUnprocessableEntity).andExpect(jsonPath("$.error").value("TODO(legal): PM-VOTE-004"))
         whenever(assemblies.reschedule(any(), any(), any(), any())).thenThrow(IllegalArgumentException("PM-GA-004"))

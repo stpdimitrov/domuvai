@@ -18,6 +18,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 data class RegisterPartyRequest(
+    val entranceId: UUID,        // the entrance whose book may name the party, and no other's (PM-BOOK-011)
     val fullName: String,
     val idType: String? = null,
     val idValue: String? = null,
@@ -35,9 +36,10 @@ data class AssignTitleRequest(
 
 data class TitleAssignedResponse(val titleId: UUID)
 
-/** The resident-visible owner line — name only, never an identity number (PM-BOOK-011). */
+/** The owner line — the party's id beside the name, never an identity number (PM-BOOK-011). */
 data class OwnerResponse(
     val unitId: UUID,
+    val partyId: UUID,
     val partyName: String,
     val titleRole: String,
     val share: BigDecimal,
@@ -47,16 +49,17 @@ data class OwnerResponse(
 @RestController
 @RequestMapping("/api/registry")
 class OwnershipController(
-    private val ownership: OwnershipService,
+    private val registrations: Registrations,
     private val lists: BookLists,
     private val book: BookEntries,
     private val who: WhoAsks,
 ) {
 
+    /** A party, registered in an entrance by the administrator or by the manager or the board of that entrance; anybody else is a 403 (PM-SEC-001, PM-BOOK-005, PM-BOOK-011). */
     @PostMapping("/parties")
     @ResponseStatus(HttpStatus.CREATED)
-    fun registerParty(@RequestBody request: RegisterPartyRequest): PartyRegisteredResponse {
-        val id = ownership.registerParty(RegisterParty(request.fullName, request.idType, request.idValue))
+    fun registerParty(@RequestBody request: RegisterPartyRequest, signedIn: JwtAuthenticationToken?): PartyRegisteredResponse {
+        val id = registrations.party(RegisterParty(request.entranceId, request.fullName, request.idType, request.idValue), who.of(signedIn))
         return PartyRegisteredResponse(id)
     }
 
@@ -91,16 +94,16 @@ class OwnershipController(
         val date = runCatching { LocalDate.parse(on) }
             .getOrElse { throw IllegalArgumentException("on must be an ISO date (YYYY-MM-DD): $on") }
         return lists.owners(entranceId, date, who.of(signedIn)).orForbidden()
-            .map { OwnerResponse(it.unitId, it.partyName, it.titleRole, it.share) }
+            .map { OwnerResponse(it.unitId, it.partyId, it.partyName, it.titleRole, it.share) }
     }
 
-    /** A blank name, an unknown id type or role, or a share outside (0, 1] → 400. */
+    /** A blank name, an unknown id type or role, a share outside (0, 1], or a party unknown to the entrance → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> =
         mapOf("error" to (e.message ?: "invalid request"))
 
-    /** No such unit, entrance or party. */
+    /** No such unit or entrance. */
     @ExceptionHandler(NoSuchElementException::class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> =

@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
+import java.sql.SQLException
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -62,6 +64,19 @@ class MoveOutTest {
             .thenReturn(Optional.of(resident.copy(validTo = movedOut, endRecordedOn = LocalDate.parse("2026-05-02"))))
         registry.endHouseholdStay(entranceId, unitId, resident.id, LocalDate.parse("2026-06-01"))
         assertThat(updates.single()).isEqualTo(resident.copy(validTo = LocalDate.parse("2026-06-01"), endRecordedOn = recordedOn))
+    }
+
+    @Test
+    fun `PM-BOOK-002 a corrected move-out that runs into a later stay of the same party is a refusal naming the rule`() {
+        val party = UUID.randomUUID()
+        whenever(household.findById(resident.id)).thenReturn(Optional.of(resident.copy(partyId = party, validTo = movedOut)))
+        val overlap = SQLException("conflicting key value violates exclusion constraint \"household_member_party_stays_no_overlap\"", "23P01")
+        whenever(aggregates.update(any<Any>())).thenThrow(DataIntegrityViolationException("update", overlap))
+
+        assertThatThrownBy { registry.endHouseholdStay(entranceId, unitId, resident.id, LocalDate.parse("2026-06-01")) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("PM-BOOK-002")
+            .hasMessageContaining(party.toString())
     }
 
     @Test

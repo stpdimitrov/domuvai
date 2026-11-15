@@ -54,7 +54,13 @@ class MandateRolesIT {
         return UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'А', 'GA')", it, condominium) }
     }
 
-    private fun party(): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, full_name) VALUES (?, ?)", it, "Иван Петров") }
+    /** BOOK-02e: a party is registered in an entrance; these hold no title here, so they are registered in one aside. */
+    private val aside: UUID by lazy {
+        val condominium = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.condominium (id, address) VALUES (?, ?)", it, "ул. Другаде 1") }
+        UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'Б', 'GA')", it, condominium) }
+    }
+
+    private fun party(): UUID = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, entrance_id, full_name) VALUES (?, ?, ?)", it, aside, "Иван Петров") }
 
     private fun mandate(entrance: UUID, body: String, party: UUID?, from: String, to: String, succeededAt: String? = null): UUID = UUID.randomUUID().also {
         jdbc.update(
@@ -101,6 +107,21 @@ class MandateRolesIT {
         assertThat(roles.held(Asking(null, ivan), block, day("2024-04-01"))).containsExactly(Held(Role.BM, block))
         assertThat(roles.held(Asking(null, ivan), block, day("2024-05-10"))).isEmpty()
         assertThat(roles.held(Asking(null, null), block, day("2024-04-01"))).isEmpty()
+    }
+
+    @Test
+    fun `PM-GOV-004 two managers on the table with no end recorded — one manager on every date, and the read and the roles say the same one`() {
+        val block = entrance()
+        val ivan = party(); val maria = party()
+        mandate(block, "BM", ivan, "2025-01-01", "2027-01-01")
+        mandate(block, "BM", maria, "2026-03-01", "2028-03-01")
+        fun manager(on: String) = roles.holdersOn(block, day(on)).filter { it.role == Role.BM }.map { it.partyId }
+        assertThat(manager("2026-02-28")).containsExactly(ivan)
+        for (on in listOf("2026-03-01", "2026-12-31", "2027-01-01", "2028-03-01")) assertThat(manager(on)).describedAs(on).containsExactly(maria)
+        assertThat(roles.held(Asking(null, ivan), block, day("2026-02-28"))).containsExactly(Held(Role.BM, block))
+        assertThat(roles.held(Asking(null, ivan), block, day("2026-03-01"))).isEmpty()
+        for (on in listOf("2026-02-28", "2026-03-01", "2027-01-01"))
+            assertThat(standing.of(block, day(on)).map { it.partyId }).describedAs(on).containsExactlyElementsOf(manager(on))
     }
 
     @Test

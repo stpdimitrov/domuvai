@@ -56,12 +56,7 @@ export async function inTurn<T, R>(items: T[], each: (item: T) => Promise<R>, at
   return results;
 }
 
-/** Integer minor units as euros, €1.234,56 — integer arithmetic only, no floats (PM-FEE-016). */
-export const eur = (minor: number) => {
-  const abs = Math.abs(minor);
-  const euros = ((abs - (abs % 100)) / 100).toLocaleString("de-DE");
-  return `${minor < 0 ? "−" : ""}€${euros},${String(abs % 100).padStart(2, "0")}`;
-};
+export { eur } from "./money";   // a client form shows the API's figures too, and this file is server-only
 
 const MONTHS = ["януари", "февруари", "март", "април", "май", "юни", "юли", "август", "септември", "октомври", "ноември", "декември"];
 

@@ -47,7 +47,7 @@ class BookLists(
 class BookRefusals {
     @ExceptionHandler(BookReadForbidden::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
-    fun onForbidden(e: BookReadForbidden): Map<String, String> = mapOf("error" to (REFUSALS[e.ruleId] ?: "refused"), "rule" to e.ruleId)
+    fun onForbidden(e: BookReadForbidden): Map<String, String> = mapOf("error" to (e.why ?: REFUSALS[e.ruleId] ?: "refused"), "rule" to e.ruleId)
 
     private companion object {
         val REFUSALS = mapOf(

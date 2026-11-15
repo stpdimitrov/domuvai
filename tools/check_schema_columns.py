@@ -26,7 +26,8 @@ COLUMN = re.compile(r'@Column\("([^"]+)"\)')
 PROP = re.compile(r'\bval\s+(\w+)\s*:')
 MIGRATION_NAME = re.compile(r'^V(\d+)__[a-z0-9_]+\.sql$')
 # Additive migrations (V2, V3…) may add a column to an existing table rather than recreate it.
-ALTER_ADD = re.compile(r'ALTER TABLE\s+\w+\.(\w+)\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?(\w+)', re.IGNORECASE)
+ALTER_ADD = re.compile(r'ALTER TABLE\s+\w+\.(\w+)\s+ADD COLUMN\s+(IF NOT EXISTS\s+)?(\w+)', re.IGNORECASE)
+ALTER_DROP = re.compile(r'ALTER TABLE\s+\w+\.(\w+)\s+DROP COLUMN\s+(?:IF EXISTS\s+)?(\w+)', re.IGNORECASE)
 
 
 def migrations_sql() -> str:
@@ -101,8 +102,37 @@ def parse_schema(sql: str) -> dict[str, set[str]]:
         tables[m.group(1)] = cols
     # Additive migrations: a column added to an existing table via ALTER TABLE … ADD COLUMN.
     for a in ALTER_ADD.finditer(sql):
-        tables.setdefault(a.group(1), set()).add(a.group(2).lower())
+        tables.setdefault(a.group(1), set()).add(a.group(3).lower())
     return tables
+
+
+def duplicate_columns() -> list[str]:
+    """A migration that adds a column its table already has: Flyway stops at start ("column … already exists"),
+    so every persistence test and the application fail — in CI only, on a machine without Docker. The migrations
+    are replayed in version order; `ADD COLUMN IF NOT EXISTS` is allowed, a `DROP COLUMN` frees the name (#266)."""
+    problems, known, where = [], {}, {}
+    for path in sorted(MIGRATIONS.glob('V*.sql'), key=lambda p: int(MIGRATION_NAME.match(p.name).group(1))
+                       if MIGRATION_NAME.match(p.name) else 0):
+        sql = re.sub(r'--[^\n]*', '', path.read_text())             # comments out, line numbers kept
+        created = parse_schema(ALTER_ADD.sub('', sql))
+        for table, cols in created.items():
+            for col in cols:
+                known.setdefault(table, set()).add(col)
+                where[(table, col)] = path.name
+        events = sorted([(m.start(), 'add', m) for m in ALTER_ADD.finditer(sql)] +
+                        [(m.start(), 'drop', m) for m in ALTER_DROP.finditer(sql)], key=lambda e: e[0])
+        for pos, kind, m in events:
+            table = m.group(1)
+            col = (m.group(3) if kind == 'add' else m.group(2)).lower()
+            if kind == 'drop':
+                known.get(table, set()).discard(col)
+                continue
+            if col in known.get(table, set()) and not m.group(2):
+                line = sql.count('\n', 0, pos) + 1
+                problems.append(f"  {path.name}:{line} — adds `{col}` to {table}, which has it since {where[(table, col)]}")
+            known.setdefault(table, set()).add(col)
+            where.setdefault((table, col), path.name)
+    return problems
 
 
 def _column_of(definition: str) -> set[str]:
@@ -149,6 +179,13 @@ def main() -> int:
         print("\n".join(versions))
         print("\nFlyway refuses two migrations with one version, so the app would not start. "
               "Restamp the newer file with the real UTC minute: date -u +%Y%m%d%H%M")
+        return 1
+    duplicates = duplicate_columns()
+    if duplicates:
+        print(f"COLUMN ADDED TWICE — {len(duplicates)}:")
+        print("\n".join(duplicates))
+        print("\nFlyway stops at start on a column that already exists, so the app would not start. "
+              "Drop the ADD COLUMN (the column is there), or write ADD COLUMN IF NOT EXISTS.")
         return 1
     tables = parse_schema(migrations_sql())
     checked, bad = 0, []

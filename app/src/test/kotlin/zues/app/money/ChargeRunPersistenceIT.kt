@@ -3,7 +3,10 @@ package zues.app.money
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -12,6 +15,7 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -20,6 +24,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import java.util.UUID
+import zues.app.assembly.GaDecisions
 
 /**
  * Money persistence against real PostgreSQL: compute from registry units → store the jsonb
@@ -52,6 +57,10 @@ class ChargeRunPersistenceIT {
     @Autowired lateinit var chargeRuns: ChargeRunRepository
     @Autowired lateinit var chargeLines: ChargeLineRepository
     @Autowired lateinit var jdbc: JdbcTemplate
+    @MockitoBean lateinit var decisions: GaDecisions
+
+    @BeforeEach
+    fun everyCitedDecisionPassed() { whenever(decisions.passed(any(), any())).thenReturn(true) }
 
     private val runRequest = StoredChargeRunRequest(
         period = "2026-05", legalDate = "2026-05-01",

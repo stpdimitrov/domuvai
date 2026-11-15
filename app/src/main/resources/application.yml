@@ -6,7 +6,7 @@ spring:
   # module schemas so an unqualified @Table("entrance") resolves to registry.entrance,
   # while table names stay unique across schemas.
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/domuvai?currentSchema=registry,identity_org,assembly,money,maintenance,compliance,evidence,app,public}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/domuvai?currentSchema=registry,identity_org,assembly,money,maintenance,compliance,evidence,intake,app,public}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
 

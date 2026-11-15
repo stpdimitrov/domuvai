@@ -2,7 +2,8 @@
 """
 Seed the demo entrance through the public API only, never SQL, so every write it makes is exercised as a client
 makes it (E2E-01 D2). The end-to-end check (tools/check_e2e.py) expects exactly this entrance; a local run uses it
-to have something true on screen. Prints the entrance id.
+to have something true on screen. Prints the entrance id; with SEED_OWNERS_FILE set, writes there the party id of
+each owner it registered, by name — no API read serves them (#249), and a posting act is co-signed by one (WEB-28).
 
 A second, small entrance holds a business unit reached through the common parts (WEB-16, PM-FEE-010): the charges
 screen needs the assembly's multiple for it. No run is issued for it and no figure is seeded — the multiple is the
@@ -14,6 +15,7 @@ second copy could not be made anyway). To seed again, recreate the database.
 Usage: seed_demo.py [API_URL]   (default http://localhost:8080)
 """
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -78,7 +80,7 @@ for unit, (_, _, adults, children) in zip(unit_ids, UNITS):
 
 
 def party(name):
-    return call("POST", "/api/registry/parties", {"fullName": name})["partyId"]
+    return call("POST", "/api/registry/parties", {"entranceId": entrance, "fullName": name})["partyId"]
 
 
 OWNERS = [["Иван Петров"], ["Елена Колева", "Георги Колев"], ["Мария Иванова"], ["Стефан Димов"], ["Надя Тодорова"], ["Петър Георгиев"]]
@@ -91,16 +93,29 @@ for unit, names in zip(unit_ids, OWNERS):
 
 manager = parties["Мария Иванова"]  # the домоуправител, who holds both accounts (чл. 50)
 incoming = party("Красимир Ангелов")  # the manager taking over at the handover
+# The fund's account is opened on the manager's mandate (PM-FUND-004). The demo's sign-in is off, so the record names nobody (GOV-03).
+# Its first day stays before those of the end-to-end run's offices: mandates are recorded in the order they began, and its first board member ends this one.
+call("POST", f"/api/identity/entrances/{entrance}/mandates", {
+    "body": "BM", "partyId": manager, "validFrom": "2026-03-12", "validTo": "2027-03-12", "protocolRef": "Протокол на ОС от 12.03.2026, т. 2"})
 call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
     "purpose": "REPAIR_RENEWAL", "iban": iban("UNCR70001512998102"), "holderName": "Мария Иванова", "holderKind": "MANAGER", "holderPartyId": manager})
 call("POST", f"/api/money/entrances/{entrance}/fund-accounts", {
     "purpose": "OPERATING", "iban": iban("UNCR70001512345678"), "holderName": "Мария Иванова", "holderKind": "MANAGER", "holderPartyId": manager})
 
-# September's charges, issued on the demo decision — the same basis the charges screen previews
+# The assembly's decisions, as it took them on paper: recorded from the protocol, so the runs and disbursements below
+# cite decisions of this entrance (PM-FEE-012, PM-FUND-007, DEC-01). The demo's sign-in is off, so a record names nobody.
+def paper_decision(text, item):
+    return call("POST", f"/api/assembly/entrances/{entrance}/paper-decisions", {
+        "decisionText": text, "protocolDate": "2026-03-12", "protocolRef": f"Протокол на ОС от 12.03.2026, т. {item}",
+        "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"}, {"Idempotency-Key": str(uuid.uuid4())})["id"]
+
+tariff = paper_decision("Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.", 4)
+
+# September's charges, issued on that decision — the same basis the charges screen previews
 call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01", "lines": [
-    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 600},
-    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 450},
-    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": "GA-2026-03-12-4", "totalMinor": 60_000},
+    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 600},
+    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 450},
+    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": tariff, "totalMinor": 60_000},
 ]})
 
 # Payments: four units pay into the fund's account, two into the operating one
@@ -114,21 +129,24 @@ for unit, amount, into in zip(unit_ids, [30_000, 25_000, 20_000, 30_000, 4_000, 
 # so the debts screen has something to net (WEB-18): a payment settles only debts raised by its own date, and an
 # advance is not applied to a later charge.
 call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-10", "legalDate": "2026-10-01", "lines": [
-    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 600},
-    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 450},
-    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": "GA-2026-03-12-4", "totalMinor": 60_000},
+    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 600},
+    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 450},
+    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": tariff, "totalMinor": 60_000},
 ]})
 
 # Disbursements from the fund: works on a GA decision, paid; an emergency; a measure, cancelled; one committed
 base = f"/api/money/entrances/{entrance}/fund/disbursements"
-roof = call("POST", base, {"amountMinor": 48_000, "purpose": "WORKS", "authorisedBy": manager, "decisionId": "GA-2026-03-12-3"}, {"Idempotency-Key": str(uuid.uuid4())})
-call("POST", f"{base}/{roof['id']}/pay", {"paidOn": roof["committedOn"], "paidBy": manager}, {"Idempotency-Key": str(uuid.uuid4())})
-call("POST", base, {"amountMinor": 12_500, "purpose": "WORKS", "authorisedBy": manager,
+roof = call("POST", base, {"amountMinor": 48_000, "purpose": "WORKS",
+                           "decisionId": paper_decision("Ремонт на покрива от фонд „Ремонт и обновяване“.", 3)}, {"Idempotency-Key": str(uuid.uuid4())})
+call("POST", f"{base}/{roof['id']}/pay", {"paidOn": roof["committedOn"]}, {"Idempotency-Key": str(uuid.uuid4())})
+call("POST", base, {"amountMinor": 12_500, "purpose": "WORKS",
                     "emergencyJustification": "теч от покрива над ап. 6 след бурята"}, {"Idempotency-Key": str(uuid.uuid4())})
-lift = call("POST", base, {"amountMinor": 9_900, "purpose": "PASSPORT_MEASURE", "authorisedBy": manager,
-                           "decisionId": "GA-2026-03-12-5", "passportMeasure": "ТП 2019, мярка 4.2 — асансьорна уредба"}, {"Idempotency-Key": str(uuid.uuid4())})
-call("POST", f"{base}/{lift['id']}/cancel", {"cancelledBy": manager, "reason": "изпълнителят се отказа"}, {"Idempotency-Key": str(uuid.uuid4())})
-last = call("POST", base, {"amountMinor": 30_000, "purpose": "GA_PURPOSE", "authorisedBy": manager, "decisionId": "GA-2026-03-12-6"}, {"Idempotency-Key": str(uuid.uuid4())})
+lift = call("POST", base, {"amountMinor": 9_900, "purpose": "PASSPORT_MEASURE",
+                           "decisionId": paper_decision("Мярка 4.2 от техническия паспорт — асансьорна уредба.", 5),
+                           "passportMeasure": "ТП 2019, мярка 4.2 — асансьорна уредба"}, {"Idempotency-Key": str(uuid.uuid4())})
+call("POST", f"{base}/{lift['id']}/cancel", {"reason": "изпълнителят се отказа"}, {"Idempotency-Key": str(uuid.uuid4())})
+last = call("POST", base, {"amountMinor": 30_000, "purpose": "GA_PURPOSE",
+                           "decisionId": paper_decision("Разход за цел, решена от общото събрание.", 6)}, {"Idempotency-Key": str(uuid.uuid4())})
 
 # The handover to the incoming manager, dated on the last commitment — so every open one is inherited, even if the
 # seed ran across midnight — with the bank's balance matching the ledger
@@ -137,4 +155,7 @@ call("POST", f"/api/money/entrances/{entrance}/fund/handover-statements", {
     "handoverOn": last["committedOn"], "from": "2026-01-01", "outgoingPartyId": manager, "incomingPartyId": incoming,
     "bankBalanceMinor": fund["balanceMinor"]}, {"Idempotency-Key": str(uuid.uuid4())})
 
+if os.environ.get("SEED_OWNERS_FILE"):
+    with open(os.environ["SEED_OWNERS_FILE"], "w") as out:
+        json.dump({name: parties[name] for names in OWNERS for name in names}, out, ensure_ascii=False)
 print(entrance)

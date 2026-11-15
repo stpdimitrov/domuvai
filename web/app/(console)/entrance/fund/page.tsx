@@ -3,6 +3,9 @@ import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthDays, monthName, reach, shiftPeriod, thisPeriod, type EntranceAt } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
+import { PURPOSE } from "@/lib/disbursement";
+import { NOT_SIGNED } from "@/lib/handover";
+import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Каса и фонд — Етаж" };
 
@@ -66,13 +69,6 @@ async function load(entranceId: string | undefined, period: string, account: str
       ?? { failed: unansweredBy(journal, "дневника") },
   };
 }
-
-/** What a disbursement may be for (PM-FUND-006), the API's purpose codes in words. */
-const PURPOSE: Record<string, string> = {
-  WORKS: "работи и оборудване (чл. 48–49)",
-  PASSPORT_MEASURE: "мярка по техническия паспорт",
-  GA_PURPOSE: "друга цел, решена от ОС",
-};
 
 const STATUS: Record<string, { label: string; many: string; tone: string }> = {
   COMMITTED: { label: "Поето", many: "Поети", tone: "warn" },
@@ -164,7 +160,7 @@ export default async function FundPage({ searchParams }: { searchParams: Promise
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button type="button" className="chip" disabled title="Още няма API за банкови извлечения." style={{ opacity: 0.5, cursor: "not-allowed" }}>Банково извлечение</button>
-          <button type="button" className="chip active" disabled title="Разход от фонда подписва титулярят на сметката — изисква вход в системата." style={{ opacity: 0.5, cursor: "not-allowed" }}>Нов документ</button>
+          {entrance && <Link href={`/entrance/fund/disbursements?entrance=${entrance.id}`} className="chip active">Нов документ</Link>}
         </div>
       </div>
 
@@ -175,9 +171,9 @@ export default async function FundPage({ searchParams }: { searchParams: Promise
           <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "16px 18px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
             {view.kind === "down" && <>Бекендът не отговаря на <code>{API_URL}</code>. Стартирайте го (<code>app/</code>) и опреснете страницата.</>}
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
-            {view.kind === "none" && <>Няма регистриран вход. Регистрирайте вход и обектите му в <code>registry</code>, после опреснете.</>}
+            {view.kind === "none" && <NoEntrance />}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
-            {view.kind === "nofund" && <>Входът няма регистрирана сметка на фонд „Ремонт и обновяване“ — фондът се създава от общото събрание, а парите му се държат в отделна банкова сметка (чл. 50 ЗУЕС). Регистрирайте сметката в <code>money</code>, после опреснете.</>}
+            {view.kind === "nofund" && <>Входът няма регистрирана сметка на фонд „Ремонт и обновяване“ — фондът се създава от общото събрание, а парите му се държат в отделна банкова сметка (чл. 50 ЗУЕС). <Link href={`/entrance/fund/accounts?entrance=${view.entrance.id}`}>Регистрирайте сметката</Link>.</>}
             {view.kind === "refused" && view.message}
           </div>
         </div>
@@ -288,7 +284,7 @@ function Fund({ view, status, period, account: shownAccount }: { view: Extract<L
         </div>
       </div>
 
-      <Handovers handovers={handovers} />
+      <Handovers handovers={handovers} entrance={entrance.id} />
 
       <JournalSection journal={journal} period={period} account={shownAccount} link={link} />
     </div>
@@ -366,14 +362,15 @@ function JournalSection({ journal, period, account, link }: {
 
 /**
  * The fund's handover statements as issued, newest first (PM-FUND-010) — the API checks each against its hash.
- * The parties' signatures are not recorded yet, so nothing here calls a statement signed or agreed.
+ * Each carries the one line saying the parties have not signed it yet (#57); `/entrance/fund/handover` issues and opens them (WEB-43).
  */
-function Handovers({ handovers }: { handovers: Handover[] | { failed: string } }) {
+// Rule: PM-FUND-010
+function Handovers({ handovers, entrance }: { handovers: Handover[] | { failed: string }; entrance: string }) {
   return (
     <>
       <div style={{ margin: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         <span className="acct-title">Отчети при предаване на фонда</span>
-        <span style={NOTE}>при смяна на управителя · подписите на страните още не се записват</span>
+        <span style={NOTE}>при смяна на управителя · <Link href={`/entrance/fund/handover?entrance=${entrance}`}>Издай отчет</Link></span>
       </div>
       <div className="pf-card" style={{ margin: "8px 24px 0", flex: "none" }}>
         <div className="ho-grid pf-head">
@@ -400,6 +397,9 @@ function Handovers({ handovers }: { handovers: Handover[] | { failed: string } }
                 </div>
                 <div className="ho-grid ho-note">
                   <div>разполагаемо след поетите {eur(s.availableMinor)} · издаден {date(s.issuedOn)} · закон {lawVersion} · двигател {engineVersion} · хеш на основата <span className="mono">{basisHash}</span></div>
+                </div>
+                <div className="ho-grid ho-note">
+                  <div>{NOT_SIGNED} · <Link href={`/entrance/fund/handover?entrance=${entrance}&statement=${id}`}>отвори</Link></div>
                 </div>
                 {s.inherited.map((d) => (
                   <div key={d.disbursementId} className="ho-grid ho-note">

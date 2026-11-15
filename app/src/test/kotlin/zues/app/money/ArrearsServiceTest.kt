@@ -291,4 +291,72 @@ class ArrearsServiceTest {
         assertThat(report.advanceMinor).isEqualTo(3_000)                                             // its surplus 2,000 pays no other unit
         assertThat(report.netMinor).isEqualTo(8_000)
     }
+
+    @Test
+    fun `PM-DEBT-008 a unit's open debts are listed oldest first, each with its date, its due day and what is outstanding — a settled one is not offered`() {
+        val settled = owed(unitId, 100, 3_000)
+        val older = owed(unitId, 60, 1_000)
+        val newer = owed(unitId, 45, 2_000)
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE"))
+            .thenReturn(listOf(newer, settled, settles(settled, 3_000), older, settles(older, 400)))
+
+        assertThat(service.openDebts(unitId, asOf)).containsExactly(
+            OpenDebt(older.valueDate, older.valueDate.plusDays(term), 600),
+            OpenDebt(newer.valueDate, newer.valueDate.plusDays(term), 2_000),
+        )
+    }
+
+    @Test
+    fun `PM-DEBT-002 an open debt's due day is the one the arrears read gives it, by the term in force on its own date`() {
+        val twoTerms = ArrearsService(postings) { if (it.isBefore(LocalDate.of(2026, 5, 1))) 10 else 40 }
+        val older = charged(LocalDate.of(2026, 4, 1), 1_000)
+        val newer = charged(LocalDate.of(2026, 5, 1), 2_000)
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(older, newer))
+
+        val debts = twoTerms.openDebts(unitId, asOf)
+
+        assertThat(debts.map { it.dueOn }).containsExactly(LocalDate.of(2026, 4, 11), LocalDate.of(2026, 6, 10))
+        assertThat(twoTerms.forUnit(unitId, asOf).oldestDebt?.dueOn).isEqualTo(debts.first().dueOn)
+    }
+
+    @Test
+    fun `PM-DEBT-008 the list is the one a payment of that date is allocated from — a debt raised after it is not offered`() {
+        val rows = listOf(owed(unitId, 45, 2_000), owed(unitId, 60, 1_000), owed(unitId, -term - 1, 500))
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(rows)
+
+        val offered = service.openDebts(unitId, asOf)
+
+        assertThat(offered.map { it.debtDate }).doesNotContain(rows[2].valueDate)
+        assertThat(offered.map { PaymentAllocation.OutstandingDebt(it.debtDate, it.outstandingMinor) })
+            .containsExactlyInAnyOrderElementsOf(Ledger.openDebts(rows, asOf))
+    }
+
+    @Test
+    fun `PM-DEBT-008 a credit dated after the read date has closed its debt here, as for a payment of that date — the arrears of that date still count it`() {
+        val paid = owed(unitId, 60, 3_000)
+        val open = owed(unitId, 45, 1_000)
+        val laterCredit = paid.copy(id = UUID.randomUUID(), amountMinor = -3_000, valueDate = asOf.plusDays(5), settlesValueDate = paid.valueDate)
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(paid, laterCredit, open))
+
+        assertThat(service.openDebts(unitId, asOf).map { it.debtDate }).containsExactly(open.valueDate)
+        assertThat(service.forUnit(unitId, asOf).totalMinor).isEqualTo(4_000)
+    }
+
+    @Test
+    fun `PM-DEBT-008 a unit with postings and nothing open has an empty list`() {
+        val settled = owed(unitId, 60, 3_000)
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(settled, settles(settled, 3_000)))
+
+        assertThat(service.openDebts(unitId, asOf)).isEmpty()
+    }
+
+    @Test
+    fun `PM-SYS-002 an open debt dated before any payment term stops the open-debts read, naming the missing constant — one it does not offer is not looked up`() {
+        val ancient = charged(LocalDate.of(1990, 1, 1), 500)
+        whenever(postings.findByUnitIdAndAccount(unitId, "RECEIVABLE")).thenReturn(listOf(owed(unitId, 20, 3_000), ancient))
+
+        assertThatThrownBy { service.openDebts(unitId, asOf) }
+            .isInstanceOf(NoSuchElementException::class.java).hasMessageContaining("PAYMENT_TERM_DAYS")
+        assertThat(service.openDebts(unitId, LocalDate.of(1985, 1, 1))).isEmpty()
+    }
 }

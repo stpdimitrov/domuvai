@@ -12,6 +12,7 @@ const NAV: { label: string; href: string; count?: string; due?: string }[] = [
   { label: "Календар на сроковете", href: "#" },
   { label: "Доставчици", href: "#" },
   { label: "Съответствие на фирмата", href: "/compliance" },
+  { label: "Регистър на входове и лица", href: "/registry" },
   { label: "Документи", href: "#" },
   { label: "Екип", href: "#" },
 ];

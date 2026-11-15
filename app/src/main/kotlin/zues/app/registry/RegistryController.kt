@@ -66,6 +66,7 @@ data class RegisterHouseholdRequest(val members: List<NewMemberRequest>)
 data class NewMemberRequest(
     val isChildUnder6: Boolean = false,
     val validFrom: String? = null,   // ISO date; defaults to today
+    val partyId: UUID? = null,       // PM-BOOK-002 — a registered party naming the resident; never a name or an ЕГН (PM-BOOK-011)
 )
 
 data class HouseholdRegisteredResponse(val memberIds: List<UUID>)
@@ -85,6 +86,7 @@ data class RegisterAbsencesRequest(val absences: List<NewAbsenceRequest>)
 data class NewAbsenceRequest(
     val absentFrom: String,      // ISO date, inclusive
     val absentTo: String,        // ISO date, exclusive — the first day back
+    val handedInOn: String? = null,   // ISO date the paper was handed in; none means today (PM-FEE-007)
 )
 
 data class AbsencesRegisteredResponse(val absenceIds: List<UUID>)
@@ -95,25 +97,27 @@ data class EndStayRequest(val on: String)
 data class StayEnded(val id: UUID, val validFrom: LocalDate, val validTo: LocalDate)
 
 /**
- * The registry module's HTTP edge — entrances and their units. A unit, and who lives in it, is entered in the book by
- * the manager or the board, as the sign-in says who is asking; anybody else is a 403 (PM-BOOK-005).
+ * The registry module's HTTP edge — entrances and their units. An entrance is registered by the administrator, and
+ * listed to whoever holds a role in it; a unit, and who lives in it, is entered in the book by the manager or the
+ * board, as the sign-in says who is asking; anybody else is a 403 (PM-SEC-001, PM-BOOK-005).
  */
 @RestController
 @RequestMapping("/api/registry/entrances")
-class RegistryController(private val registry: RegistryService, private val book: BookEntries, private val who: WhoAsks) {
+class RegistryController(private val registrations: Registrations, private val book: BookEntries, private val who: WhoAsks) {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun register(@RequestBody request: RegisterEntranceRequest): EntranceCreatedResponse {
-        val created = registry.registerEntrance(
+    fun register(@RequestBody request: RegisterEntranceRequest, signedIn: JwtAuthenticationToken?): EntranceCreatedResponse {
+        val created = registrations.entrance(
             RegisterEntrance(request.address, request.label, request.managementForm, request.condominiumId),
+            who.of(signedIn),
         )
         return EntranceCreatedResponse(created.entranceId, created.condominiumId)
     }
 
     @GetMapping
-    fun list(): List<EntranceView> =
-        registry.listEntrances().map { EntranceView(it.id, it.condominiumId, it.label, it.managementForm) }
+    fun list(signedIn: JwtAuthenticationToken?): List<EntranceView> =
+        registrations.entrances(who.of(signedIn)).map { EntranceView(it.id, it.condominiumId, it.label, it.managementForm) }
 
     @PostMapping("/{entranceId}/units")
     @ResponseStatus(HttpStatus.CREATED)
@@ -132,6 +136,7 @@ class RegistryController(private val registry: RegistryService, private val book
         return UnitsCreatedResponse(ids)
     }
 
+    // Rule: PM-BOOK-002, PM-GA-009 — a member named by a registered party
     @PostMapping("/{entranceId}/units/{unitId}/household")
     @ResponseStatus(HttpStatus.CREATED)
     fun registerHousehold(
@@ -143,7 +148,7 @@ class RegistryController(private val registry: RegistryService, private val book
         val ids = book.household(
             entranceId,
             unitId,
-            request.members.map { RegisterMember(it.isChildUnder6, it.validFrom) },
+            request.members.map { RegisterMember(it.isChildUnder6, it.validFrom, it.partyId) },
             who.of(signedIn),
         )
         return HouseholdRegisteredResponse(ids)
@@ -177,7 +182,7 @@ class RegistryController(private val registry: RegistryService, private val book
         val ids = book.absences(
             entranceId,
             unitId,
-            request.absences.map { RegisterAbsence(it.absentFrom, it.absentTo) },
+            request.absences.map { RegisterAbsence(it.absentFrom, it.absentTo, it.handedInOn) },
             who.of(signedIn),
         )
         return AbsencesRegisteredResponse(ids)

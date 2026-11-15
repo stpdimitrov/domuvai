@@ -3,7 +3,9 @@ package zues.app.money
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -12,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import zues.app.policy.Asking
 import java.time.LocalDate
 import java.util.UUID
 
@@ -48,6 +51,35 @@ class ArrearsWebTest {
     fun `a malformed asOf is a 400`() {
         mvc.perform(get("/api/money/units/$unitId/arrears").param("asOf", "nonsense"))
             .andExpect(status().isBadRequest)
+        mvc.perform(get("/api/money/units/$unitId/open-debts").param("asOf", "nonsense"))
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `PM-DEBT-008 GET a unit's open debts serves each debt's date, due day and outstanding, and no more`() {
+        whenever(arrears.openDebts(unitId, LocalDate.parse("2026-06-01"))).thenReturn(
+            listOf(OpenDebt(LocalDate.parse("2026-04-01"), LocalDate.parse("2026-04-15"), 1_000), OpenDebt(LocalDate.parse("2026-05-01"), LocalDate.parse("2026-05-15"), 2_000)),
+        )
+        mvc.perform(get("/api/money/units/$unitId/open-debts").param("asOf", "2026-06-01"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].length()").value(3))
+            .andExpect(jsonPath("$[0].debtDate").value("2026-04-01"))
+            .andExpect(jsonPath("$[0].dueOn").value("2026-04-15"))
+            .andExpect(jsonPath("$[0].outstandingMinor").value(1000))
+            .andExpect(jsonPath("$[1].debtDate").value("2026-05-01"))
+    }
+
+    @Test
+    fun `PM-SEC-002 a reader refused the unit's charges is told nothing of its open debts`() {
+        val asking = Asking(null, null)
+        whenever(whoAsks.of(null)).thenReturn(asking)
+        doThrow(MoneyReadForbidden("PM-SEC-002")).whenever(access).unitCharges(unitId, asking)
+
+        mvc.perform(get("/api/money/units/$unitId/open-debts").param("asOf", "2026-06-01"))
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        verifyNoInteractions(arrears)
     }
 
     @Test
@@ -72,8 +104,9 @@ class ArrearsWebTest {
         val missing = NoSuchElementException("no constant PAYMENT_TERM_DAYS in force on 1990-01-01")
         whenever(arrears.forUnit(eq(unitId), any())).thenThrow(missing)
         whenever(arrears.forEntrance(any(), any())).thenThrow(missing)
+        whenever(arrears.openDebts(eq(unitId), any())).thenThrow(missing)
         // No handler takes it, so it leaves the controller as it is — the servlet container answers that with a 500.
-        for (path in listOf("/api/money/units/$unitId/arrears", "/api/money/entrances/${UUID.randomUUID()}/arrears")) {
+        for (path in listOf("/api/money/units/$unitId/arrears", "/api/money/units/$unitId/open-debts", "/api/money/entrances/${UUID.randomUUID()}/arrears")) {
             assertThatThrownBy { mvc.perform(get(path).param("asOf", "2026-06-01")) }.hasRootCause(missing)
         }
     }

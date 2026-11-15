@@ -25,6 +25,7 @@ data class IssueHandover(
     val outgoingPartyId: UUID,
     val incomingPartyId: UUID,
     val bankBalanceMinor: Long,
+    val recordedBy: UUID? = null,
 )
 
 /** A signed-off disbursement still unpaid at the handover: the incoming side inherits it (Rule: PM-FUND-010). */
@@ -42,7 +43,7 @@ data class InheritedDisbursement(
  * The fund's reconciled balance statement at a handover (Rule: PM-FUND-010) — all it says, so all its hash covers.
  * [closingMinor] is [openingMinor] + [receivedMinor] − [paidOutMinor] by construction. [differenceMinor] is the
  * bank's balance less [closingMinor] — positive when the bank shows more — and the statement is [reconciled]
- * only when it is zero.
+ * only when it is zero. The two parties are null only on an owner's redacted copy, which is never hashed (#253).
  */
 data class HandoverStatement(
     val entranceId: UUID,
@@ -51,8 +52,8 @@ data class HandoverStatement(
     val holderName: String,
     val from: LocalDate?,
     val handoverOn: LocalDate,
-    val outgoingPartyId: UUID,
-    val incomingPartyId: UUID,
+    val outgoingPartyId: UUID?,
+    val incomingPartyId: UUID?,
     val openingMinor: Long,
     val receivedMinor: Long,
     val paidOutMinor: Long,
@@ -71,7 +72,7 @@ data class HandoverStatement(
         sortedMapOf(
             "entranceId" to entranceId.toString(), "fundAccountId" to fundAccountId.toString(), "iban" to iban,
             "holderName" to holderName, "from" to from?.toString(), "handoverOn" to handoverOn.toString(),
-            "outgoingPartyId" to outgoingPartyId.toString(), "incomingPartyId" to incomingPartyId.toString(),
+            "outgoingPartyId" to outgoingPartyId?.toString(), "incomingPartyId" to incomingPartyId?.toString(),
             "openingMinor" to openingMinor, "receivedMinor" to receivedMinor, "paidOutMinor" to paidOutMinor,
             "closingMinor" to closingMinor, "bankBalanceMinor" to bankBalanceMinor, "differenceMinor" to differenceMinor,
             "reconciled" to reconciled, "committedMinor" to committedMinor, "availableMinor" to availableMinor,
@@ -123,15 +124,21 @@ data class HandoverStatement(
 /**
  * A statement as it was issued (Rule: PM-FUND-010), with [basis] — the exact canonical text its [basisHash] covers,
  * which both parties will sign (the signing itself is the evidence lane's) — so anyone can check the one against the other.
+ * [recordedBy] is who issued it, the sign-in's party: outside the basis, which is what the two sides sign, and null for a
+ * statement issued before it was kept or with sign-in off.
  */
 data class HandoverStatementView(
     val id: UUID,
     val statement: HandoverStatement,
-    val basis: String,
+    val basis: String?,
     val basisHash: String,
     val lawVersion: String,
     val engineVersion: String,
-)
+    val recordedBy: UUID? = null,
+) {
+    /** Rule: PM-SEC-002 — the statement as an owner reads it: every figure, nobody it names. The basis names the two parties, so it goes too; its hash stays (#253). */
+    fun withoutParties() = copy(statement = statement.copy(outgoingPartyId = null, incomingPartyId = null), basis = null, recordedBy = null)
+}
 
 /** A stored handover statement (Rule: PM-FUND-010). Insert-only: the table ignores updates and deletes. */
 @Table("fund_handover_statement")
@@ -156,6 +163,7 @@ data class FundHandoverRow(
     val engineVersion: String,
     val issuedOn: LocalDate,
     val issuedAt: Instant,
+    val recordedBy: UUID? = null,
 )
 
 /** Reads only: a statement is written once, through the aggregate template, and never saved over or deleted. */
@@ -205,11 +213,11 @@ class FundHandoverService(
                 UUID.randomUUID(), entranceId, fund.id, command.from, command.handoverOn, command.outgoingPartyId, command.incomingPartyId,
                 statement.openingMinor, statement.receivedMinor, statement.paidOutMinor, statement.closingMinor,
                 statement.bankBalanceMinor, statement.committedMinor, "EUR",
-                JsonbValue(basis), BasisJson.hash(basis), CATALOGUE_VERSION, ENGINE_VERSION, statement.issuedOn, issuedAt,
+                JsonbValue(basis), BasisJson.hash(basis), CATALOGUE_VERSION, ENGINE_VERSION, statement.issuedOn, issuedAt, command.recordedBy,
             ),
         )
         keys.keep(entranceId, idempotencyKey, FundOperation.HANDOVER, command.asRequest(), row.id)
-        return HandoverStatementView(row.id, statement, basis, row.basisHash, row.lawVersion, row.engineVersion)
+        return HandoverStatementView(row.id, statement, basis, row.basisHash, row.lawVersion, row.engineVersion, row.recordedBy)
     }
 
     /** Rule: PM-FUND-010 — a statement read back as it was issued: from its stored basis, checked against its hash, never recomputed. */
@@ -226,7 +234,7 @@ class FundHandoverService(
     /** What the request asked, field by field, for its Idempotency-Key's hash (DEVBRIEF §8). */
     private fun IssueHandover.asRequest() = mapOf(
         "handoverOn" to handoverOn.toString(), "from" to from?.toString(), "outgoingPartyId" to outgoingPartyId.toString(),
-        "incomingPartyId" to incomingPartyId.toString(), "bankBalanceMinor" to bankBalanceMinor,
+        "incomingPartyId" to incomingPartyId.toString(), "bankBalanceMinor" to bankBalanceMinor, "recordedBy" to recordedBy?.toString(),
     )
 
     private fun asIssued(row: FundHandoverRow): HandoverStatementView {
@@ -236,6 +244,6 @@ class FundHandoverService(
         if (BasisJson.hash(basis) != row.basisHash) {
             throw StatementTampered("handover statement ${row.id} no longer matches the hash it was issued with")
         }
-        return HandoverStatementView(row.id, statement, basis, row.basisHash, row.lawVersion, row.engineVersion)
+        return HandoverStatementView(row.id, statement, basis, row.basisHash, row.lawVersion, row.engineVersion, row.recordedBy)
     }
 }

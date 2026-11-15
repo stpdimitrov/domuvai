@@ -79,8 +79,12 @@ Branch:       slice/S-nn-<name>
 Rules:        PM-XXX-000 … (quote each rule's text back, do not paraphrase)
 Interprets:   how I read each rule, one line each
 Out of scope: what this slice deliberately does not touch
+Model:        <Opus|Sonnet> — Opus for a design or rule slice, Sonnet for a mechanical one
+Confirmed:    <who, yyyy-mm-dd, where — quote any change they made>
 Done when:    the exit checks pass
 ```
+
+The claim gate refuses a contract with no `Model:` line (T-08) or no dated `Confirmed:` line (T-09).
 
 The contract becomes the pull request description.
 
@@ -107,6 +111,21 @@ Review the diff against the rule texts as if someone else wrote it. Re-reading y
 ### Close
 
 Add the slice's entry as a new file in `docs/sessionlog/` and commit it with the slice. Never edit an earlier entry.
+
+**Claim only in a session whose first act was the boot** — the claim gate (`.claude/hooks/claim-gate.sh`, T-07) refuses a second claim and a claim in a long or forked session, and prints the fresh-session prompt.
+
+**One slice per session.** Once its PR is open the session drafts the next slice's contract; the session in which the owner confirms it starts the successor once the PR has merged, and the next slice boots fresh from the repo and claims at once (`.claude/skills/zues-slice/SKILL.md` §7.5).
+
+### Working cheaply
+
+Every tool call re-reads the whole context; a long session pays for it on every call (why: the T-05 log entry).
+
+- Search (`grep`, line ranges) before reading a whole file; trim output (`tail`, `grep`), never paste raw logs — `tools/ci_failure.py <pr>` for a red PR.
+- No wait or poll loops: PR and CI notifications wake the session. Batch independent calls in one turn.
+- `tools/check.sh <lane>` before any push — one validated push per round. `tools/mutate.py` to prove a test kills its bug.
+- Per person, once: switch off the claude.ai connectors this project does not use (their tools are re-sent every turn); pick the model per session — Opus for design and rule slices, a cheaper one for mechanical ones.
+- **The size gate** (T-08, `.claude/hooks/size-gate.sh`) measures the transcript on every turn: past **2.0 MB** it adds a one-line warning, past **2.5 MB** it refuses the prompt — and any `git push`, `gh pr create`, `gh pr merge` or session start — and prints the fresh-session boot prompt. To let one turn pass, start the prompt with **`override-size:`**. `tools/cost.py` prints the session's measured size for the Cost line.
+- A coordinating session is a fresh session too: it boots status-only, answers its question and ends.
 
 ## Working in parallel (multiple developers)
 

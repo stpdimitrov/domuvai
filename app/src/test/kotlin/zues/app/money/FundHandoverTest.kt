@@ -127,6 +127,33 @@ class FundHandoverTest {
         assertThat(basis).startsWith("{\"availableMinor\":22400,\"bankBalanceMinor\":33000,")   // keys sorted
     }
 
+    @Test
+    fun `PM-FUND-010 who recorded a statement is outside its basis, so an issued statement keeps its text and its hash`() {
+        val unsigned = statement(handover())
+        assertThat(statement(handover().copy(recordedBy = UUID.randomUUID())).basisJson()).isEqualTo(unsigned.basisJson())
+        assertThat(unsigned.basisJson()).doesNotContain("recordedBy")
+    }
+
+    @Test
+    fun `PM-FUND-010 the row keeps who recorded the statement, and the read gives it back`() {
+        val recorder = UUID.randomUUID()
+        val issued = service.issue(entranceId, UUID.randomUUID().toString(), handover(bankBalance = 33_000).copy(recordedBy = recorder))
+        assertThat(stored.single().recordedBy).isEqualTo(recorder)
+        assertThat(issued.recordedBy).isEqualTo(recorder)
+    }
+
+    @Test
+    fun `PM-SEC-002 an owner's copy keeps every figure and the hash, not the two parties, the recorder or the basis naming them`() {
+        val full = statement(handover())
+        val view = HandoverStatementView(UUID.randomUUID(), full, full.basisJson(), "ab12", "1.3", "0.2.0", UUID.randomUUID()).withoutParties()
+        assertThat(view.statement.outgoingPartyId).isNull()
+        assertThat(view.statement.incomingPartyId).isNull()
+        assertThat(view.recordedBy).isNull()
+        assertThat(view.basis).isNull()
+        assertThat(view.basisHash).isEqualTo("ab12")
+        assertThat(view.statement.copy(outgoingPartyId = full.outgoingPartyId, incomingPartyId = full.incomingPartyId)).isEqualTo(full)
+    }
+
     // The service: validation, storing as issued, reading back from what was stored.
 
     private val aggregates: JdbcAggregateTemplate = mock()
@@ -152,7 +179,7 @@ class FundHandoverTest {
         val issued = service.issue(entranceId, UUID.randomUUID().toString(), handover(bankBalance = 33_000))
         val row = stored.single()
         assertThat(row.basis.json).isEqualTo(issued.basis).isEqualTo(issued.statement.basisJson())
-        assertThat(row.basisHash).isEqualTo(BasisJson.hash(issued.basis)).isEqualTo(issued.basisHash)
+        assertThat(row.basisHash).isEqualTo(BasisJson.hash(issued.basis!!)).isEqualTo(issued.basisHash)
         assertThat(listOf(row.openingMinor, row.receivedMinor, row.paidOutMinor, row.closingMinor, row.bankMinor, row.committedMinor))
             .containsExactly(43_000L, 10_700L, 20_500L, 33_200L, 33_000L, 10_800L)                   // the ledger's closing, the bank's own
         assertThat(listOf(row.fundAccountId, row.outgoingParty, row.incomingParty)).containsExactly(fund.id, chair, successor)

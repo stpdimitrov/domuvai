@@ -26,8 +26,11 @@ data class Holding(
     val idealPartsSource: String,   // DECLARED | DERIVED
 )
 
-/** A household member in residence on a date who is a known party. The book holds no date of birth, so no age. */
-data class Resident(val partyId: UUID, val unitId: UUID)
+/**
+ * A household member in residence on a date who is a known party. The book holds no date of birth, so no age: its one
+ * age fact is [childUnder6], a member it positively knows to be a child under six.
+ */
+data class Resident(val partyId: UUID, val unitId: UUID, val childUnder6: Boolean)
 
 /**
  * The titles of one role in force on one date, read once: the [holdings], and the units they over-hold.
@@ -91,11 +94,12 @@ class HoldingsAdapter(
         return HeldOn(holdings, overHeld)
     }
 
+    // Rule: PM-GA-009
     @Transactional(readOnly = true)
     override fun residents(entranceId: UUID, on: LocalDate): List<Resident> =
         household.findByEntranceId(entranceId)
             .filter { current(it.validFrom, it.validTo, on) }
-            .mapNotNull { member -> member.partyId?.let { Resident(it, member.unitId) } }
+            .mapNotNull { member -> member.partyId?.let { Resident(it, member.unitId, member.isChildUnder6) } }
 
     /**
      * More than the whole, beyond what rounding explains. A share is stored to a fixed number of decimals, so

@@ -2,6 +2,7 @@ package zues.app.registry
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -10,11 +11,14 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
@@ -66,6 +70,7 @@ class AbsencePersistenceIT {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var units: Units
+    @Autowired lateinit var jdbc: JdbcTemplate
 
     private fun createEntrance(): UUID {
         val response = mvc.perform(
@@ -107,5 +112,72 @@ class AbsencePersistenceIT {
         val declaredDays = ChronoUnit.DAYS.between(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 5, 1)).toInt()
         assertThat(unit.absentDays).isEqualTo(declaredDays)
         assertThat(unit.absentDays).isGreaterThan(numberOn("ABSENCE_EXEMPTION_DAYS", "2026-05-15").toInt())
+    }
+
+    private val entryDay = LocalDate.of(2026, 5, 15)                                     // the pinned clock
+    private val grace = numberOn("ABSENCE_DECLARATION_GRACE_DAYS", entryDay.toString()).toLong()
+    private val absentTo = entryDay.minusDays(grace + 10)                                // the window closed ten days ago
+    private val absentFrom = absentTo.minusDays(numberOn("ABSENCE_EXEMPTION_DAYS", entryDay.toString()).toLong() + 5)
+
+    private fun absence(handedInOn: LocalDate) = """{"absentFrom":"$absentFrom","absentTo":"$absentTo","handedInOn":"$handedInOn"}"""
+
+    private fun filing(entranceId: UUID, unitId: UUID, vararg absences: String) = mvc.perform(
+        post("/api/registry/entrances/$entranceId/units/$unitId/absences")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"absences":[${absences.joinToString(",")}]}"""),
+    )
+
+    private fun absentDays(entranceId: UUID, unitId: UUID) =
+        units.forEntrance(entranceId, entryDay).single { it.unitId == unitId }.absentDays
+
+    @Test
+    fun `PM-FEE-006 PM-FEE-007 a declaration handed in on time and entered after the window earns the exemption, both days kept`() {
+        val entranceId = createEntrance()
+        val unitId = registerSingleUnit(entranceId)
+        val cutoff = absentTo.plusDays(grace)
+
+        filing(entranceId, unitId, absence(cutoff)).andExpect(status().isCreated)
+
+        assertThat(absentDays(entranceId, unitId)).isEqualTo(ChronoUnit.DAYS.between(absentFrom, absentTo).toInt())
+            .isGreaterThan(numberOn("ABSENCE_EXEMPTION_DAYS", entryDay.toString()).toInt())
+        val days = jdbc.queryForMap("SELECT filed_on, handed_in_on FROM registry.absence_declaration WHERE unit_id = ?", unitId)
+        assertThat(days["filed_on"].toString()).isEqualTo(entryDay.toString())
+        assertThat(days["handed_in_on"].toString()).isEqualTo(cutoff.toString())
+    }
+
+    @Test
+    fun `PM-FEE-007 a declaration handed in after the window earns nothing`() {
+        val entranceId = createEntrance()
+        val unitId = registerSingleUnit(entranceId)
+
+        filing(entranceId, unitId, absence(absentTo.plusDays(grace + 1))).andExpect(status().isCreated)
+
+        assertThat(absentDays(entranceId, unitId)).isEqualTo(0)
+    }
+
+    @Test
+    fun `PM-FEE-007 a day handed in after the day of entry is a 400 naming the rule and stores nothing`() {
+        val entranceId = createEntrance()
+        val unitId = registerSingleUnit(entranceId)
+
+        filing(entranceId, unitId, absence(entryDay), absence(entryDay.plusDays(1)))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("PM-FEE-007")))
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM registry.absence_declaration WHERE unit_id = ?", Int::class.java, unitId)).isEqualTo(0)
+    }
+
+    @Test
+    fun `PM-FEE-007 the table refuses a day handed in after the day of entry`() {
+        val entranceId = createEntrance()
+        val unitId = registerSingleUnit(entranceId)
+
+        assertThatThrownBy {
+            jdbc.update(
+                "INSERT INTO registry.absence_declaration (id, entrance_id, unit_id, absent_from, absent_to, filed_on, handed_in_on) " +
+                    "VALUES (?, ?, ?, DATE '2026-02-01', DATE '2026-03-01', DATE '2026-03-10', DATE '2026-03-11')",
+                UUID.randomUUID(), entranceId, unitId,
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
     }
 }
