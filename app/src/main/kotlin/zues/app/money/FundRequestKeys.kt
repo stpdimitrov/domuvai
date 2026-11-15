@@ -6,6 +6,9 @@ import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.Repository
 import org.springframework.stereotype.Component
+import zues.kernel.KeptKey
+import zues.kernel.KeyDecision
+import zues.kernel.decideKey
 import java.util.UUID
 
 /** The `Idempotency-Key` a fund write came with (DEVBRIEF §8): the operation, a hash of the request, the record it made. Insert-only. */
@@ -34,14 +37,18 @@ interface FundRequestKeyRepository : Repository<FundRequestKeyRow, UUID> {
 @Component
 class FundRequestKeys(private val keys: FundRequestKeyRepository, private val aggregates: JdbcAggregateTemplate) {
 
-    /** The id of the record an earlier request with this key made, or null when the key is new. */
+    /**
+     * The id of the record an earlier request with this key made, or null when the key is new — the kernel's [decideKey]
+     * on what this entrance kept for the key (found by entrance and key together). Rule: PM-SYS-014
+     */
     fun prior(entranceId: UUID, key: String, operation: FundOperation, request: Map<String, Any?>): UUID? {
         require(key.isNotBlank()) { "an Idempotency-Key is required" }
-        val kept = keys.findByEntranceIdAndIdempotencyKey(entranceId, key) ?: return null
-        if (kept.operation != operation.name || kept.requestHash != hash(request)) {
-            throw IdempotencyKeyReused("Idempotency-Key $key was used for a different request")
+        val kept = keys.findByEntranceIdAndIdempotencyKey(entranceId, key)?.let { KeptKey(it.operation, it.requestHash, it.resultId.toString()) }
+        return when (val decision = decideKey(kept, operation.name, hash(request))) {
+            KeyDecision.Apply -> null
+            is KeyDecision.Replay -> UUID.fromString(decision.resultId)
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for a different request")
         }
-        return kept.resultId
     }
 
     /** A key taken by a request racing this one is refused like any reused key, and this write is rolled back. */
