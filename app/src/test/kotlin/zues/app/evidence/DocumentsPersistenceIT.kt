@@ -204,8 +204,8 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-003 PM-DOC-004 the table refuses a constative protocol without breach details - who, what, when, where`() {
         val entranceId = entrance()
-        val author = party()
-        val breacher = party()
+        val author = party(entranceId)
+        val breacher = party(entranceId)
         val occurred = java.sql.Timestamp.from(java.time.Instant.now())
         // a complete constative protocol is stored
         val id = UUID.randomUUID()
@@ -243,7 +243,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-005 retention policy - a document is marked for deletion, the deletion is logged`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         val entity = "assembly:${UUID.randomUUID()}"
         val stored = protocol(entranceId, author, entity, "протокол".toByteArray())
 
@@ -272,7 +272,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-006 case file export - documents for a matter are returned chronologically`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         val matter = "arrear:${UUID.randomUUID()}"
         // store three documents for the matter, out of order
         Thread.sleep(10)  // ensure different stored_at
@@ -292,7 +292,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-008 signature validation report is stored at signing time`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         val validationReport = """{"signer":"Иван Петров","signedAt":"2026-10-22T14:00:00Z","valid":true}"""
         val stored = documents.store(
             StoreDocument(
@@ -307,7 +307,7 @@ class DocumentsPersistenceIT {
     @Test
     fun `PM-DOC-009 photographic evidence retains capture timestamp and display copy - original bytes unmodified`() {
         val entranceId = entrance()
-        val author = party()
+        val author = party(entranceId)
         val captured = java.time.Instant.parse("2026-10-22T14:30:00Z")
         val originalBytes = "original photo bytes".toByteArray()
         val displayBytes = "resized photo".toByteArray()
