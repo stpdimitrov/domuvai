@@ -9,13 +9,14 @@ import PaperRecord from "./PaperRecord";
  * deployment's administrator may (Rule: PM-SEC-001), the API's refusal is shown in its words and the fields kept. What a
  * record must hold is the API's too (Rule: PM-GA-022, PM-DOC-007); what it answers is shown here, the list above being refused to the administrator.
  */
-// Rule: PM-GA-022, PM-DOC-007, PM-SEC-001
-export default function PaperDecisionForm({ entrance }: { entrance: string }) {
+// Rule: PM-GA-022, PM-DOC-007, PM-SEC-001, PM-SYS-014 (the key the action sends)
+export default function PaperDecisionForm({ entrance, mintedKey }: { entrance: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<PaperDecisionState, FormData>(record, {});
   const v = state.values ?? {};
   return (
     <form action={act} key={JSON.stringify(v)} className="as-form" style={{ margin: "16px 24px" }}>
       <input type="hidden" name="entrance" value={entrance} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <div className="wide acct-title">Вписване на решение от протокол</div>
       <div className="wide as-hint">
         Решението се вписва такова, каквото е в протокола: не посочва заседание, кворум или мнозинство и след вписването не се променя.

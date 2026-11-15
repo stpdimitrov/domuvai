@@ -46,7 +46,8 @@ class ChargeRunDecisionIT {
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var chargeRuns: ChargeRunRepository
 
-    private fun send(path: String, body: String) = mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body))
+    /** Each write under a fresh `Idempotency-Key`, which the keyed ones (a paper decision among them) require (PM-SYS-014); the others ignore it. */
+    private fun send(path: String, body: String) = mvc.perform(post(path).header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON).content(body))
 
     private fun entrance(): UUID {
         val made = send("/api/registry/entrances", """{"address":"ул. Раковски 1","label":"А","managementForm":"GA"}""")

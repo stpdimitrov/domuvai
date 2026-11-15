@@ -59,10 +59,15 @@ class PaperDecisionPersistenceIT {
         return UUID.randomUUID().also { jdbc.update("INSERT INTO registry.entrance (id, condominium_id, label, management_form) VALUES (?, ?, 'А', 'GA')", it, condominium) }
     }
 
-    private fun record(entrance: UUID) = mvc.perform(
-        post("/api/assembly/entrances/$entrance/paper-decisions").contentType(MediaType.APPLICATION_JSON).content(content)
-            .with(jwt().jwt { it.subject("operator-p").issuer(PAPER_REALM_IT) }),
+    /** Sent under an `Idempotency-Key` (PM-SYS-014): a fresh one unless [key] names it, none when it is null. */
+    private fun record(entrance: UUID, key: String? = UUID.randomUUID().toString(), body: String = content, subject: String = "operator-p") = mvc.perform(
+        post("/api/assembly/entrances/$entrance/paper-decisions").contentType(MediaType.APPLICATION_JSON).content(body)
+            .apply { if (key != null) header("Idempotency-Key", key) }
+            .with(jwt().jwt { it.subject(subject).issuer(PAPER_REALM_IT) }),
     )
+
+    private fun records(entrance: UUID) = jdbc.queryForList("SELECT * FROM assembly.paper_decision WHERE entrance_id = ? ORDER BY recorded_at", entrance)
+    private fun keys(entrance: UUID) = jdbc.queryForList("SELECT * FROM assembly.vote_request_key WHERE entrance_id = ? ORDER BY kept_at", entrance)
 
     private fun recorded(entrance: UUID): String = record(entrance).andExpect(status().isCreated).andReturn().response.contentAsString.substringAfter("\"id\":\"").substringBefore('"')
 
@@ -92,5 +97,59 @@ class PaperDecisionPersistenceIT {
     @Test
     fun `PM-SEC-001 an entrance nobody registered is a 404, said to the administrator`() {
         record(UUID.randomUUID()).andExpect(status().isNotFound).andExpect(jsonPath("$.error").isNotEmpty)
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying a recorded paper decision twice records it once - the same key and request answer with the record first made`() {
+        val block = entrance()
+        val key = UUID.randomUUID().toString()
+        val first = record(block, key).andExpect(status().isCreated).andReturn().response.contentAsString
+        for (again in 1..2) assertThat(record(block, key).andExpect(status().isCreated).andReturn().response.contentAsString).isEqualTo(first)
+        assertThat(records(block)).hasSize(1)
+        assertThat(keys(block).single()["operation"]).isEqualTo("RECORD_PAPER_DECISION")
+        record(block).andExpect(status().isCreated)   // another key is another record: the same protocol may be transcribed twice only on purpose
+        assertThat(records(block)).hasSize(2)
+    }
+
+    @Test
+    fun `PM-SYS-014 a paper decision's key is refused for another request or operation, and one without an Idempotency-Key is a 400`() {
+        val block = entrance()
+        val key = UUID.randomUUID().toString()
+        record(block, key).andExpect(status().isCreated)
+        record(block, key, body = content.replace("Иван Иванов", "Мария Иванова")).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.error").value("Idempotency-Key $key was used for another request (PM-SYS-014)"))
+        val vote = UUID.randomUUID().toString()
+        jdbc.update("INSERT INTO assembly.vote_request_key (id, entrance_id, idempotency_key, operation, request_hash, kept_at) VALUES (gen_random_uuid(), ?, ?, 'RECORD_VOTE', 'h', now())", block, vote)
+        record(block, vote).andExpect(status().isConflict)
+        record(block, key = null).andExpect(status().isBadRequest)
+        record(block, key = " ").andExpect(status().isBadRequest)
+        assertThat(records(block)).hasSize(1)
+        assertThat(keys(block)).hasSize(2)
+    }
+
+    @Test
+    fun `PM-SEC-004 a replayed paper decision adds no record and edits none - its record names the key, which is never changed or removed`() {
+        val block = entrance()
+        val key = UUID.randomUUID().toString()
+        record(block, key).andExpect(status().isCreated)
+        val (made, kept) = records(block) to keys(block)
+        assertThat(made.single()["request_key_id"]).isEqualTo(kept.single()["id"])
+        record(block, key).andExpect(status().isCreated)
+        jdbc.update("UPDATE assembly.vote_request_key SET request_hash = 'x' WHERE entrance_id = ?", block)
+        jdbc.update("DELETE FROM assembly.vote_request_key WHERE entrance_id = ?", block)
+        assertThatThrownBy { jdbc.update("UPDATE assembly.paper_decision SET request_key_id = NULL WHERE entrance_id = ?", block) }.isInstanceOf(DataAccessException::class.java)
+        assertThat(records(block)).isEqualTo(made)
+        assertThat(keys(block)).isEqualTo(kept)
+    }
+
+    @Test
+    fun `PM-SEC-001 a replayed paper decision is answered only to the administrator - the policy is asked before the key is looked up`() {
+        val block = entrance()
+        val key = UUID.randomUUID().toString()
+        record(block, key).andExpect(status().isCreated)
+        record(block, key, subject = "someone-else").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+            .andExpect(jsonPath("$.id").doesNotExist())
+        record(block, " ", subject = "someone-else").andExpect(status().isForbidden)
+        assertThat(records(block)).hasSize(1)
     }
 }

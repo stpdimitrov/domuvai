@@ -2,12 +2,14 @@ package zues.app.assembly
 
 import org.springframework.data.annotation.Id
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
-import org.springframework.data.relational.core.conversion.DbActionExecutionException
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.ListCrudRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import zues.app.policy.Action
 import zues.app.policy.Asking
+import zues.kernel.IdempotencyKey
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import zues.law.CATALOGUE_VERSION
 import zues.law.ENGINE_VERSION
@@ -15,6 +17,7 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /** A decision to record, as its protocol gives it. Each field may be missing: what is missing is said only to the administrator. */
@@ -47,23 +50,30 @@ data class PaperDecision(
     val loginIssuer: String?,
     val loginSubject: String?,
     val recordedAt: Instant,
+    /** The keyed request that recorded it (Rule: PM-SYS-014); none on a record made before the write took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 interface PaperDecisionRepository : ListCrudRepository<PaperDecision, UUID> {
     fun findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entranceId: UUID): List<PaperDecision>
+    fun findByRequestKeyId(requestKeyId: UUID): PaperDecision?
 }
 
 /**
  * An entrance's decisions taken on paper. One is recorded only by the deployment's administrator — the policy decides,
  * as at today in Sofia, before anything else is looked at, and a refused caller learns nothing else. With sign-in
  * switched off in so many words nobody is asking, and the record names nobody (the demo seed's way in). Recording is
- * the only write: the table refuses any other (Rule: PM-SEC-004).
+ * the only write: the table refuses any other (Rule: PM-SEC-004). A record is made under an `Idempotency-Key`
+ * (Rule: PM-SYS-014): the same request sent again under the same key — an answer lost, the form sent again — records
+ * nothing more and is answered with the record the first one made; the same key for another request or operation is an
+ * [IdempotencyKeyReused]. The policy is asked first, so a replay is answered only to whoever may record.
  */
 @Service
 class PaperDecisions(
     private val aggregates: JdbcAggregateTemplate,
     private val stored: PaperDecisionRepository,
     private val reads: AssemblyReads,
+    private val keys: VoteRequestKeys,
     private val clock: Clock,
 ) {
     // Rule: PM-FEE-012
@@ -71,9 +81,12 @@ class PaperDecisions(
     // Rule: PM-DOC-007
     // Rule: PM-SEC-001
     // Rule: PM-SEC-004
-    fun record(by: Asking, entranceId: UUID, request: RecordPaperDecision): PaperDecision {
+    // Rule: PM-SYS-014
+    @Transactional
+    fun record(by: Asking, entranceId: UUID, key: String, request: RecordPaperDecision): PaperDecision {
         val decision = reads.decided(entranceId, by, Action.RECORD_PAPER_DECISION)
         if (decision != null && !(decision.allowed && by.login != null)) throw ActRefused(decision.ruleId)
+        val idempotencyKey = IdempotencyKey(key)   // a blank key is a 400, said once the policy has been asked
         val text = textOf(request.decisionText)
         val date = requireNotNull(request.protocolDate) { "the protocol's date is required" }
         require(!date.isAfter(LocalDate.parse(toSofiaDate(clock.instant())))) { "the protocol's date is not in the future" }
@@ -82,14 +95,22 @@ class PaperDecisions(
         val custodian = lineOf(request.custodian, "who keeps the paper original")
         val basis = "paper protocol $ref of $date, kept at $location by $custodian\n$text"
         val hash = MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) }
-        val row = PaperDecision(
-            UUID.randomUUID(), entranceId, text, date, ref, location, custodian, basis, hash,
-            CATALOGUE_VERSION, ENGINE_VERSION, by.login?.issuer, by.login?.subject, clock.instant(),
-        )
+        val asked = VoteRequestKeys.hash(entranceId, by.login?.issuer, by.login?.subject, text, date, ref, location, custodian)
+        when (val decided = keys.decide(entranceId, idempotencyKey, VoteRequestKeys.RECORD_PAPER_DECISION, asked)) {
+            is KeyDecision.Replay -> return checkNotNull(stored.findByRequestKeyId(UUID.fromString(decided.resultId))) { "the key's record is kept" }
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
         try {
-            return aggregates.insert(row)
-        } catch (e: DbActionExecutionException) {
-            // the registry's own tables are not this module's to read: the foreign key says who is missing
+            val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.RECORD_PAPER_DECISION, asked)   // kept with the record, in this transaction
+            return aggregates.insert(
+                PaperDecision(
+                    UUID.randomUUID(), entranceId, text, date, ref, location, custodian, basis, hash,
+                    CATALOGUE_VERSION, ENGINE_VERSION, by.login?.issuer, by.login?.subject, clock.instant().truncatedTo(ChronoUnit.MICROS), made,
+                ),
+            )
+        } catch (e: RuntimeException) {
+            // the registry's own tables are not this module's to read: the foreign key — the key's or the record's — says who is missing
             if (missingReference(e) != null) throw NoSuchElementException("no entrance $entranceId")
             throw e
         }

@@ -9,6 +9,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
@@ -57,7 +58,7 @@ private const val PAPER_API = "domuvai-api"
     PaperDecisionController::class,
     properties = ["domuvai.auth.issuer-uri=$PAPER_REALM", "domuvai.auth.audience=$PAPER_API", "domuvai.auth.mode=", "domuvai.auth.admins=operator"],
 )
-@Import(WhoAsks::class, PaperDecisions::class, AssemblyReads::class, Policy::class, Administrators::class)
+@Import(WhoAsks::class, PaperDecisions::class, VoteRequestKeys::class, AssemblyReads::class, Policy::class, Administrators::class)
 class PaperDecisionWebTest {
 
     companion object {
@@ -76,6 +77,7 @@ class PaperDecisionWebTest {
     @MockitoBean lateinit var aggregates: JdbcAggregateTemplate
     @MockitoBean lateinit var stored: PaperDecisionRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var kept: VoteRequestKeyRepository
 
     private val entrance = UUID.randomUUID()
     private val url = "/api/assembly/entrances/$entrance/paper-decisions"
@@ -91,8 +93,12 @@ class PaperDecisionWebTest {
             JWTClaimsSet.Builder().subject(subject).issuer(PAPER_REALM).audience(PAPER_API).expirationTime(Date.from(Instant.now().plusSeconds(300))).build(),
         ).apply { sign(RSASSASigner(issuer.private)) }.serialize()
 
-    private fun send(subject: String?, content: String = body()) =
-        mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(content).apply { if (subject != null) header(HttpHeaders.AUTHORIZATION, "Bearer ${token(subject)}") })
+    /** Each record request is sent under an `Idempotency-Key` (PM-SYS-014) unless [key] is null. */
+    private fun send(subject: String?, content: String = body(), key: String? = UUID.randomUUID().toString()) =
+        mvc.perform(
+            post(url).contentType(MediaType.APPLICATION_JSON).content(content)
+                .apply { if (subject != null) header(HttpHeaders.AUTHORIZATION, "Bearer ${token(subject)}") }.apply { if (key != null) header("Idempotency-Key", key) },
+        )
 
     private fun read(subject: String) = mvc.perform(get(url).header(HttpHeaders.AUTHORIZATION, "Bearer ${token(subject)}"))
 
@@ -105,7 +111,9 @@ class PaperDecisionWebTest {
         answering()
         send("operator").andExpect(status().isCreated).andExpect(jsonPath("$.id").isNotEmpty).andExpect(jsonPath("$.custodian").value("Иван Иванов"))
             .andExpect(jsonPath("$.protocolRef").value("Протокол № 3")).andExpect(jsonPath("$.basisHash").isNotEmpty)
-        val row = argumentCaptor<PaperDecision>().apply { verify(aggregates).insert(capture()) }.firstValue
+        val written = argumentCaptor<Any>().apply { verify(aggregates, times(2)).insert(capture()) }.allValues   // the key, then the record
+        val row = written.filterIsInstance<PaperDecision>().single()
+        assertThat(row.requestKeyId).isEqualTo(written.filterIsInstance<VoteRequestKeyRow>().single().id)
         assertThat(row.entranceId).isEqualTo(entrance)
         assertThat(row.loginIssuer to row.loginSubject).isEqualTo(PAPER_REALM to "operator")
         assertThat(row.basis).contains("Протокол № 3", "2026-03-14", "шкаф в офиса", "Иван Иванов", "Месечна вноска за управление")
@@ -159,5 +167,21 @@ class PaperDecisionWebTest {
             read("login-$role").andExpect(status().isOk).andExpect(jsonPath("$[0].protocolRef").value("Протокол № 3")).andExpect(jsonPath("$[0].custodian").doesNotExist())
                 .andExpect(jsonPath("$[0].archiveLocation").value("шкаф")).andExpect(jsonPath("$[0].basis").doesNotExist())
         read("login-of-nobody").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+    }
+
+    @Test
+    fun `PM-SYS-014 a paper decision without an Idempotency-Key is a 400 and nothing is written, a blank one is a 400 once the policy has been asked`() {
+        send("operator", key = null).andExpect(status().isBadRequest)
+        send("operator", key = " ").andExpect(status().isBadRequest).andExpect(jsonPath("$.error").isNotEmpty)
+        send("login-of-nobody", key = " ").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))   // asked before the key is looked at
+        verifyNoInteractions(aggregates)
+    }
+
+    @Test
+    fun `PM-SYS-014 a key used for another operation is a 409 and nothing is written`() {
+        val key = UUID.randomUUID().toString()
+        whenever(kept.findByEntranceIdAndIdempotencyKey(entrance, key)).thenReturn(VoteRequestKeyRow(UUID.randomUUID(), entrance, key, VoteRequestKeys.RECORD_VOTE, "ab".repeat(32), Instant.now()))
+        send("operator", key = key).andExpect(status().isConflict).andExpect(jsonPath("$.error").value("Idempotency-Key $key was used for another request (PM-SYS-014)"))
+        verifyNoInteractions(aggregates)
     }
 }

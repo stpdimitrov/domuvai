@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -27,10 +28,13 @@ class PaperDecisionController(private val decisions: PaperDecisions, private val
     // Rule: PM-DOC-007
     // Rule: PM-SEC-001
     // Rule: PM-SEC-004
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun record(@PathVariable entranceId: UUID, @RequestBody request: RecordPaperDecision, signedIn: JwtAuthenticationToken?): PaperDecisionView =
-        PaperDecisionView.of(decisions.record(who.of(signedIn), entranceId, request), namesCustodian = true)
+    fun record(
+        @PathVariable entranceId: UUID, @RequestBody request: RecordPaperDecision,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String, signedIn: JwtAuthenticationToken?,
+    ): PaperDecisionView = PaperDecisionView.of(decisions.record(who.of(signedIn), entranceId, idempotencyKey, request), namesCustodian = true)
 
     // Rule: PM-GA-022
     // Rule: PM-DOC-007
@@ -49,8 +53,13 @@ class PaperDecisionController(private val decisions: PaperDecisions, private val
     @ResponseStatus(HttpStatus.NOT_FOUND)
     fun onMissing(e: NoSuchElementException): Map<String, String> = mapOf("error" to (e.message ?: "not found"))
 
-    /** Something the record lacks, or a protocol dated in the future → 400. */
+    /** Something the record lacks, a protocol dated in the future, or a blank Idempotency-Key → 400. */
     @ExceptionHandler(IllegalArgumentException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid"))
+
+    /** The Idempotency-Key was used for another request, or by a racing one (PM-SYS-014) → 409. */
+    @ExceptionHandler(IdempotencyKeyReused::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun onReused(e: IdempotencyKeyReused): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))
 }

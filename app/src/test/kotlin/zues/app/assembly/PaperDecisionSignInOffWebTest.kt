@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
@@ -28,7 +29,7 @@ import java.util.UUID
  * nobody named: the demo seed reaches it through the api so. Unlike the acts of a sitting, it has no party to name.
  */
 @WebMvcTest(PaperDecisionController::class, properties = ["domuvai.auth.mode=off"])
-@Import(WhoAsks::class, PaperDecisions::class, AssemblyReads::class, Policy::class, PaperDecisionSignInOffWebTest.Fixed::class)
+@Import(WhoAsks::class, PaperDecisions::class, VoteRequestKeys::class, AssemblyReads::class, Policy::class, PaperDecisionSignInOffWebTest.Fixed::class)
 class PaperDecisionSignInOffWebTest {
 
     class Fixed {
@@ -39,14 +40,15 @@ class PaperDecisionSignInOffWebTest {
     @MockitoBean lateinit var aggregates: JdbcAggregateTemplate
     @MockitoBean lateinit var stored: PaperDecisionRepository
     @MockitoBean lateinit var logins: Logins
+    @MockitoBean lateinit var kept: VoteRequestKeyRepository
 
     @Test
     fun `PM-FEE-012 the decision a charge run will cite can be recorded with sign-in switched off, naming nobody`() {
         whenever(aggregates.insert(any<PaperDecision>())).thenAnswer { it.arguments[0] }
         val content = """{"decisionText":"вноска","protocolDate":"2026-03-14","protocolRef":"Протокол № 3","archiveLocation":"шкаф","custodian":"Иван Иванов"}"""
-        mvc.perform(post("/api/assembly/entrances/${UUID.randomUUID()}/paper-decisions").contentType(MediaType.APPLICATION_JSON).content(content))
+        mvc.perform(post("/api/assembly/entrances/${UUID.randomUUID()}/paper-decisions").header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON).content(content))
             .andExpect(status().isCreated).andExpect(jsonPath("$.id").isNotEmpty)
-        val row = argumentCaptor<PaperDecision>().apply { verify(aggregates).insert(capture()) }.firstValue
+        val row = argumentCaptor<Any>().apply { verify(aggregates, times(2)).insert(capture()) }.allValues.filterIsInstance<PaperDecision>().single()   // the key, then the record
         assertThat(row.loginIssuer).isNull()
         assertThat(row.loginSubject).isNull()
     }

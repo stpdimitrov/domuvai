@@ -275,7 +275,7 @@ export interface paths {
         /** List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403 */
         get: operations["get_assembly_entrances_entranceId_paper_decisions"];
         put?: never;
-        /** Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001 */
+        /** Record a decision the general assembly took on paper, from its protocol: the decision's text, the protocol's date (not in the future) and reference, where the paper original is kept and who keeps it, all required. Claims no sitting, tally or majority; it is never changed. Only the deployment's administrator, as the sign-in says who is asking; anybody else is a 403 naming PM-SEC-001. Sent under an Idempotency-Key: the same request again records nothing more and is answered with the record it first made; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_paper_decisions"];
         delete?: never;
         options?: never;
@@ -3855,12 +3855,25 @@ export interface operations {
                     };
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
         };
     };
     post_assembly_entrances_entranceId_paper_decisions: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
             };
@@ -3905,6 +3918,17 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
