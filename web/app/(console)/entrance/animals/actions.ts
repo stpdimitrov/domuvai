@@ -69,7 +69,7 @@ export async function leaveAnimal(_: AnimalLeavingState, form: FormData): Promis
 // Rule: PM-BOOK-008, PM-FEE-006, PM-FEE-007, PM-SEC-001
 export async function enterAbsences(_: AbsencesState, form: FormData): Promise<AbsencesState> {
   const [entranceId, unitId] = [text(form, "entrance"), text(form, "unit")];
-  const rows = Array.from({ length: ABSENCE_ROWS }, (_, i) => ({ from: text(form, `absentFrom${i}`), to: text(form, `absentTo${i}`) }));
+  const rows = Array.from({ length: ABSENCE_ROWS }, (_, i) => ({ from: text(form, `absentFrom${i}`), to: text(form, `absentTo${i}`), handedIn: text(form, `handedIn${i}`) }));
   const input = { unit: unitId, rows };
   if (!UUID.test(entranceId)) return { input, refused: "Входът не е посочен." };
   if (!UUID.test(unitId)) return { input, refused: "Изберете обект." };
