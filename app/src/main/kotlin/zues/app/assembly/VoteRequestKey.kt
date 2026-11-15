@@ -16,7 +16,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-/** The `Idempotency-Key` a vote, an absentee ballot, a proxy, an attendance or a paper decision was recorded with (DEVBRIEF §8): the operation, a hash of the request, when. The rows it made name it. Insert-only. Rule: PM-SYS-014 */
+/** The `Idempotency-Key` a vote, an absentee ballot, a proxy, an attendance, a paper decision, an item's close, an absentee merge or a protocol posting was made with (DEVBRIEF §8): the operation, a hash of the request, when. The rows it made name it. Insert-only. Rule: PM-SYS-014 */
 @Table("vote_request_key")
 data class VoteRequestKeyRow(
     @Id val id: UUID,
@@ -30,6 +30,9 @@ data class VoteRequestKeyRow(
 interface VoteRequestKeyRepository : Repository<VoteRequestKeyRow, UUID> {
     fun findByEntranceIdAndIdempotencyKey(entranceId: UUID, idempotencyKey: String): VoteRequestKeyRow?
 }
+
+/** A blank `Idempotency-Key`: a 400, and only this one — any other bad argument keeps the status it had. Rule: PM-SYS-014 */
+class BlankIdempotencyKey(message: String) : IllegalArgumentException(message)
 
 /** The same `Idempotency-Key` for another request, or taken by a racing one: a 409, never a second write. Rule: PM-SYS-014 */
 class IdempotencyKeyReused(message: String) : IllegalStateException(message)
@@ -60,11 +63,19 @@ class VoteRequestKeys(private val keys: VoteRequestKeyRepository, private val ag
     }
 
     companion object {
+        // Rule: PM-SYS-014
+        /** The key as the kernel takes it; a blank one is a [BlankIdempotencyKey]. */
+        fun keyOf(key: String): IdempotencyKey =
+            try { IdempotencyKey(key) } catch (e: IllegalArgumentException) { throw BlankIdempotencyKey(e.message ?: "an Idempotency-Key is required (PM-SYS-014)") }
+
         const val RECORD_VOTE = "RECORD_VOTE"
         const val ENTER_ABSENTEE_BALLOT = "ENTER_ABSENTEE_BALLOT"
         const val REGISTER_PROXY = "REGISTER_PROXY"
         const val RECORD_ATTENDANCE = "RECORD_ATTENDANCE"
         const val RECORD_PAPER_DECISION = "RECORD_PAPER_DECISION"
+        const val CLOSE_ITEM = "CLOSE_ITEM"
+        const val MERGE_ABSENTEE = "MERGE_ABSENTEE"
+        const val POST_PROTOCOL = "POST_PROTOCOL"
 
         // Rule: PM-SYS-014
         /** Each field length-prefixed and a missing one apart from any text, so two requests hash alike only when they are alike. */

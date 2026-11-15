@@ -10,6 +10,7 @@ import zues.app.policy.Action
 import zues.app.policy.Asking
 import zues.app.registry.Holdings
 import zues.app.registry.TitleRole
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import zues.law.CATALOGUE_VERSION
 import zues.law.ENGINE_VERSION
@@ -17,6 +18,7 @@ import java.math.BigDecimal
 import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /**
@@ -45,10 +47,13 @@ data class MergedDecision(
     val mergedBy: UUID,
     val loginIssuer: String,
     val loginSubject: String,
+    /** The keyed request that merged them (Rule: PM-SYS-014); none on a merge made before the write took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 interface MergedDecisionRepository : ListCrudRepository<MergedDecision, UUID> {
     fun findBySupersedes(decisionId: UUID): MergedDecision?
+    fun findByRequestKeyId(requestKeyId: UUID): MergedDecision?
 }
 
 /** The represented share at the merge: the sitting's, with each absent owner's ballot weight added (Rule: PM-GA-017). */
@@ -69,20 +74,35 @@ class AbsenteeMergeService(
     private val holdings: Holdings,
     private val majorities: Majorities,
     private val aggregates: JdbcAggregateTemplate,
+    private val keys: VoteRequestKeys,
     private val clock: Clock,
 ) {
     /**
      * Merges the absentee ballots on [itemId] into its tally, by whoever runs the assembly (RECORD_VOTE, PM-SEC-001),
      * once day 7 has closed — "the tally reopens until day 7": the votes in effect and every ballot, against the majority
      * the item was bound to. Entered on an eligible item even with no ballot: it is what makes the item final.
+     * Entered under [key] (PM-SYS-014): the same request under the same key stores nothing more and is answered with the
+     * merge the first one made, even though the item is merged; the same key for another request or operation is an
+     * [IdempotencyKeyReused].
      */
     // Rule: PM-VOTE-013
     // Rule: PM-GA-017
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @Transactional
-    fun merge(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID): Pair<Decision, MergedDecision> {
+    fun merge(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID, key: String): Pair<Decision, MergedDecision> {
         val by = acts.runBy(who, entranceId, assemblyId, Action.RECORD_VOTE)
+        val idempotencyKey = VoteRequestKeys.keyOf(key)   // a blank key is a 400, said once the policy has been asked
         assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
+        val asked = VoteRequestKeys.hash(assemblyId, itemId, by.party)
+        when (val decided = keys.decide(entranceId, idempotencyKey, VoteRequestKeys.MERGE_ABSENTEE, asked)) {   // decided under the assembly's lock
+            is KeyDecision.Replay -> {
+                val first = checkNotNull(merged.findByRequestKeyId(UUID.fromString(decided.resultId))) { "the key's merge is kept" }
+                return decisions.findById(first.supersedes).orElseThrow { IllegalStateException("the merge's provisional decision is kept") } to first
+            }
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
         val item = agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
         check(item.absenteeEligible) { "this item is not tagged for absentee ballots: its decision has nothing to merge (PM-GA-017)" }
@@ -111,12 +131,13 @@ class AbsenteeMergeService(
                     absent.map { "absentee ${it.partyId} ${it.unitId} ${plain(it.weight)} ${it.choice} by ${it.id} ${it.documentSha256}" }).sorted() +
                 decision.basis.lines().filter { it.startsWith("present ") }
             ).joinToString("\n")
+        val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.MERGE_ABSENTEE, asked)   // kept with the merge, in this transaction
         val stored = aggregates.insert(
             MergedDecision(
                 UUID.randomUUID(), entranceId, assemblyId, item.id, decision.id, represented, result.forParts, result.againstParts, result.abstainParts,
                 if (result.passed) "PASSED" else "NOT_PASSED", basis,
                 MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) },
-                CATALOGUE_VERSION, ENGINE_VERSION, clock.instant(), by.party, by.loginIssuer, by.loginSubject,
+                CATALOGUE_VERSION, ENGINE_VERSION, clock.instant().truncatedTo(ChronoUnit.MICROS), by.party, by.loginIssuer, by.loginSubject, made,
             ),
         )
         return decision to stored

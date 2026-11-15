@@ -340,7 +340,7 @@ function Assembly({ shown, entrance, voided, myself }: { shown: Shown; entrance:
       ))}
       {a.status === "OPEN" && !Object.values(decisions).some((d) => d.ok && d.data.protocolPostedOn) && (   // the posting is entered once; on which day and by whom are the api's (PM-GA-023, PM-SEC-001)
         <div className="co-card" style={{ marginTop: 12 }}>
-          <ProtocolForm entrance={entrance} assembly={a.id} />
+          <ProtocolForm entrance={entrance} assembly={a.id} mintedKey={randomUUID()} />
         </div>
       )}
     </>
@@ -473,7 +473,7 @@ function Votes({ item, votes, decision, entrance, assembly, myself }: {
         <div className="co-card" style={{ marginTop: 12 }}>
           <PartyPicker id={`parties-vote-${item.id}`} entrance={entrance} role="OWN" myself={myself} />
           <VoteForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-vote-${item.id}`} mintedKey={randomUUID()} />
-          <CloseForm entrance={entrance} assembly={assembly} item={item.id} />
+          <CloseForm entrance={entrance} assembly={assembly} item={item.id} mintedKey={randomUUID()} />
         </div>
       )}
       {decision && !open && <Decided decision={decision} />}
@@ -481,7 +481,7 @@ function Votes({ item, votes, decision, entrance, assembly, myself }: {
         <div className="co-card" style={{ marginTop: 12 }}>
           <PartyPicker id={`parties-ballot-${item.id}`} entrance={entrance} role="OWN" />
           <BallotForm entrance={entrance} assembly={assembly} item={item.id} parties={`parties-ballot-${item.id}`} mintedKey={randomUUID()} />
-          <MergeForm entrance={entrance} assembly={assembly} item={item.id} />
+          <MergeForm entrance={entrance} assembly={assembly} item={item.id} mintedKey={randomUUID()} />
         </div>
       )}
     </>

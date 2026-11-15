@@ -52,6 +52,9 @@ import java.util.UUID
 class VotePersistenceIT {
 
     companion object {
+        /** The writes made under an Idempotency-Key (PM-SYS-014): a proxy, an attendance, an item's close, an absentee merge, a protocol posting. */
+        private val KEYED = listOf("/proxies", "/attendance", "/decision", "/absentee-merge", "/protocol-posting")
+
         @Container
         @JvmStatic
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer(DockerImageName.parse("postgres:16"))
@@ -92,8 +95,8 @@ class VotePersistenceIT {
     private val realm = "https://id.example.test/realms/${UUID.randomUUID()}"
     private var signedInAs: String? = null
 
-    private fun post(path: String, body: String) = MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON).content(body)
-        .also { request -> if (path.endsWith("/proxies") || path.endsWith("/attendance")) request.header("Idempotency-Key", UUID.randomUUID().toString()) }   // PM-SYS-014: a proxy is registered under a key
+    private fun post(path: String, body: String, key: String? = UUID.randomUUID().toString()) = MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON).content(body)
+        .also { request -> if (key != null && KEYED.any { path.endsWith(it) }) request.header("Idempotency-Key", key) }   // PM-SYS-014: a proxy, an attendance, a close, a merge and a posting are made under a key
         .also { request -> signedInAs?.let { request.with(jwt().jwt { token -> token.subject(it).issuer(realm) }) } }
 
     private fun created(path: String, body: String): JsonNode =
@@ -307,7 +310,7 @@ class VotePersistenceIT {
         assertThat(rows(other)).hasSize(1)
     }
 
-    private fun close(m: Meeting): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/decision", ""))
+    private fun close(m: Meeting, key: String? = UUID.randomUUID().toString()): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/decision", "", key))
 
     private fun decisions(m: Meeting) = jdbc.queryForList("SELECT * FROM assembly.decision WHERE agenda_item_id = ?::uuid", m.item)
 
@@ -437,8 +440,8 @@ class VotePersistenceIT {
         signedIn(person()) { read("${m.base}/agenda/${m.item}/decision").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
     }
 
-    private fun postProtocol(m: Meeting, on: String): ResultActions =
-        mvc.perform(post("${m.base}/protocol-posting", """{"postedOn":"$on"}"""))
+    private fun postProtocol(m: Meeting, on: String, key: String? = UUID.randomUUID().toString()): ResultActions =
+        mvc.perform(post("${m.base}/protocol-posting", """{"postedOn":"$on"}""", key))
 
     @Test
     fun `PM-GA-023 the protocol's posting starts the countdown - entered once by whoever runs the assembly, never edited - and the decision reads PROVISIONAL with its final day`() {
@@ -729,7 +732,7 @@ class VotePersistenceIT {
         assertThat(log.map { it["at"] as java.sql.Timestamp }).allSatisfy { assertThat(it.toInstant()).isBetween(Instant.now().minusSeconds(60), Instant.now()) }
     }
 
-    private fun merge(m: Meeting): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/absentee-merge", ""))
+    private fun merge(m: Meeting, key: String? = UUID.randomUUID().toString()): ResultActions = mvc.perform(post("${m.base}/agenda/${m.item}/absentee-merge", "", key))
 
     @Test
     fun `PM-VOTE-013 the absentee ballots are merged after day 7 into a decision superseding the provisional one - once, never edited, and only then FINAL`() {
@@ -781,5 +784,109 @@ class VotePersistenceIT {
             merge(m).andExpect(status().isCreated).andExpect(jsonPath("$.represented").value("75")).andExpect(jsonPath("$.status").value("FINAL"))   // no ballot: merged all the same
         }
         signedIn(untagged.manager) { merge(untagged).andExpect(status().isConflict) }
+    }
+
+    /** A 409 saying the Idempotency-Key was used for another request — not the act's own refusal. */
+    private fun reused(result: ResultActions) =
+        result.andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("Idempotency-Key")))
+
+    private fun answer(result: ResultActions): JsonNode = json.readTree(result.andReturn().response.contentAsString)
+
+    private fun keyRow(m: Meeting, key: String) =
+        jdbc.queryForList("SELECT id::text, operation FROM assembly.vote_request_key WHERE entrance_id = ? AND idempotency_key = ?", m.entranceId, key)
+
+    @Test
+    fun `PM-SYS-014 replaying an item's close with its key answers the decision the first made - one decision, and a new key for a closed item is still the 409`() {
+        val m = opened()
+        val key = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            val first = answer(close(m, key).andExpect(status().isCreated))
+            val again = answer(close(m, key).andExpect(status().isCreated))        // the answer was lost, the form sent again
+            assertThat(again).isEqualTo(first)
+            val refused = UUID.randomUUID().toString()
+            close(m, refused).andExpect(status().isConflict)                       // another key: the item is closed (PM-VOTE-014), and no key is kept
+            assertThat(keyRow(m, refused)).isEmpty()
+        }
+        val row = decisions(m).single()
+        assertThat(keyRow(m, key).single()["operation"]).isEqualTo("CLOSE_ITEM")
+        assertThat(row["request_key_id"].toString()).isEqualTo(keyRow(m, key).single()["id"])
+    }
+
+    @Test
+    fun `PM-SYS-014 an item's close key is refused for another request or operation, answered only to whoever runs the assembly, and one without an Idempotency-Key is a 400`() {
+        val m = opened()
+        val key = UUID.randomUUID().toString()
+        val today = toSofiaDate(Instant.now())
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m, " ").andExpect(status().isBadRequest)                         // a blank key, said once the policy has been asked
+            close(m, null).andExpect(status().isBadRequest)
+            postProtocol(m, today, key).andExpect(status().isCreated)
+            reused(close(m, key))                                                  // the key of a posting, not of a close
+            assertThat(decisions(m)).isEmpty()
+            close(m, key.reversed()).andExpect(status().isCreated)
+            reused(vote(m, m.owners[1], "FOR", key = key.reversed()))              // the key of a close, not of a vote
+        }
+        signedIn(m.owners[0]) {
+            close(m, key.reversed()).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))   // a replay is answered to who runs the assembly only
+            close(m, " ").andExpect(status().isForbidden)                          // the policy is asked before the key
+        }
+        assertThat(decisions(m)).hasSize(1)
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying the absentee merge with its key answers the merge the first made - one merge, a refused merge keeps no key, and a new key is still the 409`() {
+        val today = toSofiaDate(Instant.now())
+        val m = opened(absenteeEligible = true)
+        val key = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            vote(m, m.owners[0], "FOR").andExpect(status().isCreated)
+            close(m).andExpect(status().isCreated)
+            postProtocol(m, today).andExpect(status().isCreated)
+            merge(m, key).andExpect(status().isConflict)                           // day 7 is not over: nothing merged, nothing kept
+        }
+        assertThat(keyRow(m, key)).isEmpty()
+        clock.by = Duration.ofDays(12)
+        signedIn(m.manager) {
+            merge(m, null).andExpect(status().isBadRequest)
+            val first = answer(merge(m, key).andExpect(status().isCreated))
+            val again = answer(merge(m, key).andExpect(status().isCreated))        // the answer was lost, the form sent again
+            assertThat(again).isEqualTo(first)
+            assertThat(first.get("supersedes").asText()).isEqualTo(decisions(m).single()["id"].toString())
+            merge(m).andExpect(status().isConflict)                                // another key: merged once (PM-VOTE-013)
+            reused(close(m, key))                                                  // the key of a merge, not of a close
+        }
+        signedIn(m.owners[0]) { merge(m, key).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        val row = jdbc.queryForMap("SELECT id::text, request_key_id::text FROM assembly.merged_decision WHERE agenda_item_id = ?::uuid", m.item)
+        assertThat(keyRow(m, key).single()["operation"]).isEqualTo("MERGE_ABSENTEE")
+        assertThat(row["request_key_id"]).isEqualTo(keyRow(m, key).single()["id"])
+    }
+
+    @Test
+    fun `PM-SYS-014 replaying the protocol's posting with its key answers the posting the first made - one posting, and the same key for another day or a new key is a 409`() {
+        val m = opened()
+        val today = toSofiaDate(Instant.now())
+        val key = UUID.randomUUID().toString()
+        lateinit var first: JsonNode
+        val refusing = UUID.randomUUID().toString()
+        signedIn(m.manager) {
+            postProtocol(m, LocalDate.parse(today).plusDays(1).toString(), refusing).andExpect(status().isConflict)   // a day to come: refused, no key kept
+            postProtocol(m, today, " ").andExpect(status().isBadRequest)
+            postProtocol(m, today, null).andExpect(status().isBadRequest)
+            first = answer(postProtocol(m, today, key).andExpect(status().isCreated))
+            val again = answer(postProtocol(m, today, key).andExpect(status().isCreated))   // the answer was lost, the form sent again
+            assertThat(again).isEqualTo(first)
+            reused(postProtocol(m, LocalDate.parse(today).minusDays(1).toString(), key))   // the key of another day
+            postProtocol(m, today, UUID.randomUUID().toString()).andExpect(status().isConflict).andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Idempotency-Key"))))
+            postProtocol(m, today).andExpect(status().isConflict)                  // another key: entered once (PM-GA-023)
+            reused(close(m, key))                                                  // the key of a posting, not of a close
+        }
+        signedIn(m.owners[0]) { postProtocol(m, today, key).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001")) }
+        val row = jdbc.queryForMap("SELECT id::text, request_key_id::text FROM assembly.protocol_posting WHERE assembly_id = ?::uuid", m.base.substringAfterLast('/'))
+        assertThat(keyRow(m, refusing)).isEmpty()
+        assertThat(row["id"]).isEqualTo(first.get("id").asText())
+        assertThat(keyRow(m, key).single()["operation"]).isEqualTo("POST_PROTOCOL")
+        assertThat(row["request_key_id"]).isEqualTo(keyRow(m, key).single()["id"])
     }
 }

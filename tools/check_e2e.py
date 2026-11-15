@@ -1441,7 +1441,7 @@ def decision_before_open(api, web, here, of):
     if not agenda:
         return [f"{of}: the noticed assembly has no agenda item to close (HTTP {st})"]
     decision = f"{of}/agenda/{agenda[0]['id']}/decision"
-    status, said = fetch(api, decision, body={}, headers=as_board())
+    status, said = fetch(api, decision, body={}, headers={**as_board(), "Idempotency-Key": str(uuid.uuid4())})   # PM-SYS-014: a close carries a key
     read = fetch(api, decision)[0]
     if status != 403 or "PM-SEC-001" not in said or read != 404:
         return [f"{decision}: PM-SEC-001 — closing by a board member who does not run the assembly answers HTTP {status} {said[:120]!r}; "
@@ -1470,7 +1470,7 @@ def absentee_before_open(api, web, here, of):
               "documentSha256": "0" * 64, "receivedOn": datetime.datetime.now(ZoneInfo("Europe/Sofia")).date().isoformat()}
     failures = []
     for what, path, body in (("a ballot", f"{item}/absentee-ballots", ballot), ("the merge", f"{item}/absentee-merge", {})):
-        keyed = {**as_board(), "Idempotency-Key": str(uuid.uuid4())} if what == "a ballot" else as_board()   # PM-SYS-014: a ballot carries a key
+        keyed = {**as_board(), "Idempotency-Key": str(uuid.uuid4())}   # PM-SYS-014: a ballot and a merge carry a key
         status, said = fetch(api, path, body=body, headers=keyed)
         if status != 403 or "PM-SEC-001" not in said:
             failures.append(f"{path}: PM-SEC-001 — {what} by a board member who does not run the assembly answers HTTP {status} {said[:120]!r} — expected the API's 403 naming PM-SEC-001")
@@ -1490,7 +1490,7 @@ def protocol_before_open(api, web, here, of):
         return [f"{here}: PM-GA-023 — the noticed assembly offers to enter its protocol's posting before any sitting opened"]
     path, body = f"{of}/protocol-posting", {"postedOn": datetime.datetime.now(ZoneInfo("Europe/Sofia")).date().isoformat()}
     failures = []
-    status, said = fetch(api, path, body=body, headers=as_board())
+    status, said = fetch(api, path, body=body, headers={**as_board(), "Idempotency-Key": str(uuid.uuid4())})   # PM-SYS-014: a posting carries a key
     if status != 403 or "PM-SEC-001" not in said:
         failures.append(f"{path}: PM-SEC-001 — a posting by a board member who does not run the assembly answers HTTP {status} {said[:120]!r} — expected the API's 403 naming PM-SEC-001")
     return failures

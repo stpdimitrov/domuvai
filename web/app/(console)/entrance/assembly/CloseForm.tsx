@@ -10,13 +10,15 @@ import { closeItem, type CloseState } from "./actions";
  */
 // Rule: PM-VOTE-014
 // Rule: PM-VOTE-016
-export default function CloseForm({ entrance, assembly, item }: { entrance: string; assembly: string; item: string }) {
+// Rule: PM-SYS-014 (the key the action sends)
+export default function CloseForm({ entrance, assembly, item, mintedKey }: { entrance: string; assembly: string; item: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<CloseState, FormData>(closeItem, {});
   return (
     <form action={act} className="as-form">
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="assembly" value={assembly} />
       <input type="hidden" name="item" value={item} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <label className="check wide">
         <input type="checkbox" name="final" required /> Приключвам точката — гласовете се преброяват и по нея повече не се гласува
       </label>

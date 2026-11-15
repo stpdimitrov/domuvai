@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -73,10 +74,11 @@ class DecisionActs(
     private val clock: Clock,
 ) {
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @Transactional
-    fun close(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID): Decision {
+    fun close(who: Asking, entranceId: UUID, assemblyId: UUID, itemId: UUID, key: String): Decision {
         val by = acts.runBy(who, entranceId, assemblyId, Action.RECORD_VOTE)
-        return decisions.close(entranceId, assemblyId, itemId, by)
+        return decisions.close(entranceId, assemblyId, itemId, key, by)
     }
 
     /** The decision on [itemId], for anyone who reads the entrance's assemblies — asked before anything is read. None yet is a 404. */
@@ -117,7 +119,9 @@ class DecisionActs(
  * The decision on an item of the agenda (PM-VOTE-011, PM-VOTE-016): closing the item tallies its votes in effect and
  * stores the decision; after it no vote on the item is taken (PM-VOTE-014). Closed by whoever runs the assembly, signed
  * in, and anybody else is a 403 naming the rule (PM-SEC-001). Read by anyone holding a role in the entrance: the result,
- * never how each owner voted (the votes' own read, PM-SEC-002).
+ * never how each owner voted (the votes' own read, PM-SEC-002). An item is closed under an `Idempotency-Key`
+ * (PM-SYS-014): the same request sent again — an answer lost — stores nothing more and is answered with the decision it
+ * first made; the same key for another request is a 409.
  */
 @RestController
 @RequestMapping("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/decision")
@@ -129,10 +133,13 @@ class DecisionController(private val acts: DecisionActs, private val who: WhoAsk
     // Rule: PM-VOTE-014
     // Rule: PM-VOTE-016
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun close(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): DecisionView =
-        acts.view(acts.close(who.of(signedIn), entranceId, assemblyId, itemId))
+    fun close(
+        @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String, signedIn: JwtAuthenticationToken?,
+    ): DecisionView = acts.view(acts.close(who.of(signedIn), entranceId, assemblyId, itemId, idempotencyKey))
 
     // Rule: PM-VOTE-011
     // Rule: PM-VOTE-013
@@ -156,6 +163,10 @@ class DecisionController(private val acts: DecisionActs, private val who: WhoAsk
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))
+    /** A blank Idempotency-Key → 400 (PM-SYS-014); no other bad argument is mapped here. */
+    @ExceptionHandler(BlankIdempotencyKey::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    fun onInvalid(e: BlankIdempotencyKey): Map<String, String> = mapOf("error" to (e.message ?: "invalid"))
 }
 
 /**
@@ -170,10 +181,13 @@ class AbsenteeMergeController(private val merges: AbsenteeMergeService, private 
     // Rule: PM-VOTE-013
     // Rule: PM-GA-017
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun merge(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID, signedIn: JwtAuthenticationToken?): DecisionView =
-        acts.view(merges.merge(who.of(signedIn), entranceId, assemblyId, itemId).first)
+    fun merge(
+        @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @PathVariable itemId: UUID,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String, signedIn: JwtAuthenticationToken?,
+    ): DecisionView = acts.view(merges.merge(who.of(signedIn), entranceId, assemblyId, itemId, idempotencyKey).first)
 
     @ExceptionHandler(ActRefused::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
@@ -187,6 +201,10 @@ class AbsenteeMergeController(private val merges: AbsenteeMergeService, private 
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))
+    /** A blank Idempotency-Key → 400 (PM-SYS-014); no other bad argument is mapped here. */
+    @ExceptionHandler(BlankIdempotencyKey::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    fun onInvalid(e: BlankIdempotencyKey): Map<String, String> = mapOf("error" to (e.message ?: "invalid"))
 }
 
 /**
@@ -199,10 +217,14 @@ class ProtocolPostingController(private val postings: ProtocolPostingService, pr
 
     // Rule: PM-GA-023
     // Rule: PM-SEC-001
+    // Rule: PM-SYS-014
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun record(@PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: PostProtocol, signedIn: JwtAuthenticationToken?): Map<String, Any> =
-        postings.record(who.of(signedIn), entranceId, assemblyId, request.postedOn).let { mapOf("id" to it.id, "postedOn" to it.postedOn) }
+    fun record(
+        @PathVariable entranceId: UUID, @PathVariable assemblyId: UUID, @RequestBody request: PostProtocol,
+        @RequestHeader("Idempotency-Key") idempotencyKey: String, signedIn: JwtAuthenticationToken?,
+    ): Map<String, Any> =
+        postings.record(who.of(signedIn), entranceId, assemblyId, idempotencyKey, request.postedOn).let { mapOf("id" to it.id, "postedOn" to it.postedOn) }
 
     @ExceptionHandler(ActRefused::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
@@ -216,4 +238,8 @@ class ProtocolPostingController(private val postings: ProtocolPostingService, pr
     @ExceptionHandler(IllegalStateException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: IllegalStateException): Map<String, String> = mapOf("error" to (e.message ?: "conflict"))
+    /** A blank Idempotency-Key → 400 (PM-SYS-014); no other bad argument is mapped here. */
+    @ExceptionHandler(BlankIdempotencyKey::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    fun onInvalid(e: BlankIdempotencyKey): Map<String, String> = mapOf("error" to (e.message ?: "invalid"))
 }
