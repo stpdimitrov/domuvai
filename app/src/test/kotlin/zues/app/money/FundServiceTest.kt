@@ -401,4 +401,19 @@ class FundServiceTest {
         assertThatThrownBy { pay(other, key = "") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { cancel(other, key = "\t") }.isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    @Test
+    fun `PM-SYS-014 a key reused on a fund write is refused through the kernel decision, and the same request replays the first record`() {
+        remembering()
+        val first = commit(key = "k-1")
+        val works = signedOff()
+        assertThat(commit(key = "k-1")).isEqualTo(first)                                         // Replay answers from the first record
+        assertThatThrownBy { commit(amount = 20_001, key = "k-1") }.isInstanceOf(IdempotencyKeyReused::class.java)   // another request
+        assertThatThrownBy { pay(works, key = "k-1") }.isInstanceOf(IdempotencyKeyReused::class.java)                // another operation, same key
+        assertThatThrownBy { cancel(works, key = "k-1") }.isInstanceOf(IdempotencyKeyReused::class.java)
+        pay(works, key = "k-pay")
+        assertThatThrownBy { cancel(works, key = "k-pay") }.isInstanceOf(IdempotencyKeyReused::class.java)          // same record, other operation
+        assertThat(inserted).hasSize(1)                                                          // the first sign-off only
+        assertThat(updated).hasSize(1)                                                           // only the one payout
+    }
 }
