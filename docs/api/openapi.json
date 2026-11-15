@@ -4578,6 +4578,14 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4590,6 +4598,19 @@
               }
             },
             "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "403": {
             "content": {
@@ -4631,14 +4652,15 @@
             "description": "Conflict"
           }
         },
-        "summary": "Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the merge it first made, even though the item is merged; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-VOTE-013",
           "PM-GA-017",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },
@@ -4684,6 +4706,19 @@
               }
             },
             "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "403": {
             "content": {
@@ -4767,6 +4802,14 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4779,6 +4822,19 @@
               }
             },
             "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "403": {
             "content": {
@@ -4820,7 +4876,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the decision it first made, even though the item is closed; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
@@ -4830,7 +4886,8 @@
           "PM-VOTE-012",
           "PM-VOTE-014",
           "PM-VOTE-016",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },
@@ -5556,6 +5613,14 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5579,6 +5644,19 @@
               }
             },
             "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "403": {
             "content": {
@@ -5620,13 +5698,14 @@
             "description": "Conflict"
           }
         },
-        "summary": "Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403",
+        "summary": "Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the posting it first made, even though it is entered; the same key for another request is a 409",
         "tags": [
           "assembly"
         ],
         "x-rules": [
           "PM-GA-023",
-          "PM-SEC-001"
+          "PM-SEC-001",
+          "PM-SYS-014"
         ]
       }
     },

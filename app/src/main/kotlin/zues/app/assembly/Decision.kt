@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.registry.Holdings
 import zues.app.registry.TitleRole
+import zues.kernel.KeyDecision
 import zues.kernel.toSofiaDate
 import zues.law.CATALOGUE_VERSION
 import zues.law.Comparison
@@ -20,6 +21,7 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /**
@@ -53,11 +55,14 @@ data class Decision(
     val closedBy: UUID,
     val loginIssuer: String,
     val loginSubject: String,
+    /** The keyed request that closed the item (Rule: PM-SYS-014); none on a decision stored before the close took a key. */
+    val requestKeyId: UUID? = null,
 )
 
 interface DecisionRepository : ListCrudRepository<Decision, UUID> {
     fun existsByAgendaItemId(agendaItemId: UUID): Boolean
     fun findByAgendaItemId(agendaItemId: UUID): Decision?
+    fun findByRequestKeyId(requestKeyId: UUID): Decision?
 }
 
 /** One vote in effect, as the tally counts it. */
@@ -110,6 +115,7 @@ class DecisionService(
     private val decisions: DecisionRepository,
     private val holdings: Holdings,
     private val majorities: Majorities,
+    private val keys: VoteRequestKeys,
     private val clock: Clock,
 ) {
     /**
@@ -117,13 +123,24 @@ class DecisionService(
      * are tallied against the majority the item was bound to, and the decision is stored, PROVISIONAL — PM-VOTE-013 and
      * PM-GA-023 make it final only later. "Represented" is the register re-weighed now, as quorum is: an owner who arrived
      * after the opening counts, and their vote with them. After this no vote on the item is taken or corrected (PM-VOTE-014).
+     * Closed under [key] (PM-SYS-014): the same request under the same key — an answer lost, the form sent again — stores
+     * nothing more and is answered with the decision the first one made, even once the item is closed; the same key for
+     * another request or operation is an [IdempotencyKeyReused].
      */
     // Rule: PM-VOTE-016
     // Rule: PM-VOTE-014
     // Rule: PM-VOTE-011
+    // Rule: PM-SYS-014
     @Transactional
-    fun close(entranceId: UUID, assemblyId: UUID, itemId: UUID, by: Actor): Decision {
+    fun close(entranceId: UUID, assemblyId: UUID, itemId: UUID, key: String, by: Actor): Decision {
+        val idempotencyKey = VoteRequestKeys.keyOf(key)   // a blank key is a 400, said once the policy has been asked
         val assembly = assemblies.lock(assemblyId, entranceId) ?: throw NoSuchElementException("no assembly $assemblyId in entrance $entranceId")
+        val asked = VoteRequestKeys.hash(assemblyId, itemId, by.party)
+        when (val decided = keys.decide(entranceId, idempotencyKey, VoteRequestKeys.CLOSE_ITEM, asked)) {   // decided under the assembly's lock
+            is KeyDecision.Replay -> return checkNotNull(decisions.findByRequestKeyId(UUID.fromString(decided.resultId))) { "the key's decision is kept" }
+            KeyDecision.Reused -> throw IdempotencyKeyReused("Idempotency-Key $key was used for another request (PM-SYS-014)")
+            KeyDecision.Apply -> Unit
+        }
         val item = agenda.findById(itemId).filter { it.assemblyId == assemblyId && it.entranceId == entranceId }
             .orElseThrow { NoSuchElementException("no item $itemId on the agenda of assembly $assemblyId") }
         check(assembly.status == AssemblyStatus.OPEN.name) { "an item is closed at a sitting that opened on its quorum; this assembly is ${assembly.status}" }
@@ -148,13 +165,14 @@ class DecisionService(
         val basis = (listOf("item ${item.id} at sitting ${sitting.sessionNo}, ${present.representedPct.stripTrailingZeros().toPlainString()} represented at the close: ${result.line}") +
             casts.map { "${it.partyId} ${it.unitId} ${it.weight.stripTrailingZeros().toPlainString()} ${it.choice} by ${it.voteId}" }.sorted() +
             present.basis.lines().drop(1).map { "present $it" }).joinToString("\n")
+        val made = keys.keep(entranceId, idempotencyKey, VoteRequestKeys.CLOSE_ITEM, asked)   // kept with the decision, in this transaction
         return aggregates.insert(
             Decision(
                 UUID.randomUUID(), entranceId, assemblyId, item.id, sitting.sessionNo, rule.id, rule.denominator.name, rule.comparison.name,
                 BigDecimal(rule.thresholdPct), present.representedPct, result.forParts, result.againstParts, result.abstainParts,
                 if (result.passed) "PASSED" else "NOT_PASSED", "PROVISIONAL", basis,
                 MessageDigest.getInstance("SHA-256").digest(basis.toByteArray()).joinToString("") { "%02x".format(it) },
-                CATALOGUE_VERSION, ENGINE_VERSION, clock.instant(), by.party, by.loginIssuer, by.loginSubject,
+                CATALOGUE_VERSION, ENGINE_VERSION, clock.instant().truncatedTo(ChronoUnit.MICROS), by.party, by.loginIssuer, by.loginSubject, made,
             ),
         )
     }

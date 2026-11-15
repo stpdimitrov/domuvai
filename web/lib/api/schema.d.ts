@@ -83,7 +83,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        /** Merge the absent owners' ballots on an item tagged for them into its tally, after day 7 — the votes in effect and every ballot against the majority the item was bound to, the absent owners' parts added to the represented share; stored once as a decision superseding the provisional one, with its own basis; entered even with no ballot, as an eligible item is FINAL only once merged; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the merge it first made, even though the item is merged; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_merge"];
         delete?: never;
         options?: never;
@@ -101,7 +101,7 @@ export interface paths {
         /** An item's stored decision — the majority applied, the tally on ideal parts, the represented share, the sitting, the result line to 2 decimals naming its denominator, the status on today's legal date — PROVISIONAL until day 7 after the sitting and the 30 days after the protocol's posting have closed, then FINAL — an item tagged for absentee ballots only once they are merged, then shown as the merged decision naming the one it supersedes — with each window's last day and the final day; never how each owner voted; for anyone holding a role in the entrance, as the sign-in says who is asking; anybody else is a 403, an item not closed a 404 */
         get: operations["get_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
         put?: never;
-        /** Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        /** Close an item at the opened sitting and store its decision, PROVISIONAL — the votes in effect tallied on ideal parts against the majority the item was bound to, on its own denominator, the result line to 2 decimals; no vote on the item after it; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again stores nothing more and is answered with the decision it first made, even though the item is closed; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision"];
         delete?: never;
         options?: never;
@@ -188,7 +188,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 */
+        /** Enter the day the assembly's protocol was posted (чл. 16 ал. 7) — the 30 days to seek annulment of its decisions run from it; once, on a day from the opened sitting's to today; by whoever runs the assembly, as the sign-in says who is asking; anybody else is a 403 Sent under an Idempotency-Key: the same request again enters nothing more and is answered with the posting it first made, even though it is entered; the same key for another request is a 409 */
         post: operations["post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting"];
         delete?: never;
         options?: never;
@@ -2818,7 +2818,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_absentee_merge: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;
@@ -2835,6 +2837,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Forbidden */
@@ -2894,6 +2907,17 @@ export interface operations {
                     "application/json": components["schemas"]["DecisionView"];
                 };
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
             /** @description Forbidden */
             403: {
                 headers: {
@@ -2932,7 +2956,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_agenda_itemId_decision: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;
@@ -2949,6 +2975,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Forbidden */
@@ -3425,7 +3462,9 @@ export interface operations {
     post_assembly_entrances_entranceId_assemblies_assemblyId_protocol_posting: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 entranceId: string;
                 assemblyId: string;
@@ -3446,6 +3485,17 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
                     };
                 };
             };

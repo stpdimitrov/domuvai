@@ -9,13 +9,15 @@ import { mergeBallots, type MergeState } from "./actions";
  * action answers either with the assembly's page, the merged decision as the api stored it, or with the api's refusal.
  */
 // Rule: PM-VOTE-013
-export default function MergeForm({ entrance, assembly, item }: { entrance: string; assembly: string; item: string }) {
+// Rule: PM-SYS-014 (the key the action sends)
+export default function MergeForm({ entrance, assembly, item, mintedKey }: { entrance: string; assembly: string; item: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<MergeState, FormData>(mergeBallots, {});
   return (
     <form action={act} className="as-form">
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="assembly" value={assembly} />
       <input type="hidden" name="item" value={item} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <label className="check wide">
         <input type="checkbox" name="final" required /> Сливам неприсъствените бюлетини — решението се преброява отново и сливането не се повтаря
       </label>

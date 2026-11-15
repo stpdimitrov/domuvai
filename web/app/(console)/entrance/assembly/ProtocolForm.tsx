@@ -10,13 +10,15 @@ import { postProtocol, type ProtocolState } from "./actions";
  * or with the api's refusal and the day as it was filled.
  */
 // Rule: PM-GA-023
-export default function ProtocolForm({ entrance, assembly }: { entrance: string; assembly: string }) {
+// Rule: PM-SYS-014 (the key the action sends)
+export default function ProtocolForm({ entrance, assembly, mintedKey }: { entrance: string; assembly: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<ProtocolState, FormData>(postProtocol, {});
   const v = state.values ?? {};
   return (
     <form action={act} key={JSON.stringify(state)} className="as-form">
       <input type="hidden" name="entrance" value={entrance} />
       <input type="hidden" name="assembly" value={assembly} />
+      <input type="hidden" name="key" value={state.key ?? mintedKey} />
       <label>
         Протоколът е обявен на
         <input type="date" name="postedOn" defaultValue={v.postedOn} required />
