@@ -7,6 +7,7 @@ import { reach } from "@/lib/console";
 import { proxyOf, proxyRefused } from "@/lib/proxy";
 import { undoneBy, unknownOutcome } from "@/lib/refusal";
 import { sofiaInstant } from "@/lib/sofia";
+import { outcomeOf, type Outcome, type QueuedVote } from "@/lib/voteQueue";
 
 export type ConveneState = { refused?: string; values?: Record<string, string> };
 
@@ -235,7 +236,7 @@ export async function verifyIdentity(_: VerifyState, form: FormData): Promise<Ve
   redirect(`/entrance/assembly?entrance=${entrance}&assembly=${assembly}`);
 }
 
-export type VoteState = { refused?: string; values?: Record<string, string>; key?: string };
+export type VoteState = { refused?: string; values?: Record<string, string>; key?: string; unsettled?: boolean };
 
 /**
  * Recording how an owner present at the sitting voted on an item, or correcting it (Rule: PM-VOTE-001, PM-VOTE-014,
@@ -246,7 +247,8 @@ export type VoteState = { refused?: string; values?: Record<string, string>; key
  * Rule: PM-SYS-014 — the vote carries an Idempotency-Key minted once per form: a refusal recorded nothing, so the form
  * comes back under a new key; an answer lost keeps the key, so the same form sent again is the same vote, never a second.
  * A page reloaded mints a new key: a vote sent again from it is a new request, and a second first vote for the owner is
- * refused by the api as a correction with no why. The resident's queue, which keeps its keys, is #455.
+ * refused by the api as a correction with no why. With a script, the form keeps such a vote on the device under its key
+ * (`unsettled`: a 5xx or no answer) and resends it through `resendVote` — `lib/voteQueue.ts` (WEB-55).
  */
 // Rule: PM-VOTE-001
 // Rule: PM-VOTE-014
@@ -260,19 +262,37 @@ export async function castVote(_: VoteState, form: FormData): Promise<VoteState>
   if (!UUID.test(values.entrance) || !UUID.test(values.assembly) || !UUID.test(values.item) || !UUID.test(key)) return { refused: "Точката от дневния ред не е посочена.", values, key: randomUUID() };
   if (!UUID.test(values.ownerPartyId)) return { refused: "Посочете идентификатора на собственика, чийто глас записвате.", values, key: randomUUID() };
 
-  const answer = await reach(() =>
-    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", {
-      params: { path: { entranceId: values.entrance, assemblyId: values.assembly, itemId: values.item }, header: { "Idempotency-Key": key } },
-      body: { ownerPartyId: values.ownerPartyId, choice: values.choice, correction: values.correction || undefined },
-    }),
-  );
+  const answer = await postVote(values, key);
   if (!answer?.data) {
     // the vote may be recorded before its answer is lost, or behind a 5xx: the same form, sent again, carries the same key
     return answer && answer.response.status < 500
       ? { refused: undoneBy(answer, "запишете гласа"), values, key: randomUUID() }
-      : { refused: answer ? undoneBy(answer, "запишете гласа") : unknownOutcome("записването на гласа"), values, key };
+      : { refused: answer ? undoneBy(answer, "запишете гласа") : unknownOutcome("записването на гласа"), values, key, unsettled: true };
   }
   redirect(`/entrance/assembly?entrance=${values.entrance}&assembly=${values.assembly}`);
+}
+
+// Rule: PM-SYS-014
+const postVote = (v: Record<string, string>, key: string) =>
+  reach(() =>
+    api.POST("/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/agenda/{itemId}/votes", {
+      params: { path: { entranceId: v.entrance, assemblyId: v.assembly, itemId: v.item }, header: { "Idempotency-Key": key } },
+      body: { ownerPartyId: v.ownerPartyId, choice: v.choice, correction: v.correction || undefined },
+    }),
+  );
+
+/**
+ * A vote the device kept (Rule: PM-SYS-014), sent again under the key it was queued with — the same call as `castVote`,
+ * answered as an outcome instead of a page: recorded (the api's 2xx, a replay included), refused in the api's words, or
+ * unknown (a 5xx, no answer), which leaves it queued.
+ */
+// Rule: PM-SYS-014
+export async function resendVote(vote: QueuedVote): Promise<Outcome> {
+  const v = Object.fromEntries(["entrance", "assembly", "item", "ownerPartyId", "choice", "correction"].map((n) => [n, String(vote?.[n as keyof QueuedVote] ?? "").trim()]));
+  if (![v.entrance, v.assembly, v.item, v.ownerPartyId, vote?.key].every((id) => UUID.test(String(id)))) return { kind: "refused", message: "Точката от дневния ред не е посочена." };
+  const answer = await postVote(v, vote.key);
+  const kind = outcomeOf(answer ? answer.response.status : null);
+  return kind === "refused" && answer ? { kind, message: undoneBy(answer, "запишете гласа") } : kind === "recorded" ? { kind } : { kind: "unknown" };
 }
 
 export type CloseState = { refused?: string; values?: Record<string, string>; key?: string };
