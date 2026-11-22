@@ -54,7 +54,10 @@ data class PaperDecision(
     val requestKeyId: UUID? = null,
 )
 
-/** One read that served a paper decision's custodian, a person's name (Rule: PM-SEC-004). Insert-only: the table refuses any other write. */
+/**
+ * One read that served a paper decision's custodian, a person's name, or this log of those reads, which names persons
+ * too (Rule: PM-SEC-004). Insert-only: the table refuses any other write.
+ */
 @Table("paper_decision_read")
 data class PaperDecisionRead(
     @Id val id: UUID,
@@ -65,7 +68,15 @@ data class PaperDecisionRead(
     val at: Instant,
     val outcome: String,            // PaperDecisionReadOutcome
     val ruleId: String?,
+    val readOf: String,             // PaperDecisionReadOf
 )
+
+enum class PaperDecisionReadOf {
+    /** a paper decision's custodian, served with the list of decisions */
+    CUSTODIAN,
+    /** this log, read by the manager, the board or the controller */
+    LOG,
+}
 
 enum class PaperDecisionReadOutcome {
     /** to a reader of the mandates, citing the policy's rule */
@@ -77,6 +88,10 @@ enum class PaperDecisionReadOutcome {
 interface PaperDecisionRepository : ListCrudRepository<PaperDecision, UUID> {
     fun findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entranceId: UUID): List<PaperDecision>
     fun findByRequestKeyId(requestKeyId: UUID): PaperDecision?
+}
+
+interface PaperDecisionReadRepository : ListCrudRepository<PaperDecisionRead, UUID> {
+    fun findByEntranceIdOrderByAtAscIdAsc(entranceId: UUID): List<PaperDecisionRead>
 }
 
 /**
@@ -92,6 +107,7 @@ interface PaperDecisionRepository : ListCrudRepository<PaperDecision, UUID> {
 class PaperDecisions(
     private val aggregates: JdbcAggregateTemplate,
     private val stored: PaperDecisionRepository,
+    private val readLog: PaperDecisionReadRepository,
     private val reads: AssemblyReads,
     private val keys: VoteRequestKeys,
     private val clock: Clock,
@@ -156,9 +172,33 @@ class PaperDecisions(
             PaperDecisionRead(
                 UUID.randomUUID(), entranceId, by.party, by.login?.issuer, by.login?.subject, clock.instant().truncatedTo(ChronoUnit.MICROS),
                 if (mandates == null) PaperDecisionReadOutcome.OPEN.name else PaperDecisionReadOutcome.SERVED.name, mandates?.ruleId,
+                PaperDecisionReadOf.CUSTODIAN.name,
             ),
         )
         return rows.map { PaperDecisionView.of(it, namesCustodian) }
+    }
+
+    /**
+     * The entrance's log of who read a paper decision's custodian, oldest first, this read's own entry among it — as the
+     * book's access log is exported. The log names persons, so it is read by the manager, the board and the controller
+     * only (the owner's Q1a on #497, 2026-11-22), and with sign-in switched off nobody is accountable and it is refused
+     * (Q2a). A refused read enters nothing; a served one is entered, in its own transaction, before the log is read.
+     */
+    // Rule: PM-SEC-001
+    // Rule: PM-SEC-002
+    // Rule: PM-SEC-004
+    // Rule: PM-GOV-008
+    @Transactional
+    fun reads(by: Asking, entranceId: UUID): List<PaperDecisionReadView> {
+        val decision = reads.decided(entranceId, by, Action.READ_PAPER_DECISION_READS)
+        if (decision == null || !decision.allowed) throw ActRefused(decision?.ruleId ?: Action.READ_PAPER_DECISION_READS.governedBy)
+        aggregates.insert(
+            PaperDecisionRead(
+                UUID.randomUUID(), entranceId, by.party, by.login?.issuer, by.login?.subject, clock.instant().truncatedTo(ChronoUnit.MICROS),
+                PaperDecisionReadOutcome.SERVED.name, decision.ruleId, PaperDecisionReadOf.LOG.name,
+            ),
+        )
+        return readLog.findByEntranceIdOrderByAtAscIdAsc(entranceId).map(PaperDecisionReadView::of)
     }
 
     /** A line as it is kept: ordinary characters, required. */
@@ -193,5 +233,21 @@ data class PaperDecisionView(
             row.id, row.decisionText, row.protocolDate, row.protocolRef, row.archiveLocation, row.custodian.takeIf { namesCustodian },
             row.basisHash, row.lawVersion, row.engineVersion, row.recordedAt,
         )
+    }
+}
+
+/** An entry of the log of reads as it is read: who by party and login, never by name — the registry's tables are not this module's. */
+data class PaperDecisionReadView(
+    val id: UUID,
+    val actor: UUID?,
+    val loginIssuer: String?,
+    val loginSubject: String?,
+    val at: Instant,
+    val outcome: String,
+    val ruleId: String?,
+    val readOf: String,
+) {
+    companion object {
+        fun of(row: PaperDecisionRead) = PaperDecisionReadView(row.id, row.actor, row.loginIssuer, row.loginSubject, row.at, row.outcome, row.ruleId, row.readOf)
     }
 }

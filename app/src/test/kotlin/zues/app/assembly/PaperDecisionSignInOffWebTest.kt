@@ -41,6 +41,7 @@ class PaperDecisionSignInOffWebTest {
     @MockitoBean lateinit var stored: PaperDecisionRepository
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var kept: VoteRequestKeyRepository
+    @MockitoBean lateinit var readLog: PaperDecisionReadRepository
 
     @Test
     fun `PM-FEE-012 the decision a charge run will cite can be recorded with sign-in switched off, naming nobody`() {
@@ -64,5 +65,12 @@ class PaperDecisionSignInOffWebTest {
         assertThat(entry.entranceId).isEqualTo(entrance)
         assertThat(entry.outcome).isEqualTo("OPEN")
         assertThat(listOf(entry.actor, entry.loginIssuer, entry.loginSubject, entry.ruleId)).containsOnlyNulls()
+    }
+
+    @Test
+    fun `PM-SEC-002 with sign-in switched off the log of reads is refused - a 403, and nothing is entered or read`() {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/assembly/entrances/${UUID.randomUUID()}/paper-decisions/reads"))
+            .andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        org.mockito.kotlin.verifyNoInteractions(aggregates, readLog)
     }
 }

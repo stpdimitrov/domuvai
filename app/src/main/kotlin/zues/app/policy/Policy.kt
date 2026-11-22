@@ -105,6 +105,9 @@ enum class Action(val governedBy: String) {
 
     /** registering an entrance — a new building's, or another of a building already registered (PM-ORG-001) */
     REGISTER_ENTRANCE("PM-SEC-001"),
+
+    /** who read a paper decision's custodian, and when — the log of those reads, which names persons: other persons' data */
+    READ_PAPER_DECISION_READS("PM-SEC-002"),
 }
 
 /**
@@ -194,7 +197,7 @@ class Policy(private val sources: List<RoleSource>) {
 
     companion object {
         /** Raised with every change to [MATRIX]; a test pins the content to the number (PM-SEC-001: testable and versioned). */
-        const val MATRIX_VERSION = 23
+        const val MATRIX_VERSION = 24
 
         /**
          * The book: the management board or the manager, the control board or the controller, and the owner for their
@@ -229,7 +232,9 @@ class Policy(private val sources: List<RoleSource>) {
          * on the day — whichever role, as an entrance's units are read — and the administrator every one; a party is
          * registered by the administrator and by the manager or the board of any entrance, who enter the titles that name
          * it (PM-BOOK-005); an entrance by the administrator only, no entrance's office (the owner's decisions R1a, R2a,
-         * R3a on #322, 2026-10-29).
+         * R3a on #322, 2026-10-29). Who read a paper decision's custodian — a log that names persons: the manager, the
+         * board and the controller, who reads everything (PM-GOV-008) — not the administrator, who records the decisions,
+         * nor an owner as such (the owner's decision Q1a on #497, 2026-11-22).
          */
         /**
          * What each of the administrator's actions is asked of. A line of theirs is carried on that kind of resource
@@ -337,6 +342,9 @@ class Policy(private val sources: List<RoleSource>) {
             Permit(Action.REGISTER_PARTY, Role.MB, "PM-BOOK-005"),
             Permit(Action.REGISTER_PARTY, Role.SYS_ADMIN, "PM-SEC-001"),
             Permit(Action.REGISTER_ENTRANCE, Role.SYS_ADMIN, "PM-SEC-001"),
+            Permit(Action.READ_PAPER_DECISION_READS, Role.BM, "PM-SEC-001"),
+            Permit(Action.READ_PAPER_DECISION_READS, Role.MB, "PM-SEC-001"),
+            Permit(Action.READ_PAPER_DECISION_READS, Role.CTL, "PM-GOV-008"),
         )
     }
 }

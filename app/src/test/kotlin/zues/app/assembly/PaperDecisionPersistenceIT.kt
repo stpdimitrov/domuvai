@@ -51,6 +51,7 @@ class PaperDecisionPersistenceIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var jdbc: JdbcTemplate
+    @Autowired lateinit var readLog: PaperDecisionReadRepository
 
     private val content = """{"decisionText":"Вноска за управление\nи поддръжка","protocolDate":"2026-03-14","protocolRef":"Протокол № 3","archiveLocation":"шкаф в офиса","custodian":"Иван Иванов"}"""
 
@@ -96,6 +97,24 @@ class PaperDecisionPersistenceIT {
         assertThat(jdbc.queryForMap("SELECT * FROM assembly.paper_decision_read WHERE id = ?", id)).isEqualTo(kept)
         assertThatThrownBy { jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, at, outcome) VALUES (gen_random_uuid(), ?, now(), 'SERVED')", block) }
             .isInstanceOf(DataAccessException::class.java)   // a name served names its reader
+    }
+
+    @Test
+    fun `PM-SEC-004 a read of the log is kept as the rest are - not changed, removed or emptied, oldest first, and never OPEN`() {
+        val block = entrance()
+        val older = UUID.randomUUID()
+        val log = UUID.randomUUID()
+        jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, at, outcome) VALUES (?, ?, now() - interval '1 hour', 'OPEN')", older, block)
+        jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, login_subject, at, outcome, rule_id, read_of) VALUES (?, ?, 'login-ctl', now(), 'SERVED', 'PM-GOV-008', 'LOG')", log, block)
+        val kept = jdbc.queryForMap("SELECT * FROM assembly.paper_decision_read WHERE id = ?", log)
+        jdbc.update("UPDATE assembly.paper_decision_read SET read_of = 'CUSTODIAN' WHERE id = ?", log)
+        jdbc.update("DELETE FROM assembly.paper_decision_read WHERE id = ?", log)
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.paper_decision_read") }.isInstanceOf(DataAccessException::class.java).hasMessageContaining("is not emptied")
+        assertThat(jdbc.queryForMap("SELECT * FROM assembly.paper_decision_read WHERE id = ?", log)).isEqualTo(kept)
+        assertThat(readLog.findByEntranceIdOrderByAtAscIdAsc(block).map { it.id to it.readOf }).containsExactly(older to "CUSTODIAN", log to "LOG")   // a row from before the column reads CUSTODIAN
+        for (refused in listOf("'OPEN', NULL, 'LOG'", "'SERVED', 'PM-SEC-001', 'ELSE'"))
+            assertThatThrownBy { jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, at, outcome, rule_id, read_of) VALUES (gen_random_uuid(), ?, now(), $refused)", block) }
+                .describedAs(refused).isInstanceOf(DataAccessException::class.java)
     }
 
     @Test

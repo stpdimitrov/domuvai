@@ -78,6 +78,7 @@ class PaperDecisionWebTest {
     @MockitoBean lateinit var stored: PaperDecisionRepository
     @MockitoBean lateinit var logins: Logins
     @MockitoBean lateinit var kept: VoteRequestKeyRepository
+    @MockitoBean lateinit var readLog: PaperDecisionReadRepository
 
     private val entrance = UUID.randomUUID()
     private val url = "/api/assembly/entrances/$entrance/paper-decisions"
@@ -101,6 +102,8 @@ class PaperDecisionWebTest {
         )
 
     private fun read(subject: String) = mvc.perform(get(url).header(HttpHeaders.AUTHORIZATION, "Bearer ${token(subject)}"))
+
+    private fun readLog(subject: String) = mvc.perform(get("$url/reads").header(HttpHeaders.AUTHORIZATION, "Bearer ${token(subject)}"))
 
     private fun answering() = whenever(aggregates.insert(any<PaperDecision>())).thenAnswer { it.arguments[0] }
 
@@ -208,5 +211,56 @@ class PaperDecisionWebTest {
         whenever(kept.findByEntranceIdAndIdempotencyKey(entrance, key)).thenReturn(VoteRequestKeyRow(UUID.randomUUID(), entrance, key, VoteRequestKeys.RECORD_VOTE, "ab".repeat(32), Instant.now()))
         send("operator", key = key).andExpect(status().isConflict).andExpect(jsonPath("$.error").value("Idempotency-Key $key was used for another request (PM-SYS-014)"))
         verifyNoInteractions(aggregates)
+    }
+
+    @Test
+    fun `PM-SEC-001 PM-GOV-008 the manager, the board and the controller each read the log of reads, their own read entered in it`() {
+        val earlier = PaperDecisionRead(UUID.randomUUID(), entrance, parties.getValue(Role.BM), PAPER_REALM, "login-BM", Instant.parse("2026-11-01T10:00:00Z"), "SERVED", "PM-SEC-001", "CUSTODIAN")
+        val log = mutableListOf(earlier)
+        whenever(aggregates.insert(any<PaperDecisionRead>())).thenAnswer { (it.arguments[0] as PaperDecisionRead).also(log::add) }
+        whenever(readLog.findByEntranceIdOrderByAtAscIdAsc(entrance)).thenAnswer { log.toList() }
+        for ((role, rule) in listOf(Role.BM to "PM-SEC-001", Role.MB to "PM-SEC-001", Role.CTL to "PM-GOV-008")) {
+            whenever(logins.partyOf(PAPER_REALM, "login-$role")).thenReturn(parties.getValue(role))
+            readLog("login-$role").andExpect(status().isOk)
+                .andExpect(jsonPath("$[0].readOf").value("CUSTODIAN")).andExpect(jsonPath("$[0].loginSubject").value("login-BM"))
+                .andExpect(jsonPath("$[-1].readOf").value("LOG")).andExpect(jsonPath("$[-1].outcome").value("SERVED")).andExpect(jsonPath("$[-1].ruleId").value(rule))
+                .andExpect(jsonPath("$[-1].actor").value(parties.getValue(role).toString())).andExpect(jsonPath("$[-1].loginSubject").value("login-$role"))
+                .andExpect(jsonPath("$[-1].fullName").doesNotExist())
+        }
+        assertThat(log.drop(1).map { it.readOf to it.entranceId }).containsOnly("LOG" to entrance).hasSize(3)
+    }
+
+    @Test
+    fun `PM-SEC-004 a read of the log is entered SERVED and LOG, with the party, the login and the policy's rule, before the log is read`() {
+        whenever(logins.partyOf(PAPER_REALM, "login-MB")).thenReturn(parties.getValue(Role.MB))
+        readLog("login-MB").andExpect(status().isOk)
+        val entry = argumentCaptor<PaperDecisionRead>().apply { verify(aggregates).insert(capture()) }.firstValue
+        assertThat(entry.entranceId).isEqualTo(entrance)
+        assertThat(entry.actor).isEqualTo(parties.getValue(Role.MB))
+        assertThat(entry.loginIssuer to entry.loginSubject).isEqualTo(PAPER_REALM to "login-MB")
+        assertThat(listOf(entry.outcome, entry.ruleId, entry.readOf)).containsExactly("SERVED", "PM-SEC-001", "LOG")
+        org.mockito.kotlin.inOrder(aggregates, readLog) {
+            verify(aggregates).insert(any<PaperDecisionRead>())
+            verify(readLog).findByEntranceIdOrderByAtAscIdAsc(entrance)
+        }
+    }
+
+    @Test
+    fun `PM-SEC-002 an owner, a user, the cashier and the administrator are refused the log - a 403, and nothing is entered or read`() {
+        for (role in listOf(Role.OWN, Role.USR, Role.CSH)) {
+            whenever(logins.partyOf(PAPER_REALM, "login-$role")).thenReturn(parties.getValue(role))
+            readLog("login-$role").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        }
+        readLog("operator").andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        readLog("login-of-nobody").andExpect(status().isForbidden)
+        verifyNoInteractions(aggregates, readLog)
+    }
+
+    @Test
+    fun `PM-SEC-004 a custodian read is entered as a read of the custodian, not of the log`() {
+        whenever(stored.findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entrance)).thenReturn(listOf(aRecord()))
+        whenever(logins.partyOf(PAPER_REALM, "login-CTL")).thenReturn(parties.getValue(Role.CTL))
+        read("login-CTL").andExpect(status().isOk)
+        assertThat(argumentCaptor<PaperDecisionRead>().apply { verify(aggregates).insert(capture()) }.firstValue.readOf).isEqualTo("CUSTODIAN")
     }
 }

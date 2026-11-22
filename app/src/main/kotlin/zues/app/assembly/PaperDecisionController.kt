@@ -44,6 +44,15 @@ class PaperDecisionController(private val decisions: PaperDecisions, private val
     fun list(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<PaperDecisionView> =
         decisions.list(who.of(signedIn), entranceId)
 
+    /** Who read a paper decision's custodian, oldest first, this read among them: the manager, the board and the controller only. */
+    // Rule: PM-SEC-001
+    // Rule: PM-SEC-002
+    // Rule: PM-SEC-004
+    // Rule: PM-GOV-008
+    @GetMapping("/reads")
+    fun reads(@PathVariable entranceId: UUID, signedIn: JwtAuthenticationToken?): List<PaperDecisionReadView> =
+        decisions.reads(who.of(signedIn), entranceId)
+
     @ExceptionHandler(ActRefused::class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     fun onRefused(e: ActRefused): Map<String, String> = mapOf("error" to (e.message ?: "not allowed"), "rule" to e.ruleId)
