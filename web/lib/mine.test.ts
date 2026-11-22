@@ -48,6 +48,7 @@ test("PM-FEE-018 a line shows the api's Bulgarian derivation under its name", ()
   assert.equal(lineText(line({ allocationKey: "BY_IDEAL_PARTS", quantity: 3, derivationBg: "дял от 1 200,00 € по брой души · 3 души" })).how, "дял от 1 200,00 € по брой души · 3 души");
   const page = readFileSync(new URL("../app/(resident)/my/statement/[unitId]/page.tsx", import.meta.url), "utf8");
   assert.match(page, /t\.how/);                                                       // the page renders what lineText worded
+  assert.doesNotMatch(page, /\.derivation\b/);                                         // never the api's English derivation
 });
 
 test("PM-FEE-018 a line with no Bulgarian derivation falls back to its key and count, never the English text", () => {
@@ -56,6 +57,11 @@ test("PM-FEE-018 a line with no Bulgarian derivation falls back to its key and c
     assert.equal(t.how, "на живущ · 3");
     assert.doesNotMatch(JSON.stringify(t), /person/);
   }
+});
+
+test("PM-FEE-016 a line's amount is its minor units formatted, with no float arithmetic", () => {
+  assert.equal(lineText(line({ amountMinor: 123456 })).amount, "€1.234,56");
+  assert.equal(lineText(line({ amountMinor: 5 })).amount, "€0,05");
 });
 
 test("PM-FEE-018 an empty statement says nothing is charged, not an error", () => {
