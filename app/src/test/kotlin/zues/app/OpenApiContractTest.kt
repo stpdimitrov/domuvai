@@ -121,6 +121,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var bookEntries: zues.app.registry.BookEntries
     @MockitoBean lateinit var registrations: zues.app.registry.Registrations
     @MockitoBean lateinit var ownership: OwnershipService
+    @MockitoBean lateinit var myUnits: zues.app.registry.MyUnits
     @MockitoBean lateinit var registry: RegistryService
 
     @TestConfiguration

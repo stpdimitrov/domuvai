@@ -62,6 +62,8 @@ RUNNING = {
    ('Record a title to a unit — effective-dated, with its share, naming a party of the entrance (one of another entrance is answered as unknown, 400) — entered in the book by the manager or the board of the entrance, as the sign-in says who is asking; anybody else is a 403, the owner themself included', ['PM-ORG-005', 'PM-ORG-011', 'PM-BOOK-005', 'PM-BOOK-011']),
  ('get', '/api/registry/entrances/{entranceId}/owners'):
    ("The owners and users of an entrance's units as of a date — each party's id beside the name, never an identity number; read by the entrance's manager, board and controller, as the sign-in says who is asking, and logged whether served or refused (403)", ['PM-ORG-011', 'PM-BOOK-011', 'PM-BOOK-006', 'PM-BOOK-007']),
+ ('get', '/api/registry/me/units'):
+   ("The units the person signed in holds on a date — their own titles only (owner or user), each with the entrance's label, the unit's designation and type, their own share and the ideal parts that share stands for; no co-owner, name, identity number or address. The party is the one the sign-in is tied to, never a parameter; nobody asking is a 401, a login tied to no party gets an empty list", ['PM-ORG-011', 'PM-ORG-005', 'PM-SEC-002', 'PM-BOOK-011']),
  # ---- assembly
  ('post', '/api/assembly/entrances/{entranceId}/assemblies'):
    ('Convene a general assembly as a draft — by the signed-in holder of the office stated (board, manager, control board), in force today; urgency is recorded with its justification; a date no notice could be in time for is blocked',
