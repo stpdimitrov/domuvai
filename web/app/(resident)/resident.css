@@ -1,0 +1,68 @@
+/* The resident surface (PM-SYS-015): a phone, older eyes. 17 px body, 48 px targets, light and dark.
+   The console's palette and type; the Claude Design canvases restyle it later. */
+.resident {
+  --r-bg: #f2f1ee;
+  --r-ink: #17191a;
+  --r-muted: #5c605e;
+  --r-line: #deddd9;
+  --r-bar: #edece8;
+  --r-accent: #14584a;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--r-bg);
+  color: var(--r-ink);
+  font: 400 17px/1.5 "IBM Plex Sans", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  .resident {
+    --r-bg: #17191a;
+    --r-ink: #edece8;
+    --r-muted: #b4b8b5;
+    --r-line: #3a3d3c;
+    --r-bar: #202322;
+    --r-accent: #7fc7b4;
+  }
+}
+.resident-main {
+  flex: 1;
+  padding: 24px 16px 96px;
+}
+.resident h1 {
+  font: 500 26px/1.25 Literata, Georgia, serif;
+  margin: 0 0 8px;
+}
+.resident p {
+  margin: 0 0 16px;
+  color: var(--r-muted);
+}
+.resident button,
+.resident-tabs a {
+  min-height: 48px;
+  min-width: 48px;
+  font: 500 17px/1 "IBM Plex Sans", system-ui, sans-serif;
+}
+.resident button {
+  padding: 0 20px;
+  color: var(--r-accent);
+  background: none;
+  border: 1px solid var(--r-accent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.resident-tabs {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  background: var(--r-bar);
+  border-top: 1px solid var(--r-line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.resident-tabs a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--r-accent);
+  text-decoration: none;
+}
