@@ -3,6 +3,7 @@ package zues.app.money
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import zues.law.CostItem
+import java.math.RoundingMode
 
 /**
  * A charge line's derivation in Bulgarian, worded at read time from the issued line and its run's stored basis
@@ -13,24 +14,28 @@ object DerivationBg {
 
     private val mapper = ObjectMapper()
 
-    fun parse(basisJson: String): JsonNode = mapper.readTree(basisJson)
+    /** A malformed basis traces nothing: its lines get no derivation, the statement still answers. */
+    fun parse(basisJson: String): JsonNode? = runCatching { mapper.readTree(basisJson) }.getOrNull()
 
-    /** Rule: PM-FEE-018 — (rateMinor, text); both null when the basis holds no line to trace it to, never a guess. */
+    /** (rateMinor, text); both null when the basis holds no line to trace it to, never a guess. */
+    // Rule: PM-FEE-018
     fun of(line: ChargeLineRow, basis: JsonNode): Pair<Long?, String?> {
         val tariff = basis.path("tariff")
         if (line.allocationKey == "METERED") {
             val price = tariff.path("consumption").firstOrNull { it.path("item").asText() == line.item }
                 ?.path("priceMinor")?.takeIf { it.isIntegralNumber }?.asLong() ?: return null to null
             val uom = runCatching { CostItem.valueOf(line.item!!).unitOfMeasure }.getOrNull() ?: return null to null
-            return price to "${decimal(line, 3)} $uom × ${euro(price)}/$uom"
+            val reading = decimal(line, 3) ?: return null to null
+            return price to "$reading $uom × ${euro(price)}/$uom"
         }
         val t = tariff.path("lines").firstOrNull {
-            it.path("stream").asText() == line.component && it.get("item")?.takeUnless { n -> n.isNull }?.asText() == line.item
+            it.path("stream").asText() == line.component && it.path("key").asText() == line.allocationKey &&
+                it.get("item")?.takeUnless { n -> n.isNull }?.asText() == line.item
         } ?: return null to null
         val count = when (line.allocationKey) {
             "PER_PERSON" -> line.quantity.toInt().let { if (it == 1) "1 човек" else "$it души" }
             "PER_UNIT" -> line.quantity.toInt().let { if (it == 1) "1 обект" else "$it обекта" }
-            "BY_IDEAL_PARTS" -> "${decimal(line, 6)} %"
+            "BY_IDEAL_PARTS" -> "${decimal(line, 6) ?: return null to null} %"
             else -> return null to null
         }
         val rate = t.path("rateMinor").takeIf { it.isIntegralNumber }?.asLong()
@@ -44,13 +49,15 @@ object DerivationBg {
         return rate to text + (businessSuffix(line, basis) ?: return null to null)
     }
 
-    /** Rule: PM-FEE-010 as the run applied it — the adopted multiple, else the statutory minimum the basis froze. */
+    /** PM-FEE-010 as the run applied it — the adopted multiple, else the statutory minimum the basis froze; null when the basis cannot say. */
+    // Rule: PM-FEE-018
     private fun businessSuffix(line: ChargeLineRow, basis: JsonNode): String? {
-        val unit = basis.path("units").firstOrNull { it.path("unitId").asText() == line.unitId.toString() }
-        if (unit?.path("businessUse")?.asBoolean() != true || line.component == "REPAIR_FUND") return ""
+        if (line.component == "REPAIR_FUND") return ""
+        val unit = basis.path("units").firstOrNull { it.path("unitId").asText() == line.unitId.toString() } ?: return null
+        if (!unit.path("businessUse").asBoolean()) return ""
         val adopted = basis.path("tariff").path("businessMultiplier")
         val multiple = (if (adopted.isNumber) adopted else basis.path("constants").path("BUSINESS_USE_MULTIPLIER_MIN"))
-            .takeIf { it.isNumber }?.asInt() ?: return null
+            .takeIf { it.isNumber && it.decimalValue().stripTrailingZeros().scale() <= 0 }?.asInt() ?: return null
         return " · ×$multiple стопанска дейност"
     }
 
@@ -61,9 +68,11 @@ object DerivationBg {
     }
 
     /** A count, not money: the line's quantity with a comma decimal. */
-    private fun decimal(line: ChargeLineRow, scale: Int) = line.quantity.setScale(scale).toPlainString().replace('.', ',')
+    private fun decimal(line: ChargeLineRow, scale: Int): String? =
+        runCatching { line.quantity.setScale(scale, RoundingMode.UNNECESSARY) }.getOrNull()?.toPlainString()?.replace('.', ',')
 
-    /** Rule: PM-FEE-016 — euro from integer minor units: "1 200,00 €". Integer arithmetic only. */
+    /** Euro from integer minor units: "1 200,00 €". Integer arithmetic only. */
+    // Rule: PM-FEE-016
     fun euro(minor: Long): String {
         val sign = if (minor < 0) "-" else ""
         val whole = Math.abs(minor / 100).toString()                    // minor / 100 never overflows on abs

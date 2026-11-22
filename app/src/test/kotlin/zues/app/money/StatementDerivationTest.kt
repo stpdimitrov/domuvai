@@ -123,6 +123,14 @@ class StatementDerivationTest {
 
         val emptyBasis = statementLine(lineOf("MANAGEMENT", "PER_PERSON", "3.000000", 1_860), "{}")
         assertThat(emptyBasis.derivationBg).isNull()
+
+        val otherKey = statementLine(lineOf("MANAGEMENT", "BY_IDEAL_PARTS", "2.500000", 1_550), basis(other))
+        assertThat(otherKey.derivationBg).isNull()                                   // same stream, another key
+
+        assertThat(statementLine(lineOf("MANAGEMENT", "PER_PERSON", "3.000000", 1_860), "not json").derivationBg).isNull()
+
+        val noUnit = basis(other).replace(unitId.toString(), UUID.randomUUID().toString())
+        assertThat(statementLine(lineOf("MANAGEMENT", "PER_PERSON", "3.000000", 1_860), noUnit).derivationBg).isNull()
     }
 
     @Test
