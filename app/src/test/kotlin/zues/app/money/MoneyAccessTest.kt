@@ -12,6 +12,7 @@ import zues.app.policy.Login
 import zues.app.policy.Policy
 import zues.app.policy.Role
 import zues.app.policy.RoleSource
+import zues.app.registry.Units
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
@@ -24,14 +25,12 @@ class MoneyAccessTest {
     private val flat2 = UUID.randomUUID()
     private val held = mutableMapOf<UUID, Set<Held>>()
     private val policy = Policy(listOf(RoleSource { who, entranceId, _ -> held[who.party].orEmpty().filter { it.entranceId == entranceId }.toSet() }))
-    private val postings: PostingRepository = mock()
-    private val access = MoneyAccess(policy, postings, Clock.systemUTC())
-    private val open = MoneyAccess(policy, postings, Clock.systemUTC(), mode = "off")
+    private val units: Units = mock()
+    private val access = MoneyAccess(policy, units, Clock.systemUTC())
+    private val open = MoneyAccess(policy, units, Clock.systemUTC(), mode = "off")
 
     init {
-        listOf(flat1, flat2).forEach { unit ->
-            whenever(postings.findFirstByUnitId(unit)).thenReturn(PostingRow(UUID.randomUUID(), entrance, UUID.randomUUID(), Ledger.RECEIVABLE, unit, 100, "EUR", LocalDate.parse("2026-05-01")))
-        }
+        listOf(flat1, flat2).forEach { unit -> whenever(units.entranceOf(unit)).thenReturn(entrance) }   // the registry's entrance; nothing is posted
     }
 
     private fun person(vararg roles: Held): Asking {
@@ -82,8 +81,16 @@ class MoneyAccessTest {
     }
 
     @Test
-    fun `PM-SEC-002 a unit with nothing posted is refused, even to the manager — there is no entrance to decide on`() {
+    fun `PM-SEC-002 a unit the registry does not hold is refused, even to the manager — there is no entrance to decide on`() {
         refusedBy("PM-SEC-002") { access.unitCharges(UUID.randomUUID(), person(Held(Role.BM, entrance))) }
+    }
+
+    @Test
+    fun `PM-SEC-002 the owner of a unit with nothing posted reads its charges, decided on the registry's entrance — another unit's owner does not`() {
+        val owner = person(Held(Role.OWN, entrance, setOf(flat1)))
+        assertThatCode { access.unitCharges(flat1, owner) }.doesNotThrowAnyException()
+        refusedBy("PM-SEC-002") { access.unitCharges(flat1, person(Held(Role.OWN, entrance, setOf(flat2)))) }
+        refusedBy("PM-SEC-002") { access.unitCharges(flat1, person(Held(Role.BM, UUID.randomUUID()))) }   // an office in another entrance
     }
 
     @Test

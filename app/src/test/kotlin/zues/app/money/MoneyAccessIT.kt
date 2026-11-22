@@ -131,7 +131,7 @@ class MoneyAccessIT {
     }
 
     @Test
-    fun `PM-SEC-002 a unit's open debts are read as its arrears — its owner and the offices, nobody else, and a unit with nothing posted is refused`() {
+    fun `PM-SEC-002 a unit's open debts are read as its arrears — its owner and the offices, nobody else`() {
         val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 4", "А", "GA")).entranceId
         val (flat1, flat2) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
         ownership.assignTitle(entrance, flat1, AssignTitle(person("Иван Петров", "owner-1", entrance), "OWN", validFrom = "2020-01-01"))
@@ -157,7 +157,43 @@ class MoneyAccessIT {
         for (nobody in listOf("cashier", "a-login-tied-to-nobody")) {
             mvc.perform(openDebts(flat1).by(nobody)).andExpect(status().isForbidden)
         }
-        mvc.perform(openDebts(quiet).by("owner-2")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        mvc.perform(openDebts(quiet).by("owner-1"))   // another entrance's unit; a quiet unit's own owner is read in the PM-FEE-018 test below.andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+    }
+
+    @Test
+    fun `PM-FEE-018 PM-SEC-002 the owner of a unit with nothing posted reads an empty statement — another unit's owner is still refused it`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 8", "А", "GA")).entranceId
+        val (quiet, other) = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "60.0000"), RegisterUnit("ап. 2", "APARTMENT", idealParts = "40.0000")))
+        ownership.assignTitle(entrance, quiet, AssignTitle(person("Иван Петров", "quiet-owner", entrance), "OWN", validFrom = "2020-01-01"))
+        ownership.assignTitle(entrance, other, AssignTitle(person("Георги Стоянов", "other-owner", entrance), "OWN", validFrom = "2020-01-01"))
+
+        mvc.perform(get("/api/money/units/$quiet/statement").by("quiet-owner"))
+            .andExpect(status().isOk).andExpect(jsonPath("$.balanceMinor").value(0)).andExpect(jsonPath("$.lines").isEmpty)
+        mvc.perform(get("/api/money/units/$quiet/arrears").param("asOf", "2026-05-20").by("quiet-owner")).andExpect(status().isOk)
+        mvc.perform(get("/api/money/units/$quiet/open-debts").param("asOf", "2026-05-20").by("quiet-owner")).andExpect(status().isOk).andExpect(jsonPath("$").isEmpty)
+        for (read in listOf("statement", "arrears?asOf=2026-05-20", "open-debts?asOf=2026-05-20")) {
+            mvc.perform(get("/api/money/units/$quiet/$read").by("other-owner")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        }
+        // a unit the registry does not hold: refused, as any other unit not the caller's — nothing said of whether it exists
+        mvc.perform(get("/api/money/units/${UUID.randomUUID()}/statement").by("quiet-owner")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+    }
+
+    @Test
+    fun `PM-SEC-002 a unit's entrance is the registry's, not a posting's — a posting naming another entrance gives that entrance's manager nothing`() {
+        val entrance = registry.registerEntrance(RegisterEntrance("ул. Шипка 10", "А", "GA")).entranceId
+        val flat = registry.registerUnits(entrance, listOf(RegisterUnit("ап. 1", "APARTMENT", idealParts = "100.0000"))).single()
+        ownership.assignTitle(entrance, flat, AssignTitle(person("Иван Петров", "flat-owner", entrance), "OWN", validFrom = "2020-01-01"))
+        val other = registry.registerEntrance(RegisterEntrance("ул. Шипка 12", "А", "GA")).entranceId
+        mandate(other, "BM", person("Мария Иванова", "other-manager"))
+        mvc.perform(
+            post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
+                json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)))),
+            ),
+        ).andExpect(status().isCreated)
+        jdbc.update("UPDATE money.posting SET entrance_id = ? WHERE unit_id = ?", other, flat)   // a posting stamped with the wrong entrance
+
+        mvc.perform(get("/api/money/units/$flat/statement").by("flat-owner")).andExpect(status().isOk)
+        mvc.perform(get("/api/money/units/$flat/statement").by("other-manager")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
     }
 
     @Test

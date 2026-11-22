@@ -10,6 +10,7 @@ import zues.app.policy.Action
 import zues.app.policy.Asking
 import zues.app.policy.Policy
 import zues.app.policy.Resource
+import zues.app.registry.Units
 import zues.kernel.toSofiaDate
 import java.time.Clock
 import java.time.LocalDate
@@ -23,27 +24,28 @@ class MoneyWriteForbidden(val ruleId: String) : RuntimeException("refused by $ru
 
 /**
  * Who may read money's personal data (Rule: PM-SEC-002, ADR-002): asked of the policy as at today in Sofia, for the
- * person the sign-in says is asking — never a parameter. A unit's entrance is money's own record of it, stamped on every
- * posting when the unit was charged, never the caller's: a unit with nothing posted has no entrance to decide on and is
- * refused, which tells the caller nothing about it. With sign-in switched off in so many words (`DOMUVAI_AUTH=off`)
- * nobody is asking and nothing can be decided, so the reads are served — as everything else is in that mode.
+ * person the sign-in says is asking — never a parameter. A unit's entrance is the registry's (#319), never the caller's
+ * and never a posting's: a unit with nothing posted is decided on like any other, and one the registry does not hold
+ * has no entrance to decide on and is refused, which tells the caller nothing about it. With sign-in switched off in so
+ * many words (`DOMUVAI_AUTH=off`) nobody is asking and nothing can be decided, so the reads are served — as everything
+ * else is in that mode.
  */
 @Service
 class MoneyAccess(
     private val policy: Policy,
-    private val postings: PostingRepository,
+    private val units: Units,
     private val clock: Clock,
     @Value("\${domuvai.auth.mode:}") mode: String = "",
 ) {
     private val open = mode.trim().equals("off", ignoreCase = true)
 
     /**
-     * Rule: PM-SEC-002 — one unit's charges: its statement, its arrears, its open debts. The entrance is that of the unit's first posting:
-     * every writer stamps a unit's postings with the one entrance the registry holds it in (#209 item 4).
+     * Rule: PM-SEC-002 — one unit's charges: its statement, its arrears, its open debts. The entrance is the one the
+     * registry holds the unit in, so a unit with nothing posted yet is decided on as any other (#491).
      */
     fun unitCharges(unitId: UUID, who: Asking) {
         if (unasked(who)) return
-        val entranceId = postings.findFirstByUnitId(unitId)?.entranceId ?: throw MoneyReadForbidden(Action.READ_UNIT_CHARGES.governedBy)
+        val entranceId = units.entranceOf(unitId) ?: throw MoneyReadForbidden(Action.READ_UNIT_CHARGES.governedBy)
         require(Action.READ_UNIT_CHARGES, Resource.OfUnit(entranceId, unitId), who)
     }
 

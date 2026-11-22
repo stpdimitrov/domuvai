@@ -188,4 +188,12 @@ class UnitsAdapterTest {
         assertThat(adapter.entranceExists(registered)).isTrue()
         assertThat(adapter.entranceExists(UUID.randomUUID())).isFalse()
     }
+
+    @Test
+    fun `PM-SEC-002 a unit's entrance is the one the registry holds it in, and none for a unit it does not hold`() {
+        whenever(units.findById(unitId)).thenReturn(java.util.Optional.of(PropertyUnit(unitId, entranceId, "ап. 1", "FLAT", null, BigDecimal("100.0000"), false)))
+        whenever(units.findById(UUID.fromString("00000000-0000-0000-0000-000000000001"))).thenReturn(java.util.Optional.empty())
+        assertThat(adapter.entranceOf(unitId)).isEqualTo(entranceId)
+        assertThat(adapter.entranceOf(UUID.fromString("00000000-0000-0000-0000-000000000001"))).isNull()
+    }
 }
