@@ -238,6 +238,7 @@ CALLS = {
     ("GET", "/api/identity/entrances/{entranceId}/mandates"): lambda e: (f"/api/identity/entrances/{e}/mandates", None),   # the api's own today
     ("GET", "/api/assembly/entrances/{entranceId}/paper-decisions"): lambda e: (f"/api/assembly/entrances/{e}/paper-decisions", None),
     ("GET", "/api/identity/me"): lambda e: ("/api/identity/me", None),
+    ("GET", "/api/registry/me/units"): lambda e: ("/api/registry/me/units", None),   # WEB-58: the units the person signed in holds
     ("GET", "/api/law/version"): lambda e: ("/api/law/version", None),
     ("GET", "/api/registry/entrances"): lambda e: ("/api/registry/entrances", None),
     ("GET", "/api/registry/entrances/{entranceId}/units"): lambda e: (f"/api/registry/entrances/{e}/units", None),
