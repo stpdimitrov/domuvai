@@ -132,6 +132,40 @@ class BookEntriesIT {
         assertThat(book(elsewhere)).isEqualTo(before)
     }
 
+    private fun recordedBy(unit: UUID): List<UUID?> =
+        jdbc.queryForList("SELECT recorded_by FROM registry.absence_declaration WHERE unit_id = ?", UUID::class.java, unit)
+
+    // Rule: PM-SEC-004
+    @Test
+    fun `PM-SEC-004 an absence entry records the signed-in party who stated the handed-in day`() {
+        val (entrance, flat) = entrance("ул. Витоша 20")
+        val manager = person("Мария Иванова", "e-manager").also { mandate(entrance, "BM", it) }
+        val board = person("Радка Тонева", "e-board").also { mandate(entrance, "MB", it) }
+        val absence = """{"absences":[{"absentFrom":"2026-06-01","absentTo":"2026-08-01","handedInOn":"2026-08-01"}]}"""
+
+        send("/api/registry/entrances/$entrance/units/$flat/absences", "e-manager", absence).andExpect(status().isCreated)
+        send("/api/registry/entrances/$entrance/units/$flat/absences", "e-board", absence).andExpect(status().isCreated)
+
+        assertThat(recordedBy(flat)).containsExactlyInAnyOrder(manager, board)
+        assertThat(jdbc.queryForList("SELECT handed_in_on::text FROM registry.absence_declaration WHERE unit_id = ?", String::class.java, flat))
+            .containsOnly("2026-08-01")                                                  // the day they stated is the day kept
+    }
+
+    // Rule: PM-SEC-004
+    @Test
+    fun `PM-SEC-004 a recordedBy in the request body is ignored`() {
+        val (entrance, flat) = entrance("ул. Витоша 22")
+        val manager = person("Мария Иванова", "e-manager").also { mandate(entrance, "BM", it) }
+        val someoneElse = person("Радка Тонева", "e-other")
+
+        send(
+            "/api/registry/entrances/$entrance/units/$flat/absences", "e-manager",
+            """{"absences":[{"absentFrom":"2026-06-01","absentTo":"2026-08-01","recordedBy":"$someoneElse"}]}""",
+        ).andExpect(status().isCreated)
+
+        assertThat(recordedBy(flat)).containsExactly(manager)
+    }
+
     @Test
     fun `PM-BOOK-005 the controller, the cashier, the unit's owner and user, another entrance's manager and a login tied to nobody enter nothing — each a 403 naming the rule`() {
         val (entrance, flat) = entrance("ул. Витоша 8")
