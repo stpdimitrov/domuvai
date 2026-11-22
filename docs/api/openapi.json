@@ -3410,6 +3410,9 @@
           "derivation": {
             "type": "string"
           },
+          "derivationBg": {
+            "type": "string"
+          },
           "item": {
             "type": "string"
           },
@@ -3418,6 +3421,10 @@
           },
           "quantity": {
             "type": "number"
+          },
+          "rateMinor": {
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
