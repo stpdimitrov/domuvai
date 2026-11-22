@@ -337,7 +337,8 @@ class RegistryService(
      * stored. The unit must exist and belong to the entrance.
      */
     @Transactional
-    fun registerAbsence(entranceId: UUID, unitId: UUID, declarations: List<RegisterAbsence>): List<UUID> {
+    // Rule: PM-SEC-004 — `recordedBy` is the sign-in's party, passed by the caller, never read from a request body
+    fun registerAbsence(entranceId: UUID, unitId: UUID, declarations: List<RegisterAbsence>, recordedBy: UUID? = null): List<UUID> {
         // one answer whether the unit is missing or in another entrance: a manager here learns nothing of other entrances
         units.findById(unitId).orElse(null)?.takeIf { it.entranceId == entranceId }
             ?: throw NoSuchElementException("no unit $unitId in entrance $entranceId")
@@ -356,6 +357,7 @@ class RegistryService(
                 absentTo = to,
                 filedOn = filedOn,
                 handedInOn = handedInOn,
+                recordedBy = recordedBy,
             )
         }
         return rows.map { aggregates.insert(it).id }

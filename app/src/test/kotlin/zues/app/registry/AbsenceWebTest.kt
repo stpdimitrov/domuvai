@@ -3,6 +3,7 @@ package zues.app.registry
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
@@ -44,7 +45,7 @@ class AbsenceWebTest {
 
     @Test
     fun `POST absences returns 201 with the ids`() {
-        whenever(registry.registerAbsence(any(), any(), any())).thenReturn(listOf(UUID.randomUUID()))
+        whenever(registry.registerAbsence(any(), any(), any(), anyOrNull())).thenReturn(listOf(UUID.randomUUID()))
         mvc.perform(postAbsences())
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.absenceIds.length()").value(1))
@@ -52,7 +53,7 @@ class AbsenceWebTest {
 
     @Test
     fun `PM-FEE-007 the day handed in reaches the book, and leaving it out still files`() {
-        whenever(registry.registerAbsence(any(), any(), any())).thenReturn(listOf(UUID.randomUUID()))
+        whenever(registry.registerAbsence(any(), any(), any(), anyOrNull())).thenReturn(listOf(UUID.randomUUID()))
         fun filing(absence: String) = mvc.perform(
             post("/api/registry/entrances/$entranceId/units/$unitId/absences")
                 .contentType(MediaType.APPLICATION_JSON).content("""{"absences":[$absence]}"""),
@@ -67,14 +68,14 @@ class AbsenceWebTest {
 
     @Test
     fun `absences for an unknown unit is a 404`() {
-        whenever(registry.registerAbsence(any(), any(), any()))
+        whenever(registry.registerAbsence(any(), any(), any(), anyOrNull()))
             .thenThrow(NoSuchElementException("no unit $unitId"))
         mvc.perform(postAbsences()).andExpect(status().isNotFound)
     }
 
     @Test
     fun `an inverted span is a 400`() {
-        whenever(registry.registerAbsence(any(), any(), any()))
+        whenever(registry.registerAbsence(any(), any(), any(), anyOrNull()))
             .thenThrow(IllegalArgumentException("absentTo must be after absentFrom"))
         mvc.perform(postAbsences()).andExpect(status().isBadRequest)
     }

@@ -27,6 +27,8 @@ data class AbsenceDeclaration(
     val absentTo: LocalDate,
     val filedOn: LocalDate,
     val handedInOn: LocalDate,
+    /** The signed-in party who entered it, and so stated `handedInOn` (PM-SEC-004); null before the column and with sign-in off. */
+    val recordedBy: UUID? = null,
 )
 
 interface AbsenceDeclarationRepository : ListCrudRepository<AbsenceDeclaration, UUID> {

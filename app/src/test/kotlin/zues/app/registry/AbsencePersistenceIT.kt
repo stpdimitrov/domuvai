@@ -145,6 +145,18 @@ class AbsencePersistenceIT {
         assertThat(days["handed_in_on"].toString()).isEqualTo(cutoff.toString())
     }
 
+    // Rule: PM-SEC-004
+    @Test
+    fun `PM-SEC-004 with sign-in off nobody is asking and the entry's author is null`() {
+        val entranceId = createEntrance()
+        val unitId = registerSingleUnit(entranceId)
+
+        filing(entranceId, unitId, absence(entryDay)).andExpect(status().isCreated)
+
+        assertThat(jdbc.queryForList("SELECT recorded_by FROM registry.absence_declaration WHERE unit_id = ?", UUID::class.java, unitId))
+            .containsExactly(null)
+    }
+
     @Test
     fun `PM-FEE-007 a declaration handed in after the window earns nothing`() {
         val entranceId = createEntrance()
