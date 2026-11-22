@@ -4,7 +4,7 @@
  */
 
 export type StatementLine = {
-  period: string; component: string; allocationKey: string; quantity: number; amountMinor: number; derivation: string; item?: string;
+  period: string; component: string; allocationKey: string; quantity: number; amountMinor: number; derivation: string; item?: string; derivationBg?: string | null; rateMinor?: number | null;
 };
 export type Period = { period: string; keyed: StatementLine[]; metered: StatementLine[] };
 export type Bucket = { band: string; amountMinor: number };

@@ -42,6 +42,22 @@ test("PM-FEE-018 every line shows its stream, key, count and amount in Bulgarian
   assert.equal(ps[0].keyed.length + ps[0].metered.length, 2);                         // metered stands apart, none dropped
 });
 
+test("PM-FEE-018 a line shows the api's Bulgarian derivation under its name", () => {
+  const t = lineText(line({ derivationBg: "3 души × 6,20 €", rateMinor: 620 }));
+  assert.deepEqual(t, { what: "Поддръжка", how: "3 души × 6,20 €", amount: "€18,60" });
+  assert.equal(lineText(line({ allocationKey: "BY_IDEAL_PARTS", quantity: 3, derivationBg: "дял от 1 200,00 € по брой души · 3 души" })).how, "дял от 1 200,00 € по брой души · 3 души");
+  const page = readFileSync(new URL("../app/(resident)/my/statement/[unitId]/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /t\.how/);                                                       // the page renders what lineText worded
+});
+
+test("PM-FEE-018 a line with no Bulgarian derivation falls back to its key and count, never the English text", () => {
+  for (const none of [{}, { derivationBg: null }, { derivationBg: "" }, { derivationBg: "  " }]) {
+    const t = lineText(line({ derivation: "3 person(s) x 6.20", ...none }));
+    assert.equal(t.how, "на живущ · 3");
+    assert.doesNotMatch(JSON.stringify(t), /person/);
+  }
+});
+
 test("PM-FEE-018 an empty statement says nothing is charged, not an error", () => {
   assert.equal(emptyStatement, "Няма начислени суми");
   assert.deepEqual(byPeriod([]), []);

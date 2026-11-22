@@ -45,13 +45,15 @@ export function blocks(rows: MyUnitRow[]): Block[] {
 export const owes = (balanceMinor: number): string => (balanceMinor > 0 ? `Дължите ${eur(balanceMinor)}` : balanceMinor < 0 ? `Имате преплатено ${eur(-balanceMinor)}` : "Нямате дължими суми");
 
 /**
- * Rule: PM-FEE-018 — one line worded in Bulgarian from its structured fields: the stream, the key applied, the count
- * used and the amount. The api's own `derivation` is English and is not shown (money lane issue).
+ * Rule: PM-FEE-018 — one line worded in Bulgarian. `how` is the api's `derivationBg` as it came (already formatted from
+ * minor units, so the web computes nothing); when the api sent none, it is the stream's key and the count used. The
+ * api's English `derivation` is never shown. Rule: PM-FEE-016 — `amount` is the line's minor units through `eur`.
  */
-// Rule: PM-FEE-018
+// Rule: PM-FEE-018, PM-FEE-016
 export function lineText(l: StatementLine): { what: string; how: string; amount: string } {
   const what = l.allocationKey === "METERED" && l.item ? `${COMPONENT[l.component] ?? l.component} · ${l.item}` : COMPONENT[l.component] ?? l.component;
-  return { what, how: `${KEY[l.allocationKey] ?? l.allocationKey} · ${l.quantity}`, amount: eur(l.amountMinor) };
+  const how = l.derivationBg?.trim() ? l.derivationBg : `${KEY[l.allocationKey] ?? l.allocationKey} · ${l.quantity}`;
+  return { what, how, amount: eur(l.amountMinor) };
 }
 
 /** Rule: PM-FEE-018 — nothing charged is a statement, not an error. */
