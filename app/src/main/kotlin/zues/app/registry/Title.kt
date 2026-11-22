@@ -32,6 +32,7 @@ enum class TitleRole { OWN, USR }
 
 interface TitleRepository : ListCrudRepository<Title, UUID> {
     fun findByEntranceId(entranceId: UUID): List<Title>
+    fun findByPartyId(partyId: UUID): List<Title>
     fun findByUnitId(unitId: UUID): List<Title>
     fun findByImportId(importId: UUID): List<Title>
 }

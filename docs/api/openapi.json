@@ -2147,6 +2147,51 @@
         ],
         "type": "object"
       },
+      "MyUnit": {
+        "properties": {
+          "designation": {
+            "type": "string"
+          },
+          "entranceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "entranceLabel": {
+            "type": "string"
+          },
+          "idealParts": {
+            "type": "string"
+          },
+          "idealPartsSource": {
+            "type": "string"
+          },
+          "share": {
+            "type": "string"
+          },
+          "titleRole": {
+            "type": "string"
+          },
+          "unitId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "unitType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "designation",
+          "entranceId",
+          "entranceLabel",
+          "idealParts",
+          "idealPartsSource",
+          "share",
+          "titleRole",
+          "unitId",
+          "unitType"
+        ],
+        "type": "object"
+      },
       "NewAbsenceRequest": {
         "properties": {
           "absentFrom": {
@@ -11407,6 +11452,72 @@
           "PM-ORG-005",
           "PM-ORG-011",
           "PM-BOOK-005",
+          "PM-BOOK-011"
+        ]
+      }
+    },
+    "/api/registry/me/units": {
+      "get": {
+        "operationId": "get_registry_me_units",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "on",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MyUnit"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "summary": "The units the person signed in holds on a date — their own titles only (owner or user), each with the entrance's label, the unit's designation and type, their own share and the ideal parts that share stands for; no co-owner, name, identity number or address. The party is the one the sign-in is tied to, never a parameter; nobody asking is a 401, a login tied to no party gets an empty list",
+        "tags": [
+          "registry"
+        ],
+        "x-rules": [
+          "PM-ORG-011",
+          "PM-ORG-005",
+          "PM-SEC-002",
           "PM-BOOK-011"
         ]
       }
