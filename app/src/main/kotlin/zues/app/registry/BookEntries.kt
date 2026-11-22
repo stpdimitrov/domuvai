@@ -48,8 +48,9 @@ class BookEntries(
         entered(entranceId, who) { registry.registerAnimals(entranceId, unitId, animals) }
 
     // Rule: PM-BOOK-005
+    // Rule: PM-SEC-004 — the entry records the signed-in party who made it; null with sign-in off
     fun absences(entranceId: UUID, unitId: UUID, absences: List<RegisterAbsence>, who: Asking): List<UUID> =
-        entered(entranceId, who) { registry.registerAbsence(entranceId, unitId, absences) }
+        entered(entranceId, who) { registry.registerAbsence(entranceId, unitId, absences, who.party) }
 
     /** The day is read only once the caller may enter it: a refused caller is refused, whatever they sent. */
     // Rule: PM-BOOK-005
