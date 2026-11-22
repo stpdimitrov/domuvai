@@ -18,6 +18,10 @@ data class StatementLine(
     val amountMinor: Long,
     val derivation: String,
     val item: String? = null,     // CONCIERGE, WATER, HEATING — or none for the stream's own line
+    /** The per-count rate billed (a metered line's price per unit of measure); null for a share of a total. */
+    val rateMinor: Long? = null,
+    /** The derivation in Bulgarian, from the run's stored basis (PM-FEE-018); null when the basis has no line to trace it to. */
+    val derivationBg: String? = null,
 )
 
 /**
@@ -46,11 +50,13 @@ class StatementService(
     fun forUnit(unitId: UUID): UnitStatement {
         val balanceMinor = postings.findByUnitIdAndAccount(unitId, Ledger.RECEIVABLE).sumOf { it.amountMinor }
         val lines = chargeLines.findByUnitId(unitId)
-        val periodByRun = chargeRuns.findAllById(lines.map { it.chargeRunId }.distinct())
-            .associate { it.id to it.period }
+        val runs = chargeRuns.findAllById(lines.map { it.chargeRunId }.distinct())
+        val periodByRun = runs.associate { it.id to it.period }
+        val basisByRun = runs.associate { it.id to DerivationBg.parse(it.basis.json) }
         val statementLines = lines
             .sortedWith(compareBy({ periodByRun[it.chargeRunId] ?: "?" }, { it.component }, { it.item ?: "" }))
             .map {
+                val (rateMinor, derivationBg) = basisByRun[it.chargeRunId]?.let { b -> DerivationBg.of(it, b) } ?: (null to null)
                 StatementLine(
                     period = periodByRun[it.chargeRunId] ?: "?",
                     component = it.component,
@@ -59,6 +65,8 @@ class StatementService(
                     amountMinor = it.amountMinor,
                     derivation = it.derivation,
                     item = it.item,
+                    rateMinor = rateMinor,
+                    derivationBg = derivationBg,
                 )
             }
         return UnitStatement(unitId, balanceMinor, statementLines)
