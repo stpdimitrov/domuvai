@@ -13,6 +13,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -20,6 +21,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
+import zues.app.identity_org.Logins
 import java.util.UUID
 
 private const val PAPER_REALM_IT = "https://id.example.test/realms/domuvai"
@@ -52,6 +54,7 @@ class PaperDecisionPersistenceIT {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var jdbc: JdbcTemplate
     @Autowired lateinit var readLog: PaperDecisionReadRepository
+    @Autowired lateinit var logins: Logins
 
     private val content = """{"decisionText":"Вноска за управление\nи поддръжка","protocolDate":"2026-03-14","protocolRef":"Протокол № 3","archiveLocation":"шкаф в офиса","custodian":"Иван Иванов"}"""
 
@@ -115,6 +118,22 @@ class PaperDecisionPersistenceIT {
         for (refused in listOf("'OPEN', NULL, 'LOG'", "'SERVED', 'PM-SEC-001', 'ELSE'"))
             assertThatThrownBy { jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, at, outcome, rule_id, read_of) VALUES (gen_random_uuid(), ?, now(), $refused)", block) }
                 .describedAs(refused).isInstanceOf(DataAccessException::class.java)
+    }
+
+    @Test
+    fun `PM-GOV-008 the controller's read of the log is entered and returned last as LOG, and a refused read enters nothing`() {
+        val block = entrance()
+        val controller = UUID.randomUUID().also { jdbc.update("INSERT INTO registry.party (id, entrance_id, full_name) VALUES (?, ?, ?)", it, block, "Мария Иванова") }
+        logins.tie(PAPER_REALM_IT, "login-ctl-p", controller)
+        jdbc.update(sofiaDated("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to) VALUES (gen_random_uuid(), ?, 'CTL', ?, current_date - 30, current_date + 300)"), block, controller)
+        jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, at, outcome) VALUES (gen_random_uuid(), ?, now() - interval '1 hour', 'OPEN')", block)
+        fun log(subject: String) = mvc.perform(get("/api/assembly/entrances/$block/paper-decisions/reads").with(jwt().jwt { it.subject(subject).issuer(PAPER_REALM_IT) }))
+        for (refused in listOf("someone-else", "operator-p")) log(refused).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-002"))
+        assertThat(readLog.findByEntranceIdOrderByAtAscIdAsc(block)).hasSize(1)
+        log("login-ctl-p").andExpect(status().isOk).andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].readOf").value("CUSTODIAN")).andExpect(jsonPath("$[1].readOf").value("LOG")).andExpect(jsonPath("$[1].outcome").value("SERVED"))
+            .andExpect(jsonPath("$[1].actor").value(controller.toString())).andExpect(jsonPath("$[1].ruleId").value("PM-GOV-008"))
+        assertThat(readLog.findByEntranceIdOrderByAtAscIdAsc(block).map { it.readOf }).containsExactly("CUSTODIAN", "LOG")
     }
 
     @Test

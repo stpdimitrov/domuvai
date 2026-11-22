@@ -182,7 +182,8 @@ class PaperDecisions(
      * The entrance's log of who read a paper decision's custodian, oldest first, this read's own entry among it — as the
      * book's access log is exported. The log names persons, so it is read by the manager, the board and the controller
      * only (the owner's Q1a on #497, 2026-11-22), and with sign-in switched off nobody is accountable and it is refused
-     * (Q2a). A refused read enters nothing; a served one is entered, in its own transaction, before the log is read.
+     * (Q2a). A refused read enters nothing; a served one is entered before the log is read, in the same transaction — a read
+     * that fails is rolled back with its entry, having served nothing. Oldest first is by `at`, then `id`, as the book's log.
      */
     // Rule: PM-SEC-001
     // Rule: PM-SEC-002
