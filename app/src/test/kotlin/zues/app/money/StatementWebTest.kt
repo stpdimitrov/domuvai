@@ -37,4 +37,13 @@ class StatementWebTest {
             .andExpect(jsonPath("$.lines[0].component").value("MANAGEMENT"))
             .andExpect(jsonPath("$.lines[0].derivation").value("derived"))
     }
+
+    @Test
+    fun `PM-FEE-018 a unit with nothing posted answers an empty statement — balance 0, no lines`() {
+        whenever(statements.forUnit(unitId)).thenReturn(UnitStatement(unitId, 0, emptyList()))
+        mvc.perform(get("/api/money/units/$unitId/statement"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.balanceMinor").value(0))
+            .andExpect(jsonPath("$.lines").isEmpty)
+    }
 }

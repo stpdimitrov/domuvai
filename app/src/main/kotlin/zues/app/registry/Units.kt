@@ -44,6 +44,9 @@ interface Units {
 
     /** Whether the entrance is registered: one with no units yet is, one nobody registered is not. */
     fun entranceExists(entranceId: UUID): Boolean
+
+    /** The entrance the registry holds the unit in; null for a unit it does not hold. */
+    fun entranceOf(unitId: UUID): UUID?
 }
 
 @Component
@@ -56,6 +59,9 @@ class UnitsAdapter(
 ) : Units {
     // Rule: PM-BOOK-012
     override fun entranceExists(entranceId: UUID): Boolean = entrances.existsById(entranceId)
+
+    // Rule: PM-SEC-002
+    override fun entranceOf(unitId: UUID): UUID? = units.findById(unitId).orElse(null)?.entranceId
 
     override fun forEntrance(entranceId: UUID, on: LocalDate): List<UnitForCharging> {
         // PM-FEE-006 counts absence "in a calendar year"; the run's legal date fixes the year.
