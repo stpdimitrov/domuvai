@@ -24,3 +24,5 @@ jobs:
         run: npm run gen:api && git diff --exit-code lib/api/schema.d.ts
       - name: Build + type-check
         run: npm run build
+      - name: Payload budget of the resident surface (PM-SYS-015)
+        run: npm run budget

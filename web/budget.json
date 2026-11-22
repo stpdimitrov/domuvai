@@ -1,0 +1,11 @@
+{
+  "_": "PM-SYS-015 — the resident surface's payload budget: gzip bytes of JS + CSS one (resident) route loads on a first visit, checked by `npm run budget` after the build. A dated entry: the one with the latest `from` on or before today (Sofia) is in force. A product number, not a legal one. The floor is DEVBRIEF's: a five-year-old Android on 3G.",
+  "entries": [
+    {
+      "from": "2026-11-22",
+      "floorDevice": "a five-year-old Android",
+      "floorNetwork": "3G",
+      "bytes": 120000
+    }
+  ]
+}
