@@ -2224,9 +2224,12 @@ export interface components {
             amountMinor: number;
             component: string;
             derivation: string;
+            derivationBg?: string;
             item?: string;
             period: string;
             quantity: number;
+            /** Format: int64 */
+            rateMinor?: number;
         };
         StayEnded: {
             /** Format: uuid */
