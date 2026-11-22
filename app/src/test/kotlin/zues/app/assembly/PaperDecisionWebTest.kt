@@ -170,6 +170,31 @@ class PaperDecisionWebTest {
     }
 
     @Test
+    fun `PM-SEC-004 a mandate reader's read of the custodian is entered SERVED, with the party, the login and the policy's rule`() {
+        whenever(stored.findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entrance)).thenReturn(listOf(aRecord()))
+        whenever(logins.partyOf(PAPER_REALM, "login-BM")).thenReturn(parties.getValue(Role.BM))
+        read("login-BM").andExpect(status().isOk).andExpect(jsonPath("$[0].custodian").value("Иван Иванов"))
+        val entry = argumentCaptor<PaperDecisionRead>().apply { verify(aggregates).insert(capture()) }.firstValue
+        assertThat(entry.entranceId).isEqualTo(entrance)
+        assertThat(entry.actor).isEqualTo(parties.getValue(Role.BM))
+        assertThat(entry.loginIssuer to entry.loginSubject).isEqualTo(PAPER_REALM to "login-BM")
+        assertThat(entry.outcome).isEqualTo("SERVED")
+        assertThat(entry.ruleId).matches("PM-[A-Z]+-[0-9]{3}")
+    }
+
+    @Test
+    fun `PM-SEC-002 an owner's read withholds the custodian and enters nothing, as does a refused read`() {
+        whenever(stored.findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entrance)).thenReturn(listOf(aRecord()))
+        whenever(logins.partyOf(PAPER_REALM, "login-OWN")).thenReturn(parties.getValue(Role.OWN))
+        read("login-OWN").andExpect(status().isOk).andExpect(jsonPath("$[0].custodian").doesNotExist())
+        read("login-of-nobody").andExpect(status().isForbidden)
+        whenever(stored.findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entrance)).thenReturn(emptyList())
+        whenever(logins.partyOf(PAPER_REALM, "login-BM")).thenReturn(parties.getValue(Role.BM))
+        read("login-BM").andExpect(status().isOk).andExpect(jsonPath("$").isEmpty)   // nothing recorded: no name served, none entered
+        verifyNoInteractions(aggregates)
+    }
+
+    @Test
     fun `PM-SYS-014 a paper decision without an Idempotency-Key is a 400 and nothing is written, a blank one is a 400 once the policy has been asked`() {
         send("operator", key = null).andExpect(status().isBadRequest)
         send("operator", key = " ").andExpect(status().isBadRequest).andExpect(jsonPath("$.error").isNotEmpty)

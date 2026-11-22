@@ -54,6 +54,26 @@ data class PaperDecision(
     val requestKeyId: UUID? = null,
 )
 
+/** One read that served a paper decision's custodian, a person's name (Rule: PM-SEC-004). Insert-only: the table refuses any other write. */
+@Table("paper_decision_read")
+data class PaperDecisionRead(
+    @Id val id: UUID,
+    val entranceId: UUID,
+    val actor: UUID?,
+    val loginIssuer: String?,
+    val loginSubject: String?,
+    val at: Instant,
+    val outcome: String,            // PaperDecisionReadOutcome
+    val ruleId: String?,
+)
+
+enum class PaperDecisionReadOutcome {
+    /** to a reader of the mandates, citing the policy's rule */
+    SERVED,
+    /** sign-in switched off: given to nobody, and entered so */
+    OPEN,
+}
+
 interface PaperDecisionRepository : ListCrudRepository<PaperDecision, UUID> {
     fun findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entranceId: UUID): List<PaperDecision>
     fun findByRequestKeyId(requestKeyId: UUID): PaperDecision?
@@ -124,10 +144,21 @@ class PaperDecisions(
     // Rule: PM-DOC-007
     // Rule: PM-SEC-001
     // Rule: PM-SEC-002
+    // Rule: PM-SEC-004
+    @Transactional
     fun list(by: Asking, entranceId: UUID): List<PaperDecisionView> {
         reads.require(entranceId, by)
-        val namesCustodian = reads.decided(entranceId, by, Action.READ_MANDATES)?.allowed != false
-        return stored.findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entranceId).map { PaperDecisionView.of(it, namesCustodian) }
+        val mandates = reads.decided(entranceId, by, Action.READ_MANDATES)
+        val namesCustodian = mandates?.allowed != false
+        val rows = stored.findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entranceId)
+        // a name served is entered, in this read's transaction; a name withheld, or no record at all, served no one's name
+        if (namesCustodian && rows.isNotEmpty()) aggregates.insert(
+            PaperDecisionRead(
+                UUID.randomUUID(), entranceId, by.party, by.login?.issuer, by.login?.subject, clock.instant().truncatedTo(ChronoUnit.MICROS),
+                if (mandates == null) PaperDecisionReadOutcome.OPEN.name else PaperDecisionReadOutcome.SERVED.name, mandates?.ruleId,
+            ),
+        )
+        return rows.map { PaperDecisionView.of(it, namesCustodian) }
     }
 
     /** A line as it is kept: ordinary characters, required. */

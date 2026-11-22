@@ -85,6 +85,20 @@ class PaperDecisionPersistenceIT {
     }
 
     @Test
+    fun `PM-SEC-004 the log of who read a custodian is not changed, removed or emptied by anyone`() {
+        val block = entrance()
+        val id = UUID.randomUUID()
+        jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, at, outcome) VALUES (?, ?, now(), 'OPEN')", id, block)
+        val kept = jdbc.queryForMap("SELECT * FROM assembly.paper_decision_read WHERE id = ?", id)
+        jdbc.update("UPDATE assembly.paper_decision_read SET outcome = 'SERVED', login_subject = 'x', rule_id = 'PM-SEC-002' WHERE id = ?", id)
+        jdbc.update("DELETE FROM assembly.paper_decision_read WHERE id = ?", id)
+        assertThatThrownBy { jdbc.execute("TRUNCATE assembly.paper_decision_read") }.isInstanceOf(DataAccessException::class.java).hasMessageContaining("is not emptied")
+        assertThat(jdbc.queryForMap("SELECT * FROM assembly.paper_decision_read WHERE id = ?", id)).isEqualTo(kept)
+        assertThatThrownBy { jdbc.update("INSERT INTO assembly.paper_decision_read (id, entrance_id, at, outcome) VALUES (gen_random_uuid(), ?, now(), 'SERVED')", block) }
+            .isInstanceOf(DataAccessException::class.java)   // a name served names its reader
+    }
+
+    @Test
     fun `PM-DOC-007 the table itself takes no record without its archive location or custodian`() {
         val block = entrance()
         val insert = "INSERT INTO assembly.paper_decision (id, entrance_id, decision_text, protocol_date, protocol_ref, archive_location, custodian, basis, basis_hash, law_version, engine_version, recorded_at) " +

@@ -52,4 +52,17 @@ class PaperDecisionSignInOffWebTest {
         assertThat(row.loginIssuer).isNull()
         assertThat(row.loginSubject).isNull()
     }
+
+    @Test
+    fun `PM-SEC-004 with sign-in switched off a read of the custodian is entered OPEN, naming nobody`() {
+        val entrance = UUID.randomUUID()
+        val record = PaperDecision(UUID.randomUUID(), entrance, "вноска", java.time.LocalDate.parse("2026-03-14"), "Протокол № 3", "шкаф", "Иван Иванов", "basis", "ab".repeat(32), "law", "engine", null, null, java.time.Instant.now())
+        whenever(stored.findByEntranceIdOrderByProtocolDateDescRecordedAtDesc(entrance)).thenReturn(listOf(record))
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/assembly/entrances/$entrance/paper-decisions"))
+            .andExpect(status().isOk).andExpect(jsonPath("$[0].custodian").value("Иван Иванов"))
+        val entry = argumentCaptor<PaperDecisionRead>().apply { verify(aggregates).insert(capture()) }.firstValue
+        assertThat(entry.entranceId).isEqualTo(entrance)
+        assertThat(entry.outcome).isEqualTo("OPEN")
+        assertThat(listOf(entry.actor, entry.loginIssuer, entry.loginSubject, entry.ruleId)).containsOnlyNulls()
+    }
 }
