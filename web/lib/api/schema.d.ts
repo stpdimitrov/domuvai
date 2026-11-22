@@ -865,6 +865,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/money/entrances/{entranceId}/tariff-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The entrance's tariff versions, the latest begun first, each with its decision and months — or, for a period, the one in force then: the latest begun by that month unless its own last month has passed */
+        get: operations["get_money_entrances_entranceId_tariff_versions"];
+        put?: never;
+        /** Record a tariff version — the lines and metered prices the entrance's assembly adopted, under a passed decision of the entrance (its protocol id), and the months it is in force; never altered, a changed tariff is a new version — for the manager and the board */
+        post: operations["post_money_entrances_entranceId_tariff_versions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/money/units/{unitId}/arrears": {
         parameters: {
             query?: never;
@@ -1219,6 +1237,15 @@ export interface components {
             absenteeEligible?: boolean;
             itemType: string;
             text: string;
+        };
+        AdoptedLine: {
+            item?: string;
+            key: string;
+            /** Format: int64 */
+            rateMinor?: number;
+            stream: string;
+            /** Format: int64 */
+            totalMinor?: number;
         };
         AgeingBucket: {
             /** Format: int64 */
@@ -1855,6 +1882,11 @@ export interface components {
             rule: string;
             value: string;
         };
+        MeteredPrice: {
+            item: string;
+            /** Format: int64 */
+            priceMinor: number;
+        };
         MissingReadingResponse: {
             item: string;
             unitId: string;
@@ -2145,6 +2177,13 @@ export interface components {
             /** Format: date-time */
             postedAt: string;
         };
+        RecordTariffVersion: {
+            consumption: components["schemas"]["MeteredPrice"][];
+            decisionId: string;
+            lines: components["schemas"]["AdoptedLine"][];
+            validFrom: string;
+            validTo?: string;
+        };
         RecordVoteRequest: {
             choice: string;
             correction?: string;
@@ -2297,6 +2336,15 @@ export interface components {
             stream: string;
             /** Format: int64 */
             totalMinor?: number;
+        };
+        TariffVersionView: {
+            consumption: components["schemas"]["MeteredPrice"][];
+            decisionId: string;
+            /** Format: uuid */
+            id: string;
+            lines: components["schemas"]["AdoptedLine"][];
+            validFrom: string;
+            validTo?: string;
         };
         TieLogin: {
             /** Format: uuid */
@@ -6325,6 +6373,122 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_money_entrances_entranceId_tariff_versions: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TariffVersionView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    post_money_entrances_entranceId_tariff_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordTariffVersion"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TariffVersionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

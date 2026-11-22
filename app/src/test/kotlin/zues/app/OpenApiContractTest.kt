@@ -108,6 +108,7 @@ class OpenApiContractTest {
     @MockitoBean lateinit var chargeRuns: ChargeRunService
     @MockitoBean lateinit var chargeRunStore: ChargeRunStore
     @MockitoBean lateinit var fund: FundAccountService
+    @MockitoBean lateinit var tariffVersions: zues.app.money.TariffVersions
     @MockitoBean lateinit var fundView: FundService
     @MockitoBean lateinit var fundHandover: FundHandoverService
     @MockitoBean lateinit var ledger: LedgerReads
