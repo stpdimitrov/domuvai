@@ -1139,6 +1139,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/registry/me/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The units the person signed in holds on a date — their own titles only (owner or user), each with the entrance's label, the unit's designation and type, their own share and the ideal parts that share stands for; no co-owner, name, identity number or address. The party is the one the sign-in is tied to, never a parameter; nobody asking is a 401, a login tied to no party gets an empty list */
+        get: operations["get_registry_me_units"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/registry/parties": {
         parameters: {
             query?: never;
@@ -1824,6 +1841,19 @@ export interface components {
         MissingReadingResponse: {
             item: string;
             unitId: string;
+        };
+        MyUnit: {
+            designation: string;
+            /** Format: uuid */
+            entranceId: string;
+            entranceLabel: string;
+            idealParts: string;
+            idealPartsSource: string;
+            share: string;
+            titleRole: string;
+            /** Format: uuid */
+            unitId: string;
+            unitType: string;
         };
         NewAbsenceRequest: {
             absentFrom: string;
@@ -7382,6 +7412,50 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_registry_me_units: {
+        parameters: {
+            query?: {
+                on?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyUnit"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
