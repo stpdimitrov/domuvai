@@ -140,6 +140,9 @@ RUNNING = {
  ('get', '/api/assembly/entrances/{entranceId}/paper-decisions'):
    ("List the decisions recorded from paper protocols, the latest protocol first — read as an assembly is; who keeps the paper original is named only to those who read the entrance's mandates; anybody else is a 403",
     ['PM-GA-022', 'PM-DOC-007', 'PM-SEC-001', 'PM-SEC-002']),
+ ('get', '/api/assembly/entrances/{entranceId}/paper-decisions/reads'):
+   ("Read the log of who read a paper decision's custodian, oldest first: each entry's party and login, when, its outcome and rule, and whether it read a custodian or this log — never a name. Only the manager, the board and the controller; this read is itself entered in the log, and is among what it returns. An owner, the administrator, anybody else, and any read with sign-in switched off is a 403 naming PM-SEC-002, and enters nothing",
+    ['PM-SEC-001', 'PM-SEC-002', 'PM-SEC-004', 'PM-GOV-008']),
  # ---- identity
  ('get', '/api/identity/me'):
    ("Who is asking — the login's subject and the registered party it is tied to, or none; a 401 with no token. Who, never what they may do", ['PM-SEC-001']),

@@ -283,6 +283,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assembly/entrances/{entranceId}/paper-decisions/reads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the log of who read a paper decision's custodian, oldest first: each entry's party and login, when, its outcome and rule, and whether it read a custodian or this log — never a name. Only the manager, the board and the controller; this read is itself entered in the log, and is among what it returns. An owner, the administrator, anybody else, and any read with sign-in switched off is a 403 naming PM-SEC-002, and enters nothing */
+        get: operations["get_assembly_entrances_entranceId_paper_decisions_reads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/assembly/entrances/{entranceId}/petitions": {
         parameters: {
             query?: never;
@@ -1944,6 +1961,19 @@ export interface components {
             titleRole: string;
             /** Format: uuid */
             unitId: string;
+        };
+        PaperDecisionReadView: {
+            /** Format: uuid */
+            actor?: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            id: string;
+            loginIssuer?: string;
+            loginSubject?: string;
+            outcome: string;
+            readOf: string;
+            ruleId?: string;
         };
         PaperDecisionView: {
             archiveLocation: string;
@@ -3975,6 +4005,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaperDecisionView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    get_assembly_entrances_entranceId_paper_decisions_reads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entranceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperDecisionReadView"][];
                 };
             };
             /** @description Bad Request */
