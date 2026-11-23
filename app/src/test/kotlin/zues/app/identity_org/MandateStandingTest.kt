@@ -188,4 +188,29 @@ class MandateStandingTest {
         assertThat(read.of(endsBefore.entranceId, inForceFrom.minusDays(2)).single().standing).isEqualTo(inTerm)   // its last day: no reminder was in force for it
         assertThat(read.of(endsBefore.entranceId, inForceFrom.minusDays(1)).single().standing.kind).isEqualTo(StandingKind.EXPIRED_ACTING)
     }
+
+    @Test
+    fun `PM-FUND-004 the chair is published with its mandate's standing, and is the chair no longer from the day the mandate is succeeded or ended`() {
+        val store: MandateStore = mock()
+        val chair = mandate("MB").copy(chair = true)
+        val member = mandate("MB")
+        val next = mandate("MB", from = ends, to = ends.plusYears(2)).copy(chair = true)
+        whenever(store.ofEntrance(block)).thenReturn(listOf(chair, member, next))
+        val read = MandateStanding(store)
+        assertThat(read.of(block, ends.minusDays(1)).filter { it.chair }.map { it.mandateId }).containsExactly(chair.id)
+        assertThat(read.of(block, ends).filter { it.chair }.map { it.mandateId }).containsExactly(next.id)
+        val ended = chair.copy(succeededAt = day("2025-01-01"))
+        whenever(store.ofEntrance(block)).thenReturn(listOf(ended, member))
+        assertThat(read.of(block, day("2024-12-31")).single { it.chair }.mandateId).isEqualTo(chair.id)
+        assertThat(read.of(block, day("2025-01-01")).none { it.chair }).isTrue()
+    }
+
+    @Test
+    fun `PM-FUND-004 two chairs meet on no day when one begins the day the other's end is recorded — whichever is asked`() {
+        val ended = mandate("MB", succeededAt = day("2025-01-01")).copy(chair = true)
+        val after = mandate("MB", from = day("2025-01-01"), to = day("2027-01-01")).copy(chair = true, succeededAt = day("2026-01-01"))
+        val all = listOf(ended, after)
+        assertThat(ended.overlaps(after, all)).isFalse()
+        assertThat(after.overlaps(ended, all)).isFalse()
+    }
 }

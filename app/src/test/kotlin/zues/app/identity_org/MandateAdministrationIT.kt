@@ -234,6 +234,25 @@ class MandateAdministrationIT {
     }
 
     @Test
+    fun `PM-FUND-004 the chair is stored on a board member's mandate and its entry, one at a time, kept as the mandate is — and the table refuses it on any other office`() {
+        val block = entrance()
+        val chair = party("Председател")
+        val recorded = (administration.record(operator, block, RecordMandate("MB", chair, today, today.plusYears(2), "Протокол № 7", chair = true)) as MandateAnswer.Done).value.mandateId
+        assertThat(jdbc.queryForObject("SELECT chair FROM identity_org.management_mandate WHERE id = ?", Boolean::class.java, recorded)).isTrue()
+        assertThat(jdbc.queryForObject("SELECT chair FROM identity_org.mandate_act WHERE mandate_id = ? AND act = 'RECORDED'", Boolean::class.java, recorded)).isTrue()
+        assertThatThrownBy { administration.record(operator, block, RecordMandate("MB", party("Втори"), today, today.plusYears(2), "Протокол № 8", chair = true)) }
+            .isInstanceOf(MandateChairTaken::class.java)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM identity_org.management_mandate WHERE entrance_id = ?", Long::class.java, block)).isEqualTo(1)
+        assertThat(acts(block)).containsExactly("RECORDED")
+        // the mark is never changed, not even beside the one change the table allows
+        for (change in listOf("SET chair = false", "SET succeeded_at = valid_from, chair = false"))
+            assertThatThrownBy { jdbc.update("UPDATE identity_org.management_mandate $change WHERE id = ?", recorded) }.describedAs(change).isInstanceOf(DataIntegrityViolationException::class.java)
+        assertThatThrownBy {
+            jdbc.update("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to, protocol_ref, chair) VALUES (gen_random_uuid(), ?, 'CTL', ?, ?, ?, 'п', true)", block, chair, today, today.plusYears(1))
+        }.hasMessageContaining("management_mandate_chair_is_a_board_member")
+    }
+
+    @Test
     fun `PM-SEC-004 the act and its entry stand or fall together, and the record is never changed or removed`() {
         val block = entrance()
         val maria = party("Мария Иванова")

@@ -19,13 +19,17 @@ import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
 
-/** A mandate to record, as the protocol gives it. Each field may be missing: what is missing is said only to whoever may record. */
+/**
+ * A mandate to record, as the protocol gives it. Each field may be missing: what is missing is said only to whoever may
+ * record. [chair] — the protocol names this board member the chair of the management board (PM-FUND-004); unmarked if absent.
+ */
 data class RecordMandate(
     val body: String? = null,
     val partyId: UUID? = null,
     val validFrom: LocalDate? = null,
     val validTo: LocalDate? = null,
     val protocolRef: String? = null,
+    val chair: Boolean? = null,
 )
 
 /** The mandate recorded, and the mandates it succeeded — each ended on the day this one starts. */
@@ -46,6 +50,9 @@ class MandateAlreadyEnded(message: String) : RuntimeException(message)
 /** The mandate would stand beside or behind one already recorded for the same office: a successor is recorded after what it succeeds. */
 class MandateOutOfOrder(message: String) : RuntimeException(message)
 
+/** The entrance has a chair of the board on one of the days the new chair would be in force: there is one chair at a time. */
+class MandateChairTaken(message: String) : RuntimeException(message)
+
 /** A protocol reference is a line, as the table has it. */
 const val PROTOCOL_REF_MAX = 500
 
@@ -57,9 +64,9 @@ const val PROTOCOL_REF_MAX = 500
 class MandateStore(private val jdbc: JdbcClient) {
 
     /** Adds a mandate. The table's own word on it — an unregistered entrance or party — comes back as the exception it raised. */
-    fun add(id: UUID, entranceId: UUID, body: String, partyId: UUID, validFrom: LocalDate, validTo: LocalDate, protocolRef: String) {
-        jdbc.sql("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to, protocol_ref) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            .params(id, entranceId, body, partyId, validFrom, validTo, protocolRef).update()
+    fun add(id: UUID, entranceId: UUID, body: String, partyId: UUID, validFrom: LocalDate, validTo: LocalDate, protocolRef: String, chair: Boolean) {
+        jdbc.sql("INSERT INTO identity_org.management_mandate (id, entrance_id, body, party_id, valid_from, valid_to, protocol_ref, chair) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+            .params(id, entranceId, body, partyId, validFrom, validTo, protocolRef, chair).update()
     }
 
     /**
@@ -67,13 +74,13 @@ class MandateStore(private val jdbc: JdbcClient) {
      * which, are [Mandate]'s to say, in one place — no query here repeats either.
      */
     fun ofEntrance(entranceId: UUID): List<Mandate> =
-        jdbc.sql("SELECT id, entrance_id, body, party_id, valid_from, valid_to, succeeded_at FROM identity_org.management_mandate WHERE entrance_id = ? ORDER BY valid_from, id")
+        jdbc.sql("SELECT id, entrance_id, body, party_id, valid_from, valid_to, succeeded_at, chair FROM identity_org.management_mandate WHERE entrance_id = ? ORDER BY valid_from, id")
             .param(entranceId)
             .query { rs, _ ->
                 Mandate(
                     rs.getObject("id", UUID::class.java), rs.getObject("entrance_id", UUID::class.java), rs.getString("body"), rs.getObject("party_id", UUID::class.java),
                     rs.getObject("valid_from", LocalDate::class.java), rs.getObject("valid_to", LocalDate::class.java),
-                    rs.getObject("succeeded_at", LocalDate::class.java),
+                    rs.getObject("succeeded_at", LocalDate::class.java), rs.getBoolean("chair"),
                 )
             }.list()
 
@@ -106,6 +113,7 @@ data class MandateAct(
     val onDay: LocalDate? = null,
     val succeededBy: UUID? = null,
     val protocolRef: String? = null,
+    val chair: Boolean? = null,
 )
 
 /** The record of who was given which office: written once, never changed — the table sees to that. */
@@ -115,11 +123,11 @@ class MandateActLog(private val jdbc: JdbcClient, private val clock: Clock) {
     // Rule: PM-SEC-004
     fun record(entry: MandateAct) {
         jdbc.sql(
-            "INSERT INTO identity_org.mandate_act (id, act, entrance_id, mandate_id, body, party_id, valid_from, valid_to, on_day, succeeded_by, protocol_ref, by_issuer, by_subject, rule_id, at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO identity_org.mandate_act (id, act, entrance_id, mandate_id, body, party_id, valid_from, valid_to, on_day, succeeded_by, protocol_ref, by_issuer, by_subject, rule_id, at, chair) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ).params(
             UUID.randomUUID(), entry.act, entry.entranceId, entry.mandateId, entry.body, entry.partyId, entry.validFrom, entry.validTo, entry.onDay,
-            entry.succeededBy, entry.protocolRef, entry.by?.issuer, entry.by?.subject, entry.ruleId, Timestamp.from(clock.instant()),
+            entry.succeededBy, entry.protocolRef, entry.by?.issuer, entry.by?.subject, entry.ruleId, Timestamp.from(clock.instant()), entry.chair,
         ).update()
     }
 }
@@ -152,10 +160,13 @@ class MandateAdministration(
      */
     // Rule: PM-SEC-001
     // Rule: PM-GOV-004
+    // Rule: PM-FUND-004
     @Transactional
     fun record(by: Asking, entranceId: UUID, request: RecordMandate): MandateAnswer<MandateRecorded> {
-        val login = if (unasked(by)) null else (allowed(by, entranceId) ?: return refused(by, MandateAct("RECORD_REFUSED", entranceId, null, GOVERNED_BY, body = request.body?.let(::kept), partyId = request.partyId)))
+        val login = if (unasked(by)) null else (allowed(by, entranceId) ?: return refused(by, MandateAct("RECORD_REFUSED", entranceId, null, GOVERNED_BY, body = request.body?.let(::kept), partyId = request.partyId, chair = request.chair)))
         val body = request.body?.takeIf { it in OFFICES } ?: throw IllegalArgumentException("the office is one of ${OFFICES.joinToString()}")
+        val chair = request.chair == true
+        require(!chair || body == "MB") { "only a board member's mandate is marked the chair of the board (PM-FUND-004)" }
         val party = requireNotNull(request.partyId) { "the party the mandate is given to is required" }
         val from = requireNotNull(request.validFrom) { "the mandate's first day is required" }
         val to = requireNotNull(request.validTo) { "the day the mandate runs up to is required" }
@@ -175,19 +186,31 @@ class MandateAdministration(
         if (besideOrBehind) throw MandateOutOfOrder("the entrance has an executive mandate from $from or later: mandates are recorded in the order they began")
 
         val id = UUID.randomUUID()
+        val recorded = Mandate(id, entranceId, body, party, from, to, null, chair)
+        if (chair) chairBeside(recorded)?.let { throw MandateChairTaken("the board's chair from ${it.validFrom} is in force on a day this mandate would be: one chair at a time") }
         try {
-            mandates.add(id, entranceId, body, party, from, to, protocol)
+            mandates.add(id, entranceId, body, party, from, to, protocol, chair)
         } catch (e: DataIntegrityViolationException) {
             throw explained(e, entranceId, party)
         }
-        acts.record(MandateAct("RECORDED", entranceId, login, GOVERNED_BY, id, body, party, from, to, protocolRef = protocol))
+        acts.record(MandateAct("RECORDED", entranceId, login, GOVERNED_BY, id, body, party, from, to, protocolRef = protocol, chair = chair))
         // Which mandates the new one ends is [Mandate.succeeds]' to say — the same question the reading side asks, of a
         // manager or a board member within their own dates as past them. A firm's mandate is not this api's to end.
-        val recorded = Mandate(id, entranceId, body, party, from, to, null)
         val succeeded = mandates.ofEntrance(entranceId)
             .filter { it.succeededAt == null && it.body in EXECUTIVE && recorded.succeeds(it) }.map { it.id }.filter { mandates.end(it, from) }
         succeeded.forEach { acts.record(MandateAct("ENDED", entranceId, login, "PM-GOV-004", it, onDay = from, succeededBy = id)) }
         return MandateAnswer.Done(MandateRecorded(id, succeeded))
+    }
+
+    /**
+     * Another chair's mandate in force on a day the new chair's would be, if any (Rule: PM-FUND-004 — one chair of the
+     * board at a time). Days in force are read as everywhere else, the new mandate counted: a chair it succeeds ends the
+     * day it begins, so stands beside it on no day.
+     */
+    // Rule: PM-FUND-004
+    private fun chairBeside(recorded: Mandate): Mandate? {
+        val all = mandates.ofEntrance(recorded.entranceId) + recorded
+        return all.firstOrNull { it.chair && it.id != recorded.id && it.overlaps(recorded, all) }
     }
 
     /** Records the day a mandate ended — once, a day not in the future, with the protocol or act that ended it. From that day it no longer counts; before it, it did. */

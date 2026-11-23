@@ -80,6 +80,11 @@ class MandateController(private val administration: MandateAdministration, priva
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onOutOfOrder(e: MandateOutOfOrder): Map<String, String> = mapOf("error" to (e.message ?: "out of order"))
 
+    /** Another chair of the board in force on a day the new one would be → 409: one chair at a time (PM-FUND-004). */
+    @ExceptionHandler(MandateChairTaken::class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    fun onChairTaken(e: MandateChairTaken): Map<String, String> = mapOf("error" to (e.message ?: "the board has a chair"), "rule" to "PM-FUND-004")
+
     /** The mandate has an end already → 409: the day is recorded once. */
     @ExceptionHandler(MandateAlreadyEnded::class)
     @ResponseStatus(HttpStatus.CONFLICT)

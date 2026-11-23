@@ -87,7 +87,7 @@ class MandateWebTest {
         whenever(store.ofEntrance(entrance)).thenReturn(listOf(Mandate(old, entrance, "BM", UUID.randomUUID(), LocalDate.parse("2024-05-10"), LocalDate.parse("2026-05-10"), null)))
         whenever(store.end(old, LocalDate.parse("2026-05-10"))).thenReturn(true)
         send(bearer(issuer, "operator")).andExpect(status().isOk).andExpect(jsonPath("$.mandateId").isNotEmpty).andExpect(jsonPath("$.succeeded[0]").value(old.toString()))
-        verify(store).add(any(), org.mockito.kotlin.eq(entrance), org.mockito.kotlin.eq("BM"), org.mockito.kotlin.eq(maria), any(), any(), org.mockito.kotlin.eq("Протокол № 3"))
+        verify(store).add(any(), org.mockito.kotlin.eq(entrance), org.mockito.kotlin.eq("BM"), org.mockito.kotlin.eq(maria), any(), any(), org.mockito.kotlin.eq("Протокол № 3"), org.mockito.kotlin.eq(false))
         val mandate = UUID.randomUUID()
         whenever(store.find(entrance, mandate)).thenReturn(LocalDate.parse("2024-05-10") to null)
         whenever(store.end(mandate, LocalDate.parse("2026-03-01"))).thenReturn(true)
@@ -130,6 +130,16 @@ class MandateWebTest {
         send(bearer(issuer, "operator"), """{"on":"2026-03-01","protocolRef":"Протокол № 4"}""", "$url/$mandate/end").andExpect(status().isConflict)
         verifyNoInteractions(acts)
     }
+
+    @Test
+    fun `PM-FUND-004 a chair on any office but the board is a 400, and a second chair in force beside the first a 409 naming the rule`() {
+        send(bearer(issuer, "operator"), aMandate.replace("}", ""","chair":true}""")).andExpect(status().isBadRequest)
+        val chair = Mandate(UUID.randomUUID(), entrance, "MB", UUID.randomUUID(), LocalDate.parse("2025-05-10"), LocalDate.parse("2027-05-10"), null, chair = true)
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(chair))
+        send(bearer(issuer, "operator"), aMandate.replace("\"BM\"", "\"MB\"").replace("}", ""","chair":true}"""))
+            .andExpect(status().isConflict).andExpect(jsonPath("$.rule").value("PM-FUND-004"))
+        verifyNoInteractions(acts)
+    }
 }
 
 /** Sign-in switched off: nobody is asking, so a mandate is recorded, naming nobody. There is still no administrator to end one. */
@@ -157,7 +167,7 @@ class MandateOpenTest {
         val body = """{"body":"BM","partyId":"$maria","validFrom":"2026-05-10","validTo":"2028-05-10","protocolRef":"x"}"""
         mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(body).header(HttpHeaders.AUTHORIZATION, "Bearer anything"))
             .andExpect(status().isOk).andExpect(jsonPath("$.mandateId").isNotEmpty)
-        verify(store).add(any(), org.mockito.kotlin.eq(entrance), org.mockito.kotlin.eq("BM"), org.mockito.kotlin.eq(maria), any(), any(), org.mockito.kotlin.eq("x"))
+        verify(store).add(any(), org.mockito.kotlin.eq(entrance), org.mockito.kotlin.eq("BM"), org.mockito.kotlin.eq(maria), any(), any(), org.mockito.kotlin.eq("x"), org.mockito.kotlin.eq(false))
         verify(acts).record(argThat { act == "RECORDED" && by == null && partyId == maria && entranceId == entrance })
     }
 

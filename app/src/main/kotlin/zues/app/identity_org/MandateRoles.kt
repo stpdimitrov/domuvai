@@ -11,7 +11,10 @@ import zues.law.numberOn
 import java.time.LocalDate
 import java.util.UUID
 
-/** A mandate as the table holds it: a body's office in an entrance, a party's unless it is the firm's, with its dates. */
+/**
+ * A mandate as the table holds it: a body's office in an entrance, a party's unless it is the firm's, with its dates.
+ * [chair] marks the board member who chairs the management board (Rule: PM-FUND-004), from the mandate's own protocol.
+ */
 data class Mandate(
     val id: UUID,
     val entranceId: UUID,
@@ -20,6 +23,7 @@ data class Mandate(
     val validFrom: LocalDate,
     val validTo: LocalDate,
     val succeededAt: LocalDate?,
+    val chair: Boolean = false,
 ) {
     /** The role this office is — none for the firm's own mandate (`PMC`): firm staff hold nothing until their module exists. */
     val role: Role? get() = OFFICES[body]
@@ -105,6 +109,17 @@ data class Mandate(
         else Standing(StandingKind.ELECTION_DUE, electBy = leaves, until = until)
     }
 
+    /**
+     * Whether this mandate and [other] are in force on a common day — each from its first day up to [endsOnRecord],
+     * open where that is null. Both are in force over one unbroken run of days, so the runs are compared.
+     */
+    // Rule: PM-FUND-004
+    fun overlaps(other: Mandate, ofTheEntrance: List<Mandate>): Boolean {
+        val ends = endsOnRecord(ofTheEntrance)
+        val otherEnds = other.endsOnRecord(ofTheEntrance)
+        return (otherEnds == null || validFrom.isBefore(otherEnds)) && (ends == null || other.validFrom.isBefore(ends))
+    }
+
     private companion object {
         val OFFICES = mapOf("BM" to Role.BM, "MB" to Role.MB, "CTL" to Role.CTL, "CSH" to Role.CSH)
         val CONTINUING = setOf(Role.BM, Role.MB)
@@ -127,7 +142,7 @@ data class Standing(val kind: StandingKind, val electBy: LocalDate? = null, val 
 /**
  * A mandate in force in an entrance on a date, with how it stands. The office-holder is a party's id — or nobody, where
  * the mandate names none — and [partyName] the registry's name for it, only where the reader may read the book
- * ([PartyNames]); absent otherwise.
+ * ([PartyNames]); absent otherwise. [chair] is the board member who chairs the management board that day (PM-FUND-004).
  */
 data class StandingMandate(
     val mandateId: UUID,
@@ -137,6 +152,7 @@ data class StandingMandate(
     val validTo: LocalDate,
     val standing: Standing,
     val partyName: String? = null,
+    val chair: Boolean = false,
 )
 
 /** A party holding a role in an entrance on a date, and the mandate that says so. */
@@ -185,7 +201,7 @@ class MandateStanding(private val mandates: MandateStore) {
         val all = mandates.ofEntrance(entranceId)
         return all.mapNotNull { m ->
             val role = m.role ?: return@mapNotNull null
-            m.standingOn(on, all, ::reminderDays)?.let { StandingMandate(m.id, m.partyId, role, m.validFrom, m.validTo, it) }
+            m.standingOn(on, all, ::reminderDays)?.let { StandingMandate(m.id, m.partyId, role, m.validFrom, m.validTo, it, chair = m.chair) }
         }
     }
 

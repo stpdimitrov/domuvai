@@ -392,10 +392,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent */
+        /** Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. Which board member chairs the board is marked. No task is stored or sent */
         get: operations["get_identity_entrances_entranceId_mandates"];
         put?: never;
-        /** Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too */
+        /** Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. A board member's mandate may be marked the chair of the board, one chair in force at a time (409 otherwise). On the record, refusals too */
         post: operations["post_identity_entrances_entranceId_mandates"];
         delete?: never;
         options?: never;
@@ -2113,6 +2113,7 @@ export interface components {
         };
         RecordMandate: {
             body?: string;
+            chair?: boolean;
             /** Format: uuid */
             partyId?: string;
             protocolRef?: string;
@@ -2235,6 +2236,7 @@ export interface components {
             until?: string;
         };
         StandingMandate: {
+            chair: boolean;
             /** Format: uuid */
             mandateId: string;
             /** Format: uuid */
