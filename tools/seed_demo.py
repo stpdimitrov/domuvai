@@ -58,6 +58,16 @@ if BUSINESS_LABEL not in existing:
     for unit, adults in ((shop, 1), (flat, 2)):
         call("POST", f"/api/registry/entrances/{business}/units/{unit}/household",
              {"members": [{"isChildUnder6": False, "validFrom": "2026-01-01"}] * adults})
+    # Its tariff, adopted on paper: a run bills the version in force, never amounts of its own (PM-FEE-012)
+    decided = call("POST", f"/api/assembly/entrances/{business}/paper-decisions", {
+        "decisionText": "Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.",
+        "protocolDate": "2026-03-12", "protocolRef": "Протокол на ОС от 12.03.2026, т. 4",
+        "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"}, {"Idempotency-Key": str(uuid.uuid4())})["id"]
+    call("POST", f"/api/money/entrances/{business}/tariff-versions", {"decisionId": decided, "validFrom": "2026-09", "lines": [
+        {"stream": "MANAGEMENT", "key": "PER_PERSON", "rateMinor": 600},
+        {"stream": "MAINTENANCE", "key": "PER_PERSON", "rateMinor": 450},
+        {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "totalMinor": 60_000},
+    ]})
 
 if LABEL in existing:
     print(f"seed: {LABEL} is already seeded — left as it is", file=sys.stderr)
@@ -111,12 +121,15 @@ def paper_decision(text, item):
 
 tariff = paper_decision("Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.", 4)
 
-# September's charges, issued on that decision — the same basis the charges screen previews
-call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01", "lines": [
-    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 600},
-    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 450},
-    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": tariff, "totalMinor": 60_000},
+# The tariff version adopted under that decision, in force from September: the runs bill it, never amounts of their own (PM-FEE-012)
+call("POST", f"/api/money/entrances/{entrance}/tariff-versions", {"decisionId": tariff, "validFrom": "2026-09", "lines": [
+    {"stream": "MANAGEMENT", "key": "PER_PERSON", "rateMinor": 600},
+    {"stream": "MAINTENANCE", "key": "PER_PERSON", "rateMinor": 450},
+    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "totalMinor": 60_000},
 ]})
+
+# September's charges, billed on that version — the same basis the charges screen previews
+call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01"})
 
 # Payments: four units pay into the fund's account, two into the operating one
 for unit, amount, into in zip(unit_ids, [30_000, 25_000, 20_000, 30_000, 4_000, 3_000],
@@ -125,14 +138,10 @@ for unit, amount, into in zip(unit_ids, [30_000, 25_000, 20_000, 30_000, 4_000, 
          {"unitId": unit, "amountMinor": amount, "receivedInto": into, "valueDate": "2026-09-10"},
          {"Idempotency-Key": str(uuid.uuid4())})
 
-# October's run on the same decision. The units that overpaid in September now hold an advance against a new debt,
+# October's run on the same version. The units that overpaid in September now hold an advance against a new debt,
 # so the debts screen has something to net (WEB-18): a payment settles only debts raised by its own date, and an
 # advance is not applied to a later charge.
-call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-10", "legalDate": "2026-10-01", "lines": [
-    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 600},
-    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": tariff, "rateMinor": 450},
-    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": tariff, "totalMinor": 60_000},
-]})
+call("POST", f"/api/money/entrances/{entrance}/charge-runs", {"period": "2026-10", "legalDate": "2026-10-01"})
 
 # Disbursements from the fund: works on a GA decision, paid; an emergency; a measure, cancelled; one committed
 base = f"/api/money/entrances/{entrance}/fund/disbursements"

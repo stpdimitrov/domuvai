@@ -49,7 +49,7 @@ class AccountsWriteWebTest {
     private val asking = Asking(null, UUID.randomUUID())
     private val disbursement = UUID.randomUUID()
     private val party = UUID.randomUUID()
-    private val run = """{"period":"2026-05","legalDate":"2026-05-01","lines":[]}"""
+    private val run = """{"period":"2026-05","legalDate":"2026-05-01"}"""
     private val writes = mapOf(                                      // each with a body that binds: a malformed one is a 400 before anything is asked
         "/api/money/entrances/$entrance/charge-runs/preview" to run,
         "/api/money/entrances/$entrance/charge-runs" to run,

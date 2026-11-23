@@ -19,8 +19,9 @@ import org.testcontainers.utility.DockerImageName
 import java.util.UUID
 
 /**
- * The issue through the real port, over real rows: the decision a run cites is one `assembly` stores for the entrance
- * (PM-FEE-012). GaDecisionsTest has the outcomes; a stored run's rows are ChargeRunPersistenceIT's.
+ * The issue through the real port, over real rows: a run bills the tariff version in force for its period, recorded on a
+ * decision `assembly` stores for the entrance (PM-FEE-012). TariffVersionIT has the recording; a stored run's rows are
+ * ChargeRunPersistenceIT's.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest
@@ -68,31 +69,52 @@ class ChargeRunDecisionIT {
         return json.readTree(recorded).get("id").asText()
     }
 
-    private fun issue(entrance: UUID, decisionId: String) = send(
+    private fun adopt(entrance: UUID, decisionId: String, from: String, totalMinor: Long, to: String? = null): String = json.readTree(
+        send(
+            "/api/money/entrances/$entrance/tariff-versions",
+            json.writeValueAsString(RecordTariffVersion(decisionId, from, to, listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = totalMinor)))),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString,
+    ).get("id").asText()
+
+    /** A run of [period] whose body also carries lines of its own, as an older client sent them: they bill nothing. */
+    private fun issue(entrance: UUID, period: String) = send(
         "/api/money/entrances/$entrance/charge-runs",
-        json.writeValueAsString(
-            StoredChargeRunRequest(
-                "2026-05", "2026-05-01",
-                lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", decisionId, totalMinor = 10_000)),
-            ),
-        ),
+        """{"period":"$period","legalDate":"$period-01","lines":[{"stream":"MAINTENANCE","key":"BY_IDEAL_PARTS","decisionId":"made-up","totalMinor":99999}]}""",
     )
 
+    private fun billed(entrance: UUID, period: String): Long =
+        json.readTree(issue(entrance, period).andExpect(status().isCreated).andReturn().response.contentAsString).get("totalMinor").asLong()
+
     @Test
-    fun `PM-FEE-012 a run is issued on a paper decision of its entrance`() {
+    fun `PM-FEE-012 an issued run bills the version in force on a paper decision, not the caller's lines, and its basis names the version and its decision`() {
         val entrance = entrance()
-        issue(entrance, paperDecision(entrance)).andExpect(status().isCreated)
-        assertThat(chargeRuns.existsByEntranceIdAndPeriod(entrance, "2026-05")).isTrue()
+        val decision = paperDecision(entrance)
+        val version = adopt(entrance, decision, "2026-05", 10_000)
+        val issued = json.readTree(issue(entrance, "2026-05").andExpect(status().isCreated).andReturn().response.contentAsString)
+        assertThat(issued.get("totalMinor").asLong()).isEqualTo(10_000)
+        val basis = chargeRuns.findById(UUID.fromString(issued.get("chargeRunId").asText())).orElseThrow().basis.json
+        assertThat(basis).contains("\"versionId\":\"$version\"").contains("\"decisionId\":\"$decision\"").doesNotContain("made-up")
     }
 
     @Test
-    fun `PM-FEE-012 a run on a made-up id or on another entrance's decision is refused and nothing is issued`() {
+    fun `PM-FEE-012 a period with no version in force is refused and nothing is posted`() {
         val entrance = entrance()
-        val elsewhere = paperDecision(entrance())
-        for (cited in listOf("GA-2026-03-12-4", UUID.randomUUID().toString(), elsewhere)) {
-            val refused = issue(entrance, cited).andExpect(status().isBadRequest).andReturn().response.contentAsString
-            assertThat(refused).contains(cited).contains("PM-FEE-012")
+        for (path in listOf("/api/money/entrances/$entrance/charge-runs/preview", "/api/money/entrances/$entrance/charge-runs")) {
+            val refused = send(path, """{"period":"2026-05","legalDate":"2026-05-01"}""").andExpect(status().isBadRequest).andReturn().response.contentAsString
+            assertThat(refused).contains("2026-05").contains("PM-FEE-012")
         }
         assertThat(chargeRuns.existsByEntranceIdAndPeriod(entrance, "2026-05")).isFalse()
+    }
+
+    @Test
+    fun `PM-FEE-012 a run after a newer version begins bills the newer one, and a version whose validTo has passed is not used`() {
+        val entrance = entrance()
+        val decision = paperDecision(entrance)
+        adopt(entrance, decision, "2026-01", 10_000, to = "2026-02")
+        adopt(entrance, decision, "2026-04", 12_000)
+        assertThat(billed(entrance, "2026-02")).isEqualTo(10_000)                                // its last month
+        issue(entrance, "2026-03").andExpect(status().isBadRequest)                            // ended, and nothing falls back to it
+        assertThat(chargeRuns.existsByEntranceIdAndPeriod(entrance, "2026-03")).isFalse()
+        assertThat(billed(entrance, "2026-04")).isEqualTo(12_000)
     }
 }

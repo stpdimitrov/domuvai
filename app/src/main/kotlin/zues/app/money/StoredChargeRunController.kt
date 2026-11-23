@@ -13,13 +13,14 @@ import zues.app.identity_org.WhoAsks
 import java.util.UUID
 
 /**
- * Charge runs computed from an entrance's stored units. The tariff is posted; the units are
- * read from `registry`. Still stateless — persistence is the next slice.
+ * A charge run previewed from an entrance's stored units and the tariff version in force for its period
+ * (PM-FEE-012). Posts nothing; issuing is [ChargeRunStoreController]'s.
  */
 @RestController
 @RequestMapping("/api/money/entrances/{entranceId}/charge-runs")
 class StoredChargeRunController(private val service: ChargeRunService, private val access: MoneyAccess, private val who: WhoAsks) {
 
+    // Rule: PM-FEE-012
     @PostMapping("/preview")
     fun preview(
         @PathVariable entranceId: UUID,

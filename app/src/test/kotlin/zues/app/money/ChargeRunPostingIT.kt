@@ -50,6 +50,7 @@ class ChargeRunPostingIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @Autowired lateinit var postings: PostingRepository
     @MockitoBean lateinit var decisions: GaDecisions
 
@@ -79,11 +80,11 @@ class ChargeRunPostingIT {
     fun `issuing a run writes a balanced journal`() {
         val entranceId = createEntrance().also { registerUnits(it) }
         val request = json.writeValueAsString(
-            StoredChargeRunRequest(
+            tariffs.adopted(entranceId, 
                 period = "2026-05", legalDate = "2026-05-01",
                 lines = listOf(
-                    TariffLineRequest("MANAGEMENT", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
-                    TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 20_000),
+                    AdoptedLine("MANAGEMENT", "BY_IDEAL_PARTS", totalMinor = 10_000),
+                    AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 20_000),
                 ),
             ),
         )

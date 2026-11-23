@@ -25,10 +25,7 @@ class ChargeRunStoreWebTest {
     @MockitoBean lateinit var whoAsks: zues.app.identity_org.WhoAsks
 
     private val entranceId = UUID.randomUUID()
-    private val body = StoredChargeRunRequest(
-        period = "2026-05", legalDate = "2026-05-01",
-        lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
-    )
+    private val body = StoredChargeRunRequest(period = "2026-05", legalDate = "2026-05-01")
 
     private fun postRun() = post("/api/money/entrances/$entranceId/charge-runs")
         .contentType(MediaType.APPLICATION_JSON)

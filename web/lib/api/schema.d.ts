@@ -2313,9 +2313,7 @@ export interface components {
         StoredChargeRunRequest: {
             /** Format: int32 */
             businessMultiplier?: number;
-            consumption?: components["schemas"]["ConsumptionLineRequest"][];
             legalDate: string;
-            lines: components["schemas"]["TariffLineRequest"][];
             period: string;
             readings?: components["schemas"]["ReadingRequest"][];
         };

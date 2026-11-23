@@ -3584,20 +3584,8 @@
             "format": "int32",
             "type": "integer"
           },
-          "consumption": {
-            "items": {
-              "$ref": "#/components/schemas/ConsumptionLineRequest"
-            },
-            "type": "array"
-          },
           "legalDate": {
             "type": "string"
-          },
-          "lines": {
-            "items": {
-              "$ref": "#/components/schemas/TariffLineRequest"
-            },
-            "type": "array"
           },
           "period": {
             "type": "string"
@@ -3611,7 +3599,6 @@
         },
         "required": [
           "legalDate",
-          "lines",
           "period"
         ],
         "type": "object"
