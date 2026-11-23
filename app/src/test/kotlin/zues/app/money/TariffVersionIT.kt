@@ -86,6 +86,14 @@ class TariffVersionIT {
     }
 
     @Test
+    fun `PM-SEC-004 the tariff versions are not emptied, and the rows remain`() {
+        val entrance = entrance()
+        record(entrance, paperDecision(entrance), "2027-01").andExpect(status().isCreated)
+        org.assertj.core.api.Assertions.assertThatThrownBy { jdbc.execute("TRUNCATE money.tariff_version") }.isInstanceOf(org.springframework.dao.DataAccessException::class.java).hasMessageContaining("is not emptied")
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM money.tariff_version WHERE entrance_id = ?", Int::class.java, entrance)).isEqualTo(1)
+    }
+
+    @Test
     fun `PM-FEE-012 a version on a made-up id or another entrance's decision is refused, and a stored one is never altered`() {
         val entrance = entrance()
         for (cited in listOf("GA-2027-1", UUID.randomUUID().toString(), paperDecision(entrance()))) {
