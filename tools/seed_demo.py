@@ -58,6 +58,16 @@ if BUSINESS_LABEL not in existing:
     for unit, adults in ((shop, 1), (flat, 2)):
         call("POST", f"/api/registry/entrances/{business}/units/{unit}/household",
              {"members": [{"isChildUnder6": False, "validFrom": "2026-01-01"}] * adults})
+    # Its tariff, adopted on paper: a run bills the version in force, never amounts of its own (PM-FEE-012)
+    decided = call("POST", f"/api/assembly/entrances/{business}/paper-decisions", {
+        "decisionText": "Месечни вноски: управление 6,00 € на лице, поддръжка 4,50 € на лице, фонд „Ремонт и обновяване“ 600,00 € на вход.",
+        "protocolDate": "2026-03-12", "protocolRef": "Протокол на ОС от 12.03.2026, т. 4",
+        "archiveLocation": "Папка „Протоколи“ у управителя", "custodian": "Мария Иванова"}, {"Idempotency-Key": str(uuid.uuid4())})["id"]
+    call("POST", f"/api/money/entrances/{business}/tariff-versions", {"decisionId": decided, "validFrom": "2026-09", "lines": [
+        {"stream": "MANAGEMENT", "key": "PER_PERSON", "rateMinor": 600},
+        {"stream": "MAINTENANCE", "key": "PER_PERSON", "rateMinor": 450},
+        {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "totalMinor": 60_000},
+    ]})
 
 if LABEL in existing:
     print(f"seed: {LABEL} is already seeded — left as it is", file=sys.stderr)

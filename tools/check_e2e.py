@@ -263,9 +263,9 @@ CALLS = {
         f"/api/registry/entrances/{e}/book/declarations/overdue", None),
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
-        f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}),
+        f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01"}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): lambda e: (
-        f"/api/money/entrances/{e}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}),
+        f"/api/money/entrances/{e}/charge-runs", {"period": "2026-09", "legalDate": "2026-09-01"}),
     ("GET", "/api/money/entrances/{entranceId}/fund"): lambda e: (f"/api/money/entrances/{e}/fund", None),
     ("GET", "/api/money/entrances/{entranceId}/operating-account"): lambda e: (f"/api/money/entrances/{e}/operating-account", None),
     ("GET", "/api/money/entrances/{entranceId}/charge-runs/{period}/headcount"): lambda e: (
@@ -724,7 +724,7 @@ def charges_multiple(api, web):
     entrance = next((e["id"] for e in json.loads(raw) if e["label"] == BUSINESS_LABEL), None) if status == 200 else None
     if not entrance:
         return [f"PM-FEE-010: the seed's business entrance ({BUSINESS_LABEL}) is not registered — nothing was checked"]
-    body = {"period": "2026-09", "legalDate": "2026-09-01", "lines": DEMO_BASIS}
+    body = {"period": "2026-09", "legalDate": "2026-09-01"}   # the amounts are the seeded version's (PM-FEE-012)
     preview = lambda extra: fetch(api, f"/api/money/entrances/{entrance}/charge-runs/preview", {**body, **extra}, headers=as_board())
     previews = {m: preview({"businessMultiplier": m}) for m in range(1, 10)}
     accepted = {m: json.loads(raw) for m, (status, raw) in previews.items() if status == 200}
@@ -1578,8 +1578,8 @@ def charges_issue(api, web, entrance):
     entrance's PASSED ones as the assembly API stores them, read here the same way, and those it recorded from paper (WEB-54);
     with none it says no run is issued.
     An issue posted through the form, as a browser with no script posts it, citing a decision that is not one (the demo
-    basis's) is refused by the web, and the same id posted straight to the API by the board is refused there, naming the
-    rule (FEE-01); the API then holds no run for the period. A paper decision of the seed is previewed through the form,
+    basis's) is refused by the web; the API bills the version in force, so the same lines previewed straight to it by
+    the board change nothing (TARIFF-02a); the API then holds no run for the period. A paper decision of the seed is previewed through the form,
     and the API computes it. A sitting's passed decision cannot be reached in CI (the API's clock is real, WEB-32), and
     a period is not issued here; the seed's own runs issue on a paper decision (DEC-01).
     """
@@ -1611,13 +1611,16 @@ def charges_issue(api, web, entrance):
     text = visible_text(answered)
     if status != 200 or "Ред 1: изберете прието решение" not in text or "Издадено:" in text:
         failures.append(f"{path}: an issue citing no passed decision answered HTTP {status} without the web's refusal")
-    run = {"period": period, "legalDate": f"{period}-01", "lines": DEMO_BASIS}
-    status, raw = fetch(api, f"/api/money/entrances/{entrance}/charge-runs", run, headers=as_board())
-    if status != 400 or "PM-FEE-012" not in raw or "GA-2026-03-12-4" not in raw:
-        failures.append(f"{period}: PM-FEE-012 — the API answered HTTP {status} to an issue on a made-up decision: {raw[:200]!r}")
+    # The API bills the version in force, never a caller's lines (TARIFF-02a): the demo basis's lines on the made-up
+    # decision, previewed, answer the same figures as none at all and cite none of it.
+    run, of_preview = {"period": period, "legalDate": f"{period}-01"}, f"/api/money/entrances/{entrance}/charge-runs/preview"
+    typed, plain = (fetch(api, of_preview, body, headers=as_board()) for body in ({**run, "lines": DEMO_BASIS}, run))
+    if typed[0] != 200 or typed[1] != plain[1] or "GA-2026-03-12-4" in typed[1]:
+        failures.append(f"{period}: PM-FEE-012 — a preview posted with the demo basis's lines answered HTTP {typed[0]}, "
+                        f"not the version in force's figures: {typed[1][:200]!r}")
     held = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/{period}/headcount", headers=as_board())[0]
     failures += [] if held == 404 else [f"{period}: PM-FEE-012 — the API holds a run (headcount HTTP {held}) after an issue citing no passed decision"]
-    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} decision(s) offered, {len(paper)} of them on paper, one previewed; an issue on none refused by the web and the API, no run held")
+    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} decision(s) offered, {len(paper)} of them on paper, one previewed; an issue on none refused by the web, typed lines ignored by the API, no run held")
     return failures
 
 
