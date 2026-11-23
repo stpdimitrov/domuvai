@@ -28,3 +28,6 @@ docs/TRACEABILITY.md
 
 # Per-session hook state (T-07 claim markers) — per machine, never shared
 .claude/state/
+
+# Per-session slice contracts and PR bodies (zues-slice §2 --body-file): scratch, never committed
+.slice/
