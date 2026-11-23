@@ -104,6 +104,7 @@ class MandateReadWebTest {
             .andExpect(jsonPath("$.length()").value(3))
             .andExpect(jsonPath("$[0].partyId").value(manager.toString()))
             .andExpect(jsonPath("$[0].role").value("BM"))
+            .andExpect(jsonPath("$[0].chair").value(false))
             .andExpect(jsonPath("$[0].standing.kind").value("EXPIRED_ACTING"))
             .andExpect(jsonPath("$[0].standing.actingSince").value("2026-06-01"))
             .andExpect(jsonPath("$[0].standing.electBy").value("2026-06-01"))
@@ -114,6 +115,12 @@ class MandateReadWebTest {
         // a day before, the election was due by today; the date asked for is the one read
         read(bearer("login-manager", manager), on = "2026-05-31").andExpect(status().isOk)
             .andExpect(jsonPath("$[0].standing.kind").value("ELECTION_DUE")).andExpect(jsonPath("$[0].standing.electBy").value("2026-06-01"))
+    }
+
+    @Test
+    fun `PM-FUND-004 the read says which board member chairs the board`() {
+        whenever(store.ofEntrance(hall)).thenReturn(listOf(members.copy(chair = true)))
+        read(bearer("login-board", boardMember), of = hall).andExpect(status().isOk).andExpect(jsonPath("$[0].role").value("MB")).andExpect(jsonPath("$[0].chair").value(true))
     }
 
     @Test

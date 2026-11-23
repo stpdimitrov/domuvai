@@ -3044,6 +3044,9 @@
           "body": {
             "type": "string"
           },
+          "chair": {
+            "type": "boolean"
+          },
           "partyId": {
             "format": "uuid",
             "type": "string"
@@ -3460,6 +3463,9 @@
       },
       "StandingMandate": {
         "properties": {
+          "chair": {
+            "type": "boolean"
+          },
           "mandateId": {
             "format": "uuid",
             "type": "string"
@@ -3499,6 +3505,7 @@
           }
         },
         "required": [
+          "chair",
           "mandateId",
           "role",
           "standing",
@@ -7270,7 +7277,7 @@
             "description": "Conflict"
           }
         },
-        "summary": "Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. No task is stored or sent",
+        "summary": "Every mandate in force in an entrance on a date, and how each stands — in term, an election due and by when, or acting past term and since when. Read by the entrance's manager, board and controller and by the administrator (403 otherwise). Each office-holder's id, and beside it the name to the book's readers only — the manager, the board and the controller — entered in the book's access log; the administrator gets the ids. Which board member chairs the board is marked. No task is stored or sent",
         "tags": [
           "identity"
         ],
@@ -7278,6 +7285,7 @@
           "PM-BOOK-006",
           "PM-BOOK-007",
           "PM-BOOK-011",
+          "PM-FUND-004",
           "PM-GOV-004",
           "PM-GOV-005",
           "PM-GOV-008",
@@ -7371,11 +7379,12 @@
             "description": "Conflict"
           }
         },
-        "summary": "Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. On the record, refusals too",
+        "summary": "Record a mandate of an entrance from its protocol — manager, board member, controller or cashier; only the deployment's administrator, as the sign-in says who is asking. A new manager or board ends the mandates it succeeds. A board member's mandate may be marked the chair of the board, one chair in force at a time (409 otherwise). On the record, refusals too",
         "tags": [
           "identity"
         ],
         "x-rules": [
+          "PM-FUND-004",
           "PM-GOV-004",
           "PM-SEC-001",
           "PM-SEC-004",

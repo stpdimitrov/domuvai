@@ -56,8 +56,8 @@ class MandateAdministrationTest {
     @Test
     fun `PM-SEC-001 the administrator records a mandate from its protocol, and the act is on the record`() {
         val done = (administration.record(operator, entrance, aMandate("CTL")) as MandateAnswer.Done).value
-        verify(store).add(done.mandateId, entrance, "CTL", maria, from, to, "Протокол № 3 от 10.05.2026")
-        verify(acts).record(MandateAct("RECORDED", entrance, operator.login!!, "PM-SEC-001", done.mandateId, "CTL", maria, from, to, protocolRef = "Протокол № 3 от 10.05.2026"))
+        verify(store).add(done.mandateId, entrance, "CTL", maria, from, to, "Протокол № 3 от 10.05.2026", false)
+        verify(acts).record(MandateAct("RECORDED", entrance, operator.login!!, "PM-SEC-001", done.mandateId, "CTL", maria, from, to, protocolRef = "Протокол № 3 от 10.05.2026", chair = false))
         assertThat(done.succeeded).isEmpty()
         verify(store, never()).end(any(), any())
     }
@@ -116,8 +116,8 @@ class MandateAdministrationTest {
         whenever(store.end(earlier.id, from)).thenReturn(true)
         val done = (open.record(Asking(null, null), entrance, aMandate()) as MandateAnswer.Done).value
         assertThat(done.succeeded).containsExactly(earlier.id)
-        verify(store).add(done.mandateId, entrance, "BM", maria, from, to, "Протокол № 3 от 10.05.2026")
-        verify(acts).record(MandateAct("RECORDED", entrance, null, "PM-SEC-001", done.mandateId, "BM", maria, from, to, protocolRef = "Протокол № 3 от 10.05.2026"))
+        verify(store).add(done.mandateId, entrance, "BM", maria, from, to, "Протокол № 3 от 10.05.2026", false)
+        verify(acts).record(MandateAct("RECORDED", entrance, null, "PM-SEC-001", done.mandateId, "BM", maria, from, to, protocolRef = "Протокол № 3 от 10.05.2026", chair = false))
         verify(acts).record(MandateAct("ENDED", entrance, null, "PM-GOV-004", earlier.id, onDay = from, succeededBy = done.mandateId))
     }
 
@@ -140,7 +140,7 @@ class MandateAdministrationTest {
         val done = (administration.record(operator, entrance, aMandate("BM")) as MandateAnswer.Done).value
         assertThat(done.succeeded).containsExactly(oldManager.id, sittingMember.id)
         inOrder(store, acts) {
-            verify(store).add(eq(done.mandateId), eq(entrance), eq("BM"), eq(maria), eq(from), eq(to), any())
+            verify(store).add(eq(done.mandateId), eq(entrance), eq("BM"), eq(maria), eq(from), eq(to), any(), eq(false))
             verify(acts).record(argThat { act == "RECORDED" && mandateId == done.mandateId })
             verify(store).ofEntrance(entrance)
         }
@@ -241,7 +241,7 @@ class MandateAdministrationTest {
             assertThatThrownBy { administration.record(operator, entrance, aMandate(office).copy(validTo = last.plusDays(1))) }.describedAs("$office a day over")
                 .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("PM-GOV-004")
         }
-        verify(store, org.mockito.kotlin.times(2)).add(any(), any(), any(), any(), any(), any(), any())   // the two that fit, and neither that did not
+        verify(store, org.mockito.kotlin.times(2)).add(any(), any(), any(), any(), any(), any(), any(), any())   // the two that fit, and neither that did not
     }
 
     @Test
@@ -268,7 +268,7 @@ class MandateAdministrationTest {
         val beforeTheStatute = LocalDate.parse("2008-12-31")
         assertThatThrownBy { administration.record(operator, entrance, aMandate("BM").copy(validFrom = beforeTheStatute, validTo = beforeTheStatute.plusMonths(6))) }
             .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("no term").hasMessageContaining("2008-12-31")
-        verify(store, never()).add(any(), any(), any(), any(), any(), any(), any())
+        verify(store, never()).add(any(), any(), any(), any(), any(), any(), any(), any())
     }
 
     @Test
@@ -304,7 +304,7 @@ class MandateAdministrationTest {
         assertThatThrownBy { administration.record(operator, entrance, aMandate("BM")) }.isInstanceOf(MandateOutOfOrder::class.java)
         whenever(store.beginsNoEarlier(entrance, listOf("BM"), from)).thenReturn(true)
         assertThatThrownBy { administration.record(operator, entrance, aMandate("MB")) }.isInstanceOf(MandateOutOfOrder::class.java)
-        verify(store, never()).add(any(), any(), any(), any(), any(), any(), any())
+        verify(store, never()).add(any(), any(), any(), any(), any(), any(), any(), any())
         verifyNoInteractions(acts)
         // a board member beside other members, and a controller or a cashier beside anybody, are not: the question is not asked of them
         whenever(store.beginsNoEarlier(entrance, listOf("BM"), from)).thenReturn(false)
@@ -329,5 +329,68 @@ class MandateAdministrationTest {
             override fun administers(who: Asking, asAt: LocalDate) = true
         }
         assertThat(MandateAdministration(store, Policy(listOf(anyone)), acts, clock).record(Asking(null, UUID.randomUUID()), entrance, aMandate())).isEqualTo(MandateAnswer.Refused("PM-SEC-001"))
+    }
+
+    private fun aChair(body: String = "MB") = aMandate(body).copy(chair = true)
+
+    @Test
+    fun `PM-FUND-004 a board member's mandate is recorded as the chair of the board — the mark stored, and its entry says so`() {
+        val fellow = held("MB", "2025-05-10", "2027-05-10")                                         // an unmarked member in term: no chair to meet
+        whenever(store.ofEntrance(entrance)).thenReturn(listOf(fellow))
+        val done = (administration.record(operator, entrance, aChair()) as MandateAnswer.Done).value
+        verify(store).add(done.mandateId, entrance, "MB", maria, from, to, "Протокол № 3 от 10.05.2026", true)
+        verify(acts).record(MandateAct("RECORDED", entrance, operator.login!!, "PM-SEC-001", done.mandateId, "MB", maria, from, to, protocolRef = "Протокол № 3 от 10.05.2026", chair = true))
+        // a member beside the chair is no chair, and needs none
+        val member = (administration.record(operator, entrance, aMandate("MB").copy(chair = false)) as MandateAnswer.Done).value
+        verify(store).add(member.mandateId, entrance, "MB", maria, from, to, "Протокол № 3 от 10.05.2026", false)
+    }
+
+    @Test
+    fun `PM-FUND-004 only a board member's mandate is marked the chair — the manager's, a controller's or the cashier's is a 400, and nothing is stored`() {
+        for (office in listOf("BM", "CTL", "CSH"))
+            assertThatThrownBy { administration.record(operator, entrance, aChair(office)) }.describedAs(office)
+                .isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("board member")
+        verify(store, never()).add(any(), any(), any(), any(), any(), any(), any(), any())
+        verifyNoInteractions(acts)
+    }
+
+    @Test
+    fun `PM-FUND-004 one chair at a time — a chair whose days in force would meet another chair's is a 409, and nothing is stored or entered`() {
+        val meeting = listOf(
+            held("MB", "2025-05-10", "2027-05-10").copy(chair = true),                                // in term on the new one's first day
+            held("MB", "2026-01-01", "2026-05-11").copy(chair = true),                                // its term outlasts the new one's first day, so nobody succeeds it
+            held("MB", "2027-01-01", "2029-01-01").copy(chair = true),                                // begins later, inside the new one's term
+            held("MB", "2026-05-10", "2028-05-10", ended = "2026-05-11").copy(chair = true),          // ended, but a day after the new one began
+        )
+        for (other in meeting) {
+            whenever(store.ofEntrance(entrance)).thenReturn(listOf(other))
+            assertThatThrownBy { administration.record(operator, entrance, aChair()) }.describedAs("$other").isInstanceOf(MandateChairTaken::class.java)
+        }
+        verify(store, never()).add(any(), any(), any(), any(), any(), any(), any(), any())
+        verifyNoInteractions(acts)
+    }
+
+    @Test
+    fun `PM-FUND-004 a new chair follows one no longer in force — ended, over, or past its term and succeeded by the new one on its first day`() {
+        val following = listOf(
+            held("MB", "2024-05-10", "2027-05-10", ended = "2026-05-10").copy(chair = true),          // ended the day the new one begins
+            held("CTL", "2024-05-10", "2027-05-10"),                                                  // no chair at all
+            held("MB", "2026-06-01", "2028-06-01"),                                                   // a member, unmarked
+            held("MB", "2024-05-10", "2026-05-10").copy(chair = true),                                // past term, continuing — until the new one succeeds it
+        )
+        for (other in following) {
+            whenever(store.ofEntrance(entrance)).thenReturn(listOf(other))
+            whenever(store.end(other.id, from)).thenReturn(true)
+            assertThat(administration.record(operator, entrance, aChair())).describedAs("$other").isInstanceOf(MandateAnswer.Done::class.java)
+        }
+        verify(store, org.mockito.kotlin.times(following.size)).add(any(), eq(entrance), eq("MB"), eq(maria), eq(from), eq(to), any(), eq(true))
+        verify(store).end(following[3].id, from)                                                    // the outgoing chair ends as any member past term does
+    }
+
+    @Test
+    fun `PM-SEC-004 a refused attempt to record the chair keeps the mark it was asked with`() {
+        assertThat(administration.record(manager, entrance, aChair())).isEqualTo(MandateAnswer.Refused("PM-SEC-001"))
+        verify(acts).record(MandateAct("RECORD_REFUSED", entrance, manager.login!!, "PM-SEC-001", body = "MB", partyId = maria, chair = true))
+        verifyNoInteractions(store)
     }
 }
