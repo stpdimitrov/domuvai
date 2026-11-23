@@ -81,6 +81,19 @@ class AccountsWriteWebTest {
     }
 
     @Test
+    fun `PM-FEE-012 only the unique key on a month is a 409 — another integrity violation is not reported as one`() {
+        whenever(whoAsks.of(null)).thenReturn(asking)
+        val path = "/api/money/entrances/$entrance/tariff-versions"
+        val body = """{"decisionId":"GA-1","validFrom":"2027-01"}"""
+        whenever(tariffs.record(eq(entrance), any())).doThrow(org.springframework.dao.DuplicateKeyException("unique (entrance_id, valid_from)"))
+        mvc.perform(write(path, body)).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.error").value("a tariff version of this entrance already begins that month"))
+        whenever(tariffs.record(eq(entrance), any())).doThrow(org.springframework.dao.DataIntegrityViolationException("a check"))
+        org.assertj.core.api.Assertions.assertThatThrownBy { mvc.perform(write(path, body)) }
+            .hasCauseInstanceOf(org.springframework.dao.DataIntegrityViolationException::class.java)
+    }
+
+    @Test
     fun `PM-SEC-001 the tariff versions are read by who keeps the accounts, and a refusal is a 403 naming the rule`() {
         whenever(whoAsks.of(null)).thenReturn(asking)
         doThrow(MoneyWriteForbidden("PM-SEC-001")).whenever(access).keep(eq(entrance), eq(asking))

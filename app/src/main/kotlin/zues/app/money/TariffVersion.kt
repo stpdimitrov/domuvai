@@ -2,7 +2,7 @@ package zues.app.money
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.data.annotation.Id
 import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.data.relational.core.mapping.Table
@@ -173,8 +173,8 @@ class TariffVersionController(private val tariffs: TariffVersions, private val a
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun onInvalid(e: IllegalArgumentException): Map<String, String> = mapOf("error" to (e.message ?: "invalid tariff version"))
 
-    /** A version already begins that month, or the table's own guard on a raced one → 409. */
-    @ExceptionHandler(TariffVersionConflict::class, DataIntegrityViolationException::class)
+    /** A version already begins that month, or the table's unique key on a raced one → 409. Any other integrity violation is not this. */
+    @ExceptionHandler(TariffVersionConflict::class, DuplicateKeyException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun onConflict(e: RuntimeException): Map<String, String> =
         mapOf("error" to ((e as? TariffVersionConflict)?.message ?: "a tariff version of this entrance already begins that month"))
