@@ -90,6 +90,32 @@
         ],
         "type": "object"
       },
+      "AdoptedLine": {
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "rateMinor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "stream": {
+            "type": "string"
+          },
+          "totalMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "stream"
+        ],
+        "type": "object"
+      },
       "AgeingBucket": {
         "properties": {
           "amountMinor": {
@@ -2132,6 +2158,22 @@
         ],
         "type": "object"
       },
+      "MeteredPrice": {
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "priceMinor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item",
+          "priceMinor"
+        ],
+        "type": "object"
+      },
       "MissingReadingResponse": {
         "properties": {
           "item": {
@@ -3090,6 +3132,38 @@
         ],
         "type": "object"
       },
+      "RecordTariffVersion": {
+        "properties": {
+          "consumption": {
+            "items": {
+              "$ref": "#/components/schemas/MeteredPrice"
+            },
+            "type": "array"
+          },
+          "decisionId": {
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AdoptedLine"
+            },
+            "type": "array"
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "validTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "consumption",
+          "decisionId",
+          "lines",
+          "validFrom"
+        ],
+        "type": "object"
+      },
       "RecordVoteRequest": {
         "properties": {
           "choice": {
@@ -3592,6 +3666,43 @@
           "decisionId",
           "key",
           "stream"
+        ],
+        "type": "object"
+      },
+      "TariffVersionView": {
+        "properties": {
+          "consumption": {
+            "items": {
+              "$ref": "#/components/schemas/MeteredPrice"
+            },
+            "type": "array"
+          },
+          "decisionId": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AdoptedLine"
+            },
+            "type": "array"
+          },
+          "validFrom": {
+            "type": "string"
+          },
+          "validTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "consumption",
+          "decisionId",
+          "id",
+          "lines",
+          "validFrom"
         ],
         "type": "object"
       },
@@ -9841,6 +9952,175 @@
         "x-rules": [
           "PM-DEBT-008",
           "PM-SEC-002"
+        ]
+      }
+    },
+    "/api/money/entrances/{entranceId}/tariff-versions": {
+      "get": {
+        "operationId": "get_money_entrances_entranceId_tariff_versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TariffVersionView"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "The entrance's tariff versions, the latest begun first, each with its decision and months — or, for a period, the one in force then: the latest begun by that month unless its own last month has passed",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FEE-012",
+          "PM-SEC-001"
+        ]
+      },
+      "post": {
+        "operationId": "post_money_entrances_entranceId_tariff_versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entranceId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordTariffVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TariffVersionView"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "Record a tariff version — the lines and metered prices the entrance's assembly adopted, under a passed decision of the entrance (its protocol id), and the months it is in force; never altered, a changed tariff is a new version — for the manager and the board",
+        "tags": [
+          "money"
+        ],
+        "x-rules": [
+          "PM-FEE-012",
+          "PM-SEC-001"
         ]
       }
     },
