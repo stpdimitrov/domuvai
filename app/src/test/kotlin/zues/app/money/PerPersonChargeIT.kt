@@ -51,6 +51,7 @@ class PerPersonChargeIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @MockitoBean lateinit var decisions: GaDecisions
 
     @BeforeEach
@@ -87,9 +88,9 @@ class PerPersonChargeIT {
         ).andExpect(status().isCreated)
 
         val request = json.writeValueAsString(
-            StoredChargeRunRequest(
+            tariffs.adopted(entranceId, 
                 period = "2026-05", legalDate = "2026-05-01",
-                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+                lines = listOf(AdoptedLine("MANAGEMENT", "PER_PERSON", rateMinor = 500)),
             ),
         )
         post("/api/money/entrances/$entranceId/charge-runs/preview", request)
@@ -105,9 +106,9 @@ class PerPersonChargeIT {
         post(household, """{"members":[{"isChildUnder6":false,"validFrom":"2026-01-01"},{"isChildUnder6":false,"validFrom":"2026-01-01"}]}""")
             .andExpect(status().isCreated)
         val run = json.writeValueAsString(
-            StoredChargeRunRequest(
+            tariffs.adopted(entranceId, 
                 period = "2026-05", legalDate = "2026-05-01",
-                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+                lines = listOf(AdoptedLine("MANAGEMENT", "PER_PERSON", rateMinor = 500)),
             ),
         )
         val report = "/api/money/entrances/$entranceId/charge-runs/2026-05/headcount"

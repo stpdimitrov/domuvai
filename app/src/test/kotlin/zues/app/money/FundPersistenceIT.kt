@@ -58,6 +58,7 @@ class FundPersistenceIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @Autowired lateinit var jdbc: JdbcTemplate
     @MockitoBean lateinit var decisions: GaDecisions
 
@@ -381,7 +382,9 @@ class FundPersistenceIT {
         act(entranceId, works, "pay", """{"paidOn":"$signedOn"}""").andExpect(status().isOk)
         mvc.perform(                                                                     // October's run, after the payments: a third kind of journal
             post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
-                """{"period":"2026-10","legalDate":"2026-10-01","lines":[{"stream":"REPAIR_FUND","key":"BY_IDEAL_PARTS","decisionId":"GA-2026-7","totalMinor":7000}]}""",
+                json.writeValueAsString(
+                    tariffs.adopted(entranceId, "2026-10", "2026-10-01", lines = listOf(AdoptedLine("REPAIR_FUND", "BY_IDEAL_PARTS", totalMinor = 7_000)), decisionId = "GA-2026-7"),
+                ),
             ),
         ).andExpect(status().isCreated)
 

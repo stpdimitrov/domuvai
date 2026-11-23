@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import zues.charges.Basis
 import zues.charges.ChargeRun
 import java.security.MessageDigest
+import java.util.UUID
 
 /**
  * Serializes a run's frozen [Basis] to canonical JSON and hashes it (Rule: PM-FEE-014). The
@@ -16,7 +17,9 @@ object BasisJson {
 
     private val mapper = ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
 
-    fun of(run: ChargeRun): String = mapper.writeValueAsString(basisMap(run.basis))
+    /** [tariffVersionId] names the version in force the run billed (PM-FEE-012); absent, the basis hashes as before it. */
+    fun of(run: ChargeRun, tariffVersionId: UUID? = null): String =
+        mapper.writeValueAsString(basisMap(run.basis, tariffVersionId))
 
     /** Any basis built from primitives, as canonical JSON — keys sorted, byte-stable. */
     fun canonical(basis: Map<String, Any?>): String = mapper.writeValueAsString(basis)
@@ -26,7 +29,7 @@ object BasisJson {
             .digest(json.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
 
-    private fun basisMap(basis: Basis): Map<String, Any?> = sortedMapOf(
+    private fun basisMap(basis: Basis, tariffVersionId: UUID?): Map<String, Any?> = sortedMapOf(
         "legalDate" to basis.legalDate,
         "constants" to basis.constants,
         "units" to basis.units.map {
@@ -65,6 +68,7 @@ object BasisJson {
                     sortedMapOf("item" to it.item.name, "priceMinor" to it.priceMinor, "decisionId" to it.decisionId)
                 })
             }
+            tariffVersionId?.let { put("versionId", it.toString()) }                   // absent, not null: older bases hash as before
         },
     )
 }

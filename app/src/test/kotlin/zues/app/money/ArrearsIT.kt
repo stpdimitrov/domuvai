@@ -55,6 +55,7 @@ class ArrearsIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @Autowired lateinit var postings: PostingRepository
     @MockitoBean lateinit var decisions: GaDecisions
 
@@ -89,11 +90,11 @@ class ArrearsIT {
         mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
                 json.writeValueAsString(
-                    StoredChargeRunRequest(
+                    tariffs.adopted(entranceId, 
                         period = period, legalDate = "$period-01",
                         lines = listOf(
-                            TariffLineRequest("MANAGEMENT", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
-                            TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 20_000),
+                            AdoptedLine("MANAGEMENT", "BY_IDEAL_PARTS", totalMinor = 10_000),
+                            AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 20_000),
                         ),
                     ),
                 ),

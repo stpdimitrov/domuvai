@@ -319,10 +319,21 @@ class ImportCommitPersistenceIT {
             sheet.rows.map { ImportedUnit(RegisterUnit(it.designation, "UNSPECIFIED", idealParts = it.idealParts, businessUse = it.businessUse)) },
         )
 
+        // the run bills the tariff version in force (PM-FEE-012): the assembly's decision, then the version adopted under it
+        val decision = json.readTree(
+            mvc.perform(
+                post("/api/assembly/entrances/$entranceId/paper-decisions").header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"decisionText":"Вноска за поддръжка","protocolDate":"2026-03-12","protocolRef":"Протокол 1","archiveLocation":"Папка","custodian":"Мария Иванова"}"""),
+            ).andExpect(status().isCreated).andReturn().response.contentAsString,
+        ).get("id").asText()
+        mvc.perform(
+            post("/api/money/entrances/$entranceId/tariff-versions").contentType(MediaType.APPLICATION_JSON)
+                .content("""{"decisionId":"$decision","validFrom":"2026-05","lines":[{"stream":"MAINTENANCE","key":"PER_UNIT","rateMinor":1000}]}"""),
+        ).andExpect(status().isCreated)
         val preview = mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs/preview").contentType(MediaType.APPLICATION_JSON).content(
-                """{"period":"2026-05","legalDate":"2026-05-01","businessMultiplier":$multiple,
-                    "lines":[{"stream":"MAINTENANCE","key":"PER_UNIT","decisionId":"GA-2026-1","rateMinor":1000}]}""",
+                """{"period":"2026-05","legalDate":"2026-05-01","businessMultiplier":$multiple}""",
             ),
         ).andExpect(status().isOk).andReturn().response.contentAsString
         val charged = json.readTree(preview).get("charges").associate { it.get("designation").asText() to it.get("totalMinor").asLong() }

@@ -54,6 +54,7 @@ class ChargeRunPersistenceIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @Autowired lateinit var chargeRuns: ChargeRunRepository
     @Autowired lateinit var chargeLines: ChargeLineRepository
     @Autowired lateinit var jdbc: JdbcTemplate
@@ -62,9 +63,9 @@ class ChargeRunPersistenceIT {
     @BeforeEach
     fun everyCitedDecisionPassed() { whenever(decisions.passed(any(), any())).thenReturn(true) }
 
-    private val runRequest = StoredChargeRunRequest(
-        period = "2026-05", legalDate = "2026-05-01",
-        lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
+    private fun runRequest(entranceId: UUID) = tariffs.adopted(
+        entranceId, period = "2026-05", legalDate = "2026-05-01",
+        lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)),
     )
 
     private fun createEntrance(): UUID {
@@ -91,7 +92,7 @@ class ChargeRunPersistenceIT {
         val response = mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(runRequest)),
+                .content(json.writeValueAsString(runRequest(entranceId))),
         ).andExpect(status().isCreated).andReturn().response.contentAsString
         return UUID.fromString(json.readTree(response).get("chargeRunId").asText())
     }
@@ -115,11 +116,11 @@ class ChargeRunPersistenceIT {
     @Test
     fun `PM-FEE-011 PM-FEE-003 a concierge line is stored as a second maintenance line, and every line names its decision`() {
         val entranceId = createEntrance().also { registerUnits(it) }
-        val withConcierge = StoredChargeRunRequest(
-            period = "2026-06", legalDate = "2026-06-01",
+        val withConcierge = tariffs.adopted(
+            entranceId, period = "2026-06", legalDate = "2026-06-01", decisionId = "GA-2026-2",
             lines = listOf(
-                TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
-                TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-2", totalMinor = 5_000, item = "CONCIERGE"),
+                AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000),
+                AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 5_000, item = "CONCIERGE"),
             ),
         )
         val response = mvc.perform(
@@ -132,7 +133,7 @@ class ChargeRunPersistenceIT {
         assertThat(lines).hasSize(4)                                             // two per unit, one of them the concierge
         assertThat(lines.map { it.component }).containsOnly("MAINTENANCE")
         assertThat(lines.filter { it.item == "CONCIERGE" }.sumOf { it.amountMinor }).isEqualTo(5_000)
-        assertThat(lines.map { it.decisionId }).containsOnly("GA-2026-1", "GA-2026-2")
+        assertThat(lines.map { it.decisionId }).containsOnly("GA-2026-2")              // the version's decision, on every line
     }
 
     @Test
@@ -158,10 +159,10 @@ class ChargeRunPersistenceIT {
             mvc.perform(post("/api/registry/entrances/$entranceId/units").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated).andReturn().response.contentAsString,
         ).get("unitIds").map { it.asText() }
-        val metered = StoredChargeRunRequest(
-            period = "2026-07", legalDate = "2026-07-01",
-            lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
-            consumption = listOf(ConsumptionLineRequest("WATER", 230, "GA-2026-9")),
+        val metered = tariffs.adopted(
+            entranceId, period = "2026-07", legalDate = "2026-07-01", decisionId = "GA-2026-9",
+            lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)),
+            consumption = listOf(MeteredPrice("WATER", 230)),
             readings = listOf(ReadingRequest(unitIds[0], "WATER", "12.345"), ReadingRequest(unitIds[1], "WATER", "0.500")),
         )
         val response = mvc.perform(
@@ -220,7 +221,7 @@ class ChargeRunPersistenceIT {
         mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(runRequest)),
+                .content(json.writeValueAsString(runRequest(entranceId))),
         ).andExpect(status().isConflict)
     }
 
@@ -238,9 +239,9 @@ class ChargeRunPersistenceIT {
         val multiple = zues.law.numberOn("BUSINESS_USE_MULTIPLIER_MAX", "2026-08-01").toInt()
         fun run(multiplier: Int?) = post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
             json.writeValueAsString(
-                StoredChargeRunRequest(
-                    period = "2026-08", legalDate = "2026-08-01", businessMultiplier = multiplier,
-                    lines = listOf(TariffLineRequest("MAINTENANCE", "PER_UNIT", "GA-2026-1", rateMinor = 1_000)),
+                tariffs.adopted(
+                    entranceId, period = "2026-08", legalDate = "2026-08-01", businessMultiplier = multiplier,
+                    lines = listOf(AdoptedLine("MAINTENANCE", "PER_UNIT", rateMinor = 1_000)),
                 ),
             ),
         )

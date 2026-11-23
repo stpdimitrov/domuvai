@@ -56,6 +56,7 @@ class PaymentPersistenceIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @Autowired lateinit var jdbc: JdbcTemplate
     @MockitoBean lateinit var decisions: GaDecisions
 
@@ -82,11 +83,11 @@ class PaymentPersistenceIT {
             mvc.perform(
                 post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
                     json.writeValueAsString(
-                        StoredChargeRunRequest(
+                        tariffs.adopted(entranceId, 
                             period = period, legalDate = "$period-01",
                             lines = listOf(
-                                TariffLineRequest("MANAGEMENT", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
-                                TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 20_000),
+                                AdoptedLine("MANAGEMENT", "BY_IDEAL_PARTS", totalMinor = 10_000),
+                                AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 20_000),
                             ),
                         ),
                     ),
@@ -264,11 +265,11 @@ class PaymentPersistenceIT {
         mvc.perform(
             post("/api/money/entrances/$entranceId/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
                 json.writeValueAsString(
-                    StoredChargeRunRequest(
+                    tariffs.adopted(entranceId, 
                         period = "2026-06", legalDate = "2026-06-01",
                         lines = listOf(
-                            TariffLineRequest("MANAGEMENT", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
-                            TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 20_000),
+                            AdoptedLine("MANAGEMENT", "BY_IDEAL_PARTS", totalMinor = 10_000),
+                            AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 20_000),
                         ),
                     ),
                 ),

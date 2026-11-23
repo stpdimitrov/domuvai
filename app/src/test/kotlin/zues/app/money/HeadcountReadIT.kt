@@ -66,6 +66,7 @@ class HeadcountReadIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @Autowired lateinit var registry: RegistryService
     @Autowired lateinit var ownership: OwnershipService
     @Autowired lateinit var jdbc: JdbcTemplate
@@ -99,7 +100,7 @@ class HeadcountReadIT {
 
     private fun issue(entrance: UUID, period: String, on: LocalDate) {
         val run = json.writeValueAsString(
-            StoredChargeRunRequest(period = period, legalDate = on.toString(), lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500))),
+            tariffs.adopted(entrance, period = period, legalDate = on.toString(), lines = listOf(AdoptedLine("MANAGEMENT", "PER_PERSON", rateMinor = 500))),
         )
         mvc.perform(post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(run)).andExpect(status().isCreated)
     }

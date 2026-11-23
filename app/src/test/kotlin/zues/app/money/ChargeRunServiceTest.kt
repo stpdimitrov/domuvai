@@ -23,7 +23,21 @@ class ChargeRunServiceTest {
     private val u1 = UUID.randomUUID()
     private val u2 = UUID.randomUUID()
     private val units: Units = mock()
-    private val service = ChargeRunService(units)
+    private var rows: List<TariffVersionRow> = emptyList()
+    private val service = ChargeRunService(units, tariffVersionsOver { rows })
+
+    /** A run of [period] after the assembly adopted [lines] and [consumption] in a version in force since January. */
+    private fun adopted(
+        period: String,
+        legalDate: String,
+        businessMultiplier: Int? = null,
+        lines: List<AdoptedLine>,
+        consumption: List<MeteredPrice> = emptyList(),
+        readings: List<ReadingRequest>? = null,
+    ): StoredChargeRunRequest {
+        rows = listOf(versionRow(entranceId, "2026-01", lines = lines, consumption = consumption))
+        return StoredChargeRunRequest(period, legalDate, businessMultiplier, readings)
+    }
 
     @BeforeEach
     fun stubUnits() {
@@ -37,11 +51,11 @@ class ChargeRunServiceTest {
 
     @Test
     fun `PM-FEE-011 a concierge line reaches the engine named, so its key is checked against maintenance's`() {
-        val request = StoredChargeRunRequest(
+        val request = adopted(
             period = "2026-05", legalDate = "2026-05-01",
             lines = listOf(
-                TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000),
-                TariffLineRequest("MAINTENANCE", "PER_UNIT", "GA-2026-2", rateMinor = 500, item = "CONCIERGE"),
+                AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000),
+                AdoptedLine("MAINTENANCE", "PER_UNIT", rateMinor = 500, item = "CONCIERGE"),
             ),
         )
         assertThatThrownBy { service.preview(entranceId, request) }.hasMessageContaining("PM-FEE-011")
@@ -51,9 +65,9 @@ class ChargeRunServiceTest {
     fun `a by-ideal-parts run allocates the pot across the stored units`() {
         val response = service.preview(
             entranceId,
-            StoredChargeRunRequest(
+            adopted(
                 period = "2026-05", legalDate = "2026-05-01",
-                lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
+                lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)),
             ),
         )
         assertThat(response.totalMinor).isEqualTo(10_000)
@@ -72,9 +86,9 @@ class ChargeRunServiceTest {
         )
         val response = service.preview(
             entranceId,
-            StoredChargeRunRequest(
+            adopted(
                 period = "2026-05", legalDate = "2026-05-01",
-                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+                lines = listOf(AdoptedLine("MANAGEMENT", "PER_PERSON", rateMinor = 500)),
             ),
         )
         assertThat(response.totalMinor).isEqualTo(2_000)   // 500 × (3 + 1) persons
@@ -89,9 +103,9 @@ class ChargeRunServiceTest {
         assertThatThrownBy {
             service.preview(
                 entranceId,
-                StoredChargeRunRequest(
+                adopted(
                     period = "2026-05", legalDate = "2026-05-01",
-                    lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+                    lines = listOf(AdoptedLine("MANAGEMENT", "PER_PERSON", rateMinor = 500)),
                 ),
             )
         }.isInstanceOf(IllegalArgumentException::class.java).hasMessageContaining("occupant")
@@ -102,7 +116,7 @@ class ChargeRunServiceTest {
         assertThatThrownBy {
             service.preview(
                 UUID.randomUUID(),
-                StoredChargeRunRequest("2026-05", "2026-05-01", lines = emptyList()),
+                adopted("2026-05", "2026-05-01", lines = emptyList()),
             )
         }.isInstanceOf(NoSuchElementException::class.java)
     }
@@ -118,9 +132,9 @@ class ChargeRunServiceTest {
         )
         val response = service.preview(
             entranceId,
-            StoredChargeRunRequest(
+            adopted(
                 period = "2026-05", legalDate = "2026-05-01",
-                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+                lines = listOf(AdoptedLine("MANAGEMENT", "PER_PERSON", rateMinor = 500)),
             ),
         )
         val byUnit = response.charges.associate { it.unitId to it.totalMinor }
@@ -136,9 +150,9 @@ class ChargeRunServiceTest {
         )
         val response = service.preview(
             entranceId,
-            StoredChargeRunRequest(
+            adopted(
                 period = "2026-05", legalDate = "2026-05-01",
-                lines = listOf(TariffLineRequest("MANAGEMENT", "PER_PERSON", "GA-2026-1", rateMinor = 500)),
+                lines = listOf(AdoptedLine("MANAGEMENT", "PER_PERSON", rateMinor = 500)),
             ),
         )
         // one resident plus one animal-equivalent — the animal lifts the chargeable count
@@ -147,10 +161,10 @@ class ChargeRunServiceTest {
 
     @Test
     fun `PM-FEE-017 a stored run bills a registered unit's reading, and refuses one for a unit it does not hold`() {
-        val request = StoredChargeRunRequest(
+        val request = adopted(
             period = "2026-05", legalDate = "2026-05-01",
-            lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)),
-            consumption = listOf(ConsumptionLineRequest("HEATING", 25, "GA-2026-9")),
+            lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)),
+            consumption = listOf(MeteredPrice("HEATING", 25)),
             readings = listOf(ReadingRequest(u2.toString(), "HEATING", "2")),
         )
         val response = service.preview(entranceId, request)
@@ -175,9 +189,9 @@ class ChargeRunServiceTest {
     private fun doorUnit() = UnitForCharging(door, "ап. 1", "20.0000", separateEntrance = true, businessUse = false)
     private fun flatUnit() = UnitForCharging(u2, "ап. 2", "10.0000", separateEntrance = false, businessUse = false)
 
-    private fun perUnit(multiplier: Int?, stream: String = "MAINTENANCE") = StoredChargeRunRequest(
+    private fun perUnit(multiplier: Int?, stream: String = "MAINTENANCE") = adopted(
         period = "2026-05", legalDate = "2026-05-01", businessMultiplier = multiplier,
-        lines = listOf(TariffLineRequest(stream, "PER_UNIT", "GA-2026-1", rateMinor = 1_000)),
+        lines = listOf(AdoptedLine(stream, "PER_UNIT", rateMinor = 1_000)),
     )
 
     @Test
@@ -204,17 +218,56 @@ class ChargeRunServiceTest {
         assertThat(service.preview(entranceId, perUnit(null)).charges.map { it.totalMinor }).containsOnly(1_000L)
 
         business(shopUnit().copy(idealParts = "100.0000"))                                 // the repair fund is never multiplied
-        val fund = StoredChargeRunRequest(
+        val fund = adopted(
             period = "2026-05", legalDate = "2026-05-01",
-            lines = listOf(TariffLineRequest("REPAIR_FUND", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 5_000)),
+            lines = listOf(AdoptedLine("REPAIR_FUND", "BY_IDEAL_PARTS", totalMinor = 5_000)),
         )
         assertThat(service.preview(entranceId, fund).totalMinor).isEqualTo(5_000)
 
-        val water = StoredChargeRunRequest(                                                // nor is a metered cost
+        val water = adopted(                                                // nor is a metered cost
             period = "2026-05", legalDate = "2026-05-01", lines = emptyList(),
-            consumption = listOf(ConsumptionLineRequest("WATER", 230, "GA-2026-9")),
+            consumption = listOf(MeteredPrice("WATER", 230)),
             readings = listOf(ReadingRequest(shop.toString(), "WATER", "10.000")),
         )
         assertThat(service.preview(entranceId, water).totalMinor).isEqualTo(2_300)
+    }
+
+    // --- PM-FEE-012: the amounts are the version in force's ---
+
+    private fun maintenance(totalMinor: Long) = AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = totalMinor)
+    private fun previewIn(period: String) = service.preview(entranceId, StoredChargeRunRequest(period, "$period-01"))
+
+    @Test
+    fun `PM-FEE-012 a run bills the amounts of the version in force, every line under its decision`() {
+        rows = listOf(versionRow(entranceId, "2026-01", decisionId = "GA-2026-7", lines = listOf(maintenance(10_000)), consumption = listOf(MeteredPrice("WATER", 230))))
+        val response = service.preview(entranceId, StoredChargeRunRequest("2026-05", "2026-05-01", readings = listOf(ReadingRequest(u1.toString(), "WATER", "1"), ReadingRequest(u2.toString(), "WATER", "2"))))
+        assertThat(response.totalMinor).isEqualTo(10_000 + 230 * 3)
+        assertThat(response.charges.flatMap { it.lines }.map { it.decisionId }).containsOnly("GA-2026-7")
+    }
+
+    @Test
+    fun `PM-FEE-012 a period with no version in force is refused`() {
+        assertThatThrownBy { previewIn("2026-05") }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("2026-05").hasMessageContaining("PM-FEE-012")
+        rows = listOf(versionRow(entranceId, "2026-06", lines = listOf(maintenance(10_000))))   // adopted, but not yet in force
+        assertThatThrownBy { previewIn("2026-05") }.hasMessageContaining("PM-FEE-012")
+    }
+
+    @Test
+    fun `PM-FEE-012 a run in a month after a newer version begins bills the newer one`() {
+        rows = listOf(
+            versionRow(entranceId, "2026-01", lines = listOf(maintenance(10_000))),
+            versionRow(entranceId, "2026-04", lines = listOf(maintenance(12_000))),
+        )
+        assertThat(previewIn("2026-03").totalMinor).isEqualTo(10_000)
+        assertThat(previewIn("2026-04").totalMinor).isEqualTo(12_000)
+        assertThat(previewIn("2026-09").totalMinor).isEqualTo(12_000)
+    }
+
+    @Test
+    fun `PM-FEE-012 a version whose validTo has passed is not used`() {
+        rows = listOf(versionRow(entranceId, "2026-01", to = "2026-03", lines = listOf(maintenance(10_000))))
+        assertThat(previewIn("2026-03").totalMinor).isEqualTo(10_000)                             // its last month
+        assertThatThrownBy { previewIn("2026-04") }.hasMessageContaining("PM-FEE-012")
     }
 }

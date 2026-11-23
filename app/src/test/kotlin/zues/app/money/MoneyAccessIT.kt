@@ -64,6 +64,7 @@ class MoneyAccessIT {
 
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var tariffs: TariffVersions
     @Autowired lateinit var registry: RegistryService
     @Autowired lateinit var ownership: OwnershipService
     @Autowired lateinit var logins: Logins
@@ -99,7 +100,7 @@ class MoneyAccessIT {
         mandate(entrance, "CSH", person("Стефан Илиев", "cashier"))
         mvc.perform(
             post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
-                json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)))),
+                json.writeValueAsString(tariffs.adopted(entrance, "2026-05", "2026-05-01", lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)))),
             ),
         ).andExpect(status().isCreated)
 
@@ -143,7 +144,7 @@ class MoneyAccessIT {
         ownership.assignTitle(quietEntrance, quiet, AssignTitle(person("Георги Стоянов", "owner-2", quietEntrance), "OWN", validFrom = "2020-01-01"))
         mvc.perform(
             post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
-                json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)))),
+                json.writeValueAsString(tariffs.adopted(entrance, "2026-05", "2026-05-01", lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)))),
             ),
         ).andExpect(status().isCreated)
 
@@ -187,7 +188,7 @@ class MoneyAccessIT {
         mandate(other, "BM", person("Мария Иванова", "other-manager"))
         mvc.perform(
             post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
-                json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)))),
+                json.writeValueAsString(tariffs.adopted(entrance, "2026-05", "2026-05-01", lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)))),
             ),
         ).andExpect(status().isCreated)
         jdbc.update("UPDATE money.posting SET entrance_id = ? WHERE unit_id = ?", other, flat)   // a posting stamped with the wrong entrance
@@ -205,7 +206,7 @@ class MoneyAccessIT {
         mandate(entrance, "BM", person("Мария Иванова", "p-manager"))
         mvc.perform(
             post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(
-                json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000)))),
+                json.writeValueAsString(tariffs.adopted(entrance, "2026-05", "2026-05-01", lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000)))),
             ),
         ).andExpect(status().isCreated)
         val paymentId = json.readTree(
@@ -264,7 +265,7 @@ class MoneyAccessIT {
         mandate(entrance, "MB", person("Петър Колев", "k-board"))
         mandate(entrance, "CTL", person("Елена Колева", "k-controller"))
         mandate(entrance, "CSH", person("Стефан Илиев", "k-cashier"))
-        val run = json.writeValueAsString(StoredChargeRunRequest("2026-05", "2026-05-01", lines = listOf(TariffLineRequest("MAINTENANCE", "BY_IDEAL_PARTS", "GA-2026-1", totalMinor = 10_000))))
+        val run = json.writeValueAsString(tariffs.adopted(entrance, "2026-05", "2026-05-01", lines = listOf(AdoptedLine("MAINTENANCE", "BY_IDEAL_PARTS", totalMinor = 10_000))))
         fun issue() = post("/api/money/entrances/$entrance/charge-runs").contentType(MediaType.APPLICATION_JSON).content(run)
         fun pay(key: String) = post("/api/money/entrances/$entrance/payments").header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON)
             .content("""{"unitId":"$flat1","amountMinor":1000,"valueDate":"2026-05-20","receivedInto":"CASH"}""")
