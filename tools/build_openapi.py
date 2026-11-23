@@ -187,6 +187,13 @@ RUNNING = {
    ("Register the entrance's repair-fund account; opened in the manager's name, its holder must stand on a manager's or board member's mandate of the entrance that day, and the account stores it", ['PM-FUND-001', 'PM-FUND-004', 'PM-FUND-005', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/fund-accounts'):
    ("List the entrance's fund accounts — for the manager, the board, the controller and the entrance's owners; an owner reads them without the holder's party id or mandate", ['PM-FUND-001', 'PM-FUND-004', 'PM-SEC-001', 'PM-GOV-008', 'PM-SEC-002']),
+ ('post', '/api/money/entrances/{entranceId}/tariff-versions'):
+   ("Record a tariff version — the lines and metered prices the entrance's assembly adopted, under a passed decision of "
+    "the entrance (its protocol id), and the months it is in force; never altered, a changed tariff is a new version — "
+    "for the manager and the board", ['PM-FEE-012', 'PM-SEC-001']),
+ ('get', '/api/money/entrances/{entranceId}/tariff-versions'):
+   ("The entrance's tariff versions, the latest begun first, each with its decision and months — or, for a period, the "
+    "one in force then: the latest begun by that month unless its own last month has passed", ['PM-FEE-012', 'PM-SEC-001']),
  ('get', '/api/money/entrances/{entranceId}/journal'):
    ("The entrance's double-entry journal from one date to another, both included — each journal whole, its legs "
     "summing to zero, with what wrote it where money knows; optionally only the journals that touch one account",

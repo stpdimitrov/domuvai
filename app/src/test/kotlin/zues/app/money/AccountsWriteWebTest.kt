@@ -13,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -28,7 +29,7 @@ import java.util.UUID
  */
 @WebMvcTest(
     ChargeRunController::class, StoredChargeRunController::class, ChargeRunStoreController::class, PaymentController::class,
-    FundAccountController::class, FundController::class, FundHandoverController::class,
+    FundAccountController::class, FundController::class, FundHandoverController::class, TariffVersionController::class,
 )
 class AccountsWriteWebTest {
 
@@ -40,6 +41,7 @@ class AccountsWriteWebTest {
     @MockitoBean lateinit var accounts: FundAccountService
     @MockitoBean lateinit var fund: FundService
     @MockitoBean lateinit var handovers: FundHandoverService
+    @MockitoBean lateinit var tariffs: TariffVersions
     @MockitoBean lateinit var access: MoneyAccess
     @MockitoBean lateinit var whoAsks: WhoAsks
 
@@ -56,6 +58,7 @@ class AccountsWriteWebTest {
         "/api/money/entrances/$entrance/fund/disbursements" to """{"amountMinor":100,"purpose":"WORKS","decisionId":"GA-1"}""",
         "/api/money/entrances/$entrance/fund/disbursements/$disbursement/pay" to """{"paidOn":"2026-05-01"}""",
         "/api/money/entrances/$entrance/fund/disbursements/$disbursement/cancel" to """{"reason":"withdrawn"}""",
+        "/api/money/entrances/$entrance/tariff-versions" to """{"decisionId":"GA-1","validFrom":"2027-01"}""",
         "/api/money/entrances/$entrance/fund/handover-statements" to """{"handoverOn":"2026-05-01","outgoingPartyId":"$party","incomingPartyId":"${UUID.randomUUID()}","bankBalanceMinor":0}""",
     )
 
@@ -74,7 +77,16 @@ class AccountsWriteWebTest {
         }
         verify(access, times(writes.size - SIGNED)).keep(entrance, asking)
         verify(access, times(SIGNED)).keeper(entrance, asking)
-        verifyNoInteractions(charges, store, payments, accounts, fund, handovers)
+        verifyNoInteractions(charges, store, payments, accounts, fund, handovers, tariffs)
+    }
+
+    @Test
+    fun `PM-SEC-001 the tariff versions are read by who keeps the accounts, and a refusal is a 403 naming the rule`() {
+        whenever(whoAsks.of(null)).thenReturn(asking)
+        doThrow(MoneyWriteForbidden("PM-SEC-001")).whenever(access).keep(eq(entrance), eq(asking))
+        mvc.perform(get("/api/money/entrances/$entrance/tariff-versions")).andExpect(status().isForbidden).andExpect(jsonPath("$.rule").value("PM-SEC-001"))
+        verify(access).keep(entrance, asking)
+        verifyNoInteractions(tariffs)
     }
 
     @Test
