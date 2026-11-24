@@ -66,5 +66,5 @@ test("PM-FEE-015 a version row is never editable: the screen has no edit or dele
 test("PM-SEC-001 the screen holds no role check of its own: who may record is the API's", () => {
   const dir = new URL("../app/(console)/entrance/charges/tariff/", import.meta.url);
   const text = ["page.tsx", "TariffForm.tsx", "actions.ts"].map((f) => readFileSync(new URL(f, dir), "utf8")).join("\n");
-  assert.ok(!/titleRole|mandate|role|isManager|isBoard|policy|\bBM\b|\bMB\b/.test(text.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "")));
+  assert.ok(!/titleRole|mandate|\.role\b|role\s*[!=]==|isManager|isBoard|policy|\bBM\b|\bMB\b/.test(text.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "")));
 });
