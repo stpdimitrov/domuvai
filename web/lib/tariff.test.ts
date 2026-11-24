@@ -20,7 +20,7 @@ test("PM-FEE-012 the body carries only schema fields, amounts as integer minor u
   });
   const text = JSON.stringify(got);
   assert.ok(!/\d\.\d/.test(text), text);
-  assert.ok(Object.values(got as object).flat().every((v) => v !== undefined));
+  assert.ok(!text.includes("null") && !text.includes("undefined"), text);
 });
 
 test("PM-FEE-012 validTo and an item go out only when typed; months as typed", () => {
@@ -66,5 +66,5 @@ test("PM-FEE-015 a version row is never editable: the screen has no edit or dele
 test("PM-SEC-001 the screen holds no role check of its own: who may record is the API's", () => {
   const dir = new URL("../app/(console)/entrance/charges/tariff/", import.meta.url);
   const text = ["page.tsx", "TariffForm.tsx", "actions.ts"].map((f) => readFileSync(new URL(f, dir), "utf8")).join("\n");
-  assert.ok(!/titleRole|mandate|\bBM\b|\bMB\b/.test(text.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "")));
+  assert.ok(!/titleRole|mandate|role|isManager|isBoard|policy|\bBM\b|\bMB\b/.test(text.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "")));
 });
