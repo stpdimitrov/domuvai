@@ -117,6 +117,7 @@ ON_AN_ASSEMBLY = {
 }
 # The calls that keep an entrance's accounts or enter its book — for the manager and the board only (G-3, G-1, PM-SEC-001).
 KEPT_BY_THE_BOARD = {("GET", "/api/money/entrances/{entranceId}/tariff-versions"),   # WEB-60: the version in force the charges screen shows
+                     ("POST", "/api/money/entrances/{entranceId}/tariff-versions"),   # WEB-61: a version recorded from the console
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"),
@@ -257,6 +258,8 @@ CALLS = {
         f"/api/registry/entrances/{e}/book/declarations/overdue", None),
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
     ("GET", "/api/money/entrances/{entranceId}/tariff-versions"): lambda e: (f"/api/money/entrances/{e}/tariff-versions?period=2026-09", None),
+    ("POST", "/api/money/entrances/{entranceId}/tariff-versions"): lambda e: (   # a decision nothing passed: refused, nothing recorded
+        f"/api/money/entrances/{e}/tariff-versions", {"decisionId": NO_ONE, "validFrom": "2027-01", "lines": [], "consumption": []}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01"}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): lambda e: (
