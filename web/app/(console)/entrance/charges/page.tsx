@@ -3,42 +3,26 @@ import Link from "next/link";
 import { api, API_URL, type Schemas } from "@/lib/api/client";
 import { entranceAt, eur, isPeriod, monthName, reach, shiftPeriod as shift, thisPeriod, type EntranceAt } from "@/lib/console";
 import { unanswered, unansweredBy } from "@/lib/refusal";
-import { passedDecisions, type Passed } from "./decisions";
+import { lineWords } from "@/lib/basis";
 import IssueForm from "./IssueForm";
+import { NONE_IN_FORCE, versionInForce } from "./version";
 import NoEntrance from "@/app/(console)/NoEntrance";
 
 export const metadata: Metadata = { title: "Начисления — Етаж" };
 
 type UnitCharge = Schemas["UnitChargeResponse"];
 
-/**
- * The basis the table below is previewed on (PM-FEE-012). The API takes the tariff with the request and checks
- * its decisions on issue only, so this page posts the design's decision as a DEMO basis and says so on screen. A run is
- * issued from the form, on a decision the assembly took (`passedDecisions`); never bill from this one (ADR-012 §7).
- */
-const DEMO_BASIS = {
-  decision: "Решение на ОС от 12.03.2026, т. 4",
-  lines: [
-    { stream: "MANAGEMENT", key: "PER_PERSON", decisionId: "GA-2026-03-12-4", rateMinor: 600 },
-    { stream: "MAINTENANCE", key: "PER_PERSON", decisionId: "GA-2026-03-12-4", rateMinor: 450 },
-    { stream: "REPAIR_FUND", key: "BY_IDEAL_PARTS", decisionId: "GA-2026-03-12-4", totalMinor: 60_000 },
-  ] satisfies Schemas["TariffLineRequest"][],
-};
-
-const STREAM_LABEL: Record<string, string> = { MANAGEMENT: "управление", MAINTENANCE: "поддръжка на общи части", REPAIR_FUND: "фонд „Ремонт“" };
-const describe = (l: Schemas["TariffLineRequest"]) =>
-  `${STREAM_LABEL[l.stream] ?? l.stream} ${l.rateMinor != null ? `${eur(l.rateMinor)}/${l.key === "PER_PERSON" ? "живущ" : "обект"}` : `${eur(l.totalMinor ?? 0)} по идеални части`}`;
-
 const pct = (value: number) => value.toLocaleString("de-DE", { minimumFractionDigits: 4, maximumFractionDigits: 6 }) + "%";
 
 type Loaded =
-  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string>; namesFailed?: string; passed: Passed[]; decisionsFailed?: string }
+  | { kind: "ok"; entrance: Schemas["EntranceView"]; run: Schemas["ChargeRunResponse"]; ideal: Map<string, number>; owners: Map<string, string>; namesFailed?: string; version: Schemas["TariffVersionView"] }
+  | { kind: "noversion"; entrance: Schemas["EntranceView"]; message: string }
   | Exclude<EntranceAt, { kind: "ok" }>
   | { kind: "refused"; entrance: Schemas["EntranceView"]; message: string; aboutMultiple: boolean };
 
 /**
- * Rule: PM-FEE-010 — the multiple a business unit pays is the assembly's figure. The screen holds none and the demo
- * basis has none: the person at the screen gives it (`?multiple=`), it is passed on as given, and the API decides
+ * Rule: PM-FEE-010 — the multiple a business unit pays is the assembly's figure. The screen holds none, and the tariff
+ * version has none: the person at the screen gives it (`?multiple=`), it is passed on as given, and the API decides
  * against the law whether it is in range. The screen reads it only as far as "a whole number" — the API takes no
  * other — and says so when it is not one, rather than dropping it.
  */
@@ -57,18 +41,20 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     return { kind: "refused", entrance, aboutMultiple: true, message: `API отказа изчислението: кратността „${given}“ не е цяло число.` };
   }
 
+  // Rule: PM-FEE-012 — the run is billed on the version in force for the period; with none, nothing is previewed.
+  const inForce = await versionInForce(entrance.id, period);
+  if ("refused" in inForce) return { kind: "refused", entrance, message: inForce.refused, aboutMultiple: false };
+  if ("none" in inForce) return { kind: "noversion", entrance, message: NONE_IN_FORCE(monthName(period)) };
+
   const path = { entranceId: entrance.id };
+  const body: Schemas["StoredChargeRunRequest"] = { period, legalDate, ...(multiple != null && { businessMultiplier: multiple }) };   // no lines: the API bills the version in force
   const fetched = await reach(() => Promise.all([
-    api.POST("/api/money/entrances/{entranceId}/charge-runs/preview", {
-      params: { path },
-      body: { period, legalDate, lines: DEMO_BASIS.lines, ...(multiple != null && { businessMultiplier: multiple }) },
-    }),
+    api.POST("/api/money/entrances/{entranceId}/charge-runs/preview", { params: { path }, body }),
     api.GET("/api/registry/entrances/{entranceId}/units", { params: { path } }),
     api.GET("/api/registry/entrances/{entranceId}/owners", { params: { path, query: { on: legalDate } } }),
-    passedDecisions(entrance.id),   // the decisions a run may be issued on (WEB-38, PM-FEE-012)
   ]));
   if (!fetched) return { kind: "down" };
-  const [run, units, owners, decisions] = fetched;
+  const [run, units, owners] = fetched;
   if (!run.data) {
     const message = run.error?.error ?? `HTTP ${run.response.status}`;
     return { kind: "refused", entrance, message: unansweredBy(run, "изчислението"), aboutMultiple: message.includes("PM-FEE-010") };   // the API names the rule it refuses on
@@ -83,8 +69,7 @@ async function load(entranceId: string | undefined, period: string, legalDate: s
     entrance,
     run: run.data,
     ideal: new Map((units.data ?? []).map((u) => [u.id, u.idealPartsPct])),
-    passed: "passed" in decisions ? decisions.passed : [],
-    decisionsFailed: "refused" in decisions ? decisions.refused : undefined,
+    version: inForce.version,
     owners: new Map([...names].map(([unit, list]) => [unit, list.sort((a, b) => a.localeCompare(b, "bg")).join(", ")])),   // the API lists them in no fixed order
     // The amounts are money's and stay; what the registry did not give is said to be refused, never left as a dash.
     namesFailed: [
@@ -132,7 +117,7 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
   const period = isPeriod(query.period) ? query.period : thisPeriod();
   const multiple = multipleOf(query.multiple);
   const view = await load(query.entrance, period, `${period}-01`, multiple);
-  const shown = view.kind === "ok" || view.kind === "refused" ? view.entrance : undefined;
+  const shown = view.kind === "ok" || view.kind === "refused" || view.kind === "noversion" ? view.entrance : undefined;
   const at = (p: string) => `?period=${p}${shown ? `&entrance=${shown.id}` : ""}${multiple.value != null ? `&multiple=${multiple.value}` : ""}`;
 
   return (
@@ -161,6 +146,7 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
             {view.kind === "unlisted" && unanswered(view, "списъка на входовете")}
             {view.kind === "none" && <NoEntrance />}
             {view.kind === "unknown" && <>Входът <code>{view.id}</code> не е регистриран.</>}
+            {view.kind === "noversion" && view.message}
             {view.kind === "refused" && (
               <>
                 {view.message}
@@ -184,7 +170,7 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
 }
 
 function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>; period: string; multiple: Multiple }) {
-  const { run, ideal, owners, namesFailed } = view;
+  const { run, ideal, owners, namesFailed, version } = view;
   // No ideal parts read (the units were refused): no sum of them either — a dash, never 0%.
   const idealSum = ideal.size === 0 ? "—" : pct(run.charges.reduce((total, c) => total + (ideal.get(c.unitId) ?? 0), 0));
   const totals = ["MANAGEMENT", "MAINTENANCE", "REPAIR_FUND"].map((s) => run.charges.reduce((t, c) => t + sum(stream(c, s)), 0));
@@ -195,17 +181,17 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
         <div style={{ background: "#FFFFFF", border: "1px solid #DEDDD9", padding: "12px 16px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ font: "500 10px/1 'IBM Plex Sans'", letterSpacing: ".14em", textTransform: "uppercase", color: "#6B6F6C" }}>
-              Базис на изчислението <span className="tag-mini warn" style={{ marginLeft: 6, letterSpacing: 0, textTransform: "none" }}>демо</span>
+              Тарифа в сила <span className="tag-mini" style={{ marginLeft: 6, letterSpacing: 0, textTransform: "none" }}>от {version.validFrom}{version.validTo ? ` до ${version.validTo}` : ""}</span>
             </div>
             <div style={{ font: "400 12.5px/1.6 'IBM Plex Sans'", color: "#3D413E", marginTop: 6 }}>
-              {[DEMO_BASIS.decision, ...DEMO_BASIS.lines.map(describe)].join(" · ")}
+              {[...version.lines.map(lineWords), ...version.consumption.map((m) => `${m.item} ${eur(m.priceMinor)}`)].join(" · ")}
             </div>
             <div style={{ font: "400 11.5px/1.5 'IBM Plex Mono', monospace", color: "#6B6F6C", marginTop: 4 }}>
-              Демо базис за прегледа на тази страница, не решение на общото събрание. Не се начислява от него.
+              По решение на общото събрание <code>{version.decisionId}</code> (PM-FEE-012). Сумите са на API и не се въвеждат тук.
             </div>
             <div style={{ font: "400 12.5px/1.6 'IBM Plex Sans'", color: "#3D413E", marginTop: 8 }}>
               {multiple.value != null
-                ? <>Подадена кратност: <span style={{ fontWeight: 500 }}>×{multiple.value}</span> — посочена ръчно, не е част от демо базиса. Прилага се само за обект със стопанска или професионална дейност, достъпен през общите части.</>
+                ? <>Подадена кратност: <span style={{ fontWeight: 500 }}>×{multiple.value}</span> — посочена ръчно, не е част от тарифата. Прилага се само за обект със стопанска или професионална дейност, достъпен през общите части.</>
                 : <>Кратност за стопанска или професионална дейност: не е посочена.</>}
             </div>
             <MultipleForm period={period} entrance={view.entrance.id} multiple={multiple} />
@@ -267,7 +253,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
             <span style={{ color: "#14584A", fontWeight: 500 }}>{idealSum}</span> · посочете сума, за да видите как е изведена
           </div>
           <div style={{ font: "400 11.5px/1.4 'IBM Plex Mono', monospace", color: "#6B6F6C" }}>
-            Преглед на демо базиса — нищо не е записано. Издаването е по-долу, по прието решение на ОС.
+            Преглед на тарифата в сила — нищо не е записано. Издаването е по-долу.
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
@@ -278,7 +264,7 @@ function Run({ view, period, multiple }: { view: Extract<Loaded, { kind: "ok" }>
         </div>
       </div>
 
-      <IssueForm entrance={view.entrance.id} period={period} multiple={multiple.given} passed={view.passed} unread={view.decisionsFailed} />
+      <IssueForm entrance={view.entrance.id} period={period} multiple={multiple.given} />
     </>
   );
 }

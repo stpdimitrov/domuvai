@@ -1,39 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { asPreviewed, basisKey, basisOf, type Basis, type BasisLine } from "./basis.ts";
+import { asPreviewed, lineWords, runKey, runRequest, type RunRequest } from "./basis.ts";
 
-const passed = new Set(["d-1", "d-2"]);
-const line = (l: Partial<BasisLine>): BasisLine => ({ stream: "MANAGEMENT", key: "PER_PERSON", per: "rate", amount: "6,00", decision: "d-1", ...l });
-
-test("PM-FEE-012 a line citing no passed decision of the entrance is refused", () => {
-  for (const decision of ["", "GA-2026-03-12-4", "d-3"]) {
-    const got = basisOf({ multiple: "", lines: [line({}), line({ decision })] }, passed);
-    assert.ok("refused" in got && got.refused.startsWith("Ред 2:"), decision);
-  }
-  assert.ok("refused" in basisOf({ multiple: "", lines: [line({})] }, new Set()));
+test("PM-FEE-012 the body asked for carries no lines, only the run's own fields", () => {
+  const got = runRequest("2027-01", "3");
+  assert.deepEqual(got, { period: "2027-01", legalDate: "2027-01-01", businessMultiplier: 3 });
+  assert.deepEqual(runRequest("2027-01", " "), { period: "2027-01", legalDate: "2027-01-01" });
+  for (const typed of ["1,5", "-1", "x", "1234567890"]) assert.ok("refused" in runRequest("2027-01", typed), typed);
+  assert.ok(!("lines" in (got as object)));
 });
 
-test("PM-FEE-016 euros typed are minor units, a rate or a total as chosen; empty rows are left out", () => {
-  const got = basisOf({ multiple: "3", lines: [line({}), line({ stream: "" }), line({ stream: "REPAIR_FUND", key: "BY_IDEAL_PARTS", per: "total", amount: "600", decision: "d-2" })] }, passed);
-  assert.deepEqual(got, {
-    businessMultiplier: 3,
-    lines: [
-      { stream: "MANAGEMENT", key: "PER_PERSON", decisionId: "d-1", rateMinor: 600 },
-      { stream: "REPAIR_FUND", key: "BY_IDEAL_PARTS", decisionId: "d-2", totalMinor: 60000 },
-    ],
-  });
-  assert.ok("refused" in basisOf({ multiple: "", lines: [line({ amount: "6,005" })] }, passed));
-  assert.ok("refused" in basisOf({ multiple: "1,5", lines: [line({})] }, passed));
-  assert.ok("refused" in basisOf({ multiple: "", lines: [line({ stream: "" })] }, passed));
+test("PM-FEE-012 a line of the version in force is shown as the API stored it", () => {
+  assert.equal(lineWords({ stream: "MANAGEMENT", key: "PER_PERSON", rateMinor: 600 }), "управление €6,00/живущ");
+  assert.equal(lineWords({ stream: "REPAIR_FUND", key: "BY_IDEAL_PARTS", totalMinor: 60000 }), "фонд „Ремонт“ €600,00 по идеални части");
 });
 
-test("PM-FEE-015 the basis issued is held to the one previewed: any change gives another key", () => {
-  const of = (amount: string, period = "2026-11") => basisKey(period, basisOf({ multiple: "", lines: [line({ amount })] }, passed) as never);
-  assert.equal(of("6"), of("6,00"));
-  assert.notEqual(of("6"), of("6,01"));
-  assert.notEqual(of("6"), of("6", "2026-12"));
-  const basis = (amount: string) => basisOf({ multiple: "", lines: [line({ amount })] }, passed) as Basis;
-  assert.ok(asPreviewed(of("6"), "2026-11", basis("6,00")));
-  for (const [previewed, period, amount] of [[of("6"), "2026-11", "6,01"], [of("6"), "2026-12", "6"], ["", "2026-11", "6"]] as const)
-    assert.ok(!asPreviewed(previewed, period, basis(amount)), `${period} ${amount}`);
+test("PM-FEE-015 the run issued is held to the one previewed: another version, period or multiple gives another key", () => {
+  const run = (period: string, multiple: string) => runRequest(period, multiple) as RunRequest;
+  const key = runKey("v-1", run("2027-01", ""));
+  assert.ok(asPreviewed(key, "v-1", run("2027-01", " ")));
+  for (const [previewed, version, request] of [[key, "v-2", run("2027-01", "")], [key, "v-1", run("2027-02", "")], [key, "v-1", run("2027-01", "2")], ["", "v-1", run("2027-01", "")]] as const)
+    assert.ok(!asPreviewed(previewed, version, request));
 });
