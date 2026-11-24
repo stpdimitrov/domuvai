@@ -4,6 +4,7 @@ import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.identity_org.MandateStanding
+import zues.app.identity_org.StandingMandate
 import zues.app.policy.Role
 import zues.kernel.toSofiaDate
 import java.time.Clock
