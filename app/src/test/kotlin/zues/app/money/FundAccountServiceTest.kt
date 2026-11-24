@@ -51,8 +51,8 @@ class FundAccountServiceTest {
 
     private val theManagers = command(holderKind = "MANAGER", holderPartyId = holder.toString())
 
-    private fun office(role: Role, party: UUID? = holder, id: UUID = UUID.randomUUID()) =
-        StandingMandate(id, party, role, sofiaDay.minusYears(1), sofiaDay.plusYears(1), Standing(StandingKind.IN_TERM))
+    private fun office(role: Role, party: UUID? = holder, id: UUID = UUID.randomUUID(), chair: Boolean = false) =
+        StandingMandate(id, party, role, sofiaDay.minusYears(1), sofiaDay.plusYears(1), Standing(StandingKind.IN_TERM), chair = chair)
 
     private fun stored(command: RegisterFundAccount): FundAccountRow {
         val captor = argumentCaptor<FundAccountRow>()
@@ -119,16 +119,36 @@ class FundAccountServiceTest {
     }
 
     @Test
-    fun `PM-FUND-004 a member of the board counts as the chair, since no office marks one`() {
-        val mandate = office(Role.MB)
+    fun `PM-FUND-004 the board's chair holds it, and the chair's mandate is stored`() {
+        val mandate = office(Role.MB, chair = true)
+        whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(mandate))
+        assertThat(stored(theManagers).mandateId).isEqualTo(mandate.mandateId)
+    }
+
+    @Test
+    fun `PM-FUND-004 a board member who is not the chair is refused, nothing stored`() {
+        whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(office(Role.MB)))
+        assertRefusedByName(theManagers)
+    }
+
+    @Test
+    fun `PM-FUND-004 the chair's mandate is stored even when a newer plain board mandate follows`() {
+        val chair = office(Role.MB, chair = true)
+        whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(chair, office(Role.MB)))
+        assertThat(stored(theManagers).mandateId).isEqualTo(chair.mandateId)
+    }
+
+    @Test
+    fun `PM-FUND-004 a manager needs no chair mark`() {
+        val mandate = office(Role.BM, chair = false)
         whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(mandate))
         assertThat(stored(theManagers).mandateId).isEqualTo(mandate.mandateId)
     }
 
     @Test
     fun `PM-FUND-004 the newest of the holder's standing mandates is the one stored`() {
-        val newest = office(Role.MB)
-        whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(office(Role.MB), newest))
+        val newest = office(Role.MB, chair = true)
+        whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(office(Role.MB, chair = true), newest))
         assertThat(stored(theManagers).mandateId).isEqualTo(newest.mandateId)
     }
 

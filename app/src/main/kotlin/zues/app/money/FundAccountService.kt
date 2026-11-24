@@ -4,6 +4,7 @@ import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import zues.app.identity_org.MandateStanding
+import zues.app.identity_org.StandingMandate
 import zues.app.policy.Role
 import zues.kernel.toSofiaDate
 import java.time.Clock
@@ -94,12 +95,10 @@ class FundAccountService(
     private fun mandateFor(entranceId: UUID, purpose: FundPurpose, kind: HolderKind, holder: UUID?): UUID? {
         if (purpose != FundPurpose.REPAIR_RENEWAL || kind != HolderKind.MANAGER) return null
         val today = LocalDate.parse(toSofiaDate(clock.instant()))
-        return standing.of(entranceId, today).lastOrNull { holder != null && it.partyId == holder && it.role in MAY_HOLD_THE_FUND }?.mandateId
-            ?: throw IllegalArgumentException("the fund's account is opened in the name of this entrance's manager or a member of its board on the day it is registered (PM-FUND-004)")
+        return standing.of(entranceId, today).lastOrNull { holder != null && it.partyId == holder && holdsTheFund(it) }?.mandateId
+            ?: throw IllegalArgumentException("the fund's account is opened in the name of this entrance's manager or the chair of its board on the day it is registered (PM-FUND-004)")
     }
 
-    private companion object {
-        /** "The chair of the management board (manager)": no office marks a chair, so any board member counts for now (the owner, 2026-11-01, #429). */
-        val MAY_HOLD_THE_FUND = setOf(Role.BM, Role.MB)
-    }
+    // Rule: PM-FUND-004 — the manager, or the board member the mandate marks as its chair (GOV-04).
+    private fun holdsTheFund(mandate: StandingMandate) = mandate.role == Role.BM || (mandate.role == Role.MB && mandate.chair)
 }
