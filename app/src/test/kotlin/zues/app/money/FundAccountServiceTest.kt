@@ -132,6 +132,20 @@ class FundAccountServiceTest {
     }
 
     @Test
+    fun `PM-FUND-004 the chair's mandate is stored even when a newer plain board mandate follows`() {
+        val chair = office(Role.MB, chair = true)
+        whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(chair, office(Role.MB)))
+        assertThat(stored(theManagers).mandateId).isEqualTo(chair.mandateId)
+    }
+
+    @Test
+    fun `PM-FUND-004 a manager needs no chair mark`() {
+        val mandate = office(Role.BM, chair = false)
+        whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(mandate))
+        assertThat(stored(theManagers).mandateId).isEqualTo(mandate.mandateId)
+    }
+
+    @Test
     fun `PM-FUND-004 the newest of the holder's standing mandates is the one stored`() {
         val newest = office(Role.MB, chair = true)
         whenever(standing.of(entranceId, sofiaDay)).thenReturn(listOf(office(Role.MB, chair = true), newest))
