@@ -85,13 +85,6 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = json.loads((ROOT / "docs/api/openapi.json").read_text(encoding="utf-8"))
 
-# The basis the charges screen posts (web/app/(console)/entrance/charges/page.tsx, DEMO_BASIS).
-DEMO_BASIS = [
-    {"stream": "MANAGEMENT", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 600},
-    {"stream": "MAINTENANCE", "key": "PER_PERSON", "decisionId": "GA-2026-03-12-4", "rateMinor": 450},
-    {"stream": "REPAIR_FUND", "key": "BY_IDEAL_PARTS", "decisionId": "GA-2026-03-12-4", "totalMinor": 60_000},
-]
-
 def sofia_year():
     """The calendar year Sofia is in — the one the assembly screen asks about (PM-GA-001)."""
     return datetime.datetime.now(ZoneInfo("Europe/Sofia")).year
@@ -123,7 +116,8 @@ ON_AN_ASSEMBLY = {
     ("GET", "/api/assembly/entrances/{entranceId}/assemblies/{assemblyId}/proxies"),
 }
 # The calls that keep an entrance's accounts or enter its book — for the manager and the board only (G-3, G-1, PM-SEC-001).
-KEPT_BY_THE_BOARD = {("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
+KEPT_BY_THE_BOARD = {("GET", "/api/money/entrances/{entranceId}/tariff-versions"),   # WEB-60: the version in force the charges screen shows
+                     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/dry-run"),
@@ -262,6 +256,7 @@ CALLS = {
     ("GET", "/api/registry/entrances/{entranceId}/book/declarations/overdue"): lambda e: (
         f"/api/registry/entrances/{e}/book/declarations/overdue", None),
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
+    ("GET", "/api/money/entrances/{entranceId}/tariff-versions"): lambda e: (f"/api/money/entrances/{e}/tariff-versions?period=2026-09", None),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01"}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): lambda e: (
@@ -1574,53 +1569,37 @@ def paper_decisions_screen(api, web, entrance, signed_in, owner=None, administra
 
 def charges_issue(api, web, entrance):
     """
-    WEB-38 (PM-FEE-012, PM-FEE-015, PM-SEC-001) — the issue form on `/entrance/charges`: the decisions it offers are the
-    entrance's PASSED ones as the assembly API stores them, read here the same way, and those it recorded from paper (WEB-54);
-    with none it says no run is issued.
-    An issue posted through the form, as a browser with no script posts it, citing a decision that is not one (the demo
-    basis's) is refused by the web; the API bills the version in force, so the same lines previewed straight to it by
-    the board change nothing (TARIFF-02a); the API then holds no run for the period. A paper decision of the seed is previewed through the form,
-    and the API computes it. A sitting's passed decision cannot be reached in CI (the API's clock is real, WEB-32), and
-    a period is not issued here; the seed's own runs issue on a paper decision (DEC-01).
+    WEB-60 (PM-FEE-012, PM-FEE-015, PM-SEC-001) — the issue form on `/entrance/charges` bills the tariff version in force:
+    the page shows that version's lines and its decision, read here from the API the same way, and the form has no
+    field for a tariff. A preview posted through the form as a browser with no script posts it answers the API's
+    figures, and the API's own preview of the period (no lines sent) is the same run (TARIFF-02a). A period with no
+    version in force says so and offers no form. A period is not issued here: the seeds' own runs issue on a paper
+    decision (DEC-01).
     """
     period = "2027-01"
     path = f"/entrance/charges?period={period}&entrance={entrance}"
     status, page = fetch(web, path)
-    if status != 200 or "Издаване на начисленията" not in page:
-        return [f"{path}: HTTP {status}, or no issue form"]
-    of = f"/api/assembly/entrances/{entrance}/assemblies"
-    passed = []
-    for a in json.loads(fetch(api, of)[1] or "[]"):
-        for item in json.loads(fetch(api, f"{of}/{a['id']}")[1]).get("agenda", []):
-            st, raw = fetch(api, f"{of}/{a['id']}/agenda/{item['id']}/decision")
-            passed += [json.loads(raw)["id"]] if st == 200 and json.loads(raw).get("outcome") == "PASSED" else []
-    paper = [d["id"] for d in json.loads(fetch(api, f"/api/assembly/entrances/{entrance}/paper-decisions")[1] or "[]")]
-    passed += paper
-    offered = decisions_offered(page, "decision-0")
-    failures = [] if sorted(offered) == sorted(passed) else [f"{path}: offers the decisions {offered}, the API's passed and paper ones are {passed}"]
-    if paper:
-        fields = {"stream-0": "MANAGEMENT", "key-0": "PER_PERSON", "per-0": "rate", "amount-0": "6,00", "decision-0": paper[0], "step": "preview"}
-        status, _, answered = submit_form(web, path, page, "Издаване на начисленията", fields)
-        text = visible_text(answered)
-        if status != 200 or "Изчислено от API за" not in text or "Издадено:" in text:
-            failures.append(f"{path}: a preview on the paper decision {paper[0]} answered HTTP {status} without the API's figures")
-    if not passed and "Няма прието решение на общото събрание" not in visible_text(page):
-        failures.append(f"{path}: with no passed decision, does not say no run can be issued")
-    fields = {"stream-0": "MANAGEMENT", "key-0": "PER_PERSON", "per-0": "rate", "amount-0": "6,00", "decision-0": "GA-2026-03-12-4", "step": "issue"}
-    status, _, answered = submit_form(web, path, page, "Издаване на начисленията", fields)
-    text = visible_text(answered)
-    if status != 200 or "Ред 1: изберете прието решение" not in text or "Издадено:" in text:
-        failures.append(f"{path}: an issue citing no passed decision answered HTTP {status} without the web's refusal")
-    # The API bills the version in force, never a caller's lines (TARIFF-02a): the demo basis's lines on the made-up
-    # decision, previewed, answer the same figures as none at all and cite none of it.
-    run, of_preview = {"period": period, "legalDate": f"{period}-01"}, f"/api/money/entrances/{entrance}/charge-runs/preview"
-    typed, plain = (fetch(api, of_preview, body, headers=as_board()) for body in ({**run, "lines": DEMO_BASIS}, run))
-    if typed[0] != 200 or typed[1] != plain[1] or "GA-2026-03-12-4" in typed[1]:
-        failures.append(f"{period}: PM-FEE-012 — a preview posted with the demo basis's lines answered HTTP {typed[0]}, "
-                        f"not the version in force's figures: {typed[1][:200]!r}")
+    read = fetch(api, f"/api/money/entrances/{entrance}/tariff-versions?period={period}", headers=as_board())
+    versions = json.loads(read[1] or "[]") if read[0] == 200 else []
+    if status != 200 or len(versions) != 1:
+        return [f"{path}: HTTP {status}, and the API serves {len(versions)} version(s) in force (HTTP {read[0]}) — the seed adopts one from 2026-09"]
+    version, text = versions[0], visible_text(page)
+    failures = [f"{path}: does not show {w!r}, the version in force's" for w in (version["decisionId"], version["validFrom"], "Издаване на начисленията") if w not in text]
+    failures += [f"{path}: the form still has a field for a tariff ({name})" for name in ("stream-0", "decision-0", "amount-0") if f'name="{name}"' in page]
+    status, _, answered = submit_form(web, path, page, "Издаване на начисленията", {"step": "preview"})
+    said = visible_text(answered)
+    run = {"period": period, "legalDate": f"{period}-01"}
+    api_run = json.loads(fetch(api, f"/api/money/entrances/{entrance}/charge-runs/preview", run, headers=as_board())[1] or "{}")
+    if status != 200 or "Изчислено от API за" not in said or "Издадено:" in said or eur(api_run.get("totalMinor", -1)) not in said:
+        failures.append(f"{path}: a preview through the form answered HTTP {status} without the API's figures for the version in force")
     held = fetch(api, f"/api/money/entrances/{entrance}/charge-runs/{period}/headcount", headers=as_board())[0]
-    failures += [] if held == 404 else [f"{period}: PM-FEE-012 — the API holds a run (headcount HTTP {held}) after an issue citing no passed decision"]
-    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: {len(passed)} decision(s) offered, {len(paper)} of them on paper, one previewed; an issue on none refused by the web, typed lines ignored by the API, no run held")
+    failures += [] if held == 404 else [f"{period}: PM-FEE-015 — the API holds a run (headcount HTTP {held}) after a preview alone"]
+    before = "2026-01"                                                       # before the seed's first version
+    path = f"/entrance/charges?period={before}&entrance={entrance}"
+    status, page = fetch(web, path)
+    if status != 200 or "Няма тарифна версия в сила" not in visible_text(page) or "Издаване на начисленията" in page or 'name="step"' in page:
+        failures.append(f"{path}: with no version in force, HTTP {status}, it does not say so or still offers a preview or an issue")
+    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the issue form: the version in force shown with its decision, previewed through the form with no typed lines, no run held; a month with none offers nothing")
     return failures
 
 
