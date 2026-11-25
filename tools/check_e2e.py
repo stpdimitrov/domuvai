@@ -117,6 +117,7 @@ ON_AN_ASSEMBLY = {
 }
 # The calls that keep an entrance's accounts or enter its book — for the manager and the board only (G-3, G-1, PM-SEC-001).
 KEPT_BY_THE_BOARD = {("GET", "/api/money/entrances/{entranceId}/tariff-versions"),   # WEB-60: the version in force the charges screen shows
+                     ("POST", "/api/money/entrances/{entranceId}/tariff-versions"),   # WEB-61: a version recorded from the console
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"),
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"),
                      ("POST", "/api/intake/entrances/{entranceId}/fee-sheet/profile"),
@@ -150,6 +151,7 @@ INTAKE_REPRO_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
 # The answer a CALLS entry is validated against when the call is refused by design: a revert needs a committed import,
 # and the seeded entrance's book already holds its units, so no import of the check's commits (WEB-37).
 REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
+                     ("POST", "/api/money/entrances/{entranceId}/tariff-versions"): 400,   # a decision nothing passed: refused, nothing recorded; tariff_record records one through the page
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409,   # September is seeded as billed: a bill is not reissued
                      ("POST", "/api/money/entrances/{entranceId}/payments"): 409,      # dated before the seeded payments: the demo stays as seeded
                      ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): 409,  # both purposes are seeded; fund_accounts_screen checks the words
@@ -257,6 +259,8 @@ CALLS = {
         f"/api/registry/entrances/{e}/book/declarations/overdue", None),
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
     ("GET", "/api/money/entrances/{entranceId}/tariff-versions"): lambda e: (f"/api/money/entrances/{e}/tariff-versions?period=2026-09", None),
+    ("POST", "/api/money/entrances/{entranceId}/tariff-versions"): lambda e: (   # a decision nothing passed: refused, nothing recorded
+        f"/api/money/entrances/{e}/tariff-versions", {"decisionId": NO_ONE, "validFrom": "2031-06", "lines": [{"stream": "MANAGEMENT", "key": "PER_PERSON", "rateMinor": 100}], "consumption": []}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01"}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): lambda e: (
@@ -1603,6 +1607,37 @@ def charges_issue(api, web, entrance):
     return failures
 
 
+def tariff_record(api, web, entrance):
+    """
+    WEB-61 (PM-FEE-012, PM-FEE-015) — a tariff version recorded from `/entrance/charges/tariff`: the form offers the
+    entrance's passed decisions (never a typed one), a version posted through it as a browser with no script posts it is
+    listed afterwards with its figures, and the same month again is the API's 409, shown in its words with the form
+    kept. A run again of this check finds the month taken: that is shown the same way, and the listing is still read.
+    """
+    path = f"/entrance/charges/tariff?entrance={entrance}"
+    status, page = fetch(web, path)
+    options = re.findall(r'<option value="([0-9a-f-]{36})"', page)
+    if status != 200 or not options:
+        return [f"{path}: HTTP {status}, and the form offers {len(options)} decision(s) — the seeds pass at least one"]
+    month = "2031-05"                                           # far past the seeds' versions
+    fields = {"decision": options[0], "validFrom": month, "line-stream-0": "MANAGEMENT", "line-key-0": "PER_PERSON",
+              "line-kind-0": "rate", "line-amount-0": "6,50"}
+    failures = []
+    status, location, answered = submit_form(web, path, page, "Запиши тарифната версия", fields)
+    said = visible_text(answered)
+    if status not in (200, 303) or (status == 200 and "already" not in said and "вече" not in said):
+        failures.append(f"{path}: recording answered HTTP {status} {said[:200]!r}")
+    status, page = fetch(web, path)
+    text = visible_text(page)
+    failures += [f"{path}: after recording, the list does not show {w!r}" for w in (month, options[0], "€6,50") if w not in text]
+    status, _, again = submit_form(web, path, page, "Запиши тарифната версия", fields)
+    if status != 200 or "already" not in visible_text(again) and "вече" not in visible_text(again):
+        failures.append(f"{path}: the same month again answered HTTP {status} without the API's refusal in its words")
+    failures += [f"{path}: a recorded version has a control to edit or delete it ({w})" for w in ("Редактир", "Изтрий") if w in text]
+    print(f"{'ok ' if not failures else 'BAD'} PM-FEE-012 the tariff screen: a version recorded under a passed decision is listed; the same month again is the API's 409, shown")
+    return failures
+
+
 BAND = {"CURRENT": "в срок", "0-30": "0–30 дни", "31-60": "31–60 дни", "61-90": "61–90 дни", "90+": "над 90 дни"}   # web/lib/statement.ts
 
 
@@ -2708,6 +2743,7 @@ def main():
     failures += mandates_screen(api, web, entrance, signed_in=bool(args.user), administrator=administrator, spare_party=args.spare_party)
     failures += paper_decisions_screen(api, web, entrance, signed_in=bool(args.user), owner=owner, administrator=administrator)
     failures += charges_issue(api, web, entrance)      # after: what the administrator just recorded is offered too
+    failures += tariff_record(api, web, entrance)      # after charges_issue: that one reads the seeds' versions as they are
     failures += payment_screen(api, web, entrance)     # last: it records a payment, so the seeded figures above are read first
 
     # WEB-22 (PM-SYS-010) — every screen under the console's layout ends in the catalogue's version, the API's own

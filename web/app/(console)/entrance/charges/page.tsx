@@ -136,6 +136,7 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Link href={at(shift(period, -1))} className="chip">◀ {monthName(shift(period, -1)).split(" ")[0]}</Link>
           <Link href={at(shift(period, 1))} className="chip">{monthName(shift(period, 1)).split(" ")[0]} ▶</Link>
+          {shown && <Link href={`/entrance/charges/tariff?entrance=${shown.id}`} className="chip">Тарифни версии</Link>}
         </div>
       </div>
 
