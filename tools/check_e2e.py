@@ -151,6 +151,7 @@ INTAKE_REPRO_RUN = {"period": "2026-09", "legalDate": "2026-09-01",
 # The answer a CALLS entry is validated against when the call is refused by design: a revert needs a committed import,
 # and the seeded entrance's book already holds its units, so no import of the check's commits (WEB-37).
 REFUSED_BY_DESIGN = {("POST", "/api/intake/imports/{id}/revert"): 409,
+                     ("POST", "/api/money/entrances/{entranceId}/tariff-versions"): 400,   # a decision nothing passed: refused, nothing recorded; tariff_record records one through the page
                      ("POST", "/api/money/entrances/{entranceId}/charge-runs"): 409,   # September is seeded as billed: a bill is not reissued
                      ("POST", "/api/money/entrances/{entranceId}/payments"): 409,      # dated before the seeded payments: the demo stays as seeded
                      ("POST", "/api/money/entrances/{entranceId}/fund-accounts"): 409,  # both purposes are seeded; fund_accounts_screen checks the words
@@ -259,7 +260,7 @@ CALLS = {
     ("GET", "/api/registry/entrances/{entranceId}/owners"): lambda e: (f"/api/registry/entrances/{e}/owners?on=2026-09-01", None),
     ("GET", "/api/money/entrances/{entranceId}/tariff-versions"): lambda e: (f"/api/money/entrances/{e}/tariff-versions?period=2026-09", None),
     ("POST", "/api/money/entrances/{entranceId}/tariff-versions"): lambda e: (   # a decision nothing passed: refused, nothing recorded
-        f"/api/money/entrances/{e}/tariff-versions", {"decisionId": NO_ONE, "validFrom": "2027-01", "lines": [], "consumption": []}),
+        f"/api/money/entrances/{e}/tariff-versions", {"decisionId": NO_ONE, "validFrom": "2031-06", "lines": [{"stream": "MANAGEMENT", "key": "PER_PERSON", "rateMinor": 100}], "consumption": []}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs/preview"): lambda e: (
         f"/api/money/entrances/{e}/charge-runs/preview", {"period": "2026-09", "legalDate": "2026-09-01"}),
     ("POST", "/api/money/entrances/{entranceId}/charge-runs"): lambda e: (
