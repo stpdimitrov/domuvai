@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { endingOf, endRefused, mandateOf, OFFICE, recordRefused, tieOf, tieRefused, untieOf, untieRefused } from "./mandate.ts";
+import { chairWords, endingOf, endRefused, mandateOf, OFFICE, recordRefused, tieOf, tieRefused, untieOf, untieRefused } from "./mandate.ts";
 
 const source = (f: string) => readFileSync(new URL(`../app/(console)/entrance/mandates/${f}`, import.meta.url), "utf8");
 const [actions, forms, page] = ["actions.ts", "MandateForms.tsx", "page.tsx"].map(source);
@@ -22,6 +22,35 @@ test("PM-GOV-004 a mandate is sent as typed, for the API's closed list of office
   for (const bad of [{ mandate: "7" }, { on: "" }, { on: "вчера" }, { protocolRef: "" }]) assert.ok("refused" in endingOf({ mandate: ID, on: "2026-10-01", protocolRef: "акт", ...bad }), JSON.stringify(bad));
   // the term and the election are the API's (PM-GOV-004, PM-GOV-005): no year, no sum and no comparison of dates in the page's code
   for (const s of [library, actions, forms, page].map(code)) assert.doesNotMatch(s, /\b[23]\b\s*(\*|years?|г\b)|plusYears|setFullYear|Date\.(parse|now|UTC)|new Date|[<>]=?\s*(validTo|validFrom|electBy)/);
+});
+
+test("PM-FUND-004 the chair mark is sent only with a board member's mandate", () => {
+  const typed = { party: ID, protocolRef: "протокол 3", validFrom: "2026-10-01", validTo: "2026-12-31" };
+  assert.equal((mandateOf({ ...typed, body: "MB", chair: true }) as { chair?: boolean }).chair, true);
+  assert.ok(!("chair" in mandateOf({ ...typed, body: "MB", chair: false })));
+  assert.ok(!("chair" in mandateOf({ ...typed, body: "MB" })));
+  for (const body of ["BM", "CTL", "CSH"]) assert.ok(!("chair" in mandateOf({ ...typed, body, chair: true })), body);
+  // the checkbox's value reaches the builder, and the body sent is typed as the contract's
+  assert.match(forms, /type="checkbox" name="chair" defaultChecked=\{v\.chair === "on"\}/);
+  assert.match(actions, /chair: values\.chair === "on"/);
+  assert.match(actions, /const body: components\["schemas"\]\["RecordMandate"\] = typed;/);
+});
+
+test("PM-FUND-004 the list says the board's chair only where the API marks one, inferred from nothing else", () => {
+  assert.equal(chairWords({ chair: true }), "председател на УС");
+  assert.equal(chairWords({ chair: false }), "");
+  assert.equal(chairWords({}), "");
+  assert.equal(chairWords({ role: "MB" } as { chair?: boolean }), "");
+  assert.match(page, /\{chairWords\(m\) && <> · \{chairWords\(m\)\}<\/>\}/);
+  assert.equal((page.match(/chair/g) ?? []).length, 3, "the import and the one shown mark");
+});
+
+test("PM-FUND-004 a second chair is the API's 409 in its words, the form kept with its checkbox", () => {
+  const words = "the board's chair from 2026-10-01 is in force on a day this mandate would be: one chair at a time";
+  assert.equal(recordRefused(said(409, words)), `Системата не прие това: ${words}`);
+  assert.match(actions, /"validTo", "chair"\]\)/);                                    // kept in `values` …
+  assert.match(actions, /if \(!answer\.data\) return \{ values, refused: recordRefused\(answer\) \};/);   // … returned with the refusal …
+  assert.match(forms, /<form action=\{act\} key=\{JSON\.stringify\(v\)\}/);            // … and the form re-made from them
 });
 
 test("PM-GOV-005 the election's due day is shown as the API answered, in its standing — the web counts down nothing (the countdown widget of its acceptance is not built here)", () => {

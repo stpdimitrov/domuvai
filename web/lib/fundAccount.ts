@@ -19,8 +19,10 @@ export const HOLDER: Record<string, string> = {
   MANAGER: "председателя на управителния съвет (управителя)",
   ASSOCIATION: "сдружението на собствениците",
 };
-/** The offices whose holder the fund's account may be opened by (PM-FUND-004): no office marks a chair, so any board member, as the API reads it. */
+/** The offices whose holder the fund's account may be opened by (PM-FUND-004): the manager, or the board member marked chair, as the API reads it. */
 export const FUND_OFFICES = ["BM", "MB"];
+/** Of those, the ones offered only when the mandate is marked the board's chair (PM-FUND-004). */
+export const FUND_CHAIRED = ["MB"];
 
 /**
  * Rule: PM-FUND-004 — the fund's account is kept apart from the operating account: each purpose is listed on its own,

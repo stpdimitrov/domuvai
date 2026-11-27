@@ -9,9 +9,9 @@ const FORM = { margin: "16px 24px" } as const;
 /**
  * A mandate recorded from its protocol (WEB-49) — works without a script. Offered whoever signs in: only the deployment's
  * administrator may (Rule: PM-SEC-001), the API's refusal is shown in its words and the fields kept. The term a mandate may
- * run (Rule: PM-GOV-004) is the API's, and so is what it succeeds.
+ * run (Rule: PM-GOV-004) is the API's, and so is what it succeeds, and whether another chair stands (Rule: PM-FUND-004).
  */
-// Rule: PM-GOV-004
+// Rule: PM-GOV-004, PM-FUND-004
 export function RecordForm({ entrance }: { entrance: string }) {
   const [state, act, pending] = useActionState<MandateState<{ mandateId: string; succeeded: string[] }>, FormData>(record, {});
   const v = state.values ?? {};
@@ -26,6 +26,9 @@ export function RecordForm({ entrance }: { entrance: string }) {
         </select>
       </label>
       <label>Номер на лицето<input type="text" name="party" defaultValue={v.party} maxLength={36} required autoComplete="off" /></label>
+      <label className="check wide">
+        <input type="checkbox" name="chair" defaultChecked={v.chair === "on"} /> председател на управителния съвет (отбелязва се само при член на управителния съвет)
+      </label>
       <label>От (първи ден)<input type="date" name="validFrom" defaultValue={v.validFrom} required /></label>
       <label>До (ден)<input type="date" name="validTo" defaultValue={v.validTo} required /></label>
       <label className="wide">Протокол<input type="text" name="protocolRef" defaultValue={v.protocolRef} maxLength={200} required /></label>

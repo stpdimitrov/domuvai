@@ -1,6 +1,7 @@
 "use server";
 
 import { api } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
 import { reach } from "@/lib/console";
 import { endingOf, endRefused, mandateOf, recordRefused, tieOf, tieRefused, untieOf, untieRefused } from "@/lib/mandate";
 import { unknownOutcome } from "@/lib/refusal";
@@ -15,13 +16,15 @@ const fields = (form: FormData, names: string[]) => Object.fromEntries(names.map
 /**
  * A mandate recorded from its protocol (WEB-49). Rule: PM-GOV-004 — its term, and the mandates it succeeds, are the API's;
  * only the deployment's administrator may (Rule: PM-SEC-001): anybody else is shown the API's refusal, the form kept.
+ * Rule: PM-FUND-004 — the chair mark is sent with a board member's mandate; a second chair is the API's 409, in its words.
  */
-// Rule: PM-GOV-004, PM-SEC-001
+// Rule: PM-GOV-004, PM-FUND-004, PM-SEC-001
 export async function record(_: MandateState<{ mandateId: string; succeeded: string[] }>, form: FormData): Promise<MandateState<{ mandateId: string; succeeded: string[] }>> {
-  const values = fields(form, ["entrance", "body", "party", "protocolRef", "validFrom", "validTo"]);
+  const values = fields(form, ["entrance", "body", "party", "protocolRef", "validFrom", "validTo", "chair"]);
   if (!UUID.test(values.entrance)) return { values, refused: "Входът не е посочен." };
-  const body = mandateOf({ body: values.body, party: values.party, protocolRef: values.protocolRef, validFrom: values.validFrom, validTo: values.validTo });
-  if ("refused" in body) return { values, refused: body.refused };
+  const typed = mandateOf({ body: values.body, party: values.party, protocolRef: values.protocolRef, validFrom: values.validFrom, validTo: values.validTo, chair: values.chair === "on" });
+  if ("refused" in typed) return { values, refused: typed.refused };
+  const body: components["schemas"]["RecordMandate"] = typed;
   const answer = await reach(() => api.POST("/api/identity/entrances/{entranceId}/mandates", { params: { path: { entranceId: values.entrance } }, body }));
   // no answer: the mandate may be recorded — sent again it would be recorded twice
   if (!answer) return { values, refused: unknownOutcome("вписването на мандата") };
