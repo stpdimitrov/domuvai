@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, reach } from "@/lib/console";
-import { byPurpose, FUND_OFFICES, fundMissing, HOLDER, PURPOSE, unheld, type Account } from "@/lib/fundAccount";
+import { byPurpose, FUND_CHAIRED, FUND_OFFICES, fundMissing, HOLDER, PURPOSE, unheld, type Account } from "@/lib/fundAccount";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import AccountForm from "./AccountForm";
 import NoEntrance from "@/app/(console)/NoEntrance";
@@ -49,7 +49,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
           {/* the list unread: every purpose is offered, and the API says which is held */}
           {(accounts ? unheld(accounts) : Object.keys(PURPOSE)).length > 0 && (
             <>
-              <PartyPicker id="parties-fund-holder" entrance={view.entrance.id} source="mandates" offices={FUND_OFFICES} margin="16px 24px 0" />
+              <PartyPicker id="parties-fund-holder" entrance={view.entrance.id} source="mandates" offices={FUND_OFFICES} chaired={FUND_CHAIRED} margin="16px 24px 0" />
               <AccountForm entrance={view.entrance.id} purposes={accounts ? unheld(accounts) : Object.keys(PURPOSE)} parties="parties-fund-holder" />
             </>
           )}

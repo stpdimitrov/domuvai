@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { accountOf, byPurpose, FUND_OFFICES, fundMissing, registrationRefused, unheld, type Account, type AccountInput } from "./fundAccount.ts";
+import { ofOffices, partyOptions } from "./partyOption.ts";
+import { accountOf, byPurpose, FUND_CHAIRED, FUND_OFFICES, fundMissing, registrationRefused, unheld, type Account, type AccountInput } from "./fundAccount.ts";
 
 const fund: Account = { id: "a-1", purpose: "REPAIR_RENEWAL", iban: "BG80BNBG96611020345678", holderName: "Иван Петров", holderKind: "MANAGER" };
 const operating: Account = { id: "a-2", purpose: "OPERATING", iban: "BG18RZBB91550123456789", holderName: "СС „Изгрев 5“", holderKind: "ASSOCIATION" };
@@ -26,7 +28,24 @@ test("PM-FUND-004 the holder's party goes to the API when given, and its mandate
   const sent = accountOf(typed({ holderPartyId: " 3f2b8c1e-0000-4000-8000-000000000001 " }));
   assert.deepEqual(sent, { purpose: "REPAIR_RENEWAL", iban: "BG80 BNBG 9661 1020 3456 78", holderName: "Иван Петров", holderKind: "MANAGER", holderPartyId: "3f2b8c1e-0000-4000-8000-000000000001" });
   for (const blank of [undefined, "", "  "]) assert.ok(!("holderPartyId" in accountOf(typed({ holderPartyId: blank }))), "none given, none sent");
-  assert.deepEqual(FUND_OFFICES, ["BM", "MB"]);
+});
+
+test("PM-FUND-004 the fund account's holder is offered from the manager and the board's chair, never a plain board member", () => {
+  const [bm, chair, plain, unmarked, ctl] = ["a", "b", "c", "d", "e"].map((c) => `${c.repeat(8)}-0000-4000-8000-000000000000`);
+  const mandates = [{ partyId: bm, role: "BM", chair: false }, { partyId: chair, role: "MB", chair: true }, { partyId: plain, role: "MB", chair: false },
+    { partyId: unmarked, role: "MB" }, { partyId: ctl, role: "CTL", chair: true }];
+  assert.deepEqual(partyOptions(ofOffices(mandates, FUND_OFFICES, FUND_CHAIRED)).map((o) => o.partyId), [bm, chair]);
+  const page = readFileSync(new URL("../app/(console)/entrance/fund/accounts/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /offices=\{FUND_OFFICES\} chaired=\{FUND_CHAIRED\}/);
+  // the form's hint names who is accepted, as the picker offers them
+  const form = readFileSync(new URL("../app/(console)/entrance/fund/accounts/AccountForm.tsx", import.meta.url), "utf8");
+  assert.match(form, /днес е управител или председател на управителния съвет \(отбелязан в мандата\)/);
+  assert.doesNotMatch(form, /или член на управителния съвет/);
+  // the narrowing reaches the read: the picker sends it and the action filters by it
+  const picker = readFileSync(new URL("../app/(console)/entrance/PartyPicker.tsx", import.meta.url), "utf8");
+  const action = readFileSync(new URL("../app/(console)/entrance/parties.ts", import.meta.url), "utf8");
+  assert.match(picker, /name="chaired" value=\{chaired\.join\(","\)\}/);
+  assert.match(action, /ofOffices\(answer\.data, offices\.split\(","\), text\("chaired"\)\.split\(","\)\)/);
 });
 
 test("PM-FUND-001 an entrance with no repair-and-renewal account is flagged, and that purpose is offered first", () => {

@@ -15,11 +15,11 @@ const WORDS = {
  * party id, and it can still be typed. Nothing is read until the click: a page view enters nothing in the book's access log, and an
  * owner's 403 is one they asked for, shown in the API's words (Rule: PM-BOOK-006, PM-BOOK-007, PM-SEC-002). `dayField` names the
  * form's own day when the read is as of it; the read is then the day typed there at the click (Rule: PM-GA-007). `offices` narrows
- * the mandates read to those offices (Rule: PM-FUND-004). `myself` is `/me`'s party, offered from the start. Nothing is stored in the browser.
+ * the mandates read to those offices, and `chaired` names the ones offered only where marked the board's chair (Rule: PM-FUND-004). `myself` is `/me`'s party, offered from the start. Nothing is stored in the browser.
  */
 // Rule: PM-BOOK-006, PM-BOOK-007, PM-SEC-001, PM-SEC-002, PM-GA-007, PM-FUND-004
-export default function PartyPicker({ id, entrance, source = "owners", role, offices, dayField, myself, margin = "0 0 12px" }: {
-  id: string; entrance: string; source?: "owners" | "mandates"; role?: "OWN"; offices?: string[]; dayField?: string; myself?: string; margin?: string;
+export default function PartyPicker({ id, entrance, source = "owners", role, offices, chaired, dayField, myself, margin = "0 0 12px" }: {
+  id: string; entrance: string; source?: "owners" | "mandates"; role?: "OWN"; offices?: string[]; chaired?: string[]; dayField?: string; myself?: string; margin?: string;
 }) {
   const [state, act, pending] = useActionState<PartiesState, FormData>(readParties, {});
   const on = useRef<HTMLInputElement>(null);
@@ -33,6 +33,7 @@ export default function PartyPicker({ id, entrance, source = "owners", role, off
       <input type="hidden" name="source" value={source} />
       {role && <input type="hidden" name="role" value={role} />}
       {offices && <input type="hidden" name="offices" value={offices.join(",")} />}
+      {chaired && <input type="hidden" name="chaired" value={chaired.join(",")} />}
       {dayField && <input type="hidden" name="on" ref={on} />}
       <div className="wide">
         <button type="submit" className="chip" disabled={pending}>{pending ? "Чете се…" : WORDS[source].read}</button>

@@ -16,22 +16,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The request's `RecordMandate`, as typed. */
-export type NewMandate = { body: string; partyId: string; protocolRef: string; validFrom: string; validTo: string };
+export type NewMandate = { body: string; partyId: string; protocolRef: string; validFrom: string; validTo: string; chair?: boolean };
 
 /**
  * Rule: PM-GOV-004 — a mandate as typed: the office, the person, the protocol that gave it, and its first day and the day
  * it runs up to. Whether it exceeds the statutory term, and what it succeeds, are the API's (its 400 in its words); the web
  * checks that what was typed is an id and two days.
+ * Rule: PM-FUND-004 — the chair mark goes only with a board member's mandate; for any other office it is left off, and
+ * the API's 400 stays the guard. One chair in force at a time is the API's 409.
  */
-// Rule: PM-GOV-004
-export function mandateOf(t: { body: string; party: string; protocolRef: string; validFrom: string; validTo: string }): NewMandate | { refused: string } {
+// Rule: PM-GOV-004, PM-FUND-004
+export function mandateOf(t: { body: string; party: string; protocolRef: string; validFrom: string; validTo: string; chair?: boolean }): NewMandate | { refused: string } {
   const [body, partyId, protocolRef, validFrom, validTo] = [t.body.trim(), t.party.trim(), t.protocolRef.trim(), t.validFrom.trim(), t.validTo.trim()];
   if (!Object.hasOwn(OFFICE, body)) return { refused: body ? `„${body}“ не е длъжност, за която се вписва мандат.` : "Изберете длъжността." };
   if (!UUID.test(partyId)) return { refused: "Посочете номера на лицето, във вида, в който го дава системата." };
   if (!protocolRef) return { refused: "Посочете протокола, с който е даден мандатът." };
   if (!DAY.test(validFrom) || !DAY.test(validTo)) return { refused: "Посочете първия ден на мандата и деня, до който важи, като дати." };
-  return { body, partyId, protocolRef, validFrom, validTo };
+  return { body, partyId, protocolRef, validFrom, validTo, ...(body === "MB" && t.chair && { chair: true }) };
 }
+
+/** Rule: PM-FUND-004 — the words beside a standing mandate: said only where the API marks the board's chair, inferred from nothing else. */
+// Rule: PM-FUND-004
+export const chairWords = (m: { chair?: boolean }): string => (m.chair === true ? "председател на УС" : "");
 
 /** Rule: PM-GOV-004 — the day a mandate ended, once, and the protocol or act that ended it; the mandate is found by its id. */
 // Rule: PM-GOV-004

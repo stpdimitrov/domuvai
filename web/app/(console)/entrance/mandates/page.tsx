@@ -3,7 +3,7 @@ import Link from "next/link";
 import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, reach } from "@/lib/console";
 import PartyName from "@/app/(console)/PartyName";
-import { OFFICE } from "@/lib/mandate";
+import { chairWords, OFFICE } from "@/lib/mandate";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { EndForm, RecordForm, TieForm, UntieForm } from "./MandateForms";
 import NoEntrance from "@/app/(console)/NoEntrance";
@@ -20,7 +20,7 @@ const STANDING: Record<string, string> = { IN_TERM: "в мандат", ELECTION_
  * arithmetic here. Only the deployment's administrator may record or end one (Rule: PM-SEC-001): every form is
  * offered, and a refusal is shown in the API's words.
  */
-// Rule: PM-GOV-004, PM-GOV-005, PM-SEC-001
+// Rule: PM-GOV-004, PM-GOV-005, PM-FUND-004, PM-SEC-001
 export default async function MandatesPage({ searchParams }: { searchParams: Promise<{ entrance?: string }> }) {
   const { entrance: asked } = await searchParams;
   const view = await entranceAt(asked);
@@ -44,7 +44,7 @@ export default async function MandatesPage({ searchParams }: { searchParams: Pro
             <ul>
               {read?.data?.map((m) => (
                 <li key={m.mandateId}>
-                  {OFFICE[m.role] ?? m.role} · лице <PartyName id={m.partyId} name={m.partyName} /> · от {date(m.validFrom)} до {date(m.validTo)} · {STANDING[m.standing.kind] ?? m.standing.kind}
+                  {OFFICE[m.role] ?? m.role}{chairWords(m) && <> · {chairWords(m)}</>} · лице <PartyName id={m.partyId} name={m.partyName} /> · от {date(m.validFrom)} до {date(m.validTo)} · {STANDING[m.standing.kind] ?? m.standing.kind}
                   {m.standing.actingSince && <> от {date(m.standing.actingSince)}</>}{m.standing.electBy && <> (изборът — до {date(m.standing.electBy)})</>}{m.standing.until && <> (в сила до {date(m.standing.until)})</>} · номер на мандата <code>{m.mandateId}</code>
                 </li>
               ))}

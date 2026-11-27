@@ -97,4 +97,6 @@ test("PM-FUND-004 a form offers only the offices it asks for, and a mandate with
   const mandates = [{ partyId: BORIS, partyName: "Борис Петров", role: "BM" }, { partyId: ANA, partyName: "Ана Иванова", role: "MB" }, { partyId: IVA, partyName: "Ива Тодорова", role: "CTL" }, { partyId: IVA }];
   assert.deepEqual(partyOptions(ofOffices(mandates, ["BM", "MB"])).map((o) => o.partyId), [ANA, BORIS]);
   assert.deepEqual(ofOffices(mandates, []), []);
+  const board = [{ role: "MB", chair: false }, { role: "MB", chair: true }, { role: "BM", chair: false }];
+  assert.deepEqual(ofOffices(board, ["BM", "MB"], ["MB"]), [board[1], board[2]]);
 });

@@ -2044,6 +2044,8 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     mandate for `--spare-party` (a party holding no other office) is recorded through the page and read back in
     the API's list, then ended on its own first day — which leaves it no day in force, so the board stays as seeded; ending
     it a second time is the API's "once" in its words.
+    WEB-62 (PM-FUND-004) — the administrator records a board member's mandate marked chair for `--spare-party`, the page lists the mark
+    beside it alone, a second chair is the API's 409 in its words with the form kept, and it is ended on its first day.
     WEB-49b (PM-SEC-001) — logins tied and untied: a board member tying a login (for no party, as the record above) is the API's 403 in its words, the form kept.
     The administrator ties a throwaway subject `e2e-spare-<hex>` to `--spare-party` (the page says so), ties it again (the API's
     409 in its words, form kept), unties it (the page says untied) and unties it again (the page says it was tied to none).
@@ -2109,6 +2111,25 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
         failures += [] if [m["standing"] for m in listed()] == [m["standing"] for m in before] else [f"{path}: after the end a seeded mandate's standing is not as seeded"]
         s, _, again = submit_form(web, path, page, "Запиши края", {"mandate": mandate, "on": first, "protocolRef": protocol})
         failures += [] if s == 200 and word(visible_text(again)) and f'value="{mandate}"' in again else [f"{path}: ending a second time answered HTTP {s} without the API's words, or the form not kept"]
+        # WEB-62 (PM-FUND-004) — a board member's mandate marked chair is recorded through the page and the mark is listed beside it alone;
+        # a second chair on the same days is the API's 409 in its words, the form kept; ended on its first day, the board stands as seeded.
+        # No seeded mandate is marked chair, and a member begun the day the seeded ones began ends none of them.
+        marked = {"body": "MB", "party": spare_party, "validFrom": first, "validTo": last, "protocolRef": protocol, "chair": "on"}
+        s, _, chaired = submit_form(web, path, page, "Впиши мандата", marked)
+        made = re.search(r"Мандатът е вписан\. Номер: ([0-9a-f-]{36})", visible_text(chaired))
+        if s != 200 or not made:
+            return failures + [f"{path}: the administrator recording the board's chair answered HTTP {s} without the mandate's number: {visible_text(chaired)[:200]!r}"]
+        chair = made.group(1)
+        try:
+            failures += [] if [m.get("chair") for m in listed() if m["mandateId"] == chair] == [True] else [f"{path}: the API's list does not mark the mandate recorded as the chair's"]
+            rows = [visible_text(row) for row in re.findall(r"<li\b.*?</li>", fetch(web, path)[1], re.S)]
+            failures += [] if [chair in row for row in rows if "председател на УС" in row] == [True] else [f"{path}: PM-FUND-004 — the chair's mandate, and it alone, is not listed as the chair's"]
+            s, _, second = submit_form(web, path, page, "Впиши мандата", marked)
+            failures += [] if s == 200 and word(visible_text(second)) and "one chair at a time" in visible_text(second) and f'value="{protocol}"' in second and re.search(r'<input\b(?=[^>]*name="chair")[^>]*\bchecked', second) else [f"{path}: a second chair answered HTTP {s} without the API's 409 in its words, or the form not kept: {visible_text(second)[:200]!r}"]
+        finally:
+            s, _, ended = submit_form(web, path, page, "Запиши края", {"mandate": chair, "on": first, "protocolRef": protocol})
+            failures += [] if s == 200 and f"е приключен на {first}" in visible_text(ended) else [f"{path}: ending the chair's mandate answered HTTP {s} without the API's day — it may still stand: {visible_text(ended)[:200]!r}"]
+        failures += [] if [(m["mandateId"], m["standing"]) for m in listed()] == [(m["mandateId"], m["standing"]) for m in before] else [f"{path}: after the chair's end the API's mandates are not as seeded"]
         # PM-SEC-001 — the throwaway subject is tied to the spare party, refused a second time, untied, and said to be tied to none
         try:
             s, _, tied = submit_form(web, path, page, "Свържи входа", {"party": spare_party, "subject": spare})
@@ -2123,7 +2144,7 @@ def mandates_screen(api, web, entrance, signed_in, administrator=None, spare_par
     finally:
         CARRIED[web] = board
     print(f"{'ok ' if not failures else 'BAD'} PM-GOV-004 the mandates: {len(before)} on the page as the API lists them; recorded by the administrator through the page, read back, "
-          "ended with the board as seeded; a throwaway login tied, refused twice and untied; the board member refused in the API's words")
+          "ended with the board as seeded; the board's chair marked, listed and a second refused; a throwaway login tied, refused twice and untied; the board member refused in the API's words")
     return failures
 
 
