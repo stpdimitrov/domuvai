@@ -6,8 +6,8 @@ import { signOff, type DisbursementState } from "./actions";
 
 /**
  * A disbursement signed off (WEB-42). Works without a script — the server's action takes the person back to the list,
- * or answers with the API's refusal and the form as it was. The signatory is never a field: the action reads the
- * session's own party (owner, 2026-10-28, "Confirm Q1"). The decisions are this entrance's passed ones, never typed.
+ * or answers with the API's refusal and the form as it was. The signatory is never a field and never
+ * sent: it is the sign-in's party, taken by the API (G-5, #390). The decisions are this entrance's passed ones, never typed.
  */
 // Rule: PM-FUND-006, PM-FUND-007, PM-FUND-008, PM-SEC-001
 export default function SignOffForm({ entrance, decisions, unread, mintedKey }: {

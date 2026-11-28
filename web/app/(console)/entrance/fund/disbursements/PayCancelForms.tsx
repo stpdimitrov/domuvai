@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { cancel, pay, type DisbursementState } from "./actions";
 
-/** The payout the fund's bank made, recorded for one committed disbursement (WEB-42b) — the date it paid, as typed. The signatory is the session's own party, read by the action. */
+/** The payout the fund's bank made, recorded for one committed disbursement (WEB-42b) — the date it paid, as typed. The signatory is the sign-in's party, taken by the API. */
 // Rule: PM-FUND-007, PM-SEC-001
 export function PayForm({ entrance, disbursement, today, mintedKey }: { entrance: string; disbursement: string; today: string; mintedKey: string }) {
   const [state, act, pending] = useActionState<DisbursementState, FormData>(pay, {});
