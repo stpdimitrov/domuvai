@@ -61,5 +61,6 @@ test("PM-BOOK-007 the log names every BookAccessKind in Bulgarian, never by its 
   const body = kt.match(/enum class BookAccessKind\s*\{([^}]*)\}/)?.[1] ?? "";
   const listed = body.replace(/\/\*[^]*?\*\/|\/\/.*/g, "").split(",").map((k) => k.trim()).filter(Boolean);
   assert.deepEqual(Object.keys(KIND).sort(), [...listed].sort());
+  assert.match(page, /\{KIND\[e\.kind\] \?\? e\.kind\}/);                             // and the screen shows an entry through the map
   for (const label of Object.values(KIND)) assert.match(label, /^[а-я][а-я0-9 .,–-]*$/i, label);
 });
