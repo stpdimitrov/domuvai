@@ -24,7 +24,7 @@ run() {
   rm -f "$out"
 }
 errors() {
-  local hit; hit=$(grep -E 'FAILED|✗|[Ee]rror|What went wrong|> |Traceback|^E |NO RAW' "$1" | grep -vE '^\s+at ' | head -25)
+  local hit; hit=$(grep -E 'FAILED|✗|[Ee]rror|What went wrong|> |Traceback|^E |NO RAW|over the budget|PM-SYS-015|✖' "$1" | grep -vE '^\s+at ' | head -25)
   if [ -n "$hit" ]; then echo "$hit"; else tail -15 "$1"; fi
 }
 
