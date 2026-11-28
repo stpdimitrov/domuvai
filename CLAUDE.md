@@ -122,7 +122,7 @@ Every tool call re-reads the whole context; a long session pays for it on every 
 
 - Search (`grep`, line ranges) before reading a whole file; trim output (`tail`, `grep`), never paste raw logs — `tools/ci_failure.py <pr>` for a red PR.
 - No wait or poll loops: PR and CI notifications wake the session. Batch independent calls in one turn.
-- `tools/check.sh <lane>` before any push — one validated push per round. `tools/mutate.py` to prove a test kills its bug.
+- `tools/check.sh <lane>` before any push (`web` too: its test, type-check, build and budget) — one validated push per round. `tools/mutate.py` to prove a test kills its bug.
 - Per person, once: switch off the claude.ai connectors this project does not use (their tools are re-sent every turn); pick the model per session — Opus for design and rule slices, a cheaper one for mechanical ones.
 - **The size gate** (T-08, `.claude/hooks/size-gate.sh`) measures the transcript on every turn: past **2.0 MB** it adds a one-line warning, past **2.5 MB** it refuses the prompt — and any `git push`, `gh pr create`, `gh pr merge` or session start — and prints the fresh-session boot prompt. To let one turn pass, start the prompt with **`override-size:`**. `tools/cost.py` prints the session's measured size for the Cost line.
 - A coordinating session is a fresh session too: it boots status-only, answers its question and ends.
