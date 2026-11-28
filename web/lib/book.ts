@@ -18,6 +18,9 @@ export const KIND: Record<string, string> = {
   OWNERS_LIST: "списък на собствениците",
   OVERDUE_LIST: "списък на просрочените декларации",
   RETENTION: "заличаване след срока на съхранение",
+  PARTY_NAMES: "имената на лица в друга справка",
+  HEADCOUNT_READ: "четене на декларирания брой живущи по обекти",
+  HOUSEHOLD_CHECK: "проверка за член на домакинството на упълномощител",
 };
 export const OUTCOME: Record<string, string> = { SERVED: "дадено", REFUSED: "отказано", OPEN: "без вход в системата" };
 
