@@ -17,16 +17,6 @@ const typedIn = (form: FormData, names: string[]) =>
   Object.fromEntries(names.map((n) => [n, typeof form.get(n) === "string" ? (form.get(n) as string).trim() : ""]));
 
 /**
- * The signed-in person's own party, read from the API on this write (owner, 2026-10-28, "Confirm Q1"): never a field
- * anyone types or picks. `undefined` when the sign-in is tied to no party; `null` when the API did not say.
- */
-// Rule: PM-FUND-007, PM-SEC-001
-async function myParty(): Promise<string | undefined | null> {
-  const me = await reach(() => api.GET("/api/identity/me"));
-  return me?.data ? me.data.partyId ?? undefined : null;
-}
-
-/**
  * The API's answer to a write: the disbursement as it now stands takes the person back to the list; a refusal recorded
  * nothing, so the form comes back under a new key; an answer lost, or a 5xx that may have recorded it, keeps the key,
  * so the same form sent again is the same write, never a second one.
@@ -48,10 +38,9 @@ function settled(
 export async function signOff(_: DisbursementState, form: FormData): Promise<DisbursementState> {
   const { entrance: entranceId, key, ...input } = typedIn(form, ["entrance", "key", "amount", "purpose", "basis", "decision", "measure", "justification"]);
   if (!UUID.test(entranceId) || !UUID.test(key)) return { input, key: randomUUID(), refused: "Входът не е посочен." };
-  const [party, decisions] = await Promise.all([myParty(), passedDecisions(entranceId)]);
-  if (party === null) return { input, key, refused: "Системата не каза кой сте — не е изпратено нищо. Опитайте отново." };
+  const decisions = await passedDecisions(entranceId);
   if ("refused" in decisions && input.basis === "DECISION") return { input, key, refused: decisions.refused };
-  const body = signOffOf(input as SignOffInput, party, "passed" in decisions ? decisions.passed.map((d) => d.id) : []);
+  const body = signOffOf(input as SignOffInput, "passed" in decisions ? decisions.passed.map((d) => d.id) : []);
   if ("refused" in body) return { input, key: randomUUID(), refused: body.refused };
   const answer = await reach(() =>
     api.POST("/api/money/entrances/{entranceId}/fund/disbursements", { params: { path: { entranceId }, header: { "Idempotency-Key": key } }, body }),
@@ -59,14 +48,12 @@ export async function signOff(_: DisbursementState, form: FormData): Promise<Dis
   return settled(answer, entranceId, { input, key }, "подпишете разход от фонда");
 }
 
-/** The payout the fund's bank made, recorded (WEB-42b). Rule: PM-FUND-007 — by the session's party; nothing here moves money (ADR-007). */
+/** The payout the fund's bank made, recorded (WEB-42b). Rule: PM-FUND-007 — who records it is the API's; nothing here moves money (ADR-007). */
 // Rule: PM-FUND-007, PM-SEC-001
 export async function pay(_: DisbursementState, form: FormData): Promise<DisbursementState> {
   const { entrance: entranceId, key, disbursement: disbursementId, ...input } = typedIn(form, ["entrance", "key", "disbursement", "paidOn"]);
   if (![entranceId, key, disbursementId].every((id) => UUID.test(id))) return { input, key: randomUUID(), refused: "Разходът не е посочен." };
-  const party = await myParty();
-  if (party === null) return { input, key, refused: "Системата не каза кой сте — не е изпратено нищо. Опитайте отново." };
-  const body = payOf(input.paidOn, party);
+  const body = payOf(input.paidOn);
   if ("refused" in body) return { input, key: randomUUID(), refused: body.refused };
   const answer = await reach(() =>
     api.POST("/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/pay", {
@@ -76,14 +63,12 @@ export async function pay(_: DisbursementState, form: FormData): Promise<Disburs
   return settled(answer, entranceId, { input, key }, "отбележите разхода като платен");
 }
 
-/** A signed-off disbursement withdrawn, with its reason (WEB-42b). Rule: PM-FUND-007 — by the session's party. */
+/** A signed-off disbursement withdrawn, with its reason (WEB-42b). Rule: PM-FUND-007 — who withdraws it is the API's. */
 // Rule: PM-FUND-007, PM-SEC-001
 export async function cancel(_: DisbursementState, form: FormData): Promise<DisbursementState> {
   const { entrance: entranceId, key, disbursement: disbursementId, ...input } = typedIn(form, ["entrance", "key", "disbursement", "reason"]);
   if (![entranceId, key, disbursementId].every((id) => UUID.test(id))) return { input, key: randomUUID(), refused: "Разходът не е посочен." };
-  const party = await myParty();
-  if (party === null) return { input, key, refused: "Системата не каза кой сте — не е изпратено нищо. Опитайте отново." };
-  const body = cancelOf(input.reason, party);
+  const body = cancelOf(input.reason);
   if ("refused" in body) return { input, key: randomUUID(), refused: body.refused };
   const answer = await reach(() =>
     api.POST("/api/money/entrances/{entranceId}/fund/disbursements/{disbursementId}/cancel", {

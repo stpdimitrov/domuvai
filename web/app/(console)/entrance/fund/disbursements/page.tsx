@@ -3,7 +3,7 @@ import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { api, API_URL } from "@/lib/api/client";
 import { entranceAt, eur, reach } from "@/lib/console";
-import { NO_PARTY, PURPOSE } from "@/lib/disbursement";
+import { PURPOSE } from "@/lib/disbursement";
 import { sofiaToday } from "@/lib/payment";
 import { unanswered, unansweredBy } from "@/lib/refusal";
 import { passedDecisions } from "../../charges/decisions";
@@ -17,7 +17,7 @@ const DONE: Record<string, string> = { committed: "Разходът е подп�
 
 /**
  * A disbursement signed off, paid or cancelled (WEB-42, WEB-42b). One screen, one server-side aggregation (ADR-011): the fund as the API reads it
- * (its figures shown, never recomputed — PM-FUND-009 is the API's), who is signed in, and this entrance's passed
+ * (its figures shown, never recomputed — PM-FUND-009 is the API's) and this entrance's passed
  * decisions. The committed, unpaid disbursements each carry a pay and a cancel form; paid and cancelled ones are on
  * `/entrance/fund`. Every form's key is minted here, once per form.
  */
@@ -25,16 +25,11 @@ const DONE: Record<string, string> = { committed: "Разходът е подп�
 export default async function DisbursementsPage({ searchParams }: { searchParams: Promise<{ entrance?: string; done?: string }> }) {
   const asked = await searchParams;
   const view = await entranceAt(asked.entrance);
-  const loaded = view.kind === "ok"
-    ? await reach(() => Promise.all([
-      api.GET("/api/money/entrances/{entranceId}/fund", { params: { path: { entranceId: view.entrance.id } } }),
-      api.GET("/api/identity/me"),
-    ]))
+  const fund = view.kind === "ok"
+    ? await reach(() => api.GET("/api/money/entrances/{entranceId}/fund", { params: { path: { entranceId: view.entrance.id } } }))
     : null;
-  const [fund, me] = loaded ?? [null, null];
-  const party = me?.data?.partyId;
   const today = sofiaToday();
-  const decisions = view.kind === "ok" && party ? await passedDecisions(view.entrance.id) : null;
+  const decisions = view.kind === "ok" ? await passedDecisions(view.entrance.id) : null;
   return (
     <>
       <div className="topbar">
@@ -49,7 +44,7 @@ export default async function DisbursementsPage({ searchParams }: { searchParams
       {view.kind === "ok" ? (
         <>
           {asked.done && DONE[asked.done] && <div role="status" style={{ margin: "16px 24px", font: "400 13px/1.6 'IBM Plex Sans'" }}>{DONE[asked.done]}</div>}
-          {!loaded && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>Бекендът не отговаря на <code>{API_URL}</code>.</div>}
+          {!fund && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>Бекендът не отговаря на <code>{API_URL}</code>.</div>}
           {fund && !fund.data && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{unansweredBy(fund, "фонда")}</div>}
           {fund?.data && (
             <div style={{ margin: "16px 24px", font: "400 13px/1.6 'IBM Plex Sans'" }}>
@@ -57,16 +52,14 @@ export default async function DisbursementsPage({ searchParams }: { searchParams
               {" · "}<Link href={`/entrance/fund?entrance=${view.entrance.id}`}>платените и оттеглените — в „Каса и фонд“</Link>
             </div>
           )}
-          {me && !me.data && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{unansweredBy(me, "кой сте в системата")}</div>}
-          {me?.data && !me.data.partyId && <div className="as-refused" role="alert" style={{ margin: "16px 24px" }}>{NO_PARTY}</div>}
           {fund?.data && (
             <>
-              {party && <SignOffForm
+              <SignOffForm
                 entrance={view.entrance.id}
                 decisions={decisions && "passed" in decisions ? decisions.passed : []}
                 unread={decisions && "refused" in decisions ? decisions.refused : undefined}
                 mintedKey={randomUUID()}
-              />}
+              />
               <div style={{ margin: "16px 24px" }}>
                 <div className="acct-title">Поети, неплатени</div>
                 {fund.data.disbursements.filter((d) => d.status === "COMMITTED").map((d) => (
@@ -77,8 +70,8 @@ export default async function DisbursementsPage({ searchParams }: { searchParams
                       {d.passportMeasure && <> · {d.passportMeasure}</>}
                       {d.emergencyJustification && <> · аварийно, без решение: {d.emergencyJustification}</>}
                     </div>
-                    {party && <PayForm entrance={view.entrance.id} disbursement={d.id} today={today} mintedKey={randomUUID()} />}
-                    {party && <CancelForm entrance={view.entrance.id} disbursement={d.id} mintedKey={randomUUID()} />}
+                    <PayForm entrance={view.entrance.id} disbursement={d.id} today={today} mintedKey={randomUUID()} />
+                    <CancelForm entrance={view.entrance.id} disbursement={d.id} mintedKey={randomUUID()} />
                   </div>
                 ))}
                 {!fund.data.disbursements.some((d) => d.status === "COMMITTED") && <div className="as-hint">Няма поет, неплатен разход.</div>}
