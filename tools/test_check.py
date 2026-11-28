@@ -40,9 +40,17 @@ class CheckSh(unittest.TestCase):
         self.assertEqual(check("web", f'printf "\\n%s\\n\\nPlease set it.\\n" "{cause}" >&2; exit 1'),
                          (1, f"check.sh: could not build the API spec (needs JDK 21): {cause}\n"))
 
+    def test_gradles_headings_are_skipped_for_the_line_that_says_why(self):
+        log = ["", "FAILURE: Build failed with an exception.", "", "* What went wrong:",
+               "Execution failed for task ':app:test'.", "> No matching toolchains found."]
+        printf = "printf '%s\\n' " + " ".join(f'"{line}"' for line in log)
+        self.assertEqual(check("web", f"{printf}; exit 1"),
+                         (1, "check.sh: could not build the API spec (needs JDK 21): > No matching toolchains found.\n"))
+
     def test_the_gate_pack_prints_a_budget_overrun_and_a_failing_node_test(self):
         function = re.search(r"^errors\(\) \{.*?^\}$", CHECK.with_name("gates.sh").read_text(), re.M | re.S).group()
-        wanted = ["PM-SYS-015: /me is over the budget: 9 B, 1 B over", "✖ the resident page renders (3ms)"]
+        wanted = ["/me is over the budget: 9 B, 1 B over", "PM-SYS-015: no entry of web/budget.json is in force",
+                  "✖ the resident page renders (3ms)"]   # one line for each part of the pattern
         with tempfile.NamedTemporaryFile("w", suffix=".log", encoding="utf-8") as log:
             log.write("\n".join(["✔ a refusal is not an error", *wanted]) + "\n")   # a passing line matches too
             log.flush()

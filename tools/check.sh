@@ -13,7 +13,7 @@ if [ "$lane" = web ]; then export GATES_TESTS="npm --prefix web run --silent che
   # No Gradle step among the web's checks: without this, gate 6 reads whatever spec an earlier run left, or none (#533).
   [ -z "${JAVA_HOME:-}" ] && [ -d /usr/local/opt/openjdk@21 ] && export JAVA_HOME=/usr/local/opt/openjdk@21   # as gates.sh
   spec=$(./gradlew -q :app:test --tests zues.app.OpenApiContractTest 2>&1) || {
-    echo "check.sh: could not build the API spec (needs JDK 21): $(grep -m1 -vE '^[[:space:]]*$|^FAILURE:|What went wrong' <<<"$spec")"; exit 1; }
+    echo "check.sh: could not build the API spec (needs JDK 21): $(grep -m1 -vE '^[[:space:]]*$|^FAILURE:|What went wrong|Execution failed for task|Could not determine the dependencies' <<<"$spec")"; exit 1; }
 elif [ -n "$lane" ]; then
   pkg=${lane//-/_}
   if [ -d "app/src/test/kotlin/zues/app/$pkg" ]; then export GATES_TESTS="./gradlew -q :app:test --tests zues.app.$pkg.* --tests zues.app.OpenApiContractTest"   # the openapi gate reads its spec
