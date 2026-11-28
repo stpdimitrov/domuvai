@@ -164,4 +164,6 @@ env_file=$tmp/env; : > "$env_file"
 out=$(echo '{}' | CLAUDE_PROJECT_DIR=$PWD CLAUDE_ENV_FILE=$env_file CLAUDE_CODE_REMOTE= .claude/hooks/session-start.sh 2>&1); rc=$?
 [ $rc -eq 0 ] && grep -qx 'export LC_ALL=C.UTF-8' "$env_file" && ok "SessionStart hook still exports the session env" || bad "session-start: rc=$rc $out"
 
+out=$(python3 tools/test_check.py 2>&1) && ok "check.sh hands each lane its tests" || bad "check.sh: $out"
+
 exit $fail

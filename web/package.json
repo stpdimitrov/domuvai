@@ -9,7 +9,8 @@
     "start": "next start",
     "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\"",
     "gen:api": "openapi-typescript ../docs/api/openapi.json -o lib/api/schema.d.ts",
-    "budget": "node --experimental-strip-types scripts/budget.ts"
+    "budget": "node --experimental-strip-types scripts/budget.ts",
+    "check": "npm test && tsc --noEmit && npm run build && npm run budget"
   },
   "dependencies": {
     "next": "^15.1.6",
