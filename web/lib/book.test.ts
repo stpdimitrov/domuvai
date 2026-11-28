@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { bookRefused, completeness, partyLine, purposeOf, sofiaTime } from "./book.ts";
+import { bookRefused, completeness, KIND, partyLine, purposeOf, sofiaTime } from "./book.ts";
 
 const page = ["page.tsx", "BookForm.tsx", "actions.ts"].map((f) => readFileSync(new URL(`../app/(console)/entrance/book/${f}`, import.meta.url), "utf8")).join("\n");
 
@@ -53,4 +53,13 @@ test("PM-BOOK-001 PM-BOOK-002 the book and each unit are shown complete or not a
 test("PM-BOOK-007 a log entry's time is shown in Sofia's time, the instant the API recorded", () => {
   assert.equal(sofiaTime("2026-10-29T08:05:00Z"), "29.10.2026, 10:05:00");
   assert.equal(sofiaTime("2026-07-01T21:30:15.123456Z"), "02.07.2026, 00:30:15");
+});
+
+test("PM-BOOK-007 the log names every BookAccessKind in Bulgarian, never by its enum name", () => {
+  // BookAccess.kt: the spec gives an entry's kind as a bare string (ADR-013), so the code is the list
+  const kt = readFileSync(new URL("../../app/src/main/kotlin/zues/app/registry/BookAccess.kt", import.meta.url), "utf8");
+  const body = kt.match(/enum class BookAccessKind\s*\{([^}]*)\}/)?.[1] ?? "";
+  const listed = body.replace(/\/\*[^]*?\*\/|\/\/.*/g, "").split(",").map((k) => k.trim()).filter(Boolean);
+  assert.deepEqual(Object.keys(KIND).sort(), [...listed].sort());
+  for (const label of Object.values(KIND)) assert.match(label, /^[а-я][а-я0-9 .,–-]*$/i, label);
 });
