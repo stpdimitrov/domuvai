@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """T-10 (#342): what tools/check.sh hands to the gate pack per lane. A copy runs against a stub gates.sh and docker."""
+import json
 import os
 import shutil
 import subprocess
@@ -28,6 +29,10 @@ def check(lane):
 class CheckSh(unittest.TestCase):
     def test_web_selects_the_web_check_and_says_nothing_about_docker(self):
         self.assertEqual(check("web"), (0, "TESTS=npm --prefix web run --silent check\n"))
+
+    def test_the_web_script_runs_test_types_build_and_budget_failing_on_the_first(self):
+        package = json.loads((CHECK.parent.parent / "web/package.json").read_text())
+        self.assertEqual(package["scripts"]["check"], "npm test && tsc --noEmit && npm run build && npm run budget")
 
     def test_unknown_lane_exits_2_with_the_message(self):
         self.assertEqual(check("nope"), (2, "check.sh: no tests for lane 'nope'\n"))
